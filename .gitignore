@@ -1,0 +1,182 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv
+.venv/
+venv/
+env/
+
+# uv
+.uv/
+.uv
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-workspace
+*.sublime-project
+.project
+.pydevproject
+.settings/
+*.iml
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
+*.cover
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Type checking
+.mypy_cache
+.dmypy.json
+dmypy.json
+
+# Linting
+.ruff_cache/
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+ats_playground.db
+
+# Data files (local)
+data/
+data/*.json
+data/*.csv
+data/*.db
+!data/.gitkeep
+
+# Crawler output
+raw_jobs/
+preprocessed_jobs/
+extracted_jobs/
+assessments/
+!raw_jobs/.gitkeep
+!preprocessed_jobs/.gitkeep
+!extracted_jobs/.gitkeep
+!assessments/.gitkeep
+
+# Model cache
+models/
+.spacy_models/
+*.bin
+
+# Docker
+.dockerignore
+*.container
+
+# OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+.~*
+__temp__*
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Node modules (if using any frontend build tools)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Generated files (do not commit)
+/src/version.py
+/config/selectors_generated.json
+/config/cache/
+
+# IDE temporary files
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+
+# Backup files
+*.backup
+*.bak
+
+# Package managers
+poetry.lock
+Pipfile.lock
+requirements.lock
+
+# Miscellaneous
+.DS_Store
+.AppleDouble
+Thumbs.db
+*.orig
+*.rej
