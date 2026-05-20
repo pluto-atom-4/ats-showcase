@@ -39,7 +39,32 @@ python -m src.cli export --output data/assessments/report.md
 
 **Setup Troubleshooting?** See [docs/SETUP.md](./docs/SETUP.md) for detailed Python 3.12 configuration, system dependencies, and troubleshooting.
 
-## 📚 Documentation
+## 🧠 NLP Setup Validation (Issue #7)
+
+After setup, validate the NLP environment:
+
+```bash
+# Comprehensive validation of all NLP components
+python -m src.setup.validate_nlp_setup
+
+# Output shows status of:
+# ✅ Python version (3.12+ required)
+# ✅ spaCy installation & model
+# ✅ Pydantic v2 compatibility
+# ✅ tiktoken token counting
+# ✅ MarkItDown HTML cleaning
+# ✅ lxml C bindings (optional)
+# ✅ System dependencies (libxml2, libxslt)
+```
+
+**Result**: Should show `✅ ALL CRITICAL COMPONENTS OK`
+
+**Python Version Strategy**:
+- **Recommended**: Python 3.12.x (production-ready, EOL 2028-10)
+- **Alternative**: Python 3.13+ (security-only, newer features)
+- **Not Recommended**: Python 3.11 (legacy, slower)
+
+**If validation fails**: See [docs/SETUP.md](./docs/SETUP.md) for platform-specific system dependency installation (Ubuntu/Debian, macOS, Windows) and [docs/COMPATIBILITY.md](./docs/COMPATIBILITY.md) for known issues and workarounds.
 
 **New here?** Start with:
 - 👉 **[.github/copilot-instructions.md](./.github/copilot-instructions.md)** (5 min quick overview)
