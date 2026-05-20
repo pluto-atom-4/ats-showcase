@@ -1,0 +1,26 @@
+{
+  "companies": {
+    "TechCorp": {
+      "name": "Tech Corp",
+      "url": "https://techcorp.example.com/careers",
+      "selectors": {
+        "job_container": ".job-posting",
+        "title": ".job-title",
+        "description": ".job-description",
+        "location": ".job-location",
+        "requirements": ".job-requirements"
+      }
+    },
+    "DataCo": {
+      "name": "Data Co",
+      "url": "https://dataco.example.com/jobs",
+      "selectors": {
+        "job_container": "[data-job-id]",
+        "title": "h2.title",
+        "description": ".content",
+        "location": ".meta-location",
+        "requirements": ".requirements-list"
+      }
+    }
+  }
+}
