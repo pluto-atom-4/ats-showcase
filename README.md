@@ -1,7 +1,7 @@
 # ATS Playground
 
 [![GitHub](https://img.shields.io/badge/github-pluto--atom--4%2Fats--playground-blue?logo=github)](https://github.com/pluto-atom-4/ats-playground)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Status: Active](https://img.shields.io/badge/status-active-success)]()
 
@@ -12,17 +12,21 @@ An agentic AI workflow for intelligent job assessment. Extract job postings from
 ## 🚀 Quick Start
 
 ```bash
-# 1. Clone & setup
+# 1. Clone & setup (with Python 3.12)
 git clone https://github.com/pluto-atom-4/ats-playground.git
 cd ats-playground
+uv python pin 3.12                    # Recommended: Python 3.12.x
 uv sync
 python -m spacy download en_core_web_md
 
-# 2. Create .env and set API key
+# 2. Validate NLP setup
+python -m src.setup.validate_nlp_setup  # Check all components
+
+# 3. Create .env and set API key
 cp .env.example .env
 export ANTHROPIC_API_KEY="sk-ant-..."
 
-# 3. Run the full workflow
+# 4. Run the full workflow
 python -m src.cli --all --cv data/cv.json --config config/companies.json
 
 # Or run individually:
@@ -33,7 +37,34 @@ python -m src.cli assess --cv data/cv.json
 python -m src.cli export --output data/assessments/report.md
 ```
 
-## 📚 Documentation
+**Setup Troubleshooting?** See [docs/SETUP.md](./docs/SETUP.md) for detailed Python 3.12 configuration, system dependencies, and troubleshooting.
+
+## 🧠 NLP Setup Validation (Issue #7)
+
+After setup, validate the NLP environment:
+
+```bash
+# Comprehensive validation of all NLP components
+python -m src.setup.validate_nlp_setup
+
+# Output shows status of:
+# ✅ Python version (3.12+ required)
+# ✅ spaCy installation & model
+# ✅ Pydantic v2 compatibility
+# ✅ tiktoken token counting
+# ✅ MarkItDown HTML cleaning
+# ✅ lxml C bindings (optional)
+# ✅ System dependencies (libxml2, libxslt)
+```
+
+**Result**: Should show `✅ ALL CRITICAL COMPONENTS OK`
+
+**Python Version Strategy**:
+- **Recommended**: Python 3.12.x (production-ready, EOL 2028-10)
+- **Alternative**: Python 3.13+ (security-only, newer features)
+- **Not Recommended**: Python 3.11 (legacy, slower)
+
+**If validation fails**: See [docs/SETUP.md](./docs/SETUP.md) for platform-specific system dependency installation (Ubuntu/Debian, macOS, Windows) and [docs/COMPATIBILITY.md](./docs/COMPATIBILITY.md) for known issues and workarounds.
 
 **New here?** Start with:
 - 👉 **[.github/copilot-instructions.md](./.github/copilot-instructions.md)** (5 min quick overview)

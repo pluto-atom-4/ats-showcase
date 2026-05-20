@@ -55,9 +55,6 @@ dependencies = [
     
     # LLM client
     "anthropic>=0.25.0,<1.0",
-    
-    # Database
-    "sqlite3-python>=1.0.0,<2.0; python_version < '3.13'",
 ]
 
 [project.optional-dependencies]

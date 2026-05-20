@@ -29,6 +29,8 @@ uv run python src/storage/db.py --init
 uv run python -m src.cli --all --cv data/cv.json --config config/companies.json
 ```
 
+**For detailed setup with Python 3.12 pinning and NLP validation**: See **[🧠 NLP Setup Validation](../README.md#-nlp-setup-validation-issue-7)** section in README.md
+
 ## Project Overview
 
 **Agentic AI workflow for intelligent job opportunity assessment** with local preprocessing to save 80–90% on LLM costs.
