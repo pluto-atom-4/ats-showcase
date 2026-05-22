@@ -312,6 +312,87 @@ From real-world testing:
 - Commit `.env` files or API keys
 - Hardcode configuration (use config files + environment variables)
 
+## Session Blog → Gist Skill
+
+**Trigger phrases** (recognize any of these and run the workflow below):
+- `session-blog-to-gist`
+- `blog this`
+- `create a blog post from this session`
+- `make a gist`
+- `turn this session into a portfolio post`
+
+### When triggered, follow this exact workflow:
+
+**Step 1 — Gather context**
+Because Copilot CLI has no conversation history, ask the user for a brief summary:
+> "What did you work on this session? Summarize the key problem you solved and why it mattered (2–4 sentences)."
+
+Wait for the response, then use it as the basis for the blog post.
+
+**Step 2 — Analyze git commits**
+```bash
+git log main..HEAD --oneline          # commits on this branch
+git diff main..HEAD --stat            # files changed + scope
+```
+Use the output to corroborate the user's summary and surface technical details.
+
+**Step 3 — Infer title from PR/Issue**
+```bash
+gh pr list --head "$(git branch --show-current)" --json title --jq '.[0].title' 2>/dev/null
+gh issue list --state open --json title,number --jq '.[0] | "#\(.number) \(.title)"' 2>/dev/null
+```
+Use the PR or Issue title as the gist title. If neither exists, generate a descriptive title from the work summary.
+
+**Step 4 — Write the blog post** using this exact structure (Markdown, no code snippets):
+
+```markdown
+# <title>
+
+## Problem
+<what was broken, missing, or suboptimal — and why it mattered>
+
+## Approach
+<how you solved it: architecture, patterns, key decisions>
+
+## Impact
+<what changed, why it matters, metrics if available>
+
+## Learnings
+<what surprised you, what you discovered, decision rationale>
+```
+
+Tone: professional, peer-engineer audience. Explain *why*, not just *what*. Portfolio-ready.
+
+**Step 5 — Ask for visibility**
+> "Should the gist be public (shareable URL) or private (direct link only)?"
+
+**Step 6 — Create the gist**
+```bash
+# Save local copy first
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+cat > "./session-blog-${TIMESTAMP}.md" << 'EOF'
+<blog post content>
+EOF
+
+# Publish to GitHub Gist
+gh gist create "./session-blog-${TIMESTAMP}.md" \
+  --desc "<gist title>" \
+  [--public]   # omit this flag for private
+```
+
+**Step 7 — Return the URL**
+Show the gist URL and the local file path to the user.
+
+### Prerequisites check (run before Step 1 if not already verified)
+```bash
+gh auth status          # must show "Logged in to github.com"
+git rev-parse --git-dir # must be inside a git repo
+git log main..HEAD --oneline | wc -l  # should be > 0
+```
+If `gh` is not authenticated, ask the user to run `gh auth login` before continuing.
+
+---
+
 ## Getting Help
 
 1. **Quick Reference**: Check CLAUDE.md section headers (top of this doc links to it)
