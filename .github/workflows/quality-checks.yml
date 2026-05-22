@@ -38,7 +38,7 @@ jobs:
             uv-
       
       - name: Install dependencies
-        run: uv sync --all-groups
+        run: uv sync --all-extras
       
       - name: Validate pre-commit config
         run: uv run pre-commit validate-config
