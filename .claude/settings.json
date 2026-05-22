@@ -1,6 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "model": "sonnet",
+  "model": "claude-haiku-4-5-20251001",
+  "modelOverride": "haiku",
   "fastMode": false,
   "verbose": true,
   "autoCompactEnabled": true,
@@ -8,7 +9,7 @@
   "fileCheckpointingEnabled": true,
   "respectGitignore": true,
   "permissions": {
-    "defaultMode": "ask",
+    "defaultMode": "default",
     "allow": [
       "Read",
       "Edit",
@@ -58,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; if [[ \"$f\" =~ \\.(py)$ ]]; then echo 'Formatting Python file...'; fi; } 2>/dev/null || true",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; if echo \"$f\" | grep -qE '\\.py$'; then echo 'Formatting Python file...'; fi; } 2>/dev/null || true",
             "statusMessage": "Formatting code..."
           }
         ]
@@ -68,7 +69,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; if [[ \"$f\" =~ ^src/ && \"$f\" =~ \\.(py)$ ]]; then echo 'Running relevant tests...'; uv run pytest tests/ -k \"$(basename $f .py)\" -v 2>/dev/null || true; fi; } 2>/dev/null || true",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; if echo \"$f\" | grep -qE '^src/.*\\.py$'; then echo 'Running relevant tests...'; uv run pytest tests/ -k \"$(basename \"$f\" .py)\" -v 2>/dev/null || true; fi; } 2>/dev/null || true",
             "statusMessage": "Running tests...",
             "timeout": 30
           }
