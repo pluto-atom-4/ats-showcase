@@ -6,7 +6,7 @@
 repos:
   # Standard pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         name: Trim trailing whitespace
@@ -34,7 +34,7 @@ repos:
 
   # Ruff linter and formatter
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.0
+    rev: v0.15.14
     hooks:
       - id: ruff
         name: Lint with ruff
@@ -44,7 +44,7 @@ repos:
 
   # mypy type checker
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.3.0
+    rev: v2.1.0
     hooks:
       - id: mypy
         name: Type check with mypy
