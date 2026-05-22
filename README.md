@@ -39,6 +39,23 @@ python -m src.cli export --output data/assessments/report.md
 
 **Setup Troubleshooting?** See [docs/SETUP.md](./docs/SETUP.md) for detailed Python 3.12 configuration, system dependencies, and troubleshooting.
 
+## 🔍 Code Quality Assurance (Issue #6)
+
+Optional: Automatically catch code quality issues before committing:
+
+```bash
+# Install pre-commit hooks (1 minute)
+python -m src.setup.setup_precommit
+
+# Hooks run automatically on git commit:
+# • trailing-whitespace & end-of-file-fixer (auto-fix)
+# • black & ruff (auto-fix formatting)
+# • mypy (type checking)
+# • pytest (unit tests)
+```
+
+**Details**: See [docs/QUALITY-ASSURANCE.md](./docs/QUALITY-ASSURANCE.md) for hook explanations, troubleshooting, and performance tips.
+
 ## 🧠 NLP Setup Validation (Issue #7)
 
 After setup, validate the NLP environment:
@@ -250,7 +267,7 @@ Tests cover:
 2. **Create feature branch**: `git checkout -b feature/my-feature`
 3. **Make changes** & write tests (coverage: 80%+)
 4. **Test**: `uv run pytest tests/ -v`
-5. **Lint**: 
+5. **Lint**:
    ```bash
    uv run black src/ tests/
    uv run ruff check src/ tests/ --fix
@@ -402,7 +419,7 @@ MIT — Use freely in commercial or personal projects. See [LICENSE](LICENSE) fo
 
 ---
 
-**Last updated**: 2026-05-19  
-**Status**: Active & Maintained ✅  
-**Documentation**: [8 comprehensive guides](./docs/README.md) — **165+ KB total**  
+**Last updated**: 2026-05-19
+**Status**: Active & Maintained ✅
+**Documentation**: [8 comprehensive guides](./docs/README.md) — **165+ KB total**
 **Repository**: [pluto-atom-4/ats-playground](https://github.com/pluto-atom-4/ats-playground)

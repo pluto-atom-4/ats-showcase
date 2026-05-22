@@ -123,17 +123,17 @@ def init():
     """Initialize database and config."""
     from src.storage import StorageClient
     from pathlib import Path
-    
+
     console.print("[bold]Initializing ATS Playground...[/bold]")
-    
+
     # Create directories
     Path("data").mkdir(exist_ok=True)
     Path("logs").mkdir(exist_ok=True)
-    
+
     # Initialize database
     storage = StorageClient()
     storage.init_schema()
-    
+
     # Create example config if not exists
     config_path = Path("config/companies.json")
     if not config_path.exists():
@@ -153,7 +153,7 @@ def init():
         import json
         with open(config_path, 'w') as f:
             json.dump(example_config, f, indent=2)
-    
+
     console.print("[green]✓ Initialization complete[/green]")
     console.print(f"  - Database: data/ats_playground.db")
     console.print(f"  - Config: config/companies.json")
@@ -210,20 +210,20 @@ def crawl_command(
 ):
     """
     Phase 1: Crawl career pages and extract job postings.
-    
+
     Reads company URLs from config file, navigates to each career page,
     and extracts job listings using CSS selectors.
-    
+
     Example:
         ats-playground crawl --config config/companies.json
     """
     from src.browser import PlaywrightCrawler
     import logging
-    
+
     logger = logging.getLogger(__name__)
     output_dir = output or Path("data/extracted_jobs")
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Load config
     try:
         with open(config) as f:
@@ -234,45 +234,45 @@ def crawl_command(
     except json.JSONDecodeError:
         console.print(f"[red]Error: Invalid JSON in config file[/red]")
         raise typer.Exit(code=1)
-    
+
     companies = config_data.get("companies", [])
     if not companies:
         console.print("[yellow]Warning: No companies in config[/yellow]")
         raise typer.Exit(code=1)
-    
+
     # Initialize crawler
     crawler = PlaywrightCrawler(headless=headless, timeout=timeout)
-    
+
     console.print(f"[bold]Crawling {len(companies)} companies...[/bold]\n")
-    
+
     total_jobs = 0
     with Progress() as progress:
         task = progress.add_task("Crawling...", total=len(companies))
-        
+
         for company in companies:
             company_name = company["name"]
             url = company["url"]
             selectors = company.get("selectors", {})
-            
+
             try:
                 jobs = crawler.extract_jobs(url, selectors, company_name)
                 total_jobs += len(jobs)
-                
+
                 # Save to file
                 output_file = output_dir / f"{company_name}_jobs.json"
                 with open(output_file, 'w') as f:
                     json.dump(jobs, f, indent=2)
-                
+
                 console.print(
                     f"  [green]✓[/green] {company_name}: {len(jobs)} jobs → {output_file.name}"
                 )
-            
+
             except Exception as e:
                 console.print(f"  [red]✗[/red] {company_name}: {str(e)}")
                 logger.error(f"Crawl failed for {company_name}", exc_info=True)
-            
+
             progress.advance(task)
-    
+
     console.print(f"\n[bold green]✓ Crawl complete: {total_jobs} jobs extracted[/bold green]")
 
 def get_company_selectors(company_name: str) -> dict:
@@ -330,18 +330,18 @@ def assess_command(
 ):
     """
     Phase 4: Assess job-CV matches using Claude API.
-    
+
     Loads verified job postings and CV, then uses Claude to score
     each job-CV pair on a 0.0-1.0 scale with reasoning.
-    
+
     Example:
         ats-playground assess --cv data/cv.json --confirmed-only
     """
     from src.storage import StorageClient
     from src.llm import AssessmentClient, BatchAssessor
-    
+
     logger = logging.getLogger(__name__)
-    
+
     # Load CV
     try:
         with open(cv) as f:
@@ -349,37 +349,37 @@ def assess_command(
     except FileNotFoundError:
         console.print(f"[red]Error: CV file not found: {cv}[/red]")
         raise typer.Exit(code=1)
-    
+
     cv_id = cv_data.get("id") or cv.stem
     cv_summary = cv_data.get("summary", "")
-    
+
     # Load jobs from database
     storage = StorageClient()
-    
+
     status_filter = "confirmed" if confirmed_only else "pending"
     cursor = storage.conn.cursor()
     cursor.execute("""
         SELECT * FROM jobs WHERE status = ?
     """, (status_filter,))
-    
+
     jobs = [dict(row) for row in cursor.fetchall()]
-    
+
     if not jobs:
         console.print(f"[yellow]No {status_filter} jobs to assess[/yellow]")
         raise typer.Exit(code=0)
-    
+
     console.print(f"[bold]Assessing {len(jobs)} jobs for CV: {cv_id}[/bold]\n")
-    
+
     # Initialize Claude client
     client = AssessmentClient(model=model)
     assessor = BatchAssessor(client)
-    
+
     # Prepare job-CV pairs
     job_cv_pairs = [
         (job, cv_summary, job["job_id"], cv_id)
         for job in jobs
     ]
-    
+
     # Run assessments
     try:
         assessor.assess_batch(job_cv_pairs, show_progress=True)
@@ -387,13 +387,13 @@ def assess_command(
         console.print(f"[red]Assessment failed: {str(e)}[/red]")
         logger.error("Batch assessment failed", exc_info=True)
         raise typer.Exit(code=1)
-    
+
     # Save results
     assessor.save_results()
-    
+
     # Print summary
     assessor.print_cost_summary()
-    
+
     # Show top matches
     console.print("\n[bold]Top 5 Matches:[/bold]\n")
     top_matches = sorted(
@@ -401,13 +401,13 @@ def assess_command(
         key=lambda r: r.match_score,
         reverse=True
     )[:5]
-    
+
     table = Table(title="Top Matches")
     table.add_column("Score", style="cyan")
     table.add_column("Job", style="magenta")
     table.add_column("Company", style="green")
     table.add_column("Reasoning")
-    
+
     for result in top_matches:
         job = next((j for j in jobs if j["job_id"] == result.job_id), {})
         table.add_row(
@@ -416,7 +416,7 @@ def assess_command(
             job.get("company_name", "Unknown"),
             result.reasoning[:50] + "..."
         )
-    
+
     console.print(table)
 ```
 
@@ -593,7 +593,7 @@ ats-playground export --format markdown --output data/assessments/
 ```python
 class CLIError(Exception):
     """Base CLI error with remediation."""
-    
+
     def __init__(self, message: str, hint: str = None):
         self.message = message
         self.hint = hint
@@ -606,7 +606,7 @@ def validate_cv_file(cv_path: Path):
             f"CV file not found: {cv_path}",
             hint=f"Create CV at {cv_path} in JSON format"
         )
-    
+
     try:
         with open(cv_path) as f:
             json.load(f)
@@ -694,7 +694,7 @@ def test_assess_success(tmp_path):
     """Test successful assessment workflow."""
     cv_file = tmp_path / "test_cv.json"
     cv_file.write_text('{"id": "test", "summary": "Python engineer"}')
-    
+
     result = runner.invoke(app, ["assess", "--cv", str(cv_file), "--confirmed-only"])
     assert result.exit_code in [0, 1]  # 0 success, 1 no jobs
 
@@ -711,12 +711,12 @@ def test_query_keyword_search(tmp_path):
 def test_full_workflow(tmp_path, monkeypatch):
     """Test crawl→review→assess→export workflow."""
     from pathlib import Path
-    
+
     # Setup
     config_file = tmp_path / "config.json"
     cv_file = tmp_path / "cv.json"
     output_dir = tmp_path / "output"
-    
+
     config_file.write_text(json.dumps({
         "companies": [{
             "name": "TestCorp",
@@ -724,15 +724,15 @@ def test_full_workflow(tmp_path, monkeypatch):
             "selectors": {"job_title": "h2"}
         }]
     }))
-    
+
     cv_file.write_text(json.dumps({
         "id": "test_cv",
         "summary": "Experienced engineer"
     }))
-    
+
     # Execute workflow
     runner = CliRunner()
-    
+
     # Crawl
     result = runner.invoke(app, [
         "crawl",
@@ -740,7 +740,7 @@ def test_full_workflow(tmp_path, monkeypatch):
         "--output", str(output_dir / "extracted")
     ])
     assert result.exit_code in [0, 1]  # May fail if URL unreachable
-    
+
     # Export
     result = runner.invoke(app, [
         "export",
@@ -772,23 +772,23 @@ def test_full_workflow(tmp_path, monkeypatch):
   - [ ] `pip install -e .` installs CLI entry point
   - [ ] `ats-playground --help` works
   - [ ] `ats-playground version` shows version
-  
+
 - [ ] **Configuration**:
   - [ ] `ats-playground init` creates config/data directories
   - [ ] `.env` file with ANTHROPIC_API_KEY set
   - [ ] `config/companies.json` populated
-  
+
 - [ ] **Testing**:
   - [ ] Run unit tests: `pytest tests/ -v`
   - [ ] Test each subcommand manually
   - [ ] Test error cases (missing file, invalid config)
   - [ ] Run integration tests: `pytest tests/integration/ -v`
-  
+
 - [ ] **Documentation**:
   - [ ] `ats-playground --help` is clear
   - [ ] `ats-playground <command> --help` detailed
   - [ ] README.md has quick-start with commands
-  
+
 - [ ] **Performance**:
   - [ ] Crawl 100 jobs in <5 minutes
   - [ ] Preprocess 100 jobs in <1 minute

@@ -6,10 +6,10 @@ from typing import Optional
 def get_assessment_prompt(cv_summary: Optional[str] = None) -> str:
     """
     Get the main assessment prompt template.
-    
+
     Args:
         cv_summary: Optional CV summary for personalization
-    
+
     Returns:
         Prompt template string
     """
@@ -25,7 +25,7 @@ Provide a structured assessment with:
 7. Brief summary (2-3 sentences)
 
 Be objective and specific. If skills don't match, explain why."""
-    
+
     if cv_summary:
         return f"{base_prompt}\n\nCandidate Summary:\n{cv_summary}"
     return base_prompt
@@ -34,7 +34,7 @@ Be objective and specific. If skills don't match, explain why."""
 def get_extraction_prompt() -> str:
     """
     Get prompt for extracting structured data from job postings.
-    
+
     Returns:
         Prompt template string
     """
@@ -53,7 +53,7 @@ Provide as JSON-like structure for parsing."""
 def get_summary_prompt() -> str:
     """
     Get prompt for generating executive summary.
-    
+
     Returns:
         Prompt template string
     """
@@ -76,11 +76,11 @@ PROMPTS = {
 def get_prompt(prompt_type: str, **kwargs) -> str:
     """
     Get a prompt template by type.
-    
+
     Args:
         prompt_type: Type of prompt (assessment, extraction, summary)
         **kwargs: Additional arguments for prompt customization
-    
+
     Returns:
         Prompt template string
     """

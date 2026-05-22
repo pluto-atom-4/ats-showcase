@@ -60,7 +60,7 @@ Store all companies in `config/companies.json`:
       "url": "https://companya.com/careers",
       "enabled": true,
       "description": "Manufacturing company, MES/MOM roles",
-      
+
       "crawler": {
         "type": "pagination",
         "headless": true,
@@ -68,7 +68,7 @@ Store all companies in `config/companies.json`:
         "max_pages": 5,
         "delay_between_pages_ms": 2000
       },
-      
+
       "job_selectors": {
         "container": "div.job-card",
         "title": "h3.job-title",
@@ -77,7 +77,7 @@ Store all companies in `config/companies.json`:
         "url": "a.apply-link[href]",
         "location": "span.location"
       },
-      
+
       "selectors_fallback": [
         {
           "container": "div[class*='job']",
@@ -85,22 +85,22 @@ Store all companies in `config/companies.json`:
           "description": "div.description"
         }
       ],
-      
+
       "pagination": {
         "enabled": true,
         "selector": "a.next-page"
       },
-      
+
       "wait_for": {
         "selector": "div.job-card",
         "timeout_ms": 30000
       },
-      
+
       "cleanup_patterns": [
         "Equal Opportunity Employer",
         "Salary determined based"
       ],
-      
+
       "notes": "Updated 2025-01-15 after site redesign"
     }
   ]
@@ -159,12 +159,12 @@ def cli():
 def crawl(config, company, headless, output_dir):
     """Crawl company careers pages and extract job postings."""
     click.echo(f"📡 Crawling from config: {config}")
-    
+
     try:
         # Load config
         with open(config) as f:
             companies_config = json.load(f)
-        
+
         # Filter by company if specified
         if company:
             companies_config["companies"] = [
@@ -174,11 +174,11 @@ def crawl(config, company, headless, output_dir):
             if not companies_config["companies"]:
                 click.echo(f"❌ Company '{company}' not found", err=True)
                 raise click.Exit(1)
-        
+
         # Run crawler
         asyncio.run(_crawl_companies(companies_config, headless, output_dir))
         click.echo(f"✅ Crawl completed. Results in {output_dir}/")
-    
+
     except Exception as e:
         click.echo(f"❌ Error: {e}", err=True)
         raise click.Exit(1)
@@ -257,12 +257,12 @@ def crawl(
 ):
     """Crawl company careers pages and extract job postings."""
     typer.echo(f"📡 Crawling from config: {config}")
-    
+
     try:
         # Load config
         with open(config) as f:
             companies_config = json.load(f)
-        
+
         # Filter by company if specified
         if company:
             companies_config["companies"] = [
@@ -272,11 +272,11 @@ def crawl(
             if not companies_config["companies"]:
                 typer.echo(f"❌ Company '{company}' not found", err=True)
                 raise typer.Exit(1)
-        
+
         # Run crawler
         asyncio.run(_crawl_companies(companies_config, headless, output_dir))
         typer.echo(f"✅ Crawl completed. Results in {output_dir}/")
-    
+
     except Exception as e:
         typer.echo(f"❌ Error: {e}", err=True)
         raise typer.Exit(1)
@@ -339,17 +339,17 @@ from src.models.job_posting import JobPosting
 
 class SiteAdapter(ABC):
     """Base adapter for scraping a site."""
-    
+
     def __init__(self, config: dict):
         self.config = config
         self.name = config["name"]
         self.url = config["url"]
-    
+
     @abstractmethod
     async def crawl(self) -> List[JobPosting]:
         """Crawl site and return job postings."""
         pass
-    
+
     @abstractmethod
     def validate_config(self) -> bool:
         """Validate configuration is correct."""
@@ -371,7 +371,7 @@ logger = logging.getLogger(__name__)
 
 class PaginationAdapter(SiteAdapter):
     """Handle sites with traditional pagination."""
-    
+
     async def crawl(self) -> List[JobPosting]:
         """Crawl multi-page site."""
         async with async_playwright() as p:
@@ -379,65 +379,65 @@ class PaginationAdapter(SiteAdapter):
                 headless=self.config["crawler"]["headless"]
             )
             page = await browser.new_page()
-            
+
             try:
                 jobs = await self._crawl_pages(page)
                 return jobs
             finally:
                 await browser.close()
-    
+
     async def _crawl_pages(self, page: Page) -> List[JobPosting]:
         """Crawl all pages with pagination."""
         jobs = []
         url = self.config["url"]
         max_pages = self.config["crawler"]["max_pages"]
-        
+
         for page_num in range(max_pages):
             try:
                 # Navigate
                 logger.info(f"{self.name} Page {page_num + 1}/{max_pages}")
                 await page.goto(url, wait_until="networkidle")
-                
+
                 # Wait for content
                 wait_config = self.config["wait_for"]
                 await page.wait_for_selector(
                     wait_config["selector"],
                     timeout=wait_config["timeout_ms"]
                 )
-                
+
                 # Extract jobs
                 page_jobs = await self._extract_jobs(page)
                 jobs.extend(page_jobs)
                 logger.info(f"Extracted {len(page_jobs)} jobs")
-                
+
                 # Find next page
                 next_url = await self._find_next_page_url(page)
                 if not next_url:
                     break
-                
+
                 url = next_url
-                
+
                 # Respect server
                 delay = self.config["crawler"]["delay_between_pages_ms"]
                 await asyncio.sleep(delay / 1000)
-                
+
             except Exception as e:
                 logger.warning(f"Page {page_num} error: {e}")
                 break
-        
+
         return jobs
-    
+
     async def _extract_jobs(self, page: Page) -> List[JobPosting]:
         """Extract jobs with fallback selectors."""
         html = await page.content()
         soup = BeautifulSoup(html, "lxml")
-        
+
         # Try primary selectors
         jobs = self._parse_jobs(soup, self.config["job_selectors"])
-        
+
         if jobs:
             return jobs
-        
+
         # Try fallback selectors
         logger.warning("Primary selectors failed, trying fallbacks")
         for fallback_sel in self.config.get("selectors_fallback", []):
@@ -445,22 +445,22 @@ class PaginationAdapter(SiteAdapter):
             if jobs:
                 logger.warning(f"Used fallback selector")
                 return jobs
-        
+
         logger.error("All selectors failed")
         return []
-    
+
     def _parse_jobs(self, soup, selectors: dict) -> List[JobPosting]:
         """Parse jobs with given selectors."""
         jobs = []
-        
+
         for job_el in soup.select(selectors["container"]):
             try:
                 title_el = job_el.select_one(selectors["title"])
                 desc_el = job_el.select_one(selectors["description"])
-                
+
                 if not title_el or not desc_el:
                     continue
-                
+
                 job = JobPosting(
                     job_id=f"{self.name}_{len(jobs)}",
                     company=self.name,
@@ -470,59 +470,59 @@ class PaginationAdapter(SiteAdapter):
                     extraction_confidence=0.95,
                     status="pending_review"
                 )
-                
+
                 jobs.append(job)
-            
+
             except Exception as e:
                 logger.debug(f"Job extraction error: {e}")
                 continue
-        
+
         return jobs
-    
+
     def _extract_url(self, element, selectors: dict) -> str | None:
         """Extract URL with relative path handling."""
         if "url" not in selectors:
             return None
-        
+
         url_el = element.select_one(selectors["url"])
         if not url_el:
             return None
-        
+
         href = url_el.get("href")
-        
+
         # Handle relative URLs
         if href and not href.startswith(("http://", "https://")):
             from urllib.parse import urljoin
             return urljoin(self.url, href)
-        
+
         return href
-    
+
     async def _find_next_page_url(self, page: Page) -> str | None:
         """Find URL for next page."""
         pagination = self.config.get("pagination", {})
-        
+
         if not pagination.get("enabled"):
             return None
-        
+
         try:
             next_selector = pagination["selector"]
             next_el = await page.query_selector(next_selector)
-            
+
             if not next_el:
                 return None
-            
+
             href = await next_el.get_attribute("href")
-            
+
             if href and not href.startswith(("http://", "https://")):
                 from urllib.parse import urljoin
                 return urljoin(page.url, href)
-            
+
             return href
-        
+
         except Exception as e:
             logger.debug(f"Next page error: {e}")
             return None
-    
+
     def validate_config(self) -> bool:
         """Validate required config fields."""
         required = ["url", "job_selectors", "wait_for", "crawler"]
@@ -530,7 +530,7 @@ class PaginationAdapter(SiteAdapter):
             if field not in self.config:
                 logger.error(f"Missing: {field}")
                 return False
-        
+
         return True
 ```
 
@@ -541,28 +541,28 @@ class PaginationAdapter(SiteAdapter):
 
 class AdapterFactory:
     """Factory to instantiate correct adapter for site."""
-    
+
     ADAPTERS = {
         "pagination": PaginationAdapter,
         # Future:
         # "infinite_scroll": InfiniteScrollAdapter,
         # "api": ApiAdapter,
     }
-    
+
     @staticmethod
     def create_adapter(config: dict):
         """Create appropriate adapter for config."""
         crawler_type = config.get("crawler", {}).get("type", "pagination")
-        
+
         adapter_class = AdapterFactory.ADAPTERS.get(crawler_type)
         if not adapter_class:
             raise ValueError(f"Unknown crawler type: {crawler_type}")
-        
+
         adapter = adapter_class(config)
-        
+
         if not adapter.validate_config():
             raise ValueError(f"Invalid config for {config['name']}")
-        
+
         return adapter
 ```
 
@@ -593,7 +593,7 @@ def test_parse_jobs_from_html():
         <a class="apply-link" href="/apply/124">Apply</a>
     </div>
     """
-    
+
     config = {
         "name": "Test Company",
         "url": "https://test.com",
@@ -605,11 +605,11 @@ def test_parse_jobs_from_html():
         },
         "crawler": {"headless": True}
     }
-    
+
     adapter = PaginationAdapter(config)
     soup = BeautifulSoup(html, "lxml")
     jobs = adapter._parse_jobs(soup, config["job_selectors"])
-    
+
     assert len(jobs) == 2
     assert jobs[0].title == "Senior MES Developer"
     assert jobs[1].title == "Junior Developer"
@@ -631,14 +631,14 @@ async def test_crawl_live():
     """Test crawling live company websites."""
     with open("config/companies.json") as f:
         config = json.load(f)
-    
+
     for company in config["companies"]:
         if not company.get("enabled"):
             continue
-        
+
         adapter = AdapterFactory.create_adapter(company)
         jobs = await adapter.crawl()
-        
+
         assert len(jobs) > 0, f"No jobs extracted from {company['name']}"
         assert all(j.title for j in jobs), f"Some jobs missing titles in {company['name']}"
 ```

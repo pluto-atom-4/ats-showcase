@@ -259,10 +259,10 @@ Solution:
   # Check versions match
   python -c "import spacy; print('spaCy:', spacy.__version__)"
   python -m spacy info
-  
+
   # Create symlink if missing
   python -m spacy link en_core_web_sm en_core_web_sm --force
-  
+
   # Or clean reinstall
   uv pip install --force-reinstall en_core_web_sm
 ```
@@ -303,7 +303,7 @@ Solution:
   # ✅ Always use virtual environment
   uv sync  # Creates .venv automatically
   uv run python -m spacy download en_core_web_sm
-  
+
   # NOT: sudo pip install en_core_web_sm ❌
 ```
 
@@ -314,9 +314,9 @@ Root cause: Downloaded to system Python, not UV venv
 Solution:
   # ✅ ALWAYS use uv run
   uv run python -m spacy download en_core_web_sm
-  
+
   # NOT: python -m spacy download en_core_web_sm ❌
-  
+
   # Verify using correct interpreter
   uv python show
 ```
@@ -329,7 +329,7 @@ Solution - Correct commands:
   python -m spacy download en_core_web_sm           # ✅ CLI
   python -m spacy download en_core_web_sm-3.8.0    # ✅ Explicit version
   pip install en_core_web_sm                        # ✅ Direct pip
-  
+
   Wrong commands:
   python -m spacy download en_core_web_md           # ❌ Wrong model
   python -c "import spacy; spacy.download(...)"    # ❌ No such method
@@ -342,11 +342,11 @@ Root cause: Model version doesn't match spaCy version
 Solution:
   # Download model matching spaCy version (auto-detected)
   python -m spacy download en_core_web_sm
-  
+
   # Verify versions match
   python -c "import spacy; print('spaCy:', spacy.__version__)"
   python -m spacy info  # Shows model/spaCy version mismatch
-  
+
   # Update spaCy to 3.8+ in pyproject.toml
   # spacy = ">=3.8.0,<4.0"
   uv sync --upgrade
@@ -359,7 +359,7 @@ Root cause: Pip cache has stale versions
 Solution:
   pip cache purge
   uv pip install --force-reinstall en_core_web_sm
-  
+
   # Full reset
   rm -rf ~/.cache/pip
   uv sync --refresh
@@ -373,7 +373,7 @@ Root cause: spaCy model wheels not yet built for 3.13 (late 2024 issue)
 Solution:
   # Upgrade spaCy to 3.8.10+ (has 3.13 wheels)
   uv pip install --upgrade spacy
-  
+
   # Or fallback to Python 3.12
   uv python pin 3.12
   uv sync
@@ -388,10 +388,10 @@ Solution - Option A (recommended):
   # Use native arm64 Homebrew Python
   brew install python@3.13
   /opt/homebrew/bin/python3.13 -m spacy download en_core_web_sm
-  
+
 Solution - Option B (force reinstall):
   pip install --no-cache-dir --force-reinstall en_core_web_sm
-  
+
 Solution - Option C (x86_64 emulation, slower):
   arch -x86_64 python -m spacy download en_core_web_sm
 ```
@@ -716,7 +716,7 @@ export PYTHONUSERBASE=/custom/python/base
 - **Startup time**: ~1 second (spaCy model load + imports)
 - **Token reduction**: 80-90% (raw HTML → cleaned text → chunks)
 - **Cost per job**: ~$0.003 (Claude 3.5 Haiku, 100-token avg after preprocessing)
-- **Processing speed**: 
+- **Processing speed**:
   - Crawling: 100+ jobs/min
   - Preprocessing: 200+ jobs/min
   - Token counting: 1000+ jobs/sec

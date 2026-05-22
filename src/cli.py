@@ -1,7 +1,8 @@
 """Typer CLI for ATS Playground workflow orchestration."""
 
-from typing import Optional
 import logging
+from typing import Optional
+
 import typer
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ app.add_typer(export_app, name="export")
 # MAIN COMMANDS
 # ============================================================================
 
+
 @app.command()
 def all(
     cv: str = typer.Option(..., help="Path to CV file (JSON)"),
@@ -40,7 +42,7 @@ def all(
 ) -> None:
     """
     Run full workflow: crawl → preprocess → review → assess → export.
-    
+
     Example:
         python -m src.cli --all --cv data/cv.json --config config/companies.json
     """
@@ -52,6 +54,7 @@ def all(
 # ============================================================================
 # CRAWL COMMANDS
 # ============================================================================
+
 
 @crawl_app.command()
 def crawl_companies(
@@ -70,6 +73,7 @@ def crawl_companies(
 # PREPROCESS COMMANDS
 # ============================================================================
 
+
 @preprocess_app.command()
 def preprocess_jobs(
     batch_size: int = typer.Option(10, help="Jobs per batch"),
@@ -85,6 +89,7 @@ def preprocess_jobs(
 # REVIEW COMMANDS
 # ============================================================================
 
+
 @review_app.command()
 def review_jobs(
     interactive: bool = typer.Option(True, help="Interactive review mode"),
@@ -99,6 +104,7 @@ def review_jobs(
 # ============================================================================
 # ASSESS COMMANDS
 # ============================================================================
+
 
 @assess_app.command()
 def assess_jobs(
@@ -117,6 +123,7 @@ def assess_jobs(
 # EXPORT COMMANDS
 # ============================================================================
 
+
 @export_app.command()
 def export_results(
     output: str = typer.Option("data/assessments/report.md", help="Output file"),
@@ -133,6 +140,7 @@ def export_results(
 # UTILITY COMMANDS
 # ============================================================================
 
+
 @app.command()
 def query(
     keyword: str = typer.Option(..., help="Search keyword"),
@@ -142,7 +150,7 @@ def query(
     """Search stored assessments by keyword and score."""
     # TODO: Implement search logic
     logger.info(f"Searching for: {keyword}")
-    typer.echo(f"🔍 Searching...")
+    typer.echo("🔍 Searching...")
 
 
 @app.command()

@@ -1,11 +1,12 @@
 """Pytest configuration and shared fixtures."""
 
-import pytest
 import os
-import tempfile
 import sqlite3
+import tempfile
 from pathlib import Path
 from typing import Generator
+
+import pytest
 
 
 @pytest.fixture
@@ -13,7 +14,7 @@ def temp_db() -> Generator[str, None, None]:
     """Create a temporary SQLite database for testing."""
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = tmp.name
-    
+
     try:
         yield db_path
     finally:
@@ -45,19 +46,19 @@ def sample_job_data():
         "location": "San Francisco, CA",
         "description": """
         We are looking for a Senior Python Developer with 5+ years of experience.
-        
+
         Requirements:
         - Python 3.11+
         - FastAPI/Django experience
         - PostgreSQL/MongoDB
         - Docker & Kubernetes
         - AWS knowledge preferred
-        
+
         Responsibilities:
         - Design and implement backend systems
         - Collaborate with frontend team
         - Optimize database queries
-        
+
         Benefits:
         - Competitive salary
         - Health insurance

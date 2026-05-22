@@ -63,29 +63,29 @@ CREATE TABLE jobs (
     benefits TEXT,
     salary TEXT,
     posting_url TEXT,
-    
+
     -- Preprocessing metadata
     raw_html_tokens INT,
     cleaned_text_tokens INT,
     chunks_count INT,
     preprocessing_latency_ms REAL,
-    
+
     -- Verification status
     verified BOOLEAN DEFAULT 0,
     verified_by TEXT,
     verified_at TIMESTAMP,
-    
+
     -- Extraction metadata
     crawled_at TIMESTAMP NOT NULL,
     extracted_at TIMESTAMP NOT NULL,
-    
+
     -- Deduplication
     content_hash TEXT UNIQUE,  -- SHA256 of normalized text
     duplicate_of_job_id TEXT,  -- Reference if duplicate
-    
+
     -- Status tracking
     status TEXT DEFAULT 'pending',  -- pending|confirmed|rejected|archived
-    
+
     -- Audit
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -96,32 +96,32 @@ CREATE TABLE assessments (
     assessment_id TEXT PRIMARY KEY,
     job_id TEXT NOT NULL,
     cv_id TEXT NOT NULL,
-    
+
     -- Assessment output
     match_score REAL NOT NULL,  -- 0.0-1.0
     recommendation TEXT NOT NULL,  -- strong_match|moderate_match|weak_match
     reasoning TEXT,
     strengths TEXT,  -- JSON array
     gaps TEXT,  -- JSON array
-    
+
     -- Cost tracking
     input_tokens INT NOT NULL,
     output_tokens INT NOT NULL,
     model TEXT DEFAULT 'claude-3-5-sonnet-20241022',
     cost_usd REAL,  -- Calculated: (input/1M)*3.00 + (output/1M)*15.00
-    
+
     -- Performance
     latency_ms REAL,
     retry_count INT DEFAULT 0,
-    
+
     -- Status
     status TEXT DEFAULT 'completed',  -- completed|failed|incomplete
     error_message TEXT,
-    
+
     -- Audit
     assessed_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
+
     FOREIGN KEY (job_id) REFERENCES jobs (job_id)
 );
 
@@ -129,19 +129,19 @@ CREATE TABLE assessments (
 CREATE TABLE cvs (
     cv_id TEXT PRIMARY KEY,
     filename TEXT NOT NULL,
-    
+
     -- Preprocessing metadata
     raw_text_tokens INT,
     cleaned_text_tokens INT,
-    
+
     -- CV content (summarized)
     summary TEXT,
     skills TEXT,  -- JSON array
     experience_years INT,
-    
+
     -- Status
     status TEXT DEFAULT 'active',  -- active|archived
-    
+
     -- Audit
     uploaded_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -150,25 +150,25 @@ CREATE TABLE cvs (
 -- Cost tracking (summary for reporting)
 CREATE TABLE cost_tracking (
     tracking_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    
+
     company_name TEXT,
     cv_id TEXT,
-    
+
     -- Aggregates
     total_jobs INT,
     total_assessments INT,
     total_input_tokens INT,
     total_output_tokens INT,
     total_cost_usd REAL,
-    
+
     avg_match_score REAL,
-    
+
     -- Time period
     period_start TIMESTAMP,
     period_end TIMESTAMP,
-    
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
+
     FOREIGN KEY (cv_id) REFERENCES cvs (cv_id)
 );
 ```
@@ -186,11 +186,11 @@ CREATE VIRTUAL TABLE jobs_fts USING fts5(
     requirements,
     responsibilities,
     benefits,
-    
+
     -- Metadata (not indexed, but stored)
     company_name UNINDEXED,
     job_id UNINDEXED,
-    
+
     -- Options
     content='jobs',
     content_rowid='rowid',
@@ -226,28 +226,28 @@ import hashlib
 
 class StorageClient:
     """SQLite database client with FTS5 support."""
-    
+
     def __init__(self, db_path: str = "data/ats_playground.db"):
         self.db_path = db_path
         self.conn = None
         self._connect()
-    
+
     def _connect(self):
         """Initialize database connection with FTS5."""
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row  # Enable column-based access
-        
+
         # Enable FTS5 if available
         try:
             self.conn.execute("PRAGMA compile_options;")
             self.conn.enable_load_extension(True)
         except Exception as e:
             print(f"Warning: Could not enable FTS5: {e}")
-    
+
     def init_schema(self):
         """Create all tables and indexes."""
         cursor = self.conn.cursor()
-        
+
         # Jobs table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS jobs (
@@ -275,7 +275,7 @@ class StorageClient:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
-        
+
         # Assessments table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS assessments (
@@ -300,7 +300,7 @@ class StorageClient:
                 FOREIGN KEY (job_id) REFERENCES jobs (job_id)
             );
         """)
-        
+
         # CVs table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS cvs (
@@ -316,7 +316,7 @@ class StorageClient:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
-        
+
         # Cost tracking table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS cost_tracking (
@@ -335,45 +335,45 @@ class StorageClient:
                 FOREIGN KEY (cv_id) REFERENCES cvs (cv_id)
             );
         """)
-        
+
         # Indexes for common queries
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_jobs_company 
+            CREATE INDEX IF NOT EXISTS idx_jobs_company
             ON jobs(company_name);
         """)
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_jobs_status 
+            CREATE INDEX IF NOT EXISTS idx_jobs_status
             ON jobs(status);
         """)
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_assessments_job 
+            CREATE INDEX IF NOT EXISTS idx_assessments_job
             ON assessments(job_id);
         """)
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_assessments_cv 
+            CREATE INDEX IF NOT EXISTS idx_assessments_cv
             ON assessments(cv_id);
         """)
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_assessments_score 
+            CREATE INDEX IF NOT EXISTS idx_assessments_score
             ON assessments(match_score DESC);
         """)
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_assessments_date 
+            CREATE INDEX IF NOT EXISTS idx_assessments_date
             ON assessments(assessed_at DESC);
         """)
-        
+
         self.conn.commit()
         print(f"✓ Database initialized: {self.db_path}")
-    
+
     def insert_job(self, job: dict) -> str:
         """Insert job and return job_id."""
         content_hash = hashlib.sha256(
             f"{job['title']}|{job['requirements']}".encode()
         ).hexdigest()
-        
+
         cursor = self.conn.cursor()
         job_id = job.get('job_id') or f"job_{content_hash[:12]}"
-        
+
         try:
             cursor.execute("""
                 INSERT INTO jobs (
@@ -393,17 +393,17 @@ class StorageClient:
             ))
             self.conn.commit()
             return job_id
-        
+
         except sqlite3.IntegrityError as e:
             print(f"Job already exists or duplicate: {e}")
             return job_id
-    
+
     def insert_assessment(self, assessment: dict) -> str:
         """Insert assessment result."""
         cursor = self.conn.cursor()
         assessment_id = assessment.get('assessment_id') or \
                        f"assess_{assessment['job_id']}_{assessment['cv_id']}"
-        
+
         cursor.execute("""
             INSERT INTO assessments (
                 assessment_id, job_id, cv_id, match_score, recommendation,
@@ -414,7 +414,7 @@ class StorageClient:
         """, (
             assessment_id, assessment['job_id'], assessment['cv_id'],
             assessment['match_score'], assessment['recommendation'],
-            assessment.get('reasoning'), 
+            assessment.get('reasoning'),
             json.dumps(assessment.get('strengths', [])),
             json.dumps(assessment.get('gaps', [])),
             assessment['input_tokens'], assessment['output_tokens'],
@@ -425,11 +425,11 @@ class StorageClient:
         ))
         self.conn.commit()
         return assessment_id
-    
+
     def search_jobs(self, query: str, limit: int = 50) -> List[Dict]:
         """Full-text search jobs by keywords."""
         cursor = self.conn.cursor()
-        
+
         # FTS5 query (if available) or fallback to LIKE
         try:
             cursor.execute("""
@@ -443,13 +443,13 @@ class StorageClient:
             query_pattern = f"%{query}%"
             cursor.execute("""
                 SELECT * FROM jobs WHERE
-                title LIKE ? OR requirements LIKE ? OR 
+                title LIKE ? OR requirements LIKE ? OR
                 responsibilities LIKE ? OR benefits LIKE ?
                 LIMIT ?
             """, (query_pattern, query_pattern, query_pattern, query_pattern, limit))
-        
+
         return [dict(row) for row in cursor.fetchall()]
-    
+
     def get_best_matches(
         self,
         cv_id: str,
@@ -459,7 +459,7 @@ class StorageClient:
         """Get top-scoring job matches for a CV."""
         cursor = self.conn.cursor()
         cursor.execute("""
-            SELECT 
+            SELECT
                 a.assessment_id,
                 a.job_id,
                 a.match_score,
@@ -476,9 +476,9 @@ class StorageClient:
             ORDER BY a.match_score DESC
             LIMIT ?
         """, (cv_id, min_score, limit))
-        
+
         return [dict(row) for row in cursor.fetchall()]
-    
+
     def get_cost_summary(
         self,
         company_name: Optional[str] = None,
@@ -487,32 +487,32 @@ class StorageClient:
     ) -> Dict:
         """Get cost summary for reporting."""
         cursor = self.conn.cursor()
-        
+
         query = "SELECT * FROM assessments WHERE 1=1"
         params = []
-        
+
         if company_name:
             query += """ AND job_id IN (
                 SELECT job_id FROM jobs WHERE company_name = ?
             )"""
             params.append(company_name)
-        
+
         if cv_id:
             query += " AND cv_id = ?"
             params.append(cv_id)
-        
+
         if days:
             cutoff_date = datetime.now() - timedelta(days=days)
             query += " AND assessed_at > ?"
             params.append(cutoff_date.isoformat())
-        
+
         cursor.execute(query)
         assessments = cursor.fetchall()
-        
+
         total_input = sum(a['input_tokens'] for a in assessments)
         total_output = sum(a['output_tokens'] for a in assessments)
         total_cost = sum(a['cost_usd'] for a in assessments if a['cost_usd'])
-        
+
         return {
             "total_assessments": len(assessments),
             "total_input_tokens": total_input,
@@ -552,7 +552,7 @@ def get_company_jobs(storage: StorageClient, company: str) -> List[Dict]:
 def get_match_distribution(storage: StorageClient, cv_id: str) -> Dict:
     cursor = storage.conn.cursor()
     cursor.execute("""
-        SELECT 
+        SELECT
             recommendation,
             COUNT(*) as count,
             ROUND(AVG(match_score), 2) as avg_score
@@ -561,7 +561,7 @@ def get_match_distribution(storage: StorageClient, cv_id: str) -> Dict:
         GROUP BY recommendation
         ORDER BY avg_score DESC
     """, (cv_id,))
-    
+
     return {row['recommendation']: {
         'count': row['count'],
         'avg_score': row['avg_score']
@@ -574,7 +574,7 @@ def find_duplicates(storage: StorageClient, company: str) -> List[Tuple]:
         SELECT j1.job_id, j2.job_id, j1.title
         FROM jobs j1
         JOIN jobs j2 ON j1.content_hash = j2.content_hash
-            AND j1.company_name = ? 
+            AND j1.company_name = ?
             AND j2.company_name = ?
             AND j1.job_id < j2.job_id
     """, (company, company))
@@ -584,9 +584,9 @@ def find_duplicates(storage: StorageClient, company: str) -> List[Tuple]:
 def get_recent_assessments(storage: StorageClient, days: int = 7) -> List[Dict]:
     cursor = storage.conn.cursor()
     cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-    
+
     cursor.execute("""
-        SELECT 
+        SELECT
             a.assessment_id,
             j.title,
             j.company_name,
@@ -601,7 +601,7 @@ def get_recent_assessments(storage: StorageClient, days: int = 7) -> List[Dict]:
         WHERE a.assessed_at > ?
         ORDER BY a.assessed_at DESC
     """, (cutoff,))
-    
+
     return [dict(row) for row in cursor.fetchall()]
 ```
 
@@ -610,10 +610,10 @@ def get_recent_assessments(storage: StorageClient, days: int = 7) -> List[Dict]:
 ```python
 class MarkdownExporter:
     """Export assessments to markdown reports."""
-    
+
     def __init__(self, storage: StorageClient):
         self.storage = storage
-    
+
     def export_by_score(
         self,
         cv_id: str,
@@ -622,7 +622,7 @@ class MarkdownExporter:
         """Export matches grouped by score tier."""
         cursor = self.storage.conn.cursor()
         cursor.execute("""
-            SELECT 
+            SELECT
                 a.assessment_id,
                 a.match_score,
                 a.recommendation,
@@ -639,63 +639,63 @@ class MarkdownExporter:
             WHERE a.cv_id = ?
             ORDER BY a.match_score DESC
         """, (cv_id,))
-        
+
         assessments = cursor.fetchall()
-        
+
         with open(output_file, 'w') as f:
             f.write(f"# Job Assessment Report\n\n")
             f.write(f"**Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"**Total matches**: {len(assessments)}\n\n")
-            
+
             # Strong matches (0.8-1.0)
             strong = [a for a in assessments if a['match_score'] >= 0.8]
             self._write_section(f, "🟢 Strong Matches", strong)
-            
+
             # Moderate matches (0.5-0.8)
-            moderate = [a for a in assessments 
+            moderate = [a for a in assessments
                        if 0.5 <= a['match_score'] < 0.8]
             self._write_section(f, "🟡 Moderate Matches", moderate)
-            
+
             # Weak matches (0.0-0.5)
             weak = [a for a in assessments if a['match_score'] < 0.5]
             self._write_section(f, "🔴 Weak Matches", weak)
-        
+
         print(f"✓ Report exported: {output_file}")
-    
+
     def _write_section(self, f, title: str, assessments: List[sqlite3.Row]):
         """Write section with assessments."""
         f.write(f"\n## {title}\n\n")
         f.write(f"**Count**: {len(assessments)}\n\n")
-        
+
         for assessment in assessments:
             f.write(f"### {assessment['title']} @ {assessment['company_name']}\n\n")
             f.write(f"**Score**: {assessment['match_score']:.1%}\n\n")
             f.write(f"**Recommendation**: {assessment['recommendation']}\n\n")
             f.write(f"**Reasoning**: {assessment['reasoning']}\n\n")
-            
+
             if assessment['salary']:
                 f.write(f"**Salary**: {assessment['salary']}\n\n")
-            
+
             if assessment['requirements']:
                 f.write(f"**Requirements**: {assessment['requirements']}\n\n")
-            
+
             strengths = json.loads(assessment['strengths'] or '[]')
             if strengths:
                 f.write(f"**Strengths**:\n")
                 for s in strengths:
                     f.write(f"- {s}\n")
                 f.write("\n")
-            
+
             gaps = json.loads(assessment['gaps'] or '[]')
             if gaps:
                 f.write(f"**Gaps**:\n")
                 for g in gaps:
                     f.write(f"- {g}\n")
                 f.write("\n")
-            
+
             if assessment['posting_url']:
                 f.write(f"[View Posting]({assessment['posting_url']})\n\n")
-            
+
             f.write("---\n\n")
 ```
 
@@ -704,53 +704,53 @@ class MarkdownExporter:
 ```python
 class DataLifecycleManager:
     """Handle archival, purge, and retention policies."""
-    
+
     def __init__(self, storage: StorageClient):
         self.storage = storage
-    
+
     def archive_old_data(self, days: int = 90):
         """Archive assessments older than N days."""
         cursor = self.storage.conn.cursor()
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-        
+
         cursor.execute("""
             UPDATE assessments
             SET status = 'archived'
             WHERE assessed_at < ? AND status != 'archived'
         """, (cutoff,))
-        
+
         archived_count = cursor.rowcount
         self.storage.conn.commit()
-        
+
         print(f"✓ Archived {archived_count} old assessments")
-    
+
     def delete_sensitive_data(self, cv_id: str):
         """Purge CV and associated assessment details."""
         cursor = self.storage.conn.cursor()
-        
+
         # Delete CV content
         cursor.execute("""
             UPDATE cvs
             SET summary = NULL, skills = NULL
             WHERE cv_id = ?
         """, (cv_id,))
-        
+
         # Redact assessment reasoning (GDPR compliance)
         cursor.execute("""
             UPDATE assessments
             SET reasoning = '[redacted]', strengths = '[]', gaps = '[]'
             WHERE cv_id = ?
         """, (cv_id,))
-        
+
         self.storage.conn.commit()
         print(f"✓ Purged sensitive data for CV {cv_id}")
-    
+
     def generate_retention_report(self) -> Dict:
         """Report on data retention status."""
         cursor = self.storage.conn.cursor()
-        
+
         cursor.execute("""
-            SELECT 
+            SELECT
                 status,
                 COUNT(*) as count,
                 MIN(assessed_at) as oldest,
@@ -758,7 +758,7 @@ class DataLifecycleManager:
             FROM assessments
             GROUP BY status
         """)
-        
+
         return {
             row['status']: {
                 'count': row['count'],
@@ -789,7 +789,7 @@ strong = [a for a in assessments if a['match_score'] >= 0.8]  # Slow!
 
 # ✅ GOOD: Filter at database level (uses index)
 cursor.execute("""
-    SELECT * FROM assessments 
+    SELECT * FROM assessments
     WHERE match_score >= 0.8
     ORDER BY match_score DESC
     LIMIT 10
@@ -807,23 +807,23 @@ CREATE INDEX idx_assessments_cv ON assessments(cv_id);
   - [ ] Create `data/` directory
   - [ ] Run `StorageClient().init_schema()`
   - [ ] Verify `ats_playground.db` created
-  
+
 - [ ] **Migration** (if upgrading from old schema):
   - [ ] Backup existing database: `cp ats_playground.db ats_playground.db.backup`
   - [ ] Run migration scripts (if any)
   - [ ] Verify data integrity: `PRAGMA integrity_check;`
-  
+
 - [ ] **Testing**:
   - [ ] Insert 100+ test jobs
   - [ ] Run FTS5 search queries (verify speed <100ms)
   - [ ] Export markdown report
   - [ ] Verify cost calculations
-  
+
 - [ ] **Monitoring**:
   - [ ] Log all write operations
   - [ ] Alert if database exceeds 1 GB
   - [ ] Archive data older than 90 days monthly
-  
+
 - [ ] **Backup**:
   - [ ] Daily automated backup to S3/cloud storage
   - [ ] Test restore procedure

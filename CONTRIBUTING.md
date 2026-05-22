@@ -127,6 +127,33 @@ uv run bandit -r src/
 
 ## Code Quality Standards
 
+### Pre-commit Hooks (Recommended)
+
+Automatically enforce code quality on every commit:
+
+```bash
+# Install pre-commit hooks (1 minute)
+python -m src.setup.setup_precommit
+
+# Hooks will run automatically on git commit:
+# ✅ trailing-whitespace - Removes trailing spaces
+# ✅ end-of-file-fixer - Ensures single final newline
+# ✅ black - Auto-formats code (line-length: 100)
+# ✅ ruff - Auto-fixes imports & safe linting issues
+# ❌ mypy - Type checking (requires manual fixes)
+# ❌ pytest - Unit tests (requires manual fixes)
+```
+
+**Performance**: Full pre-commit run completes in <60 seconds
+
+**Skip hooks when needed**:
+```bash
+SKIP=mypy,pytest git commit -m "WIP: feature in progress"
+git commit --no-verify -m "Emergency hotfix" # (use sparingly)
+```
+
+**Details**: See [docs/QUALITY-ASSURANCE.md](./docs/QUALITY-ASSURANCE.md) for complete hook reference, troubleshooting, and performance tips.
+
 ### Type Hints (Required)
 
 All functions and methods must have complete type hints:
@@ -137,10 +164,10 @@ from pydantic import BaseModel
 
 def process_jobs(jobs: List[Dict[str, str]]) -> Optional[str]:
     """Process a list of job postings.
-    
+
     Args:
         jobs: List of job posting dictionaries
-        
+
     Returns:
         Processed result or None if empty
     """
@@ -164,21 +191,21 @@ This module handles:
 
 class JobCrawler:
     """Crawl job postings from career pages.
-    
+
     Attributes:
         browser: Playwright browser instance
         timeout: Request timeout in seconds
     """
-    
+
     async def crawl(self, url: str) -> List[Dict]:
         """Crawl jobs from a single URL.
-        
+
         Args:
             url: Career page URL to crawl
-            
+
         Returns:
             List of extracted job dictionaries
-            
+
         Raises:
             TimeoutError: If request exceeds timeout
             ValueError: If URL is invalid
@@ -412,7 +439,7 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
    ```bash
    # Push your branch
    git push origin feature/your-feature-name
-   
+
    # Create PR (automatically opens in browser)
    gh pr create --web
    ```
@@ -473,4 +500,3 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 **Thank you for contributing to ATS Playground!** 🚀
 
 Your contributions help make this project better for everyone.
-

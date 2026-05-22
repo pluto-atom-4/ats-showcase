@@ -95,7 +95,7 @@ import time
 
 class AssessmentClient:
     """Wrapper for Claude API with rate limiting and retry logic."""
-    
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -106,26 +106,26 @@ class AssessmentClient:
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not self.api_key:
             raise ValueError("ANTHROPIC_API_KEY not set in environment")
-        
+
         self.client = Anthropic(api_key=self.api_key)
         self.model = model
         self.max_retries = max_retries
         self.timeout_seconds = timeout_seconds
-        
+
         # Token tracking for cost calculations
         self.total_input_tokens = 0
         self.total_output_tokens = 0
         self.total_requests = 0
-    
+
     def get_cost_estimate(self) -> dict:
         """Return cumulative cost estimate."""
         # Claude 3.5 Sonnet pricing (as of 2024)
         input_cost_per_million = 3.00
         output_cost_per_million = 15.00
-        
+
         input_cost = (self.total_input_tokens / 1_000_000) * input_cost_per_million
         output_cost = (self.total_output_tokens / 1_000_000) * output_cost_per_million
-        
+
         return {
             "input_tokens": self.total_input_tokens,
             "output_tokens": self.total_output_tokens,
@@ -135,7 +135,7 @@ class AssessmentClient:
             "total_cost_usd": round(input_cost + output_cost, 6),
             "avg_cost_per_request": round((input_cost + output_cost) / max(self.total_requests, 1), 6),
         }
-    
+
     def assess_job_cv_match(
         self,
         job_posting: dict,
@@ -144,12 +144,12 @@ class AssessmentClient:
     ) -> Tuple[dict, dict]:
         """
         Assess job-CV match using Claude.
-        
+
         Args:
             job_posting: Dict with keys: title, requirements, responsibilities, benefits, salary
             cv_summary: Preprocessed CV text (should be <1000 tokens)
             max_retries: Override default retry count
-        
+
         Returns:
             Tuple of (assessment_result, metadata)
             assessment_result = {
@@ -170,15 +170,15 @@ class AssessmentClient:
         """
         max_retries = max_retries or self.max_retries
         retry_count = 0
-        
+
         while retry_count <= max_retries:
             try:
                 start_time = time.time()
-                
+
                 # Build cost-optimized prompt
                 system_prompt = self._build_system_prompt()
                 user_message = self._build_assessment_prompt(job_posting, cv_summary)
-                
+
                 # Call Claude API
                 response = self.client.messages.create(
                     model=self.model,
@@ -187,20 +187,20 @@ class AssessmentClient:
                     messages=[{"role": "user", "content": user_message}],
                     timeout=self.timeout_seconds,
                 )
-                
+
                 latency_ms = (time.time() - start_time) * 1000
-                
+
                 # Track tokens
                 input_tokens = response.usage.input_tokens
                 output_tokens = response.usage.output_tokens
                 self.total_input_tokens += input_tokens
                 self.total_output_tokens += output_tokens
                 self.total_requests += 1
-                
+
                 # Parse response
                 content = response.content[0].text
                 assessment = self._parse_assessment_response(content)
-                
+
                 metadata = {
                     "input_tokens": input_tokens,
                     "output_tokens": output_tokens,
@@ -209,9 +209,9 @@ class AssessmentClient:
                     "retry_count": retry_count,
                     "error": None,
                 }
-                
+
                 return assessment, metadata
-            
+
             except RateLimitError as e:
                 retry_count += 1
                 if retry_count > max_retries:
@@ -223,16 +223,16 @@ class AssessmentClient:
                 wait_time = 2 ** retry_count
                 print(f"Rate limited. Retrying in {wait_time}s...")
                 time.sleep(wait_time)
-            
+
             except Exception as e:
                 print(f"Error in assessment: {str(e)}")
                 return self._fallback_assessment(), {
                     "error": f"Assessment failed: {str(e)}",
                     "retry_count": retry_count,
                 }
-        
+
         return self._fallback_assessment(), {"error": "Max retries exceeded"}
-    
+
     def _build_system_prompt(self) -> str:
         """Build system prompt for Claude."""
         return """You are an expert recruiter evaluating job-CV matches.
@@ -254,7 +254,7 @@ Scoring guidelines:
 - 0.5-0.8 (moderate): Most requirements met, some gaps but learnable
 - 0.0-0.5 (weak): Missing critical requirements or significant overqualification mismatch
 """
-    
+
     def _build_assessment_prompt(self, job_posting: dict, cv_summary: str) -> str:
         """Build user message with job and CV context."""
         job_text = f"""
@@ -278,7 +278,7 @@ Assess the match between this candidate and this job posting.
 Return only valid JSON response, no markdown or formatting.
 """
         return job_text
-    
+
     def _parse_assessment_response(self, content: str) -> dict:
         """Parse Claude's JSON response."""
         try:
@@ -287,21 +287,21 @@ Return only valid JSON response, no markdown or formatting.
                 content = content.split("```json")[1].split("```")[0]
             elif "```" in content:
                 content = content.split("```")[1].split("```")[0]
-            
+
             assessment = json.loads(content.strip())
-            
+
             # Validate required fields
             required = ["match_score", "reasoning", "strengths", "gaps", "recommendation"]
             for field in required:
                 if field not in assessment:
                     assessment[field] = self._get_default_field(field)
-            
+
             return assessment
-        
+
         except json.JSONDecodeError:
             print(f"Failed to parse Claude response: {content}")
             return self._fallback_assessment()
-    
+
     def _get_default_field(self, field: str):
         """Return default value for missing field."""
         defaults = {
@@ -312,7 +312,7 @@ Return only valid JSON response, no markdown or formatting.
             "recommendation": "moderate_match",
         }
         return defaults.get(field)
-    
+
     def _fallback_assessment(self) -> dict:
         """Return fallback assessment when Claude fails."""
         return {
@@ -348,31 +348,31 @@ class AssessmentResult:
 
 class BatchAssessor:
     """Process batch of job-CV pairs with progress tracking."""
-    
+
     def __init__(self, client: AssessmentClient, output_csv: str = "assessments.csv"):
         self.client = client
         self.output_csv = output_csv
         self.results = []
-    
+
     def assess_batch(self, job_cv_pairs: list, show_progress: bool = True):
         """
         Process batch of (job, cv) pairs.
-        
+
         Args:
             job_cv_pairs: List of tuples (job_dict, cv_summary, job_id, cv_id)
             show_progress: Print progress updates
-        
+
         Returns:
             List of AssessmentResult objects
         """
         total = len(job_cv_pairs)
-        
+
         for idx, (job, cv_summary, job_id, cv_id) in enumerate(job_cv_pairs, 1):
             if show_progress:
                 print(f"[{idx}/{total}] Assessing {job_id} vs {cv_id}...", end=" ", flush=True)
-            
+
             assessment, metadata = self.client.assess_job_cv_match(job, cv_summary)
-            
+
             result = AssessmentResult(
                 job_id=job_id,
                 cv_id=cv_id,
@@ -387,20 +387,20 @@ class BatchAssessor:
                 timestamp=datetime.now().isoformat(),
                 error=metadata.get("error"),
             )
-            
+
             self.results.append(result)
-            
+
             if show_progress:
                 status = "✓" if not metadata.get("error") else "✗"
                 cost = self._estimate_result_cost(result)
                 print(f"{status} (score: {result.match_score:.2f}, cost: ${cost:.6f})")
-    
+
     def save_results(self):
         """Save results to CSV."""
         if not self.results:
             print("No results to save")
             return
-        
+
         with open(self.output_csv, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=[
                 "job_id", "cv_id", "match_score", "recommendation", "reasoning",
@@ -408,7 +408,7 @@ class BatchAssessor:
                 "timestamp", "error"
             ])
             writer.writeheader()
-            
+
             for result in self.results:
                 writer.writerow({
                     "job_id": result.job_id,
@@ -424,13 +424,13 @@ class BatchAssessor:
                     "timestamp": result.timestamp,
                     "error": result.error or "",
                 })
-        
+
         print(f"Saved {len(self.results)} results to {self.output_csv}")
-    
+
     def print_cost_summary(self):
         """Print cost and performance summary."""
         cost_est = self.client.get_cost_estimate()
-        
+
         print("\n" + "="*60)
         print("ASSESSMENT BATCH SUMMARY")
         print("="*60)
@@ -439,31 +439,31 @@ class BatchAssessor:
         print(f"Total output tokens: {cost_est['output_tokens']:,}")
         print(f"Total cost: ${cost_est['total_cost_usd']:.6f}")
         print(f"Avg cost per request: ${cost_est['avg_cost_per_request']:.6f}")
-        
+
         # Performance stats
         latencies = [r.latency_ms for r in self.results if r.latency_ms]
         if latencies:
             avg_latency = sum(latencies) / len(latencies)
             print(f"Avg latency: {avg_latency:.0f}ms")
-        
+
         # Match distribution
         recommendations = {}
         for r in self.results:
             recommendations[r.recommendation] = recommendations.get(r.recommendation, 0) + 1
-        
+
         print(f"\nMatch distribution:")
         for rec, count in sorted(recommendations.items()):
             pct = (count / len(self.results)) * 100 if self.results else 0
             print(f"  {rec}: {count} ({pct:.1f}%)")
-        
+
         errors = [r for r in self.results if r.error]
         if errors:
             print(f"\nErrors: {len(errors)}")
             for e in errors[:3]:  # Show first 3
                 print(f"  {e.job_id}: {e.error}")
-        
+
         print("="*60)
-    
+
     def _estimate_result_cost(self, result: AssessmentResult) -> float:
         """Estimate cost for single result."""
         input_cost = (result.input_tokens / 1_000_000) * 3.00
@@ -492,7 +492,7 @@ class NetworkError(AssessmentError):
 
 class ErrorHandler:
     """Centralized error handling with fallback strategies."""
-    
+
     @staticmethod
     def handle_assessment_error(
         error: Exception,
@@ -502,7 +502,7 @@ class ErrorHandler:
     ) -> dict:
         """
         Handle assessment errors with appropriate fallback.
-        
+
         Fallback strategies:
         1. RateLimitError → exponential backoff + retry
         2. TimeoutError → fallback assessment + log for manual review
@@ -510,7 +510,7 @@ class ErrorHandler:
         4. NetworkError → queue for later retry
         """
         error_type = type(error).__name__
-        
+
         if error_type == "RateLimitError":
             # Already handled in client.assess_job_cv_match()
             return {
@@ -518,7 +518,7 @@ class ErrorHandler:
                 "wait_seconds": 2 ** retry_count,
                 "next_action": "retry",
             }
-        
+
         elif error_type == "TimeoutError":
             return {
                 "strategy": "fallback_assessment",
@@ -527,14 +527,14 @@ class ErrorHandler:
                 "reasoning": "Assessment timed out - manual review recommended",
                 "next_action": "save_for_review",
             }
-        
+
         elif error_type == "InvalidResponseError":
             return {
                 "strategy": "simpler_prompt_retry",
                 "next_action": "retry_with_simpler_prompt",
                 "max_retries": 1,
             }
-        
+
         else:
             # Generic error → fallback
             return {
@@ -564,10 +564,10 @@ def test_assessment_client_success():
     }))]
     mock_response.usage.input_tokens = 1000
     mock_response.usage.output_tokens = 150
-    
+
     with patch.object(Anthropic, 'messages') as mock_create:
         mock_create.return_value.create = Mock(return_value=mock_response)
-        
+
         client = AssessmentClient()
         job = {
             "title": "Senior Python Engineer",
@@ -576,9 +576,9 @@ def test_assessment_client_success():
             "benefits": "Competitive salary",
         }
         cv_summary = "Python expert, 10 years experience"
-        
+
         assessment, metadata = client.assess_job_cv_match(job, cv_summary)
-        
+
         assert assessment["match_score"] == 0.85
         assert assessment["recommendation"] == "strong_match"
         assert metadata["input_tokens"] == 1000
@@ -598,15 +598,15 @@ def test_assessment_client_rate_limit_retry():
         }))]
         mock_success.usage.input_tokens = 900
         mock_success.usage.output_tokens = 100
-        
+
         mock_create.return_value.create = Mock(
             side_effect=[RateLimitError("Rate limited"), mock_success]
         )
-        
+
         client = AssessmentClient(max_retries=1)
         job = {"title": "Test", "requirements": "Test"}
         cv_summary = "Test CV"
-        
+
         # Should retry once after rate limit
         assessment, metadata = client.assess_job_cv_match(job, cv_summary)
         assert metadata.get("error") is None or assessment["match_score"] >= 0
@@ -617,16 +617,16 @@ def test_assessment_client_invalid_response():
     mock_response.content = [Mock(text="Not valid JSON")]
     mock_response.usage.input_tokens = 900
     mock_response.usage.output_tokens = 50
-    
+
     with patch.object(Anthropic, 'messages') as mock_create:
         mock_create.return_value.create = Mock(return_value=mock_response)
-        
+
         client = AssessmentClient()
         job = {"title": "Test", "requirements": "Test"}
         cv_summary = "Test CV"
-        
+
         assessment, metadata = client.assess_job_cv_match(job, cv_summary)
-        
+
         # Should return fallback assessment
         assert "match_score" in assessment
         assert "recommendation" in assessment
@@ -650,22 +650,22 @@ def test_assessment_client_invalid_response():
 - [ ] **Environment setup**:
   - [ ] Set `ANTHROPIC_API_KEY` in `.env` or GitHub Secrets
   - [ ] Test API connectivity: `python -c "from anthropic import Anthropic; Anthropic().models.list()"`
-  
+
 - [ ] **Configuration**:
   - [ ] Confirm model selection (Claude 3.5 Sonnet recommended)
   - [ ] Set retry policy (default: 3 retries with exponential backoff)
   - [ ] Configure timeout (default: 30 seconds)
-  
+
 - [ ] **Testing**:
   - [ ] Run unit tests with mocked Claude responses
   - [ ] Run integration test with 5 sample job-CV pairs
   - [ ] Verify cost tracking accuracy vs actual invoice
-  
+
 - [ ] **Monitoring**:
   - [ ] Log all API calls (timestamp, tokens, cost)
   - [ ] Alert on error rate >5%
   - [ ] Track rate limit frequency (should be rare)
-  
+
 - [ ] **Cost controls**:
   - [ ] Set daily budget alert ($50 recommended for testing)
   - [ ] Implement request throttling if needed (2-5 requests/sec)

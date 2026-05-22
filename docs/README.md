@@ -13,7 +13,7 @@ If you hit issues: **[docs/COMPATIBILITY.md](./docs/COMPATIBILITY.md)** - Troubl
 ATS Playground follows a 6-phase pipeline for job assessment:
 
 ```
-CRAWL (Playwright) 
+CRAWL (Playwright)
   ↓
 PREPROCESS (spaCy, tiktoken)
   ↓
@@ -141,7 +141,7 @@ See [docs/PREPROCESS.md](./docs/PREPROCESS.md#token-cost-savings) for detailed b
 
 ---
 
-**Last updated**: 2026-05-18  
-**Version**: 2.4  
-**Status**: Active & Maintained  
+**Last updated**: 2026-05-18
+**Version**: 2.4
+**Status**: Active & Maintained
 **Completed**: All 8 docs ✅ (CRAWL, PREPROCESS, VERIFY, ASSESS, STORAGE, CLI, ARCHITECTURE, CONVENTIONS) — **165 KB total**

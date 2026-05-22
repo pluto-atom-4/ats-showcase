@@ -1,0 +1,65 @@
+# Pre-commit hook configuration for ATS Playground
+# Install hooks: python -m src.setup.setup_precommit
+# Run manually: pre-commit run --all-files
+# Skip hooks: SKIP=hook_name git commit -m "..."
+
+repos:
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        entry: trailing-whitespace-fixer
+        language: python
+        types: [text]
+        stages: [commit]
+      - id: end-of-file-fixer
+        name: Fix end of file
+        entry: end-of-file-fixer
+        language: python
+        types: [text]
+        stages: [commit]
+
+  # Black code formatter
+  - repo: https://github.com/psf/black
+    rev: 26.3.1
+    hooks:
+      - id: black
+        name: Format code with black
+        language_version: python3
+        args: [--line-length=100]
+        stages: [commit]
+        types: [python]
+
+  # Ruff linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.14
+    hooks:
+      - id: ruff
+        name: Lint with ruff
+        args: [--fix, --show-fixes]
+        stages: [commit]
+        types: [python]
+
+  # mypy type checker
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.1.0
+    hooks:
+      - id: mypy
+        name: Type check with mypy
+        args: [--python-version=3.12, --ignore-missing-imports]
+        stages: [commit]
+        types: [python]
+
+  # pytest unit tests (local hook)
+  - repo: local
+    hooks:
+      - id: pytest-unit
+        name: pytest (unit tests only)
+        entry: python -m pytest -m "not slow and not integration"
+        language: system
+        types: [python]
+        stages: [commit]
+        pass_filenames: false
+        always_run: true
