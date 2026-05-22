@@ -49,7 +49,6 @@ repos:
       - id: mypy
         name: Type check with mypy
         args: [--python-version=3.12, --ignore-missing-imports]
-        additional_dependencies: [types-all]
         stages: [commit]
         types: [python]
 
