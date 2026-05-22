@@ -1,6 +1,7 @@
 """Tests for user verification CLI."""
 
 import pytest
+
 from src.verification.reviewer import JobReviewer
 
 

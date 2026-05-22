@@ -1,10 +1,10 @@
 # Issue #6 Implementation Plan: Pre-commit Code Quality Assurance
 
-**Issue**: #6 – 🔍 Pre-commit Code Quality Assurance: Black, Ruff, mypy & pytest Integration  
-**Status**: 📋 Planning  
-**Estimated Effort**: 20–30 minutes (4 phases, 15–25 min implementation + 5–10 min testing)  
-**Priority**: Medium (Quality assurance infrastructure, enables better workflows)  
-**Owner**: TBD  
+**Issue**: #6 – 🔍 Pre-commit Code Quality Assurance: Black, Ruff, mypy & pytest Integration
+**Status**: 📋 Planning
+**Estimated Effort**: 20–30 minutes (4 phases, 15–25 min implementation + 5–10 min testing)
+**Priority**: Medium (Quality assurance infrastructure, enables better workflows)
+**Owner**: TBD
 
 ---
 
@@ -209,7 +209,7 @@ Pre-commit setup utility for ATS Playground.
 
 Usage:
     python -m src.setup.setup_precommit [--skip-install]
-    
+
 Features:
     - Auto-install pre-commit hooks from .pre-commit-config.yaml
     - Validate hook configuration
@@ -225,7 +225,7 @@ class PreCommitSetup:
     def __init__(self):
         self.project_root = Path(__file__).parent.parent.parent
         self.config_file = self.project_root / ".pre-commit-config.yaml"
-    
+
     def install_hooks(self) -> bool:
         """Install pre-commit hooks."""
         try:
@@ -237,7 +237,7 @@ class PreCommitSetup:
             return True
         except subprocess.CalledProcessError:
             return False
-    
+
     def validate_config(self) -> bool:
         """Validate .pre-commit-config.yaml."""
         try:
@@ -249,7 +249,7 @@ class PreCommitSetup:
             return True
         except subprocess.CalledProcessError:
             return False
-    
+
     def run_all_hooks(self) -> bool:
         """Test all hooks on entire codebase."""
         try:
@@ -261,30 +261,30 @@ class PreCommitSetup:
             return True
         except subprocess.CalledProcessError:
             return False
-    
+
     def setup(self, skip_full_run: bool = False) -> int:
         """Complete setup process."""
         print("🔍 Setting up pre-commit hooks...\n")
-        
+
         # Step 1: Validate config
         if not self.validate_config():
             print("❌ Config validation failed")
             return 1
         print("✅ Config validated")
-        
+
         # Step 2: Install hooks
         if not self.install_hooks():
             print("❌ Hook installation failed")
             return 1
         print("✅ Hooks installed")
-        
+
         # Step 3: Run on all files (optional)
         if not skip_full_run:
             print("\n🔄 Running hooks on all files (this may take ~60s)...")
             if not self.run_all_hooks():
                 print("⚠️  Some files need formatting (auto-fixed)")
                 return 0  # Not a failure, just needs review
-        
+
         print("\n✨ Pre-commit setup complete!")
         return 0
 
@@ -317,7 +317,7 @@ git commit --no-verify -m "..."
 
 ### Deliverable
 
-**Files**: 
+**Files**:
 - `src/setup/setup_precommit.py` (200–250 lines)
 - Optional: `src/setup/__init__.py` (empty)
 
@@ -453,7 +453,7 @@ python -m src.setup.setup_precommit
   - Troubleshooting section
   - Performance benchmarks
   - Skip/bypass scenarios
-  
+
 - [ ] README updated with pre-commit reference
 - [ ] CONTRIBUTING.md has code quality checklist
 - [ ] All docs are clear & developer-friendly
@@ -485,24 +485,24 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      
+
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      
+
       - name: Install dependencies
         run: uv sync
-      
+
       - name: Run pre-commit hooks
         run: pre-commit run --all-files
-      
+
       - name: Run full test suite
         run: uv run pytest tests/ -v
 ```
@@ -703,7 +703,7 @@ Total: 20 minutes (typical) | 15–25 min range
 - **Time**: <1s
 - **Example**:
   ```python
-  # Before: x = 1     
+  # Before: x = 1
   # After:  x = 1
   ```
 

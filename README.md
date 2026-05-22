@@ -267,7 +267,7 @@ Tests cover:
 2. **Create feature branch**: `git checkout -b feature/my-feature`
 3. **Make changes** & write tests (coverage: 80%+)
 4. **Test**: `uv run pytest tests/ -v`
-5. **Lint**: 
+5. **Lint**:
    ```bash
    uv run black src/ tests/
    uv run ruff check src/ tests/ --fix
@@ -419,7 +419,7 @@ MIT — Use freely in commercial or personal projects. See [LICENSE](LICENSE) fo
 
 ---
 
-**Last updated**: 2026-05-19  
-**Status**: Active & Maintained ✅  
-**Documentation**: [8 comprehensive guides](./docs/README.md) — **165+ KB total**  
+**Last updated**: 2026-05-19
+**Status**: Active & Maintained ✅
+**Documentation**: [8 comprehensive guides](./docs/README.md) — **165+ KB total**
 **Repository**: [pluto-atom-4/ats-playground](https://github.com/pluto-atom-4/ats-playground)

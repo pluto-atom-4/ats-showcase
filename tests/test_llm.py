@@ -1,7 +1,8 @@
 """Tests for LLM client and prompts."""
 
 import pytest
-from src.llm.prompts import get_prompt, get_assessment_prompt
+
+from src.llm.prompts import get_assessment_prompt, get_prompt
 
 
 @pytest.mark.unit
@@ -26,7 +27,7 @@ def test_get_prompt():
     assessment = get_prompt("assessment")
     extraction = get_prompt("extraction")
     summary = get_prompt("summary")
-    
+
     assert len(assessment) > 0
     assert len(extraction) > 0
     assert len(summary) > 0

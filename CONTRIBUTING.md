@@ -164,10 +164,10 @@ from pydantic import BaseModel
 
 def process_jobs(jobs: List[Dict[str, str]]) -> Optional[str]:
     """Process a list of job postings.
-    
+
     Args:
         jobs: List of job posting dictionaries
-        
+
     Returns:
         Processed result or None if empty
     """
@@ -191,21 +191,21 @@ This module handles:
 
 class JobCrawler:
     """Crawl job postings from career pages.
-    
+
     Attributes:
         browser: Playwright browser instance
         timeout: Request timeout in seconds
     """
-    
+
     async def crawl(self, url: str) -> List[Dict]:
         """Crawl jobs from a single URL.
-        
+
         Args:
             url: Career page URL to crawl
-            
+
         Returns:
             List of extracted job dictionaries
-            
+
         Raises:
             TimeoutError: If request exceeds timeout
             ValueError: If URL is invalid
@@ -439,7 +439,7 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
    ```bash
    # Push your branch
    git push origin feature/your-feature-name
-   
+
    # Create PR (automatically opens in browser)
    gh pr create --web
    ```
@@ -500,4 +500,3 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 **Thank you for contributing to ATS Playground!** 🚀
 
 Your contributions help make this project better for everyone.
-

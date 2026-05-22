@@ -14,11 +14,11 @@
 
 ### Python Version & Tools
 
-**Target**: Python 3.11+  
-**Package manager**: `uv` (faster than pip)  
-**Type checking**: `mypy` (strict mode)  
-**Linting**: `ruff` (Rust-based, faster than flake8)  
-**Formatting**: `black` (opinionated, uncompromising)  
+**Target**: Python 3.11+
+**Package manager**: `uv` (faster than pip)
+**Type checking**: `mypy` (strict mode)
+**Linting**: `ruff` (Rust-based, faster than flake8)
+**Formatting**: `black` (opinionated, uncompromising)
 **Testing**: `pytest` with `pytest-cov` + `pytest-asyncio`
 
 ### Project Structure
@@ -74,12 +74,12 @@ tests/
 
 ### Naming Conventions
 
-**Modules**: `snake_case` (crawler.py, llm_client.py)  
-**Classes**: `PascalCase` (JobCrawler, CLaudeClient, StorageClient)  
-**Functions**: `snake_case` (extract_job_title, validate_selector)  
-**Constants**: `UPPER_SNAKE_CASE` (MAX_RETRIES, DEFAULT_TIMEOUT)  
-**Private**: `_leading_underscore` (_internal_helper, _parse_html)  
-**Dataclasses**: `PascalCase` (RawJob, PreprocessedJob, Assessment)  
+**Modules**: `snake_case` (crawler.py, llm_client.py)
+**Classes**: `PascalCase` (JobCrawler, CLaudeClient, StorageClient)
+**Functions**: `snake_case` (extract_job_title, validate_selector)
+**Constants**: `UPPER_SNAKE_CASE` (MAX_RETRIES, DEFAULT_TIMEOUT)
+**Private**: `_leading_underscore` (_internal_helper, _parse_html)
+**Dataclasses**: `PascalCase` (RawJob, PreprocessedJob, Assessment)
 **Type hints**: Always required (mypy --strict)
 
 ```python
@@ -87,10 +87,10 @@ tests/
 class JobCrawler:
     MAX_RETRIES = 5
     DEFAULT_TIMEOUT = 30
-    
+
     def __init__(self, config: CrawlerConfig) -> None:
         self._browser_pool: list[Browser] = []
-    
+
     async def extract_jobs(self, url: str) -> list[RawJob]:
         pass
 
@@ -118,7 +118,7 @@ class RawJob:
     company: str
     html: str
     timestamp: datetime
-    
+
     def __post_init__(self) -> None:
         # Validation after init
         if not self.url.startswith("http"):
@@ -256,12 +256,12 @@ class TestTokenCounter:
         count = counter.count(text)
         assert count > 0
         assert isinstance(count, int)
-    
+
     def test_count_tokens_empty(self):
         counter = TokenCounter()
         count = counter.count("")
         assert count == 0
-    
+
     @patch("tiktoken.encoding_for_model")
     def test_uses_correct_model(self, mock_encoding):
         counter = TokenCounter(model="gpt-4")
@@ -284,10 +284,10 @@ async def test_crawl_and_preprocess():
     """Test crawl output feeds into preprocess input."""
     crawler = JobCrawler(config=CrawlerConfig(headless=True))
     raw_job = await crawler.extract_job("https://acme.com/jobs/123")
-    
+
     cleaner = Cleaner()
     cleaned = cleaner.clean(raw_job.html)
-    
+
     assert cleaned.token_count < raw_job.html_token_estimate
     assert len(cleaned.text) > 0
     assert "<script>" not in cleaned.text  # tags removed
@@ -314,23 +314,23 @@ def test_full_workflow_e2e():
         config_path.write_text(json.dumps({
             "acme": {"url": "https://acme.com/jobs", "selector": "..."}
         }))
-        
+
         # Crawl
         result = runner.invoke(app, ["crawl", "--company", "acme", "--dry-run"])
         assert result.exit_code == 0
-        
+
         # Preprocess
         result = runner.invoke(app, ["preprocess", "--batch", "10"])
         assert result.exit_code == 0
-        
+
         # Review (non-interactive, auto-approve all)
         result = runner.invoke(app, ["review", "--auto-approve"])
         assert result.exit_code == 0
-        
+
         # Assess (mock Claude responses)
         result = runner.invoke(app, ["assess", "--mock"])
         assert result.exit_code == 0
-        
+
         # Export
         result = runner.invoke(app, ["export", "--output", f"{tmpdir}/out.md"])
         assert result.exit_code == 0
@@ -353,12 +353,12 @@ def mock_browser():
     browser = AsyncMock()
     context = AsyncMock()
     page = AsyncMock()
-    
+
     browser.new_context.return_value = context
     context.new_page.return_value = page
     page.goto.return_value = None
     page.query_selector.return_value = MagicMock(inner_html="<div>Job Title</div>")
-    
+
     return browser
 
 @pytest.fixture
@@ -433,10 +433,10 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 <footer>
 ```
 
-**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`  
-**Scope**: Module name (optional but recommended)  
-**Subject**: Imperative, 50 chars max, lowercase  
-**Body**: Why, not what (optional, 72 chars wrap)  
+**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+**Scope**: Module name (optional but recommended)
+**Subject**: Imperative, 50 chars max, lowercase
+**Body**: Why, not what (optional, 72 chars wrap)
 **Footer**: References (e.g., Fixes #123)
 
 ```bash
@@ -520,13 +520,13 @@ All docs in `docs/` use **GitHub-flavored Markdown**:
 
 ### Heading 3 (subsections)
 
-**Bold** for emphasis  
-`code` for inline code  
+**Bold** for emphasis
+`code` for inline code
 ```code block``` for multi-line
 
 - Bullet lists
   - Nested bullets
-  
+
 1. Numbered lists
 2. For procedures
 ```
@@ -761,4 +761,3 @@ git push origin feature/my-feature
 docker build -t ats-playground .
 docker run -e CLAUDE_API_KEY="sk-..." ats-playground
 ```
-

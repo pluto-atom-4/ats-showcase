@@ -257,7 +257,7 @@ Detailed troubleshooting in `docs/COMPATIBILITY.md`. Quick fixes:
 | **Token count mismatch** | Expected—tiktoken estimates vs actual Claude tokens differ slightly (tracked in cost_tracking) |
 | **Assessment skips jobs** | Ensure `status == "confirmed"` in DB; use `--confirmed-only` flag if needed |
 
-**View logs**: `tail -f logs/app.log`  
+**View logs**: `tail -f logs/app.log`
 **Full matrix**: See `docs/COMPATIBILITY.md`
 
 ## Documentation Map

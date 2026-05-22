@@ -1,8 +1,8 @@
 # NLP & Text Processing Setup Guide (Issue #7)
 
-**Status**: ✅ Complete  
-**Python Version**: 3.12.x recommended  
-**Components**: spaCy 3.8.14, MarkItDown, tiktoken, Pydantic v2  
+**Status**: ✅ Complete
+**Python Version**: 3.12.x recommended
+**Components**: spaCy 3.8.14, MarkItDown, tiktoken, Pydantic v2
 
 ---
 
@@ -49,8 +49,8 @@ python -m src.setup.validate_nlp_setup
 
 ### Python Version Strategy
 
-**Recommended**: Python 3.12.x (bugfix phase, EOL 2028-10)  
-**Alternative**: Python 3.13+ (security-only, newer features)  
+**Recommended**: Python 3.12.x (bugfix phase, EOL 2028-10)
+**Alternative**: Python 3.13+ (security-only, newer features)
 **Not Recommended**: Python 3.11 (legacy, performance slower)
 
 | Version | Status | EOL | Recommendation |
@@ -308,7 +308,7 @@ python -c "from playwright.sync_api import sync_playwright; p = sync_playwright(
 
 # Check variance
 db.query("""
-    SELECT 
+    SELECT
         AVG(ABS(actual_tokens - estimated_tokens) * 100.0 / actual_tokens) as variance_pct
     FROM cost_tracking
 """)
@@ -385,6 +385,6 @@ For issues:
 
 ---
 
-**Last Updated**: 2026-05-20  
-**Status**: Complete ✅  
-**Python**: 3.12.12 verified  
+**Last Updated**: 2026-05-20
+**Status**: Complete ✅
+**Python**: 3.12.12 verified

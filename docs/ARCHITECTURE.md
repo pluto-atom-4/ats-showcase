@@ -287,7 +287,7 @@ For 1000+ jobs/day, consider:
 1. **Async queue** (Celery, RQ, or AWS SQS):
    ```
    cli assess --async --queue "redis://localhost"
-   
+
    Workers (N processes):
      1. Poll queue for jobs
      2. Respect rate limits locally
@@ -360,7 +360,7 @@ For 1000+ jobs/day, consider:
    ```python
    # Periodically purge old assessments
    $ cli purge --older-than 90days
-   
+
    # Exports archived before deletion
    $ cli export --output archive_YYYY-MM-DD.md
    ```
@@ -427,18 +427,17 @@ ENTRYPOINT ["python", "-m", "src.cli"]
 
 ## FAQ
 
-**Q: Why SQLite instead of PostgreSQL?**  
+**Q: Why SQLite instead of PostgreSQL?**
 A: SQLite sufficient for single-user, <5 MB datasets. Easier to ship, backup, and restore. Upgrade to Postgres for multi-user or >50k assessments.
 
-**Q: Why Claude instead of open-source LLM?**  
+**Q: Why Claude instead of open-source LLM?**
 A: Claude Sonnet balances quality (good job-CV reasoning) and cost (~$0.0008/job). Open models require hosting, larger context, lower accuracy for this task.
 
-**Q: Why Playwright instead of simple HTTP?**  
+**Q: Why Playwright instead of simple HTTP?**
 A: Many job boards (LinkedIn, Indeed) require JavaScript execution. Playwright handles JavaScript rendering, form submission, pagination.
 
-**Q: Can I run this offline?**  
+**Q: Can I run this offline?**
 A: Crawl + preprocess yes (except LLM model download). Assessment requires Claude API (internet + API key). Storage queries work offline.
 
-**Q: How do I debug rate limit issues?**  
+**Q: How do I debug rate limit issues?**
 A: Check `logs/app.log` for "rate_limit_error". Batch processor will pause and retry. Monitor cost tracking in assessments table.
-

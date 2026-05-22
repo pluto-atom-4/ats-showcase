@@ -1,7 +1,7 @@
 """SQLite database initialization and schema."""
 
-import sqlite3
 import logging
+import sqlite3
 from pathlib import Path
 from typing import Optional
 
@@ -10,29 +10,29 @@ logger = logging.getLogger(__name__)
 
 class Database:
     """SQLite database manager for ATS Playground."""
-    
+
     def __init__(self, db_path: str = "data/ats_playground.db"):
         """
         Initialize database connection.
-        
+
         Args:
             db_path: Path to SQLite database file
         """
         self.db_path = db_path
         self.conn: Optional[sqlite3.Connection] = None
-    
+
     def connect(self) -> None:
         """Connect to database, creating if needed."""
         # TODO: Implement connection with proper config
         logger.info(f"Connecting to database: {self.db_path}")
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-    
+
     def initialize_schema(self) -> None:
         """Create all tables if they don't exist."""
         # TODO: Implement schema creation
         logger.info("Initializing database schema")
         self._create_tables()
-    
+
     def _create_tables(self) -> None:
         """Create all necessary tables."""
         # TODO: Implement table creation from SQL schema
@@ -42,32 +42,34 @@ class Database:
         # - assessments (CV match results)
         # - cost_tracking (token and cost logs)
         pass
-    
+
     def close(self) -> None:
         """Close database connection."""
         if self.conn:
             self.conn.close()
             logger.info("Database connection closed")
-    
+
     def get_cursor(self) -> sqlite3.Cursor:
         """Get database cursor."""
         if not self.conn:
             self.connect()
+        assert self.conn is not None, "Database connection failed"
         return self.conn.cursor()
-    
+
     def execute(self, query: str, params: tuple = ()) -> sqlite3.Cursor:
         """
         Execute query with parameters.
-        
+
         Args:
             query: SQL query
             params: Query parameters
-        
+
         Returns:
             Cursor with results
         """
         cursor = self.get_cursor()
         cursor.execute(query, params)
+        assert self.conn is not None, "Database connection failed"
         self.conn.commit()
         return cursor
 

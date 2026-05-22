@@ -142,6 +142,6 @@ For security questions or concerns, contact the maintainers privately rather tha
 
 ---
 
-**Last Updated**: 2026-05-19  
-**Status**: Initial Security Policy  
+**Last Updated**: 2026-05-19
+**Status**: Initial Security Policy
 **Next Review**: 2026-08-19 (quarterly)

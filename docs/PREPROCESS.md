@@ -26,7 +26,7 @@ Raw HTML Job Posting
 Structured Chunks Ready for VERIFY Phase
 ```
 
-**Cost Impact**: 
+**Cost Impact**:
 - Raw HTML: ~5,000-8,000 tokens per job posting
 - After preprocessing: ~500-800 tokens (82% reduction)
 - Savings: $0.034 per posting with Claude 3.5 Haiku
@@ -59,7 +59,7 @@ from markitdown import MarkItDown
 def clean_html_with_markitdown(html_string: str) -> str:
     """
     Convert HTML to clean Markdown text.
-    
+
     MarkItDown advantages:
     - Preserves document structure (headings, lists)
     - Token-efficient Markdown format
@@ -67,7 +67,7 @@ def clean_html_with_markitdown(html_string: str) -> str:
     - Much faster than BeautifulSoup for this use case
     """
     md = MarkItDown()
-    
+
     # Convert HTML string to markdown
     # Note: MarkItDown's convert() expects file paths,
     # so we use text_content from HTML stream conversion
@@ -96,21 +96,21 @@ from bs4 import BeautifulSoup
 def clean_html_with_beautifulsoup(raw_html: str) -> str:
     """Remove scripts, styles, ads, tracking elements."""
     soup = BeautifulSoup(raw_html, 'lxml')
-    
+
     # Remove noise elements
     for tag in soup.find_all(['script', 'style', 'iframe', 'noscript']):
         tag.decompose()
-    
+
     # Remove common ad/tracking classes
     for tag in soup.find_all(class_=lambda x: x and any(
-        noise in x.lower() 
+        noise in x.lower()
         for noise in ['ad', 'banner', 'tracking', 'analytics', 'cookie']
     )):
         tag.decompose()
-    
+
     # Extract text with preserved structure
     text = soup.get_text(separator='\n', strip=True)
-    
+
     # Remove excessive whitespace
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     return '\n'.join(lines)
@@ -139,7 +139,7 @@ from typing import Optional
 class HTMLCleaner:
     def __init__(self, prefer_markitdown: bool = True):
         self.prefer_markitdown = prefer_markitdown
-        
+
         if prefer_markitdown:
             try:
                 from markitdown import MarkItDown
@@ -149,14 +149,14 @@ class HTMLCleaner:
                 self.md = None
         else:
             self.md = None
-    
+
     def clean(self, html: str) -> str:
         """Clean HTML using preferred method."""
         if self.prefer_markitdown and self.md:
             return self._clean_with_markitdown(html)
         else:
             return self._clean_with_beautifulsoup(html)
-    
+
     def _clean_with_markitdown(self, html: str) -> str:
         try:
             result = self.md.convert_stream(
@@ -167,14 +167,14 @@ class HTMLCleaner:
         except Exception as e:
             print(f"MarkItDown failed: {e}, falling back to BeautifulSoup")
             return self._clean_with_beautifulsoup(html)
-    
+
     def _clean_with_beautifulsoup(self, html: str) -> str:
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(html, 'lxml')
-        
+
         for tag in soup.find_all(['script', 'style', 'iframe', 'noscript']):
             tag.decompose()
-        
+
         text = soup.get_text(separator='\n', strip=True)
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         return '\n'.join(lines)
@@ -196,7 +196,7 @@ nlp = spacy.load('en_core_web_sm')
 def extract_text_with_nlp(clean_text: str) -> dict:
     """Extract sentences and identify key entities."""
     doc = nlp(clean_text)
-    
+
     return {
         'sentences': [sent.text for sent in doc.sents],
         'tokens': [token.text for token in doc],
@@ -242,12 +242,12 @@ def create_semantic_chunks(
 ) -> List[dict]:
     """
     Create chunks respecting sentence boundaries.
-    
+
     Args:
         sentences: List of sentences from spaCy
         target_tokens: Try to fit this many tokens per chunk
         max_tokens: Hard limit (never exceed)
-    
+
     Returns:
         List of chunks with metadata
     """
@@ -255,10 +255,10 @@ def create_semantic_chunks(
     chunks = []
     current_chunk = []
     current_tokens = 0
-    
+
     for sentence in sentences:
         sentence_tokens = len(enc.encode(sentence))
-        
+
         # If adding this sentence exceeds target, start new chunk
         if current_tokens + sentence_tokens > target_tokens and current_chunk:
             chunks.append({
@@ -268,14 +268,14 @@ def create_semantic_chunks(
             })
             current_chunk = []
             current_tokens = 0
-        
+
         # If sentence alone exceeds max, truncate (rare for job postings)
         if sentence_tokens > max_tokens:
             sentence = sentence[:200]  # Emergency truncation
-        
+
         current_chunk.append(sentence)
         current_tokens += sentence_tokens
-    
+
     # Don't forget last chunk
     if current_chunk:
         chunks.append({
@@ -283,7 +283,7 @@ def create_semantic_chunks(
             'token_count': current_tokens,
             'sentence_count': len(current_chunk),
         })
-    
+
     return chunks
 ```
 
@@ -295,28 +295,28 @@ Mark each chunk with its semantic role:
 def classify_chunk_type(text: str, position: int, total_chunks: int) -> str:
     """
     Classify chunk content for filtering/prioritization.
-    
+
     Values: 'title', 'description', 'requirements', 'benefits', 'other'
     """
     text_lower = text.lower()
-    
+
     # Position heuristic: title usually near start
     if position == 0 or (position < 2 and len(text) < 100):
         return 'title'
-    
+
     # Content matching
-    if any(keyword in text_lower for keyword in 
+    if any(keyword in text_lower for keyword in
            ['requirement', 'must have', 'needed', 'skill', 'experience']):
         return 'requirements'
-    
-    if any(keyword in text_lower for keyword in 
+
+    if any(keyword in text_lower for keyword in
            ['benefit', 'offer', 'we provide', 'perks', 'compensation']):
         return 'benefits'
-    
-    if any(keyword in text_lower for keyword in 
+
+    if any(keyword in text_lower for keyword in
            ['about us', 'company', 'our team', 'mission', 'vision']):
         return 'description'
-    
+
     return 'other'
 ```
 
@@ -331,23 +331,23 @@ import tiktoken
 
 class TokenCounter:
     """Wrapper for consistent token counting across project."""
-    
+
     def __init__(self, model: str = 'claude-3-5-haiku-20241022'):
         self.encoding = tiktoken.encoding_for_model(model)
         self.model = model
-    
+
     def count_tokens(self, text: str) -> int:
         """Count tokens for given text."""
         return len(self.encoding.encode(text))
-    
+
     def count_batch(self, texts: List[str]) -> List[int]:
         """Count tokens for multiple texts."""
         return [self.count_tokens(text) for text in texts]
-    
+
     def estimate_cost(self, token_count: int, operation: str = 'input') -> float:
         """
         Estimate cost for tokens.
-        
+
         Claude 3.5 Haiku pricing:
         - Input: $0.80 per 1M tokens
         - Output: $4.00 per 1M tokens (estimate 20% output)
@@ -358,10 +358,10 @@ class TokenCounter:
                 'output': 4.00e-6,
             }
         }
-        
+
         if self.model not in rates:
             raise ValueError(f"Unknown model: {self.model}")
-        
+
         rate = rates[self.model].get(operation, 0)
         return token_count * rate
 
@@ -431,7 +431,7 @@ class ProcessedJob:
     original_tokens: int
     processed_tokens: int
     chunks: List[ProcessedChunk]
-    
+
     @property
     def token_reduction_pct(self) -> float:
         return (1 - self.processed_tokens / self.original_tokens) * 100
@@ -445,7 +445,7 @@ class PreprocessingPipeline:
         self.nlp = spacy.load(spacy_model)
         self.token_counter = TokenCounter()
         self.html_cleaner = HTMLCleaner(prefer_markitdown=use_markitdown)
-    
+
     def process_job(
         self,
         job_id: str,
@@ -455,31 +455,31 @@ class PreprocessingPipeline:
         target_chunk_tokens: int = 512,
     ) -> ProcessedJob:
         """Full preprocessing pipeline for one job."""
-        
+
         # Step 1: Clean HTML (MarkItDown or BeautifulSoup)
         clean_text = self.html_cleaner.clean(html_content)
-        
+
         # Step 2: Extract with NLP
         doc = self.nlp(clean_text)
         sentences = [sent.text for sent in doc.sents]
-        
+
         # Step 3: Semantic chunking
         chunks_data = create_semantic_chunks(
             sentences,
             target_tokens=target_chunk_tokens,
         )
-        
+
         # Step 4: Classify and track tokens
         processed_chunks = []
         total_processed_tokens = 0
-        
+
         for idx, chunk_data in enumerate(chunks_data):
             chunk_type = classify_chunk_type(
                 chunk_data['text'],
                 idx,
                 len(chunks_data)
             )
-            
+
             processed_chunks.append(ProcessedChunk(
                 text=chunk_data['text'],
                 chunk_type=chunk_type,
@@ -488,12 +488,12 @@ class PreprocessingPipeline:
                 chunk_index=idx,
                 total_chunks=len(chunks_data),
             ))
-            
+
             total_processed_tokens += chunk_data['token_count']
-        
+
         # Compare to original HTML token count
         original_tokens = self.token_counter.count_tokens(html_content)
-        
+
         return ProcessedJob(
             job_id=job_id,
             company=company,
@@ -502,7 +502,7 @@ class PreprocessingPipeline:
             processed_tokens=total_processed_tokens,
             chunks=processed_chunks,
         )
-    
+
     def process_batch(
         self,
         jobs: List[dict],  # [{'id': '', 'company': '', 'title': '', 'html': ''}]
@@ -517,13 +517,13 @@ class PreprocessingPipeline:
                 html_content=job['html'],
             )
             results.append(result)
-        
+
         # Print summary
         if results:
             total_reduction = sum(j.token_reduction_pct for j in results) / len(results)
             print(f"Batch summary: {len(results)} jobs processed")
             print(f"Average token reduction: {total_reduction:.1f}%")
-        
+
         return results
 ```
 
@@ -581,7 +581,7 @@ def test_beautifulsoup_fallback():
 def test_semantic_chunking_respects_sentence_boundaries():
     sentences = ["This is sentence one.", "This is sentence two.", "This is sentence three."]
     chunks = create_semantic_chunks(sentences, target_tokens=20)
-    
+
     # Each chunk should contain complete sentences
     for chunk in chunks:
         assert chunk['text'].endswith('.')
@@ -589,13 +589,13 @@ def test_semantic_chunking_respects_sentence_boundaries():
 def test_chunk_type_classification():
     title_text = "Senior Software Engineer - Platform Team"
     assert classify_chunk_type(title_text, 0, 5) == 'title'
-    
+
     req_text = "Requirements: 5+ years Python, AWS expertise"
     assert classify_chunk_type(req_text, 2, 5) == 'requirements'
 
 def test_token_counter_accuracy():
     counter = TokenCounter()
-    
+
     # Known examples
     text = "Hello world"
     tokens = counter.count_tokens(text)
@@ -608,7 +608,7 @@ def test_token_counter_accuracy():
 ```python
 def test_full_preprocessing_pipeline():
     pipeline = PreprocessingPipeline(use_markitdown=True)
-    
+
     job = {
         'id': 'test-1',
         'company': 'TestCorp',
@@ -626,19 +626,19 @@ def test_full_preprocessing_pipeline():
             </div>
         '''
     }
-    
+
     result = pipeline.process_job(
         job_id=job['id'],
         company=job['company'],
         title=job['title'],
         html_content=job['html'],
     )
-    
+
     # Verify structure
     assert result.job_id == 'test-1'
     assert len(result.chunks) > 0
     assert result.token_reduction_pct > 70
-    
+
     # Verify chunks
     for chunk in result.chunks:
         assert chunk.token_count > 0

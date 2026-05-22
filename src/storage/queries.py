@@ -1,28 +1,26 @@
 """SQL queries for job storage and retrieval."""
 
-from typing import List, Dict, Any, Optional
 import logging
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 class JobQueries:
     """Common SQL queries for job data."""
-    
+
     @staticmethod
     def get_all_jobs(
-        status: Optional[str] = None,
-        company: Optional[str] = None,
-        limit: int = 100
+        status: Optional[str] = None, company: Optional[str] = None, limit: int = 100
     ) -> str:
         """
         Get jobs with optional filtering.
-        
+
         Args:
             status: Filter by status (pending_review, confirmed, rejected)
             company: Filter by company name
             limit: Limit results
-        
+
         Returns:
             SQL query string
         """
@@ -33,19 +31,16 @@ class JobQueries:
             query += f" AND company = '{company}'"
         query += f" ORDER BY crawled_date DESC LIMIT {limit}"
         return query
-    
+
     @staticmethod
-    def search_jobs(
-        keyword: str,
-        min_score: Optional[float] = None
-    ) -> str:
+    def search_jobs(keyword: str, min_score: Optional[float] = None) -> str:
         """
         Full-text search jobs by keyword using FTS5.
-        
+
         Args:
             keyword: Search keyword
             min_score: Minimum assessment score (if available)
-        
+
         Returns:
             SQL query string
         """
@@ -61,7 +56,7 @@ class JobQueries:
             query += f" AND a.overall_score >= {min_score}"
         query += " ORDER BY a.overall_score DESC NULLS LAST"
         return query
-    
+
     @staticmethod
     def get_stats() -> str:
         """Get database statistics."""
@@ -81,12 +76,12 @@ class JobQueries:
 
 class CostQueries:
     """SQL queries for cost tracking."""
-    
+
     @staticmethod
     def get_total_cost() -> str:
         """Get total cost across all jobs."""
         return "SELECT SUM(cost) as total_cost FROM cost_tracking"
-    
+
     @staticmethod
     def get_cost_by_phase() -> str:
         """Get cost breakdown by phase."""
@@ -105,7 +100,7 @@ class CostQueries:
 
 class AssessmentQueries:
     """SQL queries for assessment results."""
-    
+
     @staticmethod
     def get_top_matches(limit: int = 10) -> str:
         """Get top matching jobs."""
@@ -121,7 +116,7 @@ class AssessmentQueries:
             ORDER BY a.overall_score DESC
             LIMIT {limit}
         """
-    
+
     @staticmethod
     def get_below_threshold(threshold: float = 50) -> str:
         """Get jobs below score threshold."""

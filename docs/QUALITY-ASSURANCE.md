@@ -75,8 +75,8 @@ These hooks require manual fixes:
 **Example**:
 ```python
 # Before (with trailing spaces)
-x = 1     
-y = 2     
+x = 1
+y = 2
 
 # After (spaces removed)
 x = 1
@@ -343,12 +343,12 @@ git commit --no-verify -m "Emergency hotfix"
 
 ### Q: Hooks are taking too long (>60s)
 
-**A**: 
+**A**:
 1. Check if pytest is running slow tests:
    ```bash
    # See which tests are marked slow
    pytest --collect-only -m slow
-   
+
    # Verify markers in test files
    grep -r "@pytest.mark" tests/
    ```
@@ -392,7 +392,7 @@ ignore_missing_imports = true  # Ignore all untyped imports
 
 ### Q: I got a false positive from ruff/black
 
-**A**: 
+**A**:
 
 For Black:
 ```python

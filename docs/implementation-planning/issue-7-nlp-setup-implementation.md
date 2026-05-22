@@ -1,13 +1,13 @@
 # 🚀 Issue #7 Implementation Plan: NLP & Text Processing Setup
 
-**Issue**: #7 – Setup and configure spaCy & MarkItDown  
-**Status**: 🟢 Ready for Implementation (Dependencies + Conflicts Verified)  
-**Priority**: 🔴 High  
-**Effort**: ⏱️ 35-45 minutes (revised from 15-20 min estimate)  
-**Note**: Dependencies already configured in `pyproject.toml` ✅ | Dependency conflicts analyzed ✅  
-**Python Version**: 🐍 **3.12.x recommended** (was 3.13.5, see Python section below)  
-**Created**: 2026-05-20  
-**Updated**: 2026-05-20 (aligned with pyproject.toml + Python analysis + dependency conflict research)  
+**Issue**: #7 – Setup and configure spaCy & MarkItDown
+**Status**: 🟢 Ready for Implementation (Dependencies + Conflicts Verified)
+**Priority**: 🔴 High
+**Effort**: ⏱️ 35-45 minutes (revised from 15-20 min estimate)
+**Note**: Dependencies already configured in `pyproject.toml` ✅ | Dependency conflicts analyzed ✅
+**Python Version**: 🐍 **3.12.x recommended** (was 3.13.5, see Python section below)
+**Created**: 2026-05-20
+**Updated**: 2026-05-20 (aligned with pyproject.toml + Python analysis + dependency conflict research)
 
 ---
 
@@ -31,7 +31,7 @@ This implementation focuses on:
 
 ## 🐍 Python Version Strategy
 
-**Current Environment**: Python 3.13.5 (available in session)  
+**Current Environment**: Python 3.13.5 (available in session)
 **Recommended for Implementation**: **Python 3.12.x** ✅
 
 ### Why 3.12.x Over 3.13.5?
@@ -71,8 +71,8 @@ uv run python -m spacy info  # Verify spaCy compatibility
 
 ### Performance Note
 
-Python 3.13 is ~5-10% faster for CPU-bound tasks, but ATS Playground is I/O-bound 
-(LLM API calls dominate). Performance difference is **negligible** (~0.5-1 sec on 
+Python 3.13 is ~5-10% faster for CPU-bound tasks, but ATS Playground is I/O-bound
+(LLM API calls dominate). Performance difference is **negligible** (~0.5-1 sec on
 100-job preprocessing). Stability/maturity more important.
 
 ---
@@ -128,10 +128,10 @@ Phase 4: Documentation 🟡 (10 min - TODO)
   └─ Create docs/SETUP.md guide
 ```
 
-**⚠️ UPDATED**: Added Python 3.12.x pinning to Phase 1 (5 min new task)  
+**⚠️ UPDATED**: Added Python 3.12.x pinning to Phase 1 (5 min new task)
 **New Total Effort**: ~40 minutes → **~45 minutes** (Phase 1 expanded to include Python setup)
 
-**⚠️ Key Change**: Phase 1 is already complete! Dependencies are properly configured in `pyproject.toml`.  
+**⚠️ Key Change**: Phase 1 is already complete! Dependencies are properly configured in `pyproject.toml`.
 **New Total Effort**: ~35 minutes (was 75 minutes) – **Phase 1 saves 5 minutes**
 
 ### Dependencies Map
@@ -258,7 +258,7 @@ def validate_spacy():
         version = spacy.__version__
         if not version.startswith('3.8') and not version.startswith('3.9'):
             raise ValueError(f"spaCy {version} < 3.8.0")
-        
+
         # Test model loading
         nlp = spacy.load('en_core_web_md')
         doc = nlp('Test sentence for NER.')
@@ -296,7 +296,7 @@ def check_system_dependencies():
     """Check for system-level dependencies (lxml, etc.)."""
     os_name = platform.system()
     results = {'platform': os_name, 'checks': {}}
-    
+
     if os_name == 'Linux':
         # Check for libxml2, libxslt
         for lib in ['libxml2', 'libxslt']:
@@ -308,7 +308,7 @@ def check_system_dependencies():
                 results['checks'][lib] = '✅' if result.returncode == 0 else '❌'
             except:
                 results['checks'][lib] = '⚠️ (dpkg check failed)'
-    
+
     elif os_name == 'Darwin':  # macOS
         # Check for Homebrew installs
         for lib in ['libxml2', 'libxslt']:
@@ -320,16 +320,16 @@ def check_system_dependencies():
                 results['checks'][lib] = '✅' if result.returncode == 0 else '⚠️'
             except:
                 results['checks'][lib] = '⚠️ (brew check failed)'
-    
+
     elif os_name == 'Windows':
         results['checks']['windows_wheels'] = '✅ (auto-installed)'
-    
+
     return results
 
 def main():
     print("🔍 NLP Setup Validation")
     print("=" * 60)
-    
+
     results = {
         'spacy': validate_spacy(),
         'markitdown': validate_markitdown(),
@@ -337,7 +337,7 @@ def main():
         'tiktoken': validate_tiktoken(),
         'system_deps': check_system_dependencies(),
     }
-    
+
     for name, result in results.items():
         if name == 'system_deps':
             print(f"\n🖥️  System Dependencies ({result['platform']})")
@@ -346,13 +346,13 @@ def main():
         else:
             status = result.get('status', '?')
             print(f"{status} {name}: {result}")
-    
+
     # Exit with error if required components missing
     if results['spacy']['status'] == '❌':
         print("\n❌ CRITICAL: spaCy 3.8.0+ required")
         print("   Fix: uv sync")
         sys.exit(1)
-    
+
     print("\n✅ All core components installed")
 
 if __name__ == '__main__':
@@ -406,7 +406,7 @@ def test_model_loaded():
     """Verify en_core_web_md loads."""
     nlp = spacy.load('en_core_web_md')
     doc = nlp('Senior Python developer wanted.')
-    
+
     # Check NER
     assert len(doc.ents) > 0
     assert any(ent.label_ == 'PERSON' for ent in doc.ents)
@@ -437,7 +437,7 @@ def test_html_to_markdown():
     html = "<h1>Senior Python Dev</h1><p>Requires 5+ years...</p>"
     cleaner = get_html_cleaner()
     clean = cleaner.clean(html)
-    
+
     # Verify boilerplate removed
     assert "<" not in clean or clean.count("<") < html.count("<") * 0.2
 ```
@@ -451,12 +451,12 @@ from src.tokenization.processor import PreprocessingPipeline
 def test_preprocessing_speed_100_jobs():
     """Benchmark: 100 jobs < 30 seconds."""
     jobs = [SAMPLE_JOB_HTML] * 100
-    
+
     pipeline = PreprocessingPipeline()
     start = time.time()
     results = [pipeline.process(job) for job in jobs]
     elapsed = time.time() - start
-    
+
     assert elapsed < 30, f"100 jobs took {elapsed:.1f}s (target: <30s)"
     assert all(r.tokens > 0 for r in results)
     assert all(r.cost_usd > 0 for r in results)
@@ -785,7 +785,7 @@ python-version:
 
 ---
 
-**Last Updated**: 2026-05-20  
-**Version**: 1.0  
-**Author**: Implementation Planning  
+**Last Updated**: 2026-05-20
+**Version**: 1.0
+**Author**: Implementation Planning
 **Status**: 🟡 Ready for Development

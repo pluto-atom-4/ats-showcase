@@ -1,8 +1,9 @@
 """Tests for storage and database functionality."""
 
 import pytest
+
 from src.storage.db import Database
-from src.storage.queries import JobQueries, CostQueries
+from src.storage.queries import CostQueries, JobQueries
 
 
 @pytest.mark.unit
@@ -19,7 +20,7 @@ def test_job_queries():
     query = JobQueries.get_all_jobs(status="confirmed", company="TechCorp")
     assert "confirmed" in query
     assert "TechCorp" in query
-    
+
     # Test search_jobs
     search_query = JobQueries.search_jobs(keyword="Python", min_score=75)
     assert "Python" in search_query
@@ -31,6 +32,6 @@ def test_cost_queries():
     """Test cost tracking queries."""
     total_query = CostQueries.get_total_cost()
     assert "SUM(cost)" in total_query
-    
+
     phase_query = CostQueries.get_cost_by_phase()
     assert "phase" in phase_query

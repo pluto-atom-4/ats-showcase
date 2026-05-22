@@ -206,9 +206,7 @@ class PreCommitSetup:
         if not skip_full_run:
             self._print_step("4", "Testing hooks on all files")
             if not self.run_all_hooks():
-                self._print_warning(
-                    "\n⚠️  Some formatting needed. Review changes and commit."
-                )
+                self._print_warning("\n⚠️  Some formatting needed. Review changes and commit.")
                 return 0  # Not a critical failure
 
         # Success
