@@ -52,7 +52,7 @@ Unlike Claude Code (which uses `.claude/settings.json`), GitHub Copilot CLI requ
    - Registration: `skillOverrides` array
    - Installation: Automatic (file-based)
    - When available: During Code sessions
-   
+
 2. **GitHub Copilot CLI Skills** (gh copilot)
    - Delivered via: GitHub plugin repositories
    - Installation: Manual (`gh copilot -- plugin install`)
