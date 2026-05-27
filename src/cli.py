@@ -1,9 +1,14 @@
 """Typer CLI for ATS Playground workflow orchestration."""
 
+import asyncio
+import json
 import logging
+from pathlib import Path
 from typing import Optional
 
 import typer
+
+from src.browser.crawler import Crawler
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +69,57 @@ def crawl_companies(
     mock: bool = typer.Option(False, help="Mock crawling without browser"),
 ) -> None:
     """Crawl job postings from company career pages."""
-    # TODO: Implement crawling logic
     logger.info(f"Crawling companies from {config}")
-    typer.echo("🌐 Crawling in progress...")
+    typer.echo("🌐 Crawling in progress...\n")
+
+    config_path = Path(config)
+    if not config_path.exists():
+        typer.echo(f"❌ Config file not found: {config}", err=True)
+        raise typer.Exit(1)
+
+    try:
+        with open(config_path) as f:
+            config_data = json.load(f)
+    except json.JSONDecodeError as e:
+        typer.echo(f"❌ Invalid JSON in config: {e}", err=True)
+        raise typer.Exit(1) from None
+
+    companies = config_data.get("companies", {})
+    if not companies:
+        typer.echo("❌ No companies found in config", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"📋 Found {len(companies)} companies to crawl\n")
+
+    crawler = Crawler(headless=headless, timeout_ms=timeout)
+
+    async def run_crawl():
+        try:
+            results = await crawler.crawl_multiple(companies)
+
+            total_jobs = sum(len(jobs) for jobs in results.values())
+            typer.echo(f"\n✅ Crawl complete! Extracted {total_jobs} total jobs\n")
+
+            for company_name, jobs in results.items():
+                typer.echo(f"   • {company_name}: {len(jobs)} jobs")
+
+                if jobs:
+                    output_file = Path("data/extracted_jobs") / f"{company_name.lower()}_jobs.json"
+                    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+                    jobs_data = [job.model_dump(mode="json") for job in jobs]
+                    with open(output_file, "w") as f:
+                        json.dump(jobs_data, f, indent=2, default=str)
+                    typer.echo(f"      Saved to: {output_file}")
+
+        except Exception as e:
+            logger.error(f"Crawl failed: {e}", exc_info=True)
+            typer.echo(f"\n❌ Crawl failed: {e}", err=True)
+            raise typer.Exit(1) from None
+        finally:
+            await crawler.close()
+
+    asyncio.run(run_crawl())
 
 
 # ============================================================================

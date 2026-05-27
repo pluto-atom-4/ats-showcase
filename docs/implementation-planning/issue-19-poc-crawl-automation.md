@@ -84,45 +84,41 @@ EOF
 
 ---
 
-#### Task 1.2: CSS Selector Discovery
+#### Task 1.2: CSS Selector Discovery ✅ COMPLETE
 
-**Approach**:
-1. Inspect rendered HTML manually or with browser DevTools
-2. Identify selectors for:
-   - **Container**: Wrapping div for each job listing
-   - **Title**: Job title text (h2, h3, span, p)
-   - **Description**: Job description text (usually multiple elements)
-   - **URL**: Link to job details page (href attribute)
-   - **Location**: Location/department (usually in subtitle or data attribute)
-3. Test selectors for reliability across multiple job items
-4. Create fallback selectors for robustness
+**Key Discovery**: Carbon Robotics uses **Greenhouse Job Board** (not static Squarespace content)
 
-**Squarespace Patterns to Test**:
+**Actual Target URL**: `https://job-boards.greenhouse.io/embed/job_board?for=carbonrobotics`
+
+**Job Structure Found**:
+```html
+<tr class="job-post">
+  <td class="cell">
+    <a href="https://carbonrobotics.com/job-openings?gh_jid=4673637006" target="_top">
+      <p class="body body--medium">Deep Learning Engineer</p>
+      <p class="body body__secondary body--metadata">Seattle, WA</p>
+    </a>
+  </td>
+</tr>
 ```
-Primary (most specific):
-- .collection-item.project-item
-- [data-item-id]
 
-Secondary (broader patterns):
-- .item
-- [class*="item"]
-
-Title selectors:
-- h2 (usually first heading in item)
-- h3 (backup)
-- .item-title
-- [class*="title"]
-
-Description selectors:
-- p (first or all paragraphs)
-- .item-description
-- [class*="description"]
-
-Link selectors:
-- a[href] (first or specific pattern)
-- .item-link
-- a[data-item-id]
+**CSS Selectors Discovered**:
+```json
+{
+  "container": "tr.job-post",
+  "link": "tr.job-post a[href*='gh_jid']",
+  "title": "p.body.body--medium",
+  "location": "p.body__secondary.body--metadata"
+}
 ```
+
+**Job Count**: 26 jobs available
+**Departments**: Deep Learning, Electrical Engineering, Mechanical Engineering, Software Engineering, Field Operations, Manufacturing, People Operations, Sales, Software Support
+
+**Implementation Simplification**:
+- Don't parse complex Squarespace + iframe
+- Target Greenhouse embed directly (standard HTML structure)
+- Selectors are simple and stable (used across Greenhouse boards)
 
 **Command** (after manual inspection or browser DevTools):
 ```bash
