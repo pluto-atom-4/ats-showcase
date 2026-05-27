@@ -9,6 +9,8 @@ from typing import Optional
 import typer
 
 from src.browser.crawler import Crawler
+from src.storage.assessment_store import AssessmentStore
+from src.storage.export import ExportConfig, MarkdownExporter
 
 logger = logging.getLogger(__name__)
 
@@ -234,12 +236,10 @@ def preprocess_jobs(
 @review_app.command()
 def review_jobs(
     extracted: str = typer.Option(
-        "data/extracted_jobs/carbonrobotics_jobs.json",
-        help="Path to extracted jobs JSON"
+        "data/extracted_jobs/carbonrobotics_jobs.json", help="Path to extracted jobs JSON"
     ),
     preprocessed: str = typer.Option(
-        "data/extracted_jobs/preprocessed_jobs.json",
-        help="Path to preprocessed jobs JSON"
+        "data/extracted_jobs/preprocessed_jobs.json", help="Path to preprocessed jobs JSON"
     ),
 ) -> None:
     """Interactively review extracted jobs before LLM assessment."""
@@ -300,7 +300,7 @@ def assess_jobs(
         except ValueError as e:
             typer.echo(f"❌ LLM setup failed: {e}", err=True)
             typer.echo("   Set ANTHROPIC_API_KEY environment variable", err=True)
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
 
         # Get confirmed jobs from database
         reviewer = JobReviewer()
@@ -375,10 +375,7 @@ def assess_jobs(
                 total_tokens += assessment.tokens_used
 
             except Exception as e:
-                typer.echo(
-                    f"❌ Job {idx}/{len(confirmed_jobs)}: {title}\n"
-                    f"   Error: {e}\n"
-                )
+                typer.echo(f"❌ Job {idx}/{len(confirmed_jobs)}: {title}\n" f"   Error: {e}\n")
                 failed += 1
                 logger.error(f"Assessment failed for job {job_id}: {e}", exc_info=True)
 
@@ -399,9 +396,7 @@ def assess_jobs(
         if top_matches:
             typer.echo("\n🏆 Top Matches:")
             for i, match in enumerate(top_matches, 1):
-                typer.echo(
-                    f"   {i}. {match['title']} - Overall: {match['overall_score']:.0f}/100"
-                )
+                typer.echo(f"   {i}. {match['title']} - Overall: {match['overall_score']:.0f}/100")
 
         typer.echo("\n✅ Assessment complete!\n")
 
@@ -423,14 +418,82 @@ def assess_jobs(
 
 @export_app.command()
 def export_results(
-    output: str = typer.Option("data/assessments/report.md", help="Output file"),
-    format: str = typer.Option("md", help="Format: md or json"),
-    min_score: float = typer.Option(0, help="Minimum score to include"),
+    output: str = typer.Option("data/assessments/report.md", help="Output file path"),
+    min_score: int = typer.Option(0, help="Minimum score to include (0-100)"),
+    max_score: int = typer.Option(100, help="Maximum score to include (0-100)"),
+    sort_by: str = typer.Option("score", help="Sort by: score, company, or location"),
+    template: str = typer.Option("detailed", help="Template: detailed or summary"),
+    include_recommendations: bool = typer.Option(True, help="Include LLM recommendations"),
+    include_stats: bool = typer.Option(True, help="Include analytics section"),
 ) -> None:
-    """Export assessment results to Markdown or JSON."""
-    # TODO: Implement export logic
-    logger.info(f"Exporting to {output}")
-    typer.echo(f"📊 Exporting to {output}...")
+    """Export assessment results to Markdown report."""
+    try:
+        # Validate inputs
+        if not 0 <= min_score <= 100:
+            typer.echo("❌ min_score must be 0-100", err=True)
+            raise typer.Exit(1)
+        if not 0 <= max_score <= 100:
+            typer.echo("❌ max_score must be 0-100", err=True)
+            raise typer.Exit(1)
+        if min_score > max_score:
+            typer.echo("❌ min_score must be <= max_score", err=True)
+            raise typer.Exit(1)
+
+        # Load assessment store
+        db_path = "data/ats_playground.db"
+        store = AssessmentStore(db_path)
+        total = store.count_assessments()
+
+        if total == 0:
+            typer.echo(
+                "⚠️  No assessments found. Run assess-jobs first.",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        # Create export config
+        config = ExportConfig(
+            min_score=min_score,
+            max_score=max_score,
+            sort_by=sort_by,
+            template_style=template,
+            include_recommendations=include_recommendations,
+            include_stats=include_stats,
+        )
+
+        # Generate report
+        typer.echo(f"📊 Generating report (score {min_score}-{max_score})...")
+        exporter = MarkdownExporter(store, config)
+        report = (
+            exporter.generate_summary() if template == "summary" else exporter.generate_report()
+        )
+
+        # Write to file
+        output_path = Path(output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(report, encoding="utf-8")
+
+        # Display summary
+        filtered_in_range = len(
+            store.get_assessments_by_score(min_score, max_score)
+        )
+        file_size_kb = output_path.stat().st_size / 1024
+
+        typer.echo(f"✅ Exported {filtered_in_range}/{total} jobs to {output}")
+        typer.echo(f"   File size: {file_size_kb:.1f} KB")
+        typer.echo(f"   Template: {template}")
+
+        logger.info(
+            f"Export complete: {filtered_in_range} jobs, {file_size_kb:.1f} KB"
+        )
+
+    except ValueError as e:
+        typer.echo(f"❌ Invalid option: {e}", err=True)
+        raise typer.Exit(1) from None
+    except Exception as e:
+        logger.error(f"Export failed: {e}", exc_info=True)
+        typer.echo(f"❌ Export failed: {e}", err=True)
+        raise typer.Exit(1) from None
 
 
 # ============================================================================
@@ -441,13 +504,62 @@ def export_results(
 @app.command()
 def query(
     keyword: str = typer.Option(..., help="Search keyword"),
-    min_score: Optional[float] = typer.Option(None, help="Minimum score"),
-    limit: int = typer.Option(10, help="Result limit"),
+    min_score: Optional[int] = typer.Option(None, help="Minimum score filter"),
+    max_score: Optional[int] = typer.Option(None, help="Maximum score filter"),
+    limit: int = typer.Option(10, help="Maximum results"),
+    json_output: bool = typer.Option(False, help="Output as JSON"),
 ) -> None:
     """Search stored assessments by keyword and score."""
-    # TODO: Implement search logic
-    logger.info(f"Searching for: {keyword}")
-    typer.echo("🔍 Searching...")
+    try:
+        # Load assessment store
+        db_path = "data/ats_playground.db"
+        store = AssessmentStore(db_path)
+
+        # Set defaults
+        min_s = min_score if min_score is not None else 0
+        max_s = max_score if max_score is not None else 100
+
+        # Search
+        typer.echo(f"🔍 Searching for '{keyword}' (score {min_s}-{max_s}, limit {limit})...\n")
+        results = store.search_by_keyword(keyword, min_score=min_s, max_score=max_s, limit=limit)
+
+        if not results:
+            typer.echo(f"⚠️  No results found for '{keyword}' in score range {min_s}-{max_s}")
+            raise typer.Exit(0)
+
+        if json_output:
+            # JSON output
+            output = json.dumps(results, indent=2, default=str)
+            typer.echo(output)
+        else:
+            # Table output
+            typer.echo(f"Found {len(results)} results:\n")
+            typer.echo("Rank │ Company          │ Title                    │ Score │ Tech │ Senior")
+            typer.echo("─────┼──────────────────┼──────────────────────────┼───────┼──────┼───────")
+
+            for idx, job in enumerate(results, 1):
+                company = str(job.get("company", "N/A"))[:15].ljust(15)
+                title = str(job.get("job_title", "N/A"))[:24].ljust(24)
+                overall = int(job.get("overall_score", 0))
+                tech = int(job.get("tech_score", 0))
+                seniority = int(job.get("seniority_score", 0))
+
+                typer.echo(
+                    f" {idx:2d}  │ {company} │ {title} │ {overall:3d}   │ {tech:3d}  │ {seniority:3d}"
+                )
+
+            # Stats
+            typer.echo("")
+            avg_score = sum(r.get("overall_score", 0) for r in results) / len(results)
+            typer.echo(f"📊 Average score: {avg_score:.1f}")
+            typer.echo(f"💡 Tip: Use 'export-results --min-score {min_s}' to get a full report")
+
+        logger.info(f"Search complete: found {len(results)} results for '{keyword}'")
+
+    except Exception as e:
+        logger.error(f"Search failed: {e}", exc_info=True)
+        typer.echo(f"❌ Search failed: {e}", err=True)
+        raise typer.Exit(1) from None
 
 
 @app.command()

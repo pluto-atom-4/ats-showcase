@@ -25,6 +25,8 @@ class AssessmentStore:
         recommendations TEXT,
         summary TEXT,
         tokens_used INTEGER,
+        input_tokens INTEGER DEFAULT 0,
+        output_tokens INTEGER DEFAULT 0,
         actual_cost REAL,
         assessed_date TIMESTAMP,
         FOREIGN KEY (job_id) REFERENCES job_reviews(job_id)
@@ -88,6 +90,8 @@ class AssessmentStore:
         summary: str,
         tokens_used: int,
         actual_cost: float,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
     ) -> None:
         """Save assessment to database."""
         if not self.conn:
@@ -100,8 +104,8 @@ class AssessmentStore:
             """INSERT OR REPLACE INTO job_assessments
                (job_id, title, company, location, overall_score, tech_score,
                 seniority_score, location_score, recommendations, summary,
-                tokens_used, actual_cost, assessed_date)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                tokens_used, input_tokens, output_tokens, actual_cost, assessed_date)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
             (
                 job_id,
                 title,
@@ -114,6 +118,8 @@ class AssessmentStore:
                 json.dumps(recommendations),
                 summary,
                 tokens_used,
+                input_tokens,
+                output_tokens,
                 actual_cost,
             ),
         )
@@ -168,16 +174,19 @@ class AssessmentStore:
 
         return results
 
-    def get_assessments_by_score(self, min_score: float = 70) -> List[Dict[str, Any]]:
-        """Get all assessments above minimum score."""
+    def get_assessments_by_score(
+        self, min_score: float = 70, max_score: float = 100
+    ) -> List[Dict[str, Any]]:
+        """Get all assessments within score range."""
         if not self.conn:
             return []
 
         cursor = self.conn.cursor()
         cursor.execute(
             """SELECT * FROM job_assessments
-               WHERE overall_score >= ? ORDER BY overall_score DESC""",
-            (min_score,),
+               WHERE overall_score >= ? AND overall_score <= ?
+               ORDER BY overall_score DESC""",
+            (min_score, max_score),
         )
 
         results = []
@@ -237,14 +246,18 @@ class AssessmentStore:
                 "min_score": 0,
                 "total_cost": 0,
                 "avg_cost": 0,
+                "total_input_tokens": 0,
+                "total_output_tokens": 0,
             }
 
-        # Scores
+        # Scores & tokens
         cursor.execute("""SELECT
                AVG(overall_score) as avg_score,
                MAX(overall_score) as max_score,
                MIN(overall_score) as min_score,
-               SUM(actual_cost) as total_cost
+               SUM(actual_cost) as total_cost,
+               SUM(COALESCE(input_tokens, 0)) as total_input_tokens,
+               SUM(COALESCE(output_tokens, 0)) as total_output_tokens
                FROM job_assessments""")
         row = cursor.fetchone()
 
@@ -255,6 +268,8 @@ class AssessmentStore:
             "min_score": row["min_score"] or 0,
             "total_cost": row["total_cost"] or 0,
             "avg_cost": (row["total_cost"] or 0) / total if total > 0 else 0,
+            "total_input_tokens": row["total_input_tokens"] or 0,
+            "total_output_tokens": row["total_output_tokens"] or 0,
         }
 
     def get_score_distribution(self) -> Dict[str, int]:
@@ -281,6 +296,142 @@ class AssessmentStore:
             distribution[label] = cursor.fetchone()["count"]
 
         return distribution
+
+    def get_score_ranges(self) -> Dict[str, int]:
+        """Get job counts by score range (for analytics)."""
+        if not self.conn:
+            return {}
+
+        cursor = self.conn.cursor()
+        ranges = {}
+
+        for range_key in ["0-25", "25-50", "50-75", "75-100"]:
+            min_s, max_s = map(int, range_key.split("-"))
+            cursor.execute(
+                """SELECT COUNT(*) as count FROM job_assessments
+                   WHERE overall_score >= ? AND overall_score < ?""",
+                (min_s, max_s),
+            )
+            ranges[range_key] = cursor.fetchone()["count"]
+
+        return ranges
+
+    def search_by_keyword(
+        self,
+        keyword: str,
+        min_score: int = 0,
+        max_score: int = 100,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search assessments by keyword with score filtering.
+
+        Args:
+            keyword: Search term
+            min_score: Minimum score filter
+            max_score: Maximum score filter
+            limit: Maximum results to return
+
+        Returns:
+            List of matching assessments
+        """
+        if not self.conn or not keyword:
+            return []
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute(
+                """SELECT ja.* FROM job_assessments ja
+                   WHERE ja.job_id IN (
+                       SELECT job_id FROM job_assessments_fts
+                       WHERE job_assessments_fts MATCH ?
+                   )
+                   AND ja.overall_score BETWEEN ? AND ?
+                   ORDER BY ja.overall_score DESC
+                   LIMIT ?""",
+                (keyword, min_score, max_score, limit),
+            )
+
+            results = []
+            for row in cursor.fetchall():
+                result = dict(row)
+                if result.get("recommendations"):
+                    result["recommendations"] = json.loads(result["recommendations"])
+                results.append(result)
+
+            return results
+        except sqlite3.OperationalError as e:
+            logger.warning(f"Keyword search failed: {e}")
+            return []
+
+    def get_top_keywords(self, limit: int = 20) -> List[tuple]:
+        """
+        Get top keywords from job descriptions.
+
+        Args:
+            limit: Maximum keywords to return
+
+        Returns:
+            List of (keyword, frequency) tuples
+        """
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute(
+                """SELECT COUNT(*) as freq FROM job_assessments
+                   GROUP BY title, company
+                   ORDER BY freq DESC
+                   LIMIT ?""",
+                (limit,),
+            )
+
+            keywords = []
+            for row in cursor.fetchall():
+                keywords.append((row["freq"], row["freq"]))
+
+            return keywords
+        except sqlite3.OperationalError:
+            return []
+
+    def get_recommendations_summary(self) -> Dict[str, int]:
+        """
+        Get aggregated recommendations with frequency counts.
+
+        Returns:
+            Dictionary mapping recommendations to count
+        """
+        if not self.conn:
+            return {}
+
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT recommendations FROM job_assessments WHERE recommendations IS NOT NULL"
+        )
+
+        recommendations_summary: Dict[str, int] = {}
+
+        for row in cursor.fetchall():
+            if row["recommendations"]:
+                try:
+                    recs = json.loads(row["recommendations"])
+                    if isinstance(recs, list):
+                        for rec in recs:
+                            recommendations_summary[rec] = recommendations_summary.get(rec, 0) + 1
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+        # Sort by frequency
+        return dict(
+            sorted(
+                recommendations_summary.items(),
+                key=lambda x: x[1],
+                reverse=True,
+            )
+        )
 
     def count_assessments(self) -> int:
         """Get total assessment count."""

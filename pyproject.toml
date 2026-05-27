@@ -120,6 +120,7 @@ ignore = [
 "__init__.py" = ["F401", "F403"]
 "tests/*" = ["F401", "F403"]
 "src/llm/provider.py" = ["C901"]  # assess_job method complexity (retry logic)
+"src/cli.py" = ["C901"]  # assess_jobs command complexity (workflow orchestration)
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
