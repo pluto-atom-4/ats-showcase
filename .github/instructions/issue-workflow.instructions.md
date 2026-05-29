@@ -361,6 +361,26 @@ mdl docs/
 # Expected: All green ✅
 ```
 
+**Common Pre-commit Issues & Solutions:**
+
+If pre-commit hooks fail:
+
+| Hook | Error | Fix |
+|------|-------|-----|
+| **Trim trailing whitespace** | "Fixed trailing whitespace" | Pre-commit auto-fixes; re-run to verify |
+| **Fix end of file** | "Fixed end of file" | File missing final newline; pre-commit adds it |
+| **Black formatter** | "Reformatted file" | Pre-commit auto-fixes; re-run to verify |
+| **Ruff linter** | "Fixed issues" | Pre-commit auto-fixes; re-run to verify |
+| **mypy** | "Type errors" | Requires manual fixes; examine error messages |
+
+**If a hook modifies files:**
+```bash
+# After pre-commit auto-fixes:
+git add <modified-files>
+uv run pre-commit run --all-files
+# Repeat until all hooks pass
+```
+
 **Note on Markdown Linting:**
 If `mdl` reports errors, most are resolvable:
 - Trailing spaces: Fixed by pre-commit
@@ -855,5 +875,3 @@ This file is part of the ATS Playground GitHub Copilot instruction system. For c
 **Last Updated**: 2026-05-29
 **Status**: Active
 **Scope**: All GitHub Issue implementations in this repository
-
-
