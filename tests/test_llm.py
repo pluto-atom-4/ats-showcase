@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.llm.prompts import get_assessment_prompt, get_prompt
+from llm.prompts import get_assessment_prompt, get_prompt
 
 
 @pytest.mark.unit

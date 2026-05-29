@@ -8,9 +8,9 @@ from typing import Optional
 
 import typer
 
-from .browser.crawler import Crawler
-from .storage.assessment_store import AssessmentStore
-from .storage.export import ExportConfig, MarkdownExporter
+from browser.crawler import Crawler
+from storage.assessment_store import AssessmentStore
+from storage.export import ExportConfig, MarkdownExporter
 
 logger = logging.getLogger(__name__)
 

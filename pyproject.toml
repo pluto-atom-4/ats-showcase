@@ -127,6 +127,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+pythonpath = ["src"]
 addopts = "--strict-markers -v"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",

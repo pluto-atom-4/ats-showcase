@@ -6,7 +6,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
-from ..models.job import Assessment
+from models.job import Assessment
 
 logger = logging.getLogger(__name__)
 

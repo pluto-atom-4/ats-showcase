@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.llm.provider import AssessmentResult, LLMProvider
-from src.storage.assessment_store import AssessmentStore
+from llm.provider import AssessmentResult, LLMProvider
+from storage.assessment_store import AssessmentStore
 
 
 class TestAssessmentResult:

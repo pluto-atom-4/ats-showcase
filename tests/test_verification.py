@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.verification import JobReviewer, ReviewStats
+from verification import JobReviewer, ReviewStats
 
 
 class TestReviewStats:

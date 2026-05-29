@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.browser.crawler import Crawler
-from src.browser.selectors import SelectorManager
+from browser.crawler import Crawler
+from browser.selectors import SelectorManager
 
 
 @pytest.mark.asyncio

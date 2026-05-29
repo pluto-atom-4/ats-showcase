@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.storage.assessment_store import AssessmentStore
-from src.storage.export import ExportConfig, MarkdownExporter
+from storage.assessment_store import AssessmentStore
+from storage.export import ExportConfig, MarkdownExporter
 
 # ============================================================================
 # FIXTURES

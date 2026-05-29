@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
-from ..models.job import JobPosting
+from models.job import JobPosting
 
 logger = logging.getLogger(__name__)
 
