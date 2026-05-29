@@ -1,9 +1,9 @@
 # Issue #22: Fix Mock Response Parsing in LLM Assessment Tests
 
-**Issue**: Fix mock response parsing in LLM assessment tests  
-**Status**: Planning  
-**Priority**: Medium (blocking quality gates, but not production)  
-**Estimated Time**: 30-45 minutes  
+**Issue**: Fix mock response parsing in LLM assessment tests
+**Status**: Planning
+**Priority**: Medium (blocking quality gates, but not production)
+**Estimated Time**: 30-45 minutes
 **Dependencies**: PR #21 merged (import/fixture fixes complete)
 
 ---
@@ -179,7 +179,7 @@ Test Assertion
    # Before:
    @pytest.mark.xfail(reason="Mock response parsing not working correctly. See issue #22.")
    def test_assess_job_success(self, mock_anthropic):
-   
+
    # After:
    def test_assess_job_success(self, mock_anthropic):
    ```
@@ -270,7 +270,7 @@ Test Assertion
 
 ---
 
-**Document Version**: 1.0  
-**Created**: 2026-05-29  
-**Status**: Planning  
+**Document Version**: 1.0
+**Created**: 2026-05-29
+**Status**: Planning
 **Last Updated**: 2026-05-29

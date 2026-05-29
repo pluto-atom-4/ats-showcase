@@ -80,11 +80,14 @@ class TestLLMProvider:
             client = MagicMock()
             mock_class.return_value = client
 
-            # Mock successful response
+            # Mock successful response with proper content structure
             response = MagicMock()
             response.usage.input_tokens = 600
             response.usage.output_tokens = 50
-            response.content[0].text = json.dumps(
+
+            # Create a proper TextBlock-like object with .text attribute
+            text_block = MagicMock()
+            text_block.text = json.dumps(
                 {
                     "tech_score": 85,
                     "seniority_score": 80,
@@ -94,6 +97,9 @@ class TestLLMProvider:
                     "summary": "Good fit",
                 }
             )
+
+            # Make response.content iterable as a list
+            response.content = [text_block]
             client.messages.create.return_value = response
 
             yield mock_class, client
@@ -112,7 +118,6 @@ class TestLLMProvider:
             with pytest.raises(ValueError):
                 LLMProvider()
 
-    @pytest.mark.xfail(reason="Mock response parsing not working correctly. See issue #20.")
     def test_assess_job_success(self, mock_anthropic):
         """Test successful job assessment."""
         mock, client = mock_anthropic
@@ -129,16 +134,17 @@ class TestLLMProvider:
         assert result.tech_score == 85
         assert result.tokens_used == 650
 
-    @pytest.mark.xfail(reason="Mock response parsing not working correctly. See issue #20.")
     def test_assess_job_with_markdown_json(self, mock_anthropic):
         """Test assessment with markdown-wrapped JSON response."""
         mock, client = mock_anthropic
 
-        # Mock response with markdown code block
+        # Mock response with markdown code block - proper content structure
         response = MagicMock()
         response.usage.input_tokens = 600
         response.usage.output_tokens = 50
-        response.content[0].text = (
+
+        text_block = MagicMock()
+        text_block.text = (
             "```json\n"
             + json.dumps(
                 {
@@ -152,6 +158,7 @@ class TestLLMProvider:
             )
             + "\n```"
         )
+        response.content = [text_block]
         client.messages.create.return_value = response
 
         provider = LLMProvider(api_key="test-key")
@@ -163,7 +170,6 @@ class TestLLMProvider:
 
         assert result.overall_score == 78
 
-    @pytest.mark.xfail(reason="Mock response parsing not working correctly. See issue #20.")
     def test_assess_job_token_cost_calculation(self, mock_anthropic):
         """Test token cost calculation."""
         mock, client = mock_anthropic
