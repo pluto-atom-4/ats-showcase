@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from src.storage.assessment_store import AssessmentStore
+from .assessment_store import AssessmentStore
 
 logger = logging.getLogger(__name__)
 
