@@ -1,0 +1,1 @@
+rules "#{Dir.pwd}/.mdl_rules.rb"
