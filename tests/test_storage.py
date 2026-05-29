@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.storage.db import Database
-from src.storage.queries import CostQueries, JobQueries
+from storage.db import Database
+from storage.queries import CostQueries, JobQueries
 
 
 @pytest.mark.unit

@@ -1,23 +1,162 @@
-"""Tests for user verification CLI."""
+"""Unit tests for job verification module (Phase 3)."""
+
+import json
+import sqlite3
+import tempfile
+from pathlib import Path
 
 import pytest
 
-from src.verification.reviewer import JobReviewer
+from verification import JobReviewer, ReviewStats
 
 
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_job_reviewer_initialization():
-    """Test job reviewer initialization."""
-    reviewer = JobReviewer()
-    assert reviewer is not None
+class TestReviewStats:
+    """Test ReviewStats tracking."""
+
+    def test_init(self):
+        """Test stats initialization."""
+        stats = ReviewStats()
+        assert stats.total == 0
+        assert stats.confirmed == 0
+        assert stats.rejected == 0
+        assert stats.skipped == 0
+
+    def test_add_confirmed(self):
+        """Test recording confirmed jobs."""
+        stats = ReviewStats()
+        stats.add_confirmed(100, 0.0003)
+        assert stats.confirmed == 1
+        assert stats.total_tokens == 100
+        assert stats.total_cost == 0.0003
+
+    def test_add_rejected(self):
+        """Test recording rejected jobs."""
+        stats = ReviewStats()
+        stats.add_rejected("location")
+        assert stats.rejected == 1
+        assert stats.rejection_reasons["location"] == 1
+
+    def test_add_skipped(self):
+        """Test recording skipped jobs."""
+        stats = ReviewStats()
+        stats.add_skipped()
+        assert stats.skipped == 1
+
+    def test_get_summary(self):
+        """Test summary generation."""
+        stats = ReviewStats()
+        stats.total = 5
+        stats.confirmed = 3
+        stats.rejected = 2
+        summary = stats.get_summary()
+        assert "3" in summary
+        assert "2" in summary
 
 
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_review_job(sample_job_data):
-    """Test single job review."""
-    reviewer = JobReviewer()
-    result = await reviewer.review_job(sample_job_data)
-    assert result is not None
-    assert "title" in result
+class TestJobReviewer:
+    """Test JobReviewer class."""
+
+    @pytest.fixture
+    def temp_db(self):
+        """Create temporary database for testing."""
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        yield db_path
+        Path(db_path).unlink(missing_ok=True)
+
+    def test_init_creates_db(self, temp_db):
+        """Test reviewer initialization creates database."""
+        reviewer = JobReviewer(db_path=temp_db)
+        reviewer._close_db()
+
+        assert Path(temp_db).exists()
+
+    def test_save_and_retrieve_review(self, temp_db):
+        """Test saving and retrieving reviews."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        # Save a confirmed job
+        reviewer.save_review(
+            job_id="job_1",
+            title="Engineer",
+            location="SF",
+            status="confirmed",
+            tokens=100,
+            estimated_cost=0.0003,
+        )
+
+        # Retrieve and verify
+        status = reviewer.get_review_status("job_1")
+        assert status == "confirmed"
+
+        reviewer._close_db()
+
+    def test_save_rejection_with_reason(self, temp_db):
+        """Test saving rejections with reasons."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        reviewer.save_review(
+            job_id="job_2",
+            title="Role",
+            location="NYC",
+            status="rejected",
+            reason="location",
+        )
+
+        status = reviewer.get_review_status("job_2")
+        assert status == "rejected"
+
+        reviewer._close_db()
+
+    def test_get_confirmed_jobs(self, temp_db):
+        """Test retrieving confirmed jobs."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        reviewer.save_review(
+            "job_1", "Engineer", "SF", "confirmed", tokens=100, estimated_cost=0.0003
+        )
+        reviewer.save_review("job_2", "Designer", "NYC", "rejected", reason="location")
+        reviewer.save_review(
+            "job_3", "Manager", "LA", "confirmed", tokens=80, estimated_cost=0.0002
+        )
+
+        confirmed = reviewer.get_confirmed_jobs()
+        assert len(confirmed) == 2
+        assert confirmed[0]["job_id"] == "job_1"
+        assert confirmed[1]["job_id"] == "job_3"
+
+        reviewer._close_db()
+
+    def test_review_status_skip_reviewed(self, temp_db):
+        """Test that already-reviewed jobs are skipped."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        reviewer.save_review("job_1", "Engineer", "SF", "confirmed", tokens=100)
+        status = reviewer.get_review_status("job_1")
+        assert status == "confirmed"
+
+        reviewer._close_db()
+
+    def test_database_schema_exists(self, temp_db):
+        """Test that database schema is correctly created."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        # Verify table exists
+        cursor = reviewer.conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='job_reviews'")
+        assert cursor.fetchone() is not None
+
+        reviewer._close_db()
+
+    def test_database_persistence(self, temp_db):
+        """Test that database changes persist across connections."""
+        # First connection
+        reviewer1 = JobReviewer(db_path=temp_db)
+        reviewer1.save_review("job_1", "Engineer", "SF", "confirmed", tokens=100)
+        reviewer1._close_db()
+
+        # Second connection
+        reviewer2 = JobReviewer(db_path=temp_db)
+        status = reviewer2.get_review_status("job_1")
+        assert status == "confirmed"
+        reviewer2._close_db()

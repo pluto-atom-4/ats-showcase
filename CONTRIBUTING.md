@@ -183,7 +183,7 @@ Job 1: Senior Software Engineer @ Google
   Technical skills: 90/100 (Python, Go, AWS match)
   Seniority: 80/100 (8 years vs 10+ required)
   Location: 75/100 (Relocation available)
-  
+
   Recommendation: ✅ APPLY NOW - Good fit
   Cost: $0.002 (estimated: $0.002) ✅
 

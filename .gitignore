@@ -109,6 +109,10 @@ models/
 .spacy_models/
 *.bin
 
+# Exception: src/models/ package is Python code, not cached models
+!src/models/
+!src/models/*.py
+
 # Docker
 .dockerignore
 *.container

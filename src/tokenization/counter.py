@@ -1,7 +1,12 @@
 """Token counting and cost estimation using tiktoken."""
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
+
+try:
+    import tiktoken
+except ImportError:
+    tiktoken = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -23,17 +28,28 @@ class TokenCounter:
             model: Claude model identifier
         """
         self.model = model
-        self.encoding = None
+        self.encoding: Optional["tiktoken.Encoding"] = None
         self._load_encoding()
 
     def _load_encoding(self) -> None:
         """Load tiktoken encoding for the model."""
-        # TODO: Implement tiktoken encoding loading
-        logger.info(f"Loading tokenizer for {self.model}")
+        try:
+            import tiktoken
+
+            self.encoding = tiktoken.get_encoding("cl100k_base")
+            logger.info(f"Loaded tiktoken cl100k_base for {self.model}")
+        except ImportError:
+            logger.warning("tiktoken not available, will use fallback token counting")
+            self.encoding = None
+        except Exception as e:
+            logger.error(f"Failed to load tiktoken: {e}")
+            self.encoding = None
 
     def count_tokens(self, text: str) -> int:
         """
         Count tokens in text using tiktoken.
+
+        Falls back to word-based estimation if tiktoken unavailable.
 
         Args:
             text: Input text
@@ -41,10 +57,35 @@ class TokenCounter:
         Returns:
             Token count
         """
-        # TODO: Implement token counting
-        return 0
+        if not text:
+            return 0
 
-    def count_chunks(self, chunks: List[str]) -> Dict[str, int]:
+        if self.encoding:
+            try:
+                tokens = self.encoding.encode(text)
+                return len(tokens)
+            except Exception as e:
+                logger.warning(f"tiktoken encoding failed: {e}, using fallback")
+
+        return self._estimate_tokens(text)
+
+    def _estimate_tokens(self, text: str) -> int:
+        """
+        Estimate tokens using heuristic (fallback).
+
+        Heuristic: 1 token ≈ 1.3 words on average.
+
+        Args:
+            text: Input text
+
+        Returns:
+            Estimated token count
+        """
+        words = len(text.split())
+        estimated = max(1, int(words * 1.3))
+        return estimated
+
+    def count_chunks(self, chunks: List[str]) -> Dict[int, int]:
         """
         Count tokens for each chunk.
 
@@ -54,8 +95,7 @@ class TokenCounter:
         Returns:
             Dict of chunk_index -> token_count
         """
-        # TODO: Implement batch token counting
-        return {}
+        return {i: self.count_tokens(chunk) for i, chunk in enumerate(chunks)}
 
     def estimate_cost(self, input_tokens: int, output_tokens: int = 100) -> float:
         """
@@ -71,3 +111,15 @@ class TokenCounter:
         input_cost = (input_tokens / 1_000_000) * self.CLAUDE_PRICING["input"]
         output_cost = (output_tokens / 1_000_000) * self.CLAUDE_PRICING["output"]
         return input_cost + output_cost
+
+    def format_cost(self, cost: float) -> str:
+        """
+        Format cost as readable string.
+
+        Args:
+            cost: Cost in USD
+
+        Returns:
+            Formatted cost string (e.g., "$0.0024")
+        """
+        return f"${cost:.4f}"

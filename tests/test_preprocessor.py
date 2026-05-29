@@ -2,9 +2,9 @@
 
 import pytest
 
-from src.tokenization.chunker import SemanticChunker
-from src.tokenization.counter import TokenCounter
-from src.tokenization.preprocessor import Preprocessor
+from tokenization.chunker import SemanticChunker
+from tokenization.counter import TokenCounter
+from tokenization.preprocessor import Preprocessor
 
 
 @pytest.mark.unit

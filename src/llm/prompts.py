@@ -13,22 +13,73 @@ def get_assessment_prompt(cv_summary: Optional[str] = None) -> str:
     Returns:
         Prompt template string
     """
-    base_prompt = """You are an expert ATS (Applicant Tracking System) evaluator. Analyze the CV against the job posting.
+    base_prompt = """You are an expert recruiter evaluating job fit for candidates.
 
-Provide a structured assessment with:
-1. Overall match score (0-100)
-2. Technical skills match score (0-100)
-3. Seniority level match score (0-100)
-4. Location/logistics match score (0-100)
-5. Key gaps or missing skills
-6. Recommendations for improving fit
-7. Brief summary (2-3 sentences)
+Analyze the CV against the job posting and score on these dimensions:
 
-Be objective and specific. If skills don't match, explain why."""
+1. **Tech Skills Match (0-100)**: Do they have required technologies?
+2. **Seniority Level Match (0-100)**: Years of experience vs. role expectations?
+3. **Location Fit (0-100)**: Remote/on-site/hybrid alignment?
+4. **Overall Score (0-100)**: Weighted fit (40% tech, 30% seniority, 30% location)
+
+For each dimension, provide:
+- Score (0-100)
+- Reasoning
+- Gaps or mismatches
+
+Output format: ONLY valid JSON, no markdown, no extra text.
+
+Example response:
+{
+  "tech_score": 85,
+  "seniority_score": 78,
+  "location_score": 60,
+  "overall_score": 75,
+  "recommendations": ["Learn Kubernetes", "Strengthen AWS knowledge"],
+  "summary": "Strong Python/backend developer with solid experience. Junior on cloud infrastructure, which is a gap for this role."
+}"""
 
     if cv_summary:
         return f"{base_prompt}\n\nCandidate Summary:\n{cv_summary}"
     return base_prompt
+
+
+def build_cv_fit_prompt(cv_text: str, job_text: str) -> str:
+    """
+    Build a complete CV fit assessment prompt.
+
+    Args:
+        cv_text: User's CV as text
+        job_text: Job description text
+
+    Returns:
+        Complete assessment prompt
+    """
+    return f"""You are an expert recruiter evaluating job fit.
+
+CANDIDATE CV:
+{cv_text}
+
+JOB POSTING:
+{job_text}
+
+Score on these dimensions (0-100 scale):
+1. Tech Skills Match: Do they have required technologies?
+2. Seniority Level: Years of experience vs. role expectations?
+3. Location Fit: Remote/on-site/hybrid alignment?
+4. Overall Score: Weighted fit (40% tech, 30% seniority, 30% location)
+
+Provide 2-3 gaps/recommendations for improvement.
+
+Respond with ONLY this JSON (no markdown, no extra text):
+{{
+  "tech_score": <0-100>,
+  "seniority_score": <0-100>,
+  "location_score": <0-100>,
+  "overall_score": <0-100>,
+  "recommendations": ["gap1", "gap2"],
+  "summary": "<2-3 sentence assessment>"
+}}"""
 
 
 def get_extraction_prompt() -> str:

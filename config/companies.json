@@ -21,6 +21,36 @@
         "location": ".meta-location",
         "requirements": ".requirements-list"
       }
+    },
+    "CarbonRobotics": {
+      "name": "Carbon Robotics",
+      "url": "https://job-boards.greenhouse.io/embed/job_board?for=carbonrobotics",
+      "description": "Laser weeding robotics company - Greenhouse Job Board (26 jobs available)",
+      "crawler": {
+        "type": "single_page",
+        "headless": true,
+        "timeout_ms": 30000,
+        "wait_for_selector": "tr.job-post",
+        "delay_ms": 2000
+      },
+      "selectors": {
+        "job_container": "tr.job-post",
+        "title": "p.body.body--medium",
+        "location": "p.body__secondary.body--metadata",
+        "link": "a[href*='gh_jid']"
+      },
+      "fallback_selectors": {
+        "job_container": "[class*='job-post'], tr",
+        "title": "p, h2, h3",
+        "location": "p, span",
+        "link": "a[href]"
+      },
+      "notes": [
+        "Uses Greenhouse Job Board embed",
+        "Jobs organized by department (Deep Learning, Electrical Engineering, Mechanical Engineering, Software Engineering, Field Operations, Manufacturing, People Operations, Sales, Software Support)",
+        "26 jobs available as of 2026-05-27",
+        "All jobs primarily in Seattle, WA with some remote/international positions"
+      ]
     }
   }
 }
