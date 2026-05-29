@@ -260,6 +260,54 @@ Detailed troubleshooting in `docs/COMPATIBILITY.md`. Quick fixes:
 **View logs**: `tail -f logs/app.log`
 **Full matrix**: See `docs/COMPATIBILITY.md`
 
+## Copilot Instructions File Structure
+
+This repository follows the **official GitHub Copilot custom instructions patterns** (verified May 2026):
+
+### Files in This Repository
+
+**1. Repository-wide Instructions (This File)**
+- **Location**: `.github/copilot-instructions.md`
+- **Purpose**: Apply to all Copilot requests in the repository
+- **Used by**: Copilot Chat, Cloud Agent, Code Review
+- **Content**: Project overview, architecture, patterns, conventions, best practices
+
+**2. Path-scoped Instructions (Issue Workflow Guide)**
+- **Location**: `.github/instructions/issue-workflow.instructions.md`
+- **Purpose**: Apply to GitHub Issue implementation workflows
+- **Used by**: Cloud Agent, Code Review
+- **Content**: Standardized 5-phase workflow (Planning, Implementation, Validation, Branch/Commit, PR/Review)
+
+**3. Agent-specific Instructions (Optional)**
+- **Location**: `CLAUDE.md` (root level)
+- **Purpose**: Long-form guidance for Claude agents
+- **Content**: Commands, architecture, patterns, troubleshooting for Claude Code users
+
+### How to Use These Instructions
+
+- **For general Copilot work**: Read this file (.github/copilot-instructions.md)
+- **For implementing GitHub Issues**: Follow `.github/instructions/issue-workflow.instructions.md`
+- **For Claude Code (IDE)**: See CLAUDE.md for comprehensive guidance
+- **Official reference**: https://docs.github.com/en/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot
+
+### Documentation Structure for Issue Implementation
+
+When working on GitHub Issues, use the **two-location documentation approach**:
+
+1. **Implementation Planning** (`docs/implementation-planning/`)
+   - File: `issue-<NUMBER>-<kebab-case-title>.md`
+   - Created: During Phase 1 (Planning) - BEFORE implementation
+   - Content: Step-by-step plan, investigation checklist, success criteria
+   - Example: `issue-22-mock-parsing-fix.md`, `issue-19-poc-crawl-automation.md`
+
+2. **Developer Notes** (`docs/dev-note/`)
+   - File: `issue-<NUMBER>-<kebab-case-title>.md`
+   - Created: During Phase 2-3 (Implementation/Validation) - AFTER discoveries
+   - Content: Research findings, architecture decisions, lessons learned
+   - Example: `issue-19-poc-evaluation-guide.md`, `issue-23-copilot-structure-analysis.md`
+
+For detailed workflow steps, see `.github/instructions/issue-workflow.instructions.md`.
+
 ## Documentation Map
 
 **Detailed reference** (See CLAUDE.md for comprehensive architecture):
@@ -276,8 +324,9 @@ Detailed troubleshooting in `docs/COMPATIBILITY.md`. Quick fixes:
 - **docs/COMPATIBILITY.md** - Known issues, version compatibility, troubleshooting matrix
 - **SECURITY.md** - Vulnerability reporting, best practices, security review checklist
 - **CONTRIBUTING.md** - Development workflow, code quality standards, PR process
+- **`.github/instructions/issue-workflow.instructions.md`** - GitHub Issue implementation workflow guide (official Copilot instructions)
 
-**For Copilot users**: Start with CLAUDE.md, then reference phase-specific guides as needed.
+**For Copilot users**: Start with CLAUDE.md, then reference phase-specific guides as needed. For implementing GitHub Issues, see `.github/instructions/issue-workflow.instructions.md`.
 
 ## Performance Benchmarks
 
