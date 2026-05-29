@@ -1,7 +1,10 @@
 """Pytest configuration and fixtures"""
 
 import sys
+import tempfile
 from pathlib import Path
+
+import pytest
 
 # CRITICAL: Add paths at import time (module level) before pytest imports tests
 _root = Path(__file__).parent.parent
@@ -23,3 +26,11 @@ def pytest_configure(config):
     src = root / "src"
     if str(src) not in sys.path:
         sys.path.insert(0, str(src))
+
+
+@pytest.fixture
+def temp_db():
+    """Fixture providing a temporary database path for tests."""
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        yield tmp.name
+    # Cleanup is handled by OS after test completes
