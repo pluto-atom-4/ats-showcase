@@ -1,13 +1,14 @@
 """Pydantic models for job postings and related data."""
 
-from typing import Optional, List
 from datetime import datetime
+from typing import List, Optional
+
 from pydantic import BaseModel, Field, HttpUrl
 
 
 class JobPosting(BaseModel):
     """Schema for a job posting."""
-    
+
     id: Optional[str] = Field(None, description="Unique job ID")
     title: str = Field(..., description="Job title")
     company: str = Field(..., description="Company name")
@@ -19,8 +20,10 @@ class JobPosting(BaseModel):
     salary_max: Optional[float] = Field(None, description="Maximum salary")
     posted_date: Optional[datetime] = Field(None, description="When posted")
     crawled_date: datetime = Field(default_factory=datetime.utcnow, description="When crawled")
-    status: str = Field(default="pending_review", description="Status: pending_review, confirmed, rejected")
-    
+    status: str = Field(
+        default="pending_review", description="Status: pending_review, confirmed, rejected"
+    )
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -35,7 +38,7 @@ class JobPosting(BaseModel):
 
 class PreprocessedJob(BaseModel):
     """Schema for preprocessed job posting."""
-    
+
     job_id: str = Field(..., description="Reference to original job")
     clean_text: str = Field(..., description="Cleaned HTML -> text")
     sentences: List[str] = Field(..., description="Sentence-segmented text")
@@ -43,7 +46,7 @@ class PreprocessedJob(BaseModel):
     token_count: int = Field(..., description="Total tokens")
     estimated_cost: float = Field(..., description="Estimated LLM cost in USD")
     processed_date: datetime = Field(default_factory=datetime.utcnow)
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -57,7 +60,7 @@ class PreprocessedJob(BaseModel):
 
 class Assessment(BaseModel):
     """Schema for CV-to-job assessment."""
-    
+
     job_id: str = Field(..., description="Job posting ID")
     overall_score: float = Field(..., ge=0, le=100, description="Overall match score (0-100)")
     tech_score: float = Field(..., ge=0, le=100, description="Technical skills match")
@@ -68,7 +71,7 @@ class Assessment(BaseModel):
     tokens_used: int = Field(..., description="Actual tokens used for assessment")
     actual_cost: float = Field(..., description="Actual cost in USD")
     assessed_date: datetime = Field(default_factory=datetime.utcnow)
-    
+
     class Config:
         json_schema_extra = {
             "example": {
