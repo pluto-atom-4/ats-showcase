@@ -112,9 +112,7 @@ class TestLLMProvider:
             with pytest.raises(ValueError):
                 LLMProvider()
 
-    @pytest.mark.xfail(
-        reason="Mock response parsing not working correctly. See issue #20."
-    )
+    @pytest.mark.xfail(reason="Mock response parsing not working correctly. See issue #20.")
     def test_assess_job_success(self, mock_anthropic):
         """Test successful job assessment."""
         mock, client = mock_anthropic
@@ -131,9 +129,7 @@ class TestLLMProvider:
         assert result.tech_score == 85
         assert result.tokens_used == 650
 
-    @pytest.mark.xfail(
-        reason="Mock response parsing not working correctly. See issue #20."
-    )
+    @pytest.mark.xfail(reason="Mock response parsing not working correctly. See issue #20.")
     def test_assess_job_with_markdown_json(self, mock_anthropic):
         """Test assessment with markdown-wrapped JSON response."""
         mock, client = mock_anthropic
@@ -167,9 +163,7 @@ class TestLLMProvider:
 
         assert result.overall_score == 78
 
-    @pytest.mark.xfail(
-        reason="Mock response parsing not working correctly. See issue #20."
-    )
+    @pytest.mark.xfail(reason="Mock response parsing not working correctly. See issue #20.")
     def test_assess_job_token_cost_calculation(self, mock_anthropic):
         """Test token cost calculation."""
         mock, client = mock_anthropic
