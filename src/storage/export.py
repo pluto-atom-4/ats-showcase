@@ -115,7 +115,7 @@ class MarkdownExporter:
         Returns:
             List of assessment dictionaries
         """
-        assessments = self.store.get_assessments_by_score(
+        assessments: List[Dict[str, Any]] = self.store.get_assessments_by_score(
             min_score=self.config.min_score, max_score=self.config.max_score
         )
 
