@@ -329,22 +329,23 @@ def all(
                 # Get preprocessed job for context
                 preprocessed = preprocessed_map.get(job["job_id"], {})
                 clean_text = preprocessed.get("clean_text", job.get("description", ""))
+                job_chunks = preprocessed.get("chunks", [clean_text])
 
                 # Perform assessment
                 assessment = llm_provider.assess_job(
-                    job=job,
+                    job_id=job["job_id"],
+                    job_chunks=job_chunks,
                     cv_text=cv_text,
-                    job_description=clean_text
                 )
 
                 # Store assessment
                 assessment_store.save_assessment(job["job_id"], assessment)
                 assessment_list.append(assessment)
                 successful += 1
-                total_tokens += assessment.get("token_count", 0)
-                total_cost += assessment.get("cost", 0.0)
+                total_tokens += assessment.tokens_used
+                total_cost += assessment.actual_cost
 
-                overall_score = assessment.get("overall_score", 0)
+                overall_score = assessment.overall_score
                 typer.echo(f" ✅ Score: {overall_score:.0f}/100")
 
             except Exception as e:
@@ -361,21 +362,25 @@ def all(
         typer.echo(f"   Total assessed: {successful}/{len(confirmed_jobs)}")
         if failed > 0:
             typer.echo(f"   Failed: {failed}")
-        typer.echo(f"   Avg overall score: {sum(a.get('overall_score', 0) for a in assessment_list) / max(successful, 1):.1f}/100")
+        avg_score = sum(a.overall_score for a in assessment_list) / max(successful, 1)
+        typer.echo(f"   Avg overall score: {avg_score:.1f}/100")
         typer.echo(f"   Total cost: ${total_cost:.6f}")
         typer.echo(f"   Total tokens: {total_tokens}")
 
         if successful > 0:
             top_matches = sorted(
                 assessment_list,
-                key=lambda a: a.get("overall_score", 0),
+                key=lambda a: a.overall_score,
                 reverse=True
             )[:5]
 
             if top_matches:
                 typer.echo("\n🏆 Top Matches:")
+                # Get job titles from confirmed_jobs list
+                job_titles = {j.get("job_id"): j.get("title", "N/A") for j in confirmed_jobs}
                 for i, match in enumerate(top_matches, 1):
-                    typer.echo(f"   {i}. {match.get('title', 'N/A')} - Overall: {match.get('overall_score', 0):.0f}/100")
+                    title = job_titles.get(match.job_id, "N/A")
+                    typer.echo(f"   {i}. {title} - Overall: {match.overall_score:.0f}/100")
 
         typer.echo("\n✅ Assessment complete!\n")
         
@@ -445,10 +450,10 @@ def all(
         typer.echo("🎉 FULL WORKFLOW COMPLETED SUCCESSFULLY!")
         typer.echo("=" * 80)
         typer.echo(f"⏱️  Total time: {total_time:.2f}s")
-        typer.echo(f"📊 Generated files:")
-        typer.echo(f"   - Data: data/extracted_jobs/")
-        typer.echo(f"   - Database: data/ats_playground.db")
-        typer.echo(f"   - Report: data/assessments/report.md")
+        typer.echo("📊 Generated files:")
+        typer.echo("   - Data: data/extracted_jobs/")
+        typer.echo("   - Database: data/ats_playground.db")
+        typer.echo("   - Report: data/assessments/report.md")
         typer.echo("")
 
     except Exception as e:
