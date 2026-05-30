@@ -51,11 +51,410 @@ def all(
     Run full workflow: crawl → preprocess → review → assess → export.
 
     Example:
-        python -m src.cli --all --cv data/cv.json --config config/companies.json
+        python -m src.cli all --cv data/cv.json --config config/companies.json
     """
-    # TODO: Implement full workflow orchestration
+    import time
+    
     logger.info("Running full workflow")
-    typer.echo("✨ Full workflow started...")
+    typer.echo("✨ Full workflow started...\n")
+    
+    start_time = time.time()
+    
+    try:
+        # ====================================================================
+        # PHASE 1: CRAWL
+        # ====================================================================
+        typer.echo("=" * 80)
+        typer.echo("PHASE 1: CRAWL - Extract job postings from career pages")
+        typer.echo("=" * 80)
+        
+        phase_start = time.time()
+        
+        config_path = Path(config)
+        if not config_path.exists():
+            typer.echo(f"❌ Config file not found: {config}", err=True)
+            raise typer.Exit(1)
+
+        try:
+            with open(config_path) as f:
+                config_data = json.load(f)
+        except json.JSONDecodeError as e:
+            typer.echo(f"❌ Invalid JSON in config: {e}", err=True)
+            raise typer.Exit(1) from None
+
+        companies = config_data.get("companies", {})
+        if not companies:
+            typer.echo("❌ No companies found in config", err=True)
+            raise typer.Exit(1)
+
+        typer.echo(f"📋 Found {len(companies)} companies to crawl\n")
+
+        crawler = Crawler(headless=headless, timeout_ms=30000)
+
+        async def run_crawl():
+            try:
+                results = await crawler.crawl_multiple(companies)
+
+                total_jobs = sum(len(jobs) for jobs in results.values())
+                typer.echo(f"\n✅ Crawl complete! Extracted {total_jobs} total jobs\n")
+
+                for company_name, jobs in results.items():
+                    typer.echo(f"   • {company_name}: {len(jobs)} jobs")
+
+                    if jobs:
+                        output_file = Path("data/extracted_jobs") / f"{company_name.lower()}_jobs.json"
+                        output_file.parent.mkdir(parents=True, exist_ok=True)
+
+                        jobs_data = [job.model_dump(mode="json") for job in jobs]
+                        with open(output_file, "w") as f:
+                            json.dump(jobs_data, f, indent=2, default=str)
+                        typer.echo(f"      Saved to: {output_file}")
+
+                return results
+
+            except Exception as e:
+                logger.error(f"Crawl failed: {e}", exc_info=True)
+                typer.echo(f"\n❌ Crawl failed: {e}", err=True)
+                raise typer.Exit(1) from None
+            finally:
+                await crawler.close()
+
+        crawl_results = asyncio.run(run_crawl())
+        phase_time = time.time() - phase_start
+        typer.echo(f"⏱️  Phase 1 took {phase_time:.2f}s\n")
+
+        # ====================================================================
+        # PHASE 2: PREPROCESS
+        # ====================================================================
+        typer.echo("=" * 80)
+        typer.echo("PHASE 2: PREPROCESS - Clean HTML, chunk, count tokens")
+        typer.echo("=" * 80)
+        
+        phase_start = time.time()
+
+        from src.tokenization.chunker import SemanticChunker
+        from src.tokenization.counter import TokenCounter
+
+        extracted_dir = Path("data/extracted_jobs")
+        if not extracted_dir.exists():
+            typer.echo(f"❌ Directory not found: {extracted_dir}", err=True)
+            raise typer.Exit(1)
+
+        job_files = list(extracted_dir.glob("*_jobs.json"))
+        if not job_files:
+            typer.echo("❌ No extracted jobs found", err=True)
+            raise typer.Exit(1)
+
+        typer.echo(f"📂 Processing {len(job_files)} job files...\n")
+
+        all_preprocessed = []
+        failed_count = 0
+        total_tokens = 0
+        total_cost = 0.0
+
+        chunker = SemanticChunker()
+        counter = TokenCounter()
+
+        for job_file in job_files:
+            if "preprocessed" in job_file.name:
+                continue
+
+            with open(job_file) as f:
+                jobs = json.load(f)
+
+            typer.echo(f"📂 Processing {job_file.name}...")
+            preprocessed_jobs = []
+
+            for i, job in enumerate(jobs):
+                try:
+                    # Build clean text from available fields
+                    clean_text = job.get("title", "")
+                    if job.get("location"):
+                        clean_text = f"{clean_text}\n{job.get('location', '')}"
+                    if job.get("description"):
+                        clean_text = f"{clean_text}\n{job.get('description', '')}"
+
+                    chunks = chunker.chunk(clean_text)
+                    token_count = sum(counter.count_tokens(c) for c in chunks)
+                    estimated_cost = counter.estimate_cost(token_count)
+
+                    preprocessed_job = {
+                        "job_id": job.get("id"),
+                        "title": job.get("title"),
+                        "company": job.get("company"),
+                        "location": job.get("location"),
+                        "url": job.get("url"),
+                        "clean_text": clean_text,
+                        "chunks": chunks,
+                        "token_count": token_count,
+                        "estimated_cost": estimated_cost,
+                        "status": "pending_review",
+                    }
+
+                    preprocessed_jobs.append(preprocessed_job)
+                    total_tokens += token_count
+                    total_cost += estimated_cost
+
+                    if i % 5 == 0:
+                        typer.echo(f"   Job {i}: {job.get('title', 'N/A')[:40]}...")
+                        typer.echo(f"      Tokens: {token_count} | Cost: ${estimated_cost:.4f}")
+
+                except Exception as e:
+                    logger.error(f"Failed to preprocess job {i}: {e}", exc_info=True)
+                    failed_count += 1
+
+            all_preprocessed.extend(preprocessed_jobs)
+
+        typer.echo("\n✅ Preprocessing complete!\n")
+        typer.echo("📊 Summary:")
+        typer.echo(f"   Total jobs: {len(all_preprocessed) + failed_count}")
+        typer.echo(f"   Processed: {len(all_preprocessed)}")
+        typer.echo(f"   Failed: {failed_count}")
+        typer.echo(f"   Total tokens: {total_tokens}")
+        typer.echo(f"   Total cost: ${total_cost:.4f}")
+
+        if len(all_preprocessed) > 0:
+            avg_tokens = total_tokens // len(all_preprocessed)
+            typer.echo(f"   Avg tokens/job: {avg_tokens}")
+
+        output_file = extracted_dir / "preprocessed_jobs.json"
+        with open(output_file, "w") as f:
+            json.dump(all_preprocessed, f, indent=2)
+        typer.echo(f"   ✓ Saved to: {output_file}")
+        
+        phase_time = time.time() - phase_start
+        typer.echo(f"⏱️  Phase 2 took {phase_time:.2f}s\n")
+
+        # ====================================================================
+        # PHASE 3: REVIEW
+        # ====================================================================
+        typer.echo("=" * 80)
+        typer.echo("PHASE 3: REVIEW - Auto-confirm jobs (non-interactive mode)")
+        typer.echo("=" * 80)
+        
+        phase_start = time.time()
+
+        # For the `all` command, auto-confirm all jobs without interactive review
+        typer.echo("⏭️  Skipping interactive review - auto-confirming all preprocessed jobs\n")
+        
+        # Load and auto-confirm preprocessed jobs
+        preprocessed_path = Path("data/extracted_jobs/preprocessed_jobs.json")
+        if preprocessed_path.exists():
+            with open(preprocessed_path) as f:
+                preprocessed_jobs = json.load(f)
+            
+            # Mark all as confirmed
+            for job in preprocessed_jobs:
+                job["status"] = "confirmed"
+            
+            # Save back
+            with open(preprocessed_path, "w") as f:
+                json.dump(preprocessed_jobs, f, indent=2)
+            
+            confirmed_count = len(preprocessed_jobs)
+            typer.echo(f"✅ Auto-confirmed: {confirmed_count} jobs\n")
+        else:
+            confirmed_count = 0
+            typer.echo("⚠️  No preprocessed jobs found\n")
+        
+        phase_time = time.time() - phase_start
+        typer.echo(f"⏱️  Phase 3 took {phase_time:.2f}s\n")
+
+        # ====================================================================
+        # PHASE 4: ASSESS
+        # ====================================================================
+        typer.echo("=" * 80)
+        typer.echo("PHASE 4: ASSESS - AI assessment with Claude")
+        typer.echo("=" * 80)
+        
+        phase_start = time.time()
+
+        from src.llm.provider import LLMProvider
+
+        # Load CV
+        cv_path = Path(cv)
+        if not cv_path.exists():
+            typer.echo(f"❌ CV file not found: {cv}", err=True)
+            raise typer.Exit(1)
+
+        with open(cv_path) as f:
+            if cv_path.suffix == ".json":
+                cv_data = json.load(f)
+                cv_text = cv_data.get("text") or cv_data.get("content") or json.dumps(cv_data)
+            else:
+                cv_text = f.read()
+
+        typer.echo(f"📄 Loaded CV from: {cv}\n")
+
+        # Initialize LLM provider
+        try:
+            llm_provider = LLMProvider()
+        except ValueError as e:
+            typer.echo(f"❌ LLM setup failed: {e}", err=True)
+            typer.echo("   Set ANTHROPIC_API_KEY environment variable", err=True)
+            raise typer.Exit(1) from e
+
+        # Load confirmed jobs from preprocessed file
+        preprocessed_path = Path("data/extracted_jobs/preprocessed_jobs.json")
+        confirmed_jobs = []
+        if preprocessed_path.exists():
+            with open(preprocessed_path) as f:
+                jobs_data = json.load(f)
+                confirmed_jobs = [j for j in jobs_data if j.get("status") == "confirmed"]
+
+        if not confirmed_jobs:
+            typer.echo("❌ No confirmed jobs found.", err=True)
+            raise typer.Exit(1)
+
+        typer.echo(f"🤖 Starting CV assessment for {len(confirmed_jobs)} confirmed jobs\n")
+
+        # Initialize assessment store
+        assessment_store = AssessmentStore()
+
+        # Build map of preprocessed jobs for context
+        preprocessed_map = {j["job_id"]: j for j in jobs_data} if 'jobs_data' in locals() else {}
+
+        # Assess each confirmed job
+        successful = 0
+        failed = 0
+        assessment_list = []
+        total_tokens = 0
+        total_cost = 0.0
+
+        for idx, job in enumerate(confirmed_jobs, 1):
+            try:
+                title = job.get("title", "Unknown")
+                typer.echo(f"[{idx}/{len(confirmed_jobs)}] Assessing: {title[:50]}...", nl=False)
+
+                # Get preprocessed job for context
+                preprocessed = preprocessed_map.get(job["job_id"], {})
+                clean_text = preprocessed.get("clean_text", job.get("description", ""))
+
+                # Perform assessment
+                assessment = llm_provider.assess_job(
+                    job=job,
+                    cv_text=cv_text,
+                    job_description=clean_text
+                )
+
+                # Store assessment
+                assessment_store.save_assessment(job["job_id"], assessment)
+                assessment_list.append(assessment)
+                successful += 1
+                total_tokens += assessment.get("token_count", 0)
+                total_cost += assessment.get("cost", 0.0)
+
+                overall_score = assessment.get("overall_score", 0)
+                typer.echo(f" ✅ Score: {overall_score:.0f}/100")
+
+            except Exception as e:
+                logger.error(f"Assessment failed for job {idx}: {e}", exc_info=True)
+                failed += 1
+                title = job.get("title", "Unknown")
+                typer.echo(
+                    f"❌ Job {idx}/{len(confirmed_jobs)}: {title}\n"
+                    f"   Error: {e}\n"
+                )
+
+        typer.echo("\n" + "=" * 80)
+        typer.echo("📊 Assessment Summary:")
+        typer.echo(f"   Total assessed: {successful}/{len(confirmed_jobs)}")
+        if failed > 0:
+            typer.echo(f"   Failed: {failed}")
+        typer.echo(f"   Avg overall score: {sum(a.get('overall_score', 0) for a in assessment_list) / max(successful, 1):.1f}/100")
+        typer.echo(f"   Total cost: ${total_cost:.6f}")
+        typer.echo(f"   Total tokens: {total_tokens}")
+
+        if successful > 0:
+            top_matches = sorted(
+                assessment_list,
+                key=lambda a: a.get("overall_score", 0),
+                reverse=True
+            )[:5]
+
+            if top_matches:
+                typer.echo("\n🏆 Top Matches:")
+                for i, match in enumerate(top_matches, 1):
+                    typer.echo(f"   {i}. {match.get('title', 'N/A')} - Overall: {match.get('overall_score', 0):.0f}/100")
+
+        typer.echo("\n✅ Assessment complete!\n")
+        
+        phase_time = time.time() - phase_start
+        typer.echo(f"⏱️  Phase 4 took {phase_time:.2f}s\n")
+
+        # ====================================================================
+        # PHASE 5: EXPORT
+        # ====================================================================
+        typer.echo("=" * 80)
+        typer.echo("PHASE 5: EXPORT - Generate markdown report")
+        typer.echo("=" * 80)
+        
+        phase_start = time.time()
+
+        try:
+            # Validate inputs
+            min_score = 0
+            max_score = 100
+            sort_by = "score"
+            template = "detailed"
+            include_recommendations = True
+            include_stats = True
+            output = "data/assessments/report.md"
+
+            # Load assessment store
+            db_path = "data/ats_playground.db"
+            store = AssessmentStore(db_path)
+            total = store.count_assessments()
+
+            if total == 0:
+                typer.echo(
+                    "⚠️  No assessments found. Run assess-jobs first.",
+                    err=True,
+                )
+                raise typer.Exit(1)
+
+            # Create export config
+            config = ExportConfig(
+                min_score=min_score,
+                max_score=max_score,
+                sort_by=sort_by,
+                template_style=template,
+                include_recommendations=include_recommendations,
+                include_stats=include_stats,
+            )
+
+            # Generate report
+            exporter = MarkdownExporter(config)
+            report_path = exporter.export(db_path, output_path=output)
+
+            typer.echo(f"✅ Report exported to: {report_path}\n")
+
+        except Exception as e:
+            logger.error(f"Export failed: {e}", exc_info=True)
+            typer.echo(f"❌ Export failed: {e}", err=True)
+            raise typer.Exit(1) from None
+        
+        phase_time = time.time() - phase_start
+        typer.echo(f"⏱️  Phase 5 took {phase_time:.2f}s\n")
+
+        # ====================================================================
+        # SUMMARY
+        # ====================================================================
+        total_time = time.time() - start_time
+        typer.echo("=" * 80)
+        typer.echo("🎉 FULL WORKFLOW COMPLETED SUCCESSFULLY!")
+        typer.echo("=" * 80)
+        typer.echo(f"⏱️  Total time: {total_time:.2f}s")
+        typer.echo(f"📊 Generated files:")
+        typer.echo(f"   - Data: data/extracted_jobs/")
+        typer.echo(f"   - Database: data/ats_playground.db")
+        typer.echo(f"   - Report: data/assessments/report.md")
+        typer.echo("")
+
+    except Exception as e:
+        logger.error(f"Workflow failed: {e}", exc_info=True)
+        typer.echo(f"\n❌ Workflow failed: {e}", err=True)
+        raise typer.Exit(1) from None
 
 
 # ============================================================================
