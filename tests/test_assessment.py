@@ -110,7 +110,7 @@ class TestLLMProvider:
         provider = LLMProvider(api_key="test-key")
 
         assert provider.api_key == "test-key"
-        assert provider.MODEL == "claude-3-5-sonnet-20241022"
+        assert provider.MODEL == "claude-opus-4-1-20250805"
 
     def test_init_without_api_key_raises(self):
         """Test initialization without API key raises error."""

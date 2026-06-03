@@ -72,7 +72,7 @@ class LLMProvider:
     # Pricing constants (Claude 3.5 Sonnet)
     INPUT_PRICE_PER_1M = 0.003
     OUTPUT_PRICE_PER_1M = 0.015
-    MODEL = "claude-3-5-sonnet-20241022"
+    MODEL = "claude-opus-4-1-20250805"
 
     def __init__(self, api_key: Optional[str] = None):
         """

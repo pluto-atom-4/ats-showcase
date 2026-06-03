@@ -341,7 +341,20 @@ def all(
                 )
 
                 # Store assessment
-                assessment_store.save_assessment(job["job_id"], assessment)
+                assessment_store.save_assessment(
+                    job_id=job["job_id"],
+                    title=job.get("title", "Unknown"),
+                    company=job.get("company", "Unknown"),
+                    location=job.get("location", ""),
+                    overall_score=assessment.overall_score,
+                    tech_score=assessment.tech_score,
+                    seniority_score=assessment.seniority_score,
+                    location_score=assessment.location_score,
+                    recommendations=assessment.recommendations,
+                    summary=assessment.summary,
+                    tokens_used=assessment.tokens_used,
+                    actual_cost=assessment.actual_cost,
+                )
                 assessment_list.append(assessment)
                 successful += 1
                 total_tokens += assessment.tokens_used
@@ -424,8 +437,14 @@ def all(
             )
 
             # Generate report
-            exporter = MarkdownExporter(config)
-            report_path = exporter.export(db_path, output_path=output)
+            exporter = MarkdownExporter(store, config)
+            report_content = exporter.generate_report()
+
+            # Write report to file
+            output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(report_content)
+            report_path = output_path
 
             typer.echo(f"✅ Report exported to: {report_path}\n")
 
