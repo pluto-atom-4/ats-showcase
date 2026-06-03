@@ -65,6 +65,8 @@ dev = [
     "ruff>=0.15.0,<1.0",
     "mypy>=2.1.0,<3.0",
     "pre-commit>=3.0.0,<4.0",
+    "detect-secrets>=1.5.0", # Added for credential scanning
+    "bandit>=1.7.0",         # Added for AST vulnerability scanning
 ]
 
 [project.urls]
