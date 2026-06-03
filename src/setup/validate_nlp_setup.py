@@ -103,7 +103,10 @@ def validate_markitdown() -> Dict[str, Any]:
         return {
             "status": "⚠️",
             "fallback": "BeautifulSoup",
-            "detail": "MarkItDown not found. Fallback to BeautifulSoup (slower, 3-5x). Install: uv pip install markitdown",
+            "detail": (
+                "MarkItDown not found. Fallback to BeautifulSoup "
+                "(slower, 3-5x). Install: uv pip install markitdown"
+            ),
         }
 
 

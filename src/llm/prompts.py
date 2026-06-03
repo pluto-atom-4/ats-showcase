@@ -13,31 +13,31 @@ def get_assessment_prompt(cv_summary: Optional[str] = None) -> str:
     Returns:
         Prompt template string
     """
-    base_prompt = """You are an expert recruiter evaluating job fit for candidates.
-
-Analyze the CV against the job posting and score on these dimensions:
-
-1. **Tech Skills Match (0-100)**: Do they have required technologies?
-2. **Seniority Level Match (0-100)**: Years of experience vs. role expectations?
-3. **Location Fit (0-100)**: Remote/on-site/hybrid alignment?
-4. **Overall Score (0-100)**: Weighted fit (40% tech, 30% seniority, 30% location)
-
-For each dimension, provide:
-- Score (0-100)
-- Reasoning
-- Gaps or mismatches
-
-Output format: ONLY valid JSON, no markdown, no extra text.
-
-Example response:
-{
-  "tech_score": 85,
-  "seniority_score": 78,
-  "location_score": 60,
-  "overall_score": 75,
-  "recommendations": ["Learn Kubernetes", "Strengthen AWS knowledge"],
-  "summary": "Strong Python/backend developer with solid experience. Junior on cloud infrastructure, which is a gap for this role."
-}"""
+    base_prompt = (
+        '"""You are an expert recruiter evaluating job fit for candidates.\n\n'
+        "Analyze the CV against the job posting and score on these dimensions:\n\n"
+        "1. **Tech Skills Match (0-100)**: Do they have required technologies?\n"
+        "2. **Seniority Level Match (0-100)**: Years of experience vs. role "
+        "expectations?\n"
+        "3. **Location Fit (0-100)**: Remote/on-site/hybrid alignment?\n"
+        "4. **Overall Score (0-100)**: Weighted fit (40% tech, 30% seniority, "
+        "30% location)\n\n"
+        "For each dimension, provide:\n"
+        "- Score (0-100)\n"
+        "- Reasoning\n"
+        "- Gaps or mismatches\n\n"
+        "Output format: ONLY valid JSON, no markdown, no extra text.\n\n"
+        "Example response:\n"
+        "{\n"
+        '  "tech_score": 85,\n'
+        '  "seniority_score": 78,\n'
+        '  "location_score": 60,\n'
+        '  "overall_score": 75,\n'
+        '  "recommendations": ["Learn Kubernetes", "Strengthen AWS knowledge"],\n'
+        '  "summary": "Strong Python/backend developer with solid experience. '
+        'Junior on cloud infrastructure, which is a gap for this role."\n'
+        '}"""'
+    )
 
     if cv_summary:
         return f"{base_prompt}\n\nCandidate Summary:\n{cv_summary}"
