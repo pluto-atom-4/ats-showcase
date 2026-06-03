@@ -439,7 +439,7 @@ def all(
             # Generate report
             exporter = MarkdownExporter(store, config)
             report_content = exporter.generate_report()
-            
+
             # Write report to file
             output_path = Path(output)
             output_path.parent.mkdir(parents=True, exist_ok=True)

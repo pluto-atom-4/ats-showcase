@@ -1,7 +1,7 @@
 # Issue #26: POC Evaluation - Validation Results
 
-**Date**: 2026-05-31  
-**Status**: In Progress (Phases 1-3 Complete ✅, Phases 4-5 Blocked ⏸️)  
+**Date**: 2026-05-31
+**Status**: In Progress (Phases 1-3 Complete ✅, Phases 4-5 Blocked ⏸️)
 **Command Tested**: `uv run python -m src.cli all --cv data/cv.json --config config/companies.json`
 
 ---
@@ -350,7 +350,6 @@ The POC workflow is working excellently for local preprocessing (Phases 1-3). Pe
 
 ---
 
-**Last Updated**: 2026-05-31  
-**Author**: Copilot CLI  
+**Last Updated**: 2026-05-31
+**Author**: Copilot CLI
 **Status**: In Progress
-
