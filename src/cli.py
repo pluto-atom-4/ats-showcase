@@ -14,6 +14,82 @@ from storage.export import ExportConfig, MarkdownExporter
 
 logger = logging.getLogger(__name__)
 
+
+# ============================================================================
+# CONFIG LOADING UTILITIES
+# ============================================================================
+
+
+
+
+def load_companies_from_file(config_path: Path) -> dict:
+    """Load companies from a single config file."""
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    try:
+        with open(config_path) as f:
+            config_data = json.load(f)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in config: {e}") from e
+
+    # Explicitly verify config_data is a dictionary before reading it
+    if not isinstance(config_data, dict):
+        raise ValueError("Invalid config structure: expected a JSON object root.")
+
+    companies = config_data.get("companies", {})
+
+    # Verify the 'companies' key yields a dictionary block
+    if not isinstance(companies, dict):
+        raise ValueError("Invalid config structure: 'companies' key must be an object.")
+
+    return companies
+
+
+def load_companies_from_directory(config_dir: Path) -> dict:
+    """Load companies from all JSON files in a directory, filtering by enabled flag."""
+    if not config_dir.exists():
+        raise FileNotFoundError(f"Config directory not found: {config_dir}")
+
+    all_companies = {}
+    config_files = sorted(config_dir.glob("*.json"))
+
+    if not config_files:
+        raise FileNotFoundError(f"No JSON config files found in {config_dir}")
+
+    for config_file in config_files:
+        try:
+            companies = load_companies_from_file(config_file)
+            all_companies.update(companies)
+        except (FileNotFoundError, ValueError, json.JSONDecodeError) as e:
+            logger.warning(f"Skipped config file {config_file}: {e}")
+            continue
+
+    return all_companies
+
+
+def filter_enabled_companies(companies: dict) -> tuple[dict, list[str]]:
+    """
+    Filter companies by 'enabled' flag.
+
+    Returns:
+        Tuple of (enabled_companies, disabled_company_names)
+    """
+    enabled = {}
+    disabled = []
+
+    for company_name, company_data in companies.items():
+        if isinstance(company_data, dict):
+            is_enabled = company_data.get("enabled", True)
+            if is_enabled:
+                enabled[company_name] = company_data
+            else:
+                disabled.append(company_name)
+        else:
+            enabled[company_name] = company_data
+
+    return enabled, disabled
+
 app = typer.Typer(
     name="ats-cli",
     help="ATS Playground: Intelligent job assessment with AI",
@@ -43,15 +119,20 @@ app.add_typer(export_app, name="export")
 @app.command()
 def all(
     cv: str = typer.Option(..., help="Path to CV file (JSON)"),
-    config: str = typer.Option(..., help="Path to companies config (JSON)"),
+    config: Optional[str] = typer.Option(None, help="Path to companies config (JSON)"),
+    config_dir: Optional[str] = typer.Option(None, help="Directory with JSON config files"),
     headless: bool = typer.Option(True, help="Run browser in headless mode"),
     confirmed_only: bool = typer.Option(False, help="Skip unconfirmed jobs"),
 ) -> None:
     """
     Run full workflow: crawl → preprocess → review → assess → export.
 
+    Use either --config <file> for a single config file,
+    or --config-dir <directory> for multiple config files.
+
     Example:
         python -m src.cli all --cv data/cv.json --config config/companies.json
+        python -m src.cli all --cv data/cv.json --config-dir ./config
     """
     import time
 
@@ -70,30 +151,42 @@ def all(
 
         phase_start = time.time()
 
-        config_path = Path(config)
-        if not config_path.exists():
-            typer.echo(f"❌ Config file not found: {config}", err=True)
-            raise typer.Exit(1)
-
+        # Load companies from config file or directory
         try:
-            with open(config_path) as f:
-                config_data = json.load(f)
-        except json.JSONDecodeError as e:
-            typer.echo(f"❌ Invalid JSON in config: {e}", err=True)
+            if config_dir:
+                companies = load_companies_from_directory(Path(config_dir))
+                typer.echo(f"📋 Found {len(companies)} companies from directory: {config_dir}")
+            elif config:
+                companies = load_companies_from_file(Path(config))
+                typer.echo(f"📋 Found {len(companies)} companies from file: {config}")
+            else:
+                companies = load_companies_from_file(Path("config/companies.json"))
+                typer.echo(f"📋 Found {len(companies)} companies from default config")
+        except (FileNotFoundError, ValueError) as e:
+            typer.echo(f"❌ {e}", err=True)
             raise typer.Exit(1) from None
 
-        companies = config_data.get("companies", {})
         if not companies:
             typer.echo("❌ No companies found in config", err=True)
             raise typer.Exit(1)
 
-        typer.echo(f"📋 Found {len(companies)} companies to crawl\n")
+        # Filter by enabled flag
+        enabled_companies, disabled_companies = filter_enabled_companies(companies)
+
+        if disabled_companies:
+            typer.echo(f"⏭️  Skipping {len(disabled_companies)} disabled companies")
+
+        if not enabled_companies:
+            typer.echo("❌ No enabled companies to crawl", err=True)
+            raise typer.Exit(1)
+
+        typer.echo(f"✅ Processing {len(enabled_companies)} enabled companies\n")
 
         crawler = Crawler(headless=headless, timeout_ms=30000)
 
         async def run_crawl():
             try:
-                results = await crawler.crawl_multiple(companies)
+                results = await crawler.crawl_multiple(enabled_companies)
 
                 total_jobs = sum(len(jobs) for jobs in results.values())
                 typer.echo(f"\n✅ Crawl complete! Extracted {total_jobs} total jobs\n")
@@ -483,39 +576,56 @@ def all(
 
 @crawl_app.command()
 def crawl_companies(
-    config: str = typer.Option("config/companies.json", help="Companies config file"),
+    config: Optional[str] = typer.Option(None, help="Companies config file"),
+    config_dir: Optional[str] = typer.Option(None, help="Directory with JSON config files"),
     headless: bool = typer.Option(True, help="Headless browser mode"),
     timeout: int = typer.Option(30000, help="Browser timeout (ms)"),
     mock: bool = typer.Option(False, help="Mock crawling without browser"),
 ) -> None:
-    """Crawl job postings from company career pages."""
-    logger.info(f"Crawling companies from {config}")
+    """Crawl job postings from company career pages.
+
+    Use either --config <file> for a single config file,
+    or --config-dir <directory> for multiple config files.
+    """
+    logger.info("Crawling companies from config")
     typer.echo("🌐 Crawling in progress...\n")
 
-    config_path = Path(config)
-    if not config_path.exists():
-        typer.echo(f"❌ Config file not found: {config}", err=True)
-        raise typer.Exit(1)
-
+    # Load companies from config file or directory
     try:
-        with open(config_path) as f:
-            config_data = json.load(f)
-    except json.JSONDecodeError as e:
-        typer.echo(f"❌ Invalid JSON in config: {e}", err=True)
+        if config_dir:
+            companies = load_companies_from_directory(Path(config_dir))
+            typer.echo(f"📋 Found {len(companies)} companies from directory: {config_dir}")
+        elif config:
+            companies = load_companies_from_file(Path(config))
+            typer.echo(f"📋 Found {len(companies)} companies from file: {config}")
+        else:
+            companies = load_companies_from_file(Path("config/companies.json"))
+            typer.echo(f"📋 Found {len(companies)} companies from default config")
+    except (FileNotFoundError, ValueError) as e:
+        typer.echo(f"❌ {e}", err=True)
         raise typer.Exit(1) from None
 
-    companies = config_data.get("companies", {})
     if not companies:
         typer.echo("❌ No companies found in config", err=True)
         raise typer.Exit(1)
 
-    typer.echo(f"📋 Found {len(companies)} companies to crawl\n")
+    # Filter by enabled flag
+    enabled_companies, disabled_companies = filter_enabled_companies(companies)
+
+    if disabled_companies:
+        typer.echo(f"⏭️  Skipping {len(disabled_companies)} disabled companies: {', '.join(disabled_companies)}")
+
+    if not enabled_companies:
+        typer.echo("❌ No enabled companies to crawl", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"✅ Processing {len(enabled_companies)} enabled companies\n")
 
     crawler = Crawler(headless=headless, timeout_ms=timeout)
 
     async def run_crawl():
         try:
-            results = await crawler.crawl_multiple(companies)
+            results = await crawler.crawl_multiple(enabled_companies)
 
             total_jobs = sum(len(jobs) for jobs in results.values())
             typer.echo(f"\n✅ Crawl complete! Extracted {total_jobs} total jobs\n")

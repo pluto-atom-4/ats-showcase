@@ -27,6 +27,9 @@ uv run python src/storage/db.py --init
 
 # Run full workflow
 uv run python -m src.cli --all --cv data/cv.json --config config/companies.json
+
+# Or with directory of configs (supports selective processing via enabled flag):
+uv run python -m src.cli --all --cv data/cv.json --config-dir ./config
 ```
 
 **For detailed setup with Python 3.12 pinning and NLP validation**: See **[🧠 NLP Setup Validation](../README.md#-nlp-setup-validation-issue-7)** section in README.md
@@ -102,11 +105,13 @@ See `CLAUDE.md` for comprehensive command reference. Quick reference:
 | Phase | Command |
 |-------|---------|
 | **Crawl** | `uv run python -m src.cli crawl --config config/companies.json` |
+| **Crawl (dir)** | `uv run python -m src.cli crawl --config-dir ./config` |
 | **Preprocess** | `uv run python -m src.cli preprocess --show-estimates` |
 | **Review** | `uv run python -m src.cli review --interactive` |
 | **Assess** | `uv run python -m src.cli assess --cv data/cv.json` |
 | **Export** | `uv run python -m src.cli export --output data/assessments/report.md` |
 | **Full Workflow** | `uv run python -m src.cli --all --cv data/cv.json --config config/companies.json` |
+| **Full Workflow (dir)** | `uv run python -m src.cli --all --cv data/cv.json --config-dir ./config` |
 | **Search** | `uv run python -m src.cli query --keyword "python" --min-score 75` |
 | **Statistics** | `uv run python -m src.cli stats --show-token-usage` |
 | **Tests** | `uv run pytest tests/ -v --cov=src` |
@@ -114,6 +119,12 @@ See `CLAUDE.md` for comprehensive command reference. Quick reference:
 | **Lint** | `uv run ruff check src/ tests/ --fix` |
 | **Type Check** | `mypy src/` |
 | **Watch Logs** | `tail -f logs/app.log` |
+
+**Config Options**:
+- Use `--config <file>` for single JSON file (backward compatible)
+- Use `--config-dir <dir>` for directory of JSON files (NEW - enables selective company processing with `enabled` flag)
+
+See [docs/CLI.md - Configuration Management](../docs/CLI.md#configuration-management) for detailed examples.
 
 ## Key Conventions
 

@@ -750,6 +750,149 @@ def test_full_workflow(tmp_path, monkeypatch):
     assert result.exit_code == 0
 ```
 
+## Configuration Management
+
+### Single File Configuration (Backward Compatible)
+
+Load companies from a single `companies.json` file:
+
+```bash
+python -m src.cli crawl --config config/companies.json
+python -m src.cli all --cv data/cv.json --config config/companies.json
+```
+
+### Directory-Based Configuration with `--config-dir`
+
+*(NEW)* Load companies from multiple JSON config files in a directory:
+
+```bash
+python -m src.cli crawl --config-dir ./config
+python -m src.cli all --cv data/cv.json --config-dir ./config
+```
+
+#### The `enabled` Flag for Selective Company Processing
+
+Control which companies are processed using the `enabled` flag in your config files:
+
+```json
+{
+  "companies": {
+    "ActiveCompany": {
+      "enabled": true,
+      "name": "Company to process",
+      "url": "https://example.com/careers",
+      "selectors": { ... }
+    },
+    "InactiveCompany": {
+      "enabled": false,
+      "name": "Company to skip",
+      "url": "https://disabled.example.com",
+      "selectors": { ... }
+    },
+    "LegacyCompany": {
+      "name": "Defaults to true (backward compatible)",
+      "url": "https://legacy.example.com",
+      "selectors": { ... }
+    }
+  }
+}
+```
+
+#### Behavior
+
+| Flag | Behavior |
+|------|----------|
+| `"enabled": true` | Process the company ✅ |
+| `"enabled": false` | Skip the company ⏭️ |
+| Missing (omitted) | Defaults to `true` (backward compatible) ✅ |
+
+#### Output Example
+
+```bash
+$ python -m src.cli crawl --config-dir ./config
+
+📋 Found 5 companies from directory: ./config
+⏭️  Skipping 2 disabled companies: DataCo, OldCorp
+✅ Processing 3 enabled companies
+
+🌐 Crawling in progress...
+   • ActiveCompany: 24 jobs
+   • LegacyCompany: 18 jobs
+   • TechCorp: 31 jobs
+
+✅ Crawl complete! Extracted 73 total jobs
+```
+
+#### Use Cases
+
+**Multi-tenant scenarios**: Maintain separate config files per customer/client:
+```
+config/
+├── client_a.json      # enabled: true
+├── client_b.json      # enabled: true
+├── client_archived.json # enabled: false
+```
+
+**A/B Testing**: Test new CSS selectors before activation:
+```json
+{
+  "companies": {
+    "SiteV1": { "enabled": false, "url": "..." },
+    "SiteV2": { "enabled": true, "url": "..." }
+  }
+}
+```
+
+**Staged Rollout**: Gradually enable companies in production:
+```bash
+# Monday: Test with 2 companies
+python -m src.cli all --cv data/cv.json --config-dir ./config
+
+# Wednesday: Enable 5 more
+# (Update enabled flags in config files)
+
+# Friday: Full production
+```
+
+### Configuration File Format
+
+All JSON config files must contain a `companies` key mapping company names to configuration:
+
+```json
+{
+  "companies": {
+    "CompanyKey": {
+      "enabled": true|false,           // optional, defaults to true
+      "name": "Display Name",
+      "url": "https://career-url.com",
+      "selectors": {
+        "job_container": ".job-post",
+        "title": ".job-title",
+        "description": ".job-desc",
+        "location": ".job-location"
+      },
+      "crawler": {                     // optional
+        "type": "single_page",
+        "timeout_ms": 30000,
+        "headless": true
+      }
+    }
+  }
+}
+```
+
+### Loading Priority
+
+When using `--config-dir`:
+1. Scans directory for all `*.json` files (sorted alphabetically)
+2. Loads companies from each file
+3. Merges all companies into a single dictionary
+4. Filters by `enabled` flag before processing
+
+**Note**: If the same company key exists in multiple files, the last file wins (files are sorted alphabetically).
+
+---
+
 ## Best Practices
 
 ✅ **Always provide defaults** - Users shouldn't need flags for common cases
