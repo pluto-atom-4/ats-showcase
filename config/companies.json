@@ -1,6 +1,7 @@
 {
   "companies": {
     "TechCorp": {
+      "enabled": true,
       "name": "Tech Corp",
       "url": "https://techcorp.example.com/careers",
       "selectors": {
@@ -12,6 +13,7 @@
       }
     },
     "DataCo": {
+      "enabled": false,
       "name": "Data Co",
       "url": "https://dataco.example.com/jobs",
       "selectors": {
@@ -23,6 +25,7 @@
       }
     },
     "CarbonRobotics": {
+      "enabled": true,
       "name": "Carbon Robotics",
       "url": "https://job-boards.greenhouse.io/embed/job_board?for=carbonrobotics",
       "description": "Laser weeding robotics company - Greenhouse Job Board (26 jobs available)",

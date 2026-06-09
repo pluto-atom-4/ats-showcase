@@ -29,6 +29,9 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 # 4. Run the full workflow
 python -m src.cli --all --cv data/cv.json --config config/companies.json
 
+# Or with directory of configs (NEW - enables selective company processing):
+python -m src.cli --all --cv data/cv.json --config-dir ./config
+
 # Or run individually:
 python -m src.cli crawl --config config/companies.json
 python -m src.cli preprocess
@@ -36,6 +39,12 @@ python -m src.cli review
 python -m src.cli assess --cv data/cv.json
 python -m src.cli export --output data/assessments/report.md
 ```
+
+**Config Options**:
+- `--config <file>` - Single JSON config file (backward compatible)
+- `--config-dir <dir>` - Directory of JSON config files (NEW - enables `enabled` flag for selective processing)
+
+See [docs/CLI.md](./docs/CLI.md#configuration-management) for detailed config examples and the `enabled` flag.
 
 **Setup Troubleshooting?** See [docs/SETUP.md](./docs/SETUP.md) for detailed Python 3.12 configuration, system dependencies, and troubleshooting.
 

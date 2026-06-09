@@ -15,11 +15,15 @@ uv run python src/storage/db.py --init          # Initialize SQLite
 
 ### Development Commands
 ```bash
-# Run full workflow
+# Run full workflow (single config file)
 uv run python -m src.cli --all --cv data/cv.json --config config/companies.json
+
+# Run full workflow (directory of configs) - NEW FEATURE
+uv run python -m src.cli --all --cv data/cv.json --config-dir ./config
 
 # Run individual phases
 uv run python -m src.cli crawl --config config/companies.json
+uv run python -m src.cli crawl --config-dir ./config                        # NEW
 uv run python -m src.cli preprocess --show-estimates
 uv run python -m src.cli review --interactive
 uv run python -m src.cli assess --cv data/cv.json
@@ -27,6 +31,7 @@ uv run python -m src.cli export --output data/assessments/report.md
 
 # Testing
 uv run pytest tests/ -v                          # All tests
+uv run pytest tests/test_cli_config.py -v      # Config loading tests (NEW)
 uv run pytest tests/test_llm.py -v              # Specific test file
 uv run pytest tests/ -k "test_chunk" -v         # Tests matching pattern
 uv run pytest tests/ -v --cov=src               # With coverage
