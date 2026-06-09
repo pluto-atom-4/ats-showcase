@@ -1,0 +1,3 @@
+# Ignore development notes and temporary planning docs
+docs/dev-note/
+docs/implementation-planning/
