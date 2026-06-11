@@ -24,14 +24,15 @@ class Crawler:
         """
         self.headless = headless
         self.timeout_ms = timeout_ms
+        self.playwright: Any = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
 
     async def initialize(self) -> None:
         """Initialize Playwright browser and context."""
         logger.info("Initializing Playwright browser")
-        playwright = await async_playwright().start()
-        self.browser = await playwright.chromium.launch(headless=self.headless)
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch(headless=self.headless)
         self.context = await self.browser.new_context()
 
     async def close(self) -> None:
@@ -41,6 +42,8 @@ class Crawler:
             await self.context.close()
         if self.browser:
             await self.browser.close()
+        if self.playwright:
+            await self.playwright.stop()
 
     async def crawl_company(
         self,
