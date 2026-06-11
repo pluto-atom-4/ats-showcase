@@ -47,7 +47,7 @@ Configure the crawler to extract job openings from Carbon Robotics careers page 
 **Commands**:
 ```bash
 # Render page with Playwright and inspect structure
-cd /home/pluto-atom-4/Documents/full-stack/ats-playground
+cd /home/pluto-atom-4/Documents/full-stack/ats-showcase
 uv run python << 'EOF'
 import asyncio
 from playwright.async_api import async_playwright
@@ -225,7 +225,7 @@ EOF
 **Steps**:
 ```bash
 # Ensure all dependencies are installed
-cd /home/pluto-atom-4/Documents/full-stack/ats-playground
+cd /home/pluto-atom-4/Documents/full-stack/ats-showcase
 uv sync
 
 # Run crawl command

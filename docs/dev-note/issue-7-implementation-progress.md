@@ -200,7 +200,7 @@
 - ✅ Fallback chains tested (MarkItDown → BeautifulSoup → html.parser)
 
 **Pull Request**: #8 (Closes #7)
-- Link: https://github.com/pluto-atom-4/ats-playground/pull/8
+- Link: https://github.com/pluto-atom-4/ats-showcase/pull/8
 - Status: Ready for review and merge
 
 ---

@@ -25,8 +25,8 @@ We appreciate your interest in contributing to the ATS Playground project! This 
 
 ```bash
 # Clone the repository
-git clone https://github.com/pluto-atom-4/ats-playground.git
-cd ats-playground
+git clone https://github.com/pluto-atom-4/ats-showcase.git
+cd ats-showcase
 
 # Install dependencies
 uv sync
@@ -91,7 +91,7 @@ gh copilot -- plugin install pluto-atom-4/copilot-plugin-ats-playground
 
 # Verify installation
 gh copilot -- plugin list
-# Output: ats-playground (v1.0.0)
+# Output: ats-showcase (v1.0.0)
 ```
 
 ### Using the Plugin
@@ -198,7 +198,7 @@ Report saved: assessments/assessment-20260526.md
 gh copilot -- plugin list
 
 # Try uninstalling and reinstalling
-gh copilot -- plugin uninstall ats-playground
+gh copilot -- plugin uninstall ats-showcase
 gh copilot -- plugin install pluto-atom-4/copilot-plugin-ats-playground
 ```
 

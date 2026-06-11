@@ -16,7 +16,7 @@ The CLI phase provides a unified command-line interface orchestrating all ATS Pl
 ### Command Hierarchy
 
 ```
-ats-playground/
+ats-showcase/
 ├── crawl                    # Phase 1: Extract jobs from career pages
 │   └── --config             # Company URLs + CSS selectors
 │
@@ -87,7 +87,7 @@ from commands import crawl, preprocess, review, assess, query, export, stats
 
 console = Console()
 app = typer.Typer(
-    name="ats-playground",
+    name="ats-showcase",
     help="Agentic AI workflow for job opportunity assessment",
     pretty_exceptions_enable=True,
     no_args_is_help=True,
@@ -215,7 +215,7 @@ def crawl_command(
     and extracts job listings using CSS selectors.
 
     Example:
-        ats-playground crawl --config config/companies.json
+        ats-showcase crawl --config config/companies.json
     """
     from src.browser import PlaywrightCrawler
     import logging
@@ -335,7 +335,7 @@ def assess_command(
     each job-CV pair on a 0.0-1.0 scale with reasoning.
 
     Example:
-        ats-playground assess --cv data/cv.json --confirmed-only
+        ats-showcase assess --cv data/cv.json --confirmed-only
     """
     from src.storage import StorageClient
     from src.llm import AssessmentClient, BatchAssessor
@@ -426,7 +426,7 @@ def assess_command(
 **Purpose**: Extract job postings from career pages
 
 ```bash
-ats-playground crawl \
+ats-showcase crawl \
   --config config/companies.json \
   --output data/extracted_jobs/ \
   --headless \
@@ -447,7 +447,7 @@ ats-playground crawl \
 **Purpose**: Clean HTML, chunk text, count tokens
 
 ```bash
-ats-playground preprocess \
+ats-showcase preprocess \
   --file data/extracted_jobs/TechCorp_jobs.json \
   --output data/preprocessed_jobs/ \
   --strategy semantic
@@ -467,7 +467,7 @@ ats-playground preprocess \
 **Purpose**: User verification before LLM processing
 
 ```bash
-ats-playground review \
+ats-showcase review \
   --file data/extracted_jobs/TechCorp_jobs.json \
   --interactive \
   --show-costs
@@ -487,7 +487,7 @@ ats-playground review \
 **Purpose**: Claude LLM job-CV matching
 
 ```bash
-ats-playground assess \
+ats-showcase assess \
   --cv data/cv.json \
   --confirmed-only \
   --model claude-3-5-sonnet-20241022 \
@@ -509,7 +509,7 @@ ats-playground assess \
 **Purpose**: Search assessment results
 
 ```bash
-ats-playground query \
+ats-showcase query \
   --search "Python" \
   --min-score 0.75 \
   --company TechCorp \
@@ -531,7 +531,7 @@ ats-playground query \
 **Purpose**: Generate reports
 
 ```bash
-ats-playground export \
+ats-showcase export \
   --format markdown \
   --output data/assessments/report.md \
   --min-score 0.75
@@ -551,7 +551,7 @@ ats-playground export \
 **Purpose**: Analytics and cost tracking
 
 ```bash
-ats-playground stats \
+ats-showcase stats \
   --show-tokens \
   --show-costs \
   --days 7
@@ -572,7 +572,7 @@ ats-playground stats \
 **Purpose**: Execute all phases sequentially
 
 ```bash
-ats-playground --all \
+ats-showcase --all \
   --config config/companies.json \
   --cv data/cv.json \
   --output data/assessments/
@@ -580,10 +580,10 @@ ats-playground --all \
 
 **Equivalent to**:
 ```bash
-ats-playground crawl --config config/companies.json
-ats-playground review --file data/extracted_jobs/...
-ats-playground assess --cv data/cv.json --confirmed-only
-ats-playground export --format markdown --output data/assessments/
+ats-showcase crawl --config config/companies.json
+ats-showcase review --file data/extracted_jobs/...
+ats-showcase assess --cv data/cv.json --confirmed-only
+ats-showcase export --format markdown --output data/assessments/
 ```
 
 ## Error Handling Patterns
@@ -913,11 +913,11 @@ When using `--config-dir`:
 
 - [ ] **Installation**:
   - [ ] `pip install -e .` installs CLI entry point
-  - [ ] `ats-playground --help` works
-  - [ ] `ats-playground version` shows version
+  - [ ] `ats-showcase --help` works
+  - [ ] `ats-showcase version` shows version
 
 - [ ] **Configuration**:
-  - [ ] `ats-playground init` creates config/data directories
+  - [ ] `ats-showcase init` creates config/data directories
   - [ ] `.env` file with ANTHROPIC_API_KEY set
   - [ ] `config/companies.json` populated
 
@@ -928,8 +928,8 @@ When using `--config-dir`:
   - [ ] Run integration tests: `pytest tests/integration/ -v`
 
 - [ ] **Documentation**:
-  - [ ] `ats-playground --help` is clear
-  - [ ] `ats-playground <command> --help` detailed
+  - [ ] `ats-showcase --help` is clear
+  - [ ] `ats-showcase <command> --help` detailed
   - [ ] README.md has quick-start with commands
 
 - [ ] **Performance**:

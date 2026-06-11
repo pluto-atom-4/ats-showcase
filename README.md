@@ -1,6 +1,6 @@
 # ATS Playground
 
-[![GitHub](https://img.shields.io/badge/github-pluto--atom--4%2Fats--playground-blue?logo=github)](https://github.com/pluto-atom-4/ats-playground)
+[![GitHub](https://img.shields.io/badge/github-pluto--atom--4%2Fats--playground-blue?logo=github)](https://github.com/pluto-atom-4/ats-showcase)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Status: Active](https://img.shields.io/badge/status-active-success)]()
@@ -13,8 +13,8 @@ An agentic AI workflow for intelligent job assessment. Extract job postings from
 
 ```bash
 # 1. Clone & setup (with Python 3.12)
-git clone https://github.com/pluto-atom-4/ats-playground.git
-cd ats-playground
+git clone https://github.com/pluto-atom-4/ats-showcase.git
+cd ats-showcase
 uv python pin 3.12                    # Recommended: Python 3.12.x
 uv sync
 python -m spacy download en_core_web_md
@@ -422,13 +422,13 @@ MIT — Use freely in commercial or personal projects. See [LICENSE](LICENSE) fo
 - 📝 **All Commands**: [CLI.md](./docs/CLI.md)
 
 **Report Issues**:
-- 🐛 Bugs: [Open an issue](https://github.com/pluto-atom-4/ats-playground/issues/new?template=bug_report.md)
-- ✨ Features: [Request a feature](https://github.com/pluto-atom-4/ats-playground/issues/new?template=feature_request.md)
-- 💬 Discussion: [Start a discussion](https://github.com/pluto-atom-4/ats-playground/discussions)
+- 🐛 Bugs: [Open an issue](https://github.com/pluto-atom-4/ats-showcase/issues/new?template=bug_report.md)
+- ✨ Features: [Request a feature](https://github.com/pluto-atom-4/ats-showcase/issues/new?template=feature_request.md)
+- 💬 Discussion: [Start a discussion](https://github.com/pluto-atom-4/ats-showcase/discussions)
 
 ---
 
 **Last updated**: 2026-05-19
 **Status**: Active & Maintained ✅
 **Documentation**: [8 comprehensive guides](./docs/README.md) — **165+ KB total**
-**Repository**: [pluto-atom-4/ats-playground](https://github.com/pluto-atom-4/ats-playground)
+**Repository**: [pluto-atom-4/ats-showcase](https://github.com/pluto-atom-4/ats-showcase)

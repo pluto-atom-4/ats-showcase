@@ -1,6 +1,6 @@
 # Issue #19 Phase 5: Results Export & Analytics 📊
 
-**Issue:** [#19 - Agentic ATS Playground POC](https://github.com/pluto-atom-4/ats-playground/issues/19)
+**Issue:** [#19 - Agentic ATS Playground POC](https://github.com/pluto-atom-4/ats-showcase/issues/19)
 
 **Objective:** Implement complete results export pipeline with markdown reports, analytics, and search functionality. Enable users to review assessed jobs with cost/token tracking and actionable recommendations.
 
@@ -523,9 +523,9 @@ LIMIT :limit;
 ## References
 
 **Related Issues:**
-- [Issue #19: Full POC Workflow](https://github.com/pluto-atom-4/ats-playground/issues/19)
-- [Issue #7: NLP Setup](https://github.com/pluto-atom-4/ats-playground/issues/7)
-- [Issue #6: Storage & Database](https://github.com/pluto-atom-4/ats-playground/issues/6)
+- [Issue #19: Full POC Workflow](https://github.com/pluto-atom-4/ats-showcase/issues/19)
+- [Issue #7: NLP Setup](https://github.com/pluto-atom-4/ats-showcase/issues/7)
+- [Issue #6: Storage & Database](https://github.com/pluto-atom-4/ats-showcase/issues/6)
 
 **Prior Phase Documentation:**
 - Phase 1: Crawling (docs/CRAWL.md)

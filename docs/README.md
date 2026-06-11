@@ -44,7 +44,7 @@ STORE / RETRIEVE / EXPORT (SQLite)
 ## Directory Map
 
 ```
-ats-playground/
+ats-showcase/
 ├── .github/
 │   ├── copilot-instructions.md      ⭐ START HERE (5-min quick start)
 │   └── COMPATIBILITY.md              (troubleshooting, versions)

@@ -480,8 +480,8 @@ pytest tests/test_tokenization.py -v --cov=src/tokenization
 
 ### 1️⃣ Install & Setup (2 minutes)
 \`\`\`bash
-git clone https://github.com/pluto-atom-4/ats-playground.git
-cd ats-playground
+git clone https://github.com/pluto-atom-4/ats-showcase.git
+cd ats-showcase
 uv sync
 
 # Download NLP model (one-time, ~100 MB)
@@ -518,8 +518,8 @@ uv run python -m src.setup.validate_nlp_setup
 
 ### 1. Clone & Dependencies
 \`\`\`bash
-git clone https://github.com/pluto-atom-4/ats-playground.git
-cd ats-playground
+git clone https://github.com/pluto-atom-4/ats-showcase.git
+cd ats-showcase
 uv sync
 \`\`\`
 
