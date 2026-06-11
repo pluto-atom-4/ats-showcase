@@ -96,20 +96,6 @@ app = typer.Typer(
     invoke_without_command=False,
 )
 
-# Create sub-applications for each phase
-crawl_app = typer.Typer(help="Crawl company career pages")
-preprocess_app = typer.Typer(help="Preprocess job postings")
-review_app = typer.Typer(help="User verification & review")
-assess_app = typer.Typer(help="AI assessment with Claude")
-export_app = typer.Typer(help="Export results")
-
-# Register sub-commands
-app.add_typer(crawl_app, name="crawl")
-app.add_typer(preprocess_app, name="preprocess")
-app.add_typer(review_app, name="review")
-app.add_typer(assess_app, name="assess")
-app.add_typer(export_app, name="export")
-
 
 # ============================================================================
 # MAIN COMMANDS
@@ -574,8 +560,8 @@ def all(
 # ============================================================================
 
 
-@crawl_app.command()
-def crawl_companies(
+@app.command()
+def crawl(
     config: Optional[str] = typer.Option(None, help="Companies config file"),
     config_dir: Optional[str] = typer.Option(None, help="Directory with JSON config files"),
     headless: bool = typer.Option(True, help="Headless browser mode"),
@@ -657,8 +643,8 @@ def crawl_companies(
 # ============================================================================
 
 
-@preprocess_app.command()
-def preprocess_jobs(
+@app.command()
+def preprocess(
     batch_size: int = typer.Option(10, help="Jobs per batch"),
     show_estimates: bool = typer.Option(False, help="Show token/cost estimates"),
 ) -> None:
@@ -761,8 +747,8 @@ def preprocess_jobs(
 # ============================================================================
 
 
-@review_app.command()
-def review_jobs(
+@app.command()
+def review(
     extracted: str = typer.Option(
         "data/extracted_jobs/carbonrobotics_jobs.json", help="Path to extracted jobs JSON"
     ),
@@ -791,8 +777,8 @@ def review_jobs(
 # ============================================================================
 
 
-@assess_app.command()
-def assess_jobs(
+@app.command()
+def assess(
     cv: str = typer.Option(..., help="CV file path (json or txt)"),
     confirmed_only: bool = typer.Option(True, help="Only assess confirmed jobs"),
 ) -> None:
@@ -944,8 +930,8 @@ def assess_jobs(
 # ============================================================================
 
 
-@export_app.command()
-def export_results(
+@app.command()
+def export(
     output: str = typer.Option("data/assessments/report.md", help="Output file path"),
     min_score: int = typer.Option(0, help="Minimum score to include (0-100)"),
     max_score: int = typer.Option(100, help="Maximum score to include (0-100)"),
