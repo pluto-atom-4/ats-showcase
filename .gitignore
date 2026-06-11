@@ -184,3 +184,5 @@ requirements.lock
 Thumbs.db
 *.orig
 *.rej
+
+config_test
