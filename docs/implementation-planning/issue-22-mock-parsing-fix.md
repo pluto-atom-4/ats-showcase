@@ -239,7 +239,7 @@ Test Assertion
 - `docs/dev-note/issue-19-poc-evaluation-guide.md` - POC guide (references all 74 tests)
 
 **Issue #22:**
-- GitHub: https://github.com/pluto-atom-4/ats-playground/issues/22
+- GitHub: https://github.com/pluto-atom-4/ats-showcase/issues/22
 - Commit introducing xfail: b325203 (in feat/issue-19)
 
 ---

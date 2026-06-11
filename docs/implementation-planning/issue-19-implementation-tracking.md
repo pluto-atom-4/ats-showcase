@@ -1,6 +1,6 @@
 # Issue #19: POC Crawl Workflow - Implementation Tracking
 
-**GitHub Issue**: [#19 - Test Crawl Workflow on Real Career Page](https://github.com/pluto-atom-4/ats-playground/issues/19)
+**GitHub Issue**: [#19 - Test Crawl Workflow on Real Career Page](https://github.com/pluto-atom-4/ats-showcase/issues/19)
 **Target Company**: Carbon Robotics (Greenhouse Job Board)
 **Project**: End-to-end ATS Playground POC validation
 **Status**: Phase 2 In Progress
@@ -290,12 +290,12 @@ config/
 
 ## Contact & References
 
-- **GitHub Issue**: https://github.com/pluto-atom-4/ats-playground/issues/19
+- **GitHub Issue**: https://github.com/pluto-atom-4/ats-showcase/issues/19
 - **Related Docs**:
   - `docs/PREPROCESS.md` - Deep dive on preprocessing
   - `docs/ARCHITECTURE.md` - System design
   - `docs/CLI.md` - Command reference
-- **Slack/Discord**: #ats-playground (if applicable)
+- **Slack/Discord**: #ats-showcase (if applicable)
 
 ---
 

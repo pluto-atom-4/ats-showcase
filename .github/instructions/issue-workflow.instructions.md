@@ -109,7 +109,7 @@ docs/implementation-planning/issue-<NUMBER>-<kebab-case-title>.md
 
 ## Related Files & References
 
-- GitHub Issue: https://github.com/pluto-atom-4/ats-playground/issues/<NUMBER>
+- GitHub Issue: https://github.com/pluto-atom-4/ats-showcase/issues/<NUMBER>
 - Related files: list them
 
 ---
@@ -309,7 +309,7 @@ uv run mypy src/
 
 ```bash
 # Set PYTHONPATH for src-layout project
-export PYTHONPATH="/path/to/ats-playground/src:$PYTHONPATH"
+export PYTHONPATH="/path/to/ats-showcase/src:$PYTHONPATH"
 
 # Run full test suite
 uv run pytest tests/ -v
@@ -348,7 +348,7 @@ uv run pre-commit run --all-files
 uv run mypy src/
 
 # 3. Tests
-export PYTHONPATH="/path/to/ats-playground/src:$PYTHONPATH"
+export PYTHONPATH="/path/to/ats-showcase/src:$PYTHONPATH"
 uv run pytest tests/ -q
 
 # 4. Markdown linting (if docs/ files added)
@@ -469,7 +469,7 @@ git push -u origin fix/issue-22-mock-parsing
 
 # Output will include link to create PR:
 # Create a pull request for 'fix/issue-22-mock-parsing' on GitHub by visiting:
-#      https://github.com/pluto-atom-4/ats-playground/pull/new/fix/issue-22-mock-parsing
+#      https://github.com/pluto-atom-4/ats-showcase/pull/new/fix/issue-22-mock-parsing
 ```
 
 ---
@@ -817,7 +817,7 @@ uv run mypy src/ --show-error-codes
 **"Tests fail locally"**
 ```bash
 # Ensure PYTHONPATH is set for src-layout
-export PYTHONPATH="/path/to/ats-playground/src:$PYTHONPATH"
+export PYTHONPATH="/path/to/ats-showcase/src:$PYTHONPATH"
 uv run pytest tests/ -xvs   # Verbose, stop on first failure
 ```
 

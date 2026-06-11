@@ -32,7 +32,7 @@ This guide helps you demonstrate ATS Playground to stakeholders, showing:
 ### Environment Check
 ```bash
 # Quick validation
-cd /home/pluto-atom-4/Documents/full-stack/ats-playground
+cd /home/pluto-atom-4/Documents/full-stack/ats-showcase
 
 # Verify setup
 uv run python -m src.cli --help | head -20

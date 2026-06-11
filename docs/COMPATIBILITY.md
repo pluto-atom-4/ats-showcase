@@ -679,7 +679,7 @@ uv sync --upgrade
 ```toml
 # pyproject.toml - Optimized for ATS
 [project]
-name = "ats-playground"
+name = "ats-showcase"
 version = "0.1.0"
 requires-python = "^3.13"
 

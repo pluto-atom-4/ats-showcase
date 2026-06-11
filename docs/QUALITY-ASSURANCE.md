@@ -598,4 +598,4 @@ trailing-whitespace  end-of-file-fixer  black  ruff  mypy  pytest-unit
 
 **Last Updated**: 2026-05-22
 
-**Questions?** See troubleshooting section above or check [Issues](https://github.com/pluto-atom-4/ats-playground/issues)
+**Questions?** See troubleshooting section above or check [Issues](https://github.com/pluto-atom-4/ats-showcase/issues)

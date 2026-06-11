@@ -593,15 +593,15 @@ When code changes:
 
 ```bash
 # Build Docker image
-docker build -t ats-playground:staging .
+docker build -t ats-showcase:staging .
 
 # Test in container
-docker run --env-file .env.staging ats-playground:staging \
+docker run --env-file .env.staging ats-showcase:staging \
   python -m pytest tests/ -v
 
 # Push to registry
-docker tag ats-playground:staging myregistry/ats-playground:staging
-docker push myregistry/ats-playground:staging
+docker tag aats-showcasestaging myregistry/ats-showcase:staging
+docker push myregistry/ats-showcase:staging
 ```
 
 ### Production Deployment
@@ -613,12 +613,12 @@ git push origin v1.2.0
 
 # GitHub Action auto-triggers:
 # 1. Build Docker image
-# 2. Push to registry: myregistry/ats-playground:v1.2.0
+# 2. Push to registry: myregistry/ats-showcase:v1.2.0
 # 3. Deploy to production (if configured)
 # 4. Run smoke tests
 
 # Monitor
-docker logs -f ats-playground-prod
+docker logs -f ats-showcase-prod
 # Check: logs/app.log for errors
 # Check: Database health (query count, response time)
 # Check: Cost tracking (compare actual vs estimate)
@@ -758,6 +758,6 @@ git commit -m "feat(cli): add new command"
 git push origin feature/my-feature
 
 # Docker
-docker build -t ats-playground .
-docker run -e CLAUDE_API_KEY="sk-..." ats-playground
+docker build -t ats-showcase .
+docker run -e CLAUDE_API_KEY="sk-..." ats-showcase
 ```

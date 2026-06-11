@@ -1,7 +1,7 @@
 {
   "companies": {
     "TechCorp": {
-      "enabled": false,
+      "enabled": true,
       "name": "Tech Corp",
       "url": "https://techcorp.example.com/careers",
       "selectors": {

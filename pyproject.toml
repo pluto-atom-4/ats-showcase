@@ -3,13 +3,13 @@ requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ats-playground"
+name = "ats-showcase"
 version = "0.1.0"
 description = "Agentic AI workflow for intelligent job assessment and CV matching"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    { name = "ATS Playground Contributors", email = "dev@ats-playground.local" }
+    { name = "ATS Showcase Contributors", email = "dev@ats-showcase.local" }
 ]
 requires-python = ">=3.11"
 keywords = [
@@ -70,10 +70,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/pluto-atom-4/ats-playground"
-Repository = "https://github.com/pluto-atom-4/ats-playground.git"
-Issues = "https://github.com/pluto-atom-4/ats-playground/issues"
-Documentation = "https://github.com/pluto-atom-4/ats-playground/tree/main/docs"
+Homepage = "https://github.com/pluto-atom-4/ats-showcase"
+Repository = "https://github.com/pluto-atom-4/ats-showcase.git"
+Issues = "https://github.com/pluto-atom-4/ats-showcase/issues"
+Documentation = "https://github.com/pluto-atom-4/ats-showcase/tree/main/docs"
 
 [project.scripts]
 ats-cli = "src.cli:main"

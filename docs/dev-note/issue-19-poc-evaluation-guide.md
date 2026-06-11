@@ -94,8 +94,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ```bash
 # Clone repository
-git clone https://github.com/pluto-atom-4/ats-playground.git
-cd ats-playground
+git clone https://github.com/pluto-atom-4/ats-showcase.git
+cd ats-showcase
 
 # Install dependencies
 uv sync

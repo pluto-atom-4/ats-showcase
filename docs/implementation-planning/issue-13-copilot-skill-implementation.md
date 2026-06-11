@@ -1,6 +1,6 @@
 # Issue #13: Add GitHub Copilot Skills - Implementation Plan
 
-**Issue**: https://github.com/pluto-atom-4/ats-playground/issues/13
+**Issue**: https://github.com/pluto-atom-4/ats-showcase/issues/13
 **Status**: 🚀 **IN PROGRESS** (Phase A Complete, Phase B Ready)
 **Date Created**: 2026-05-23
 **Completion Target**: 2026-05-23 (40 minutes)
@@ -54,7 +54,7 @@ GitHub Copilot CLI and Claude Code use **completely separate** skill registratio
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Developer Workspace (ats-playground)                       │
+│  Developer Workspace (ats-showcase)                          │
 ├──────────────────────────────────────────────────────────────┤
 │                                                               │
 │  ┌──────────────────────┐  ┌────────────────────────────┐   │
@@ -63,7 +63,7 @@ GitHub Copilot CLI and Claude Code use **completely separate** skill registratio
 │  ├──────────────────────┤  ├────────────────────────────┤   │
 │  │ .claude/settings.json│  │ Requires: Plugin System    │   │
 │  │ skillOverrides: [    │  │                             │   │
-│  │  ats-playground      │  │ copilot plugin install     │   │
+│  │  ats-showcase        │  │ copilot plugin install     │   │
 │  │ ]                    │  │ copilot plugin list        │   │
 │  ├──────────────────────┤  ├────────────────────────────┤   │
 │  │ ✅ Skills available  │  │ ❌ No plugins (yet)        │   │
@@ -134,7 +134,7 @@ To enable ATS Playground skills in GitHub Copilot CLI sessions:
 
 ```bash
 # Install the plugin
-gh copilot -- plugin install pluto-atom-4/copilot-plugin-ats-playground
+gh copilot -- plugin install pluto-atom-4/copilot-plugin-ats-showcase
 
 # Verify installation
 gh copilot -- plugin list
@@ -840,7 +840,7 @@ If plugin integration has issues:
 
 ## References
 
-- **Issue #13**: https://github.com/pluto-atom-4/ats-playground/issues/13
+- **Issue #13**: https://github.com/pluto-atom-4/ats-showcase/issues/13
 - **Issue #12**: Claude Code Settings (Prerequisite, MERGED PR #16)
 - **GitHub Copilot CLI**: https://docs.github.com/copilot/how-tos/copilot-cli
 - **Plugin System**: https://docs.github.com/copilot/concepts/agents/copilot-cli/about-cli-plugins
