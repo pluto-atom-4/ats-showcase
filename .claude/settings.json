@@ -101,5 +101,18 @@
   "spinnerTipsEnabled": true,
   "showTurnDuration": false,
   "showMessageTimestamps": false,
-  "todo": false
+  "todo": false,
+  "mcpServers": {
+      "playwright": {
+      "type": "local",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
 }
