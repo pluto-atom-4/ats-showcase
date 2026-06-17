@@ -3,6 +3,7 @@
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from urllib.parse import urljoin
 
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
@@ -97,7 +98,7 @@ class Crawler:
             for i, container in enumerate(job_containers, 1):
                 try:
                     job = await self._extract_job_from_container(
-                        page, container, company_name, selectors
+                        page, container, company_name, selectors, url
                     )
                     if job:
                         jobs.append(job)
@@ -114,7 +115,7 @@ class Crawler:
             return []
 
     async def _extract_job_from_container(
-        self, page: Page, container, company_name: str, selectors: Dict[str, str]
+        self, page: Page, container, company_name: str, selectors: Dict[str, str], base_url: str = ""
     ) -> Optional[JobPosting]:
         """Extract job details from a single job container element."""
         try:
@@ -125,6 +126,10 @@ class Crawler:
             if not title:
                 logger.warning("No title found in container")
                 return None
+
+            # Convert relative URLs to absolute
+            if link and base_url:
+                link = urljoin(base_url, link)
 
             return JobPosting(
                 id=None,
