@@ -948,6 +948,7 @@ When using `--config-dir`:
 ---
 
 **Related Documentation**:
+- [CLI-STEP-BY-STEP.md](./CLI-STEP-BY-STEP.md) - Complete workflow guide with examples
 - [CRAWL.md](./CRAWL.md) - Crawling implementation
 - [PREPROCESS.md](./PREPROCESS.md) - Preprocessing implementation
 - [VERIFY.md](./VERIFY.md) - Verification workflow
