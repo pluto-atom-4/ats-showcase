@@ -98,7 +98,7 @@ class Crawler:
             for i, container in enumerate(job_containers, 1):
                 try:
                     job = await self._extract_job_from_container(
-                        page, container, company_name, selectors, url
+                        page, container, company_name, selectors, url, crawler_config
                     )
                     if job:
                         jobs.append(job)
@@ -115,10 +115,12 @@ class Crawler:
             return []
 
     async def _extract_job_from_container(
-        self, page: Page, container, company_name: str, selectors: Dict[str, str], base_url: str = ""
+        self, page: Page, container, company_name: str, selectors: Dict[str, str],
+        base_url: str = "", crawler_config: Optional[Dict[str, Any]] = None
     ) -> Optional[JobPosting]:
         """Extract job details from a single job container element."""
         try:
+            crawler_config = crawler_config or {}
             title = await self._extract_text(container, selectors.get("title"))
             location = await self._extract_text(container, selectors.get("location"))
             link = await self._extract_link(container, selectors.get("link"))
@@ -131,14 +133,23 @@ class Crawler:
             if link and base_url:
                 link = urljoin(base_url, link)
 
+            description = ""
+            requirements = None
+
+            # Fetch detail page if enabled
+            if crawler_config.get("fetch_detail") and link:
+                description, requirements = await self._fetch_job_detail(
+                    link, selectors
+                )
+
             return JobPosting(
                 id=None,
                 title=title,
                 company=company_name,
                 location=location or "Not specified",
                 url=link,  # type: ignore[arg-type]
-                description="",
-                requirements=None,
+                description=description,
+                requirements=requirements,
                 salary_min=None,
                 salary_max=None,
                 posted_date=None,
@@ -174,6 +185,49 @@ class Crawler:
         except Exception as e:
             logger.debug(f"Error extracting link with selector {selector}: {e}")
         return None
+
+    async def _fetch_job_detail(
+        self, job_url: str, selectors: Dict[str, str]
+    ) -> tuple[str, Optional[str]]:
+        """Fetch job description and requirements from detail page."""
+        if not self.context:
+            return "", None
+
+        detail_page = None
+        try:
+            detail_page = await self.context.new_page()
+            detail_page.set_default_timeout(self.timeout_ms)
+            await detail_page.goto(job_url, wait_until="networkidle")
+            await detail_page.wait_for_timeout(500)
+
+            description = ""
+            requirements = None
+
+            # Try to extract description
+            desc_selector = selectors.get("description_selector")
+            if desc_selector:
+                desc_elem = await detail_page.query_selector(desc_selector)
+                if desc_elem:
+                    desc_text = await desc_elem.text_content()
+                    description = desc_text.strip() if desc_text else ""
+
+            # Try to extract requirements
+            req_selector = selectors.get("requirements_selector")
+            if req_selector:
+                req_elem = await detail_page.query_selector(req_selector)
+                if req_elem:
+                    req_text = await req_elem.text_content()
+                    requirements = req_text.strip() if req_text else None
+
+            logger.debug(f"Fetched detail for {job_url}: {len(description)} chars")
+            return description, requirements
+
+        except Exception as e:
+            logger.debug(f"Error fetching job detail from {job_url}: {e}")
+            return "", None
+        finally:
+            if detail_page:
+                await detail_page.close()
 
     async def crawl_multiple(
         self, companies: Dict[str, Dict[str, Any]]
