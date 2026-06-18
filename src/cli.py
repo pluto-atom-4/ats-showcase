@@ -690,7 +690,9 @@ def preprocess(
 
                     clean_text = job.title
                     if job.location:
-                        clean_text = f"{job.title}\n{job.location}"
+                        clean_text += f"\n{job.location}"
+                    if job.description:
+                        clean_text += f"\n{job.description}"
 
                     chunks = chunker.chunk(clean_text)
                     token_count = sum(counter.count_tokens(c) for c in chunks)

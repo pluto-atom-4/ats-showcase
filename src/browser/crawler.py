@@ -95,10 +95,14 @@ class Crawler:
             logger.info(f"Found {len(job_containers)} job containers")
 
             jobs: List[JobPosting] = []
+            max_jobs = crawler_config.get("max_jobs_debug", None)
             for i, container in enumerate(job_containers, 1):
+                if max_jobs and i > max_jobs:
+                    logger.debug(f"Stopping at {max_jobs} jobs (debug mode)")
+                    break
                 try:
                     job = await self._extract_job_from_container(
-                        page, container, company_name, selectors, url
+                        page, container, company_name, selectors, url, crawler_config
                     )
                     if job:
                         jobs.append(job)
@@ -115,13 +119,17 @@ class Crawler:
             return []
 
     async def _extract_job_from_container(
-        self, page: Page, container, company_name: str, selectors: Dict[str, str], base_url: str = ""
+        self, page: Page, container, company_name: str, selectors: Dict[str, str],
+        base_url: str = "", crawler_config: Optional[Dict[str, Any]] = None
     ) -> Optional[JobPosting]:
         """Extract job details from a single job container element."""
         try:
+            crawler_config = crawler_config or {}
             title = await self._extract_text(container, selectors.get("title"))
             location = await self._extract_text(container, selectors.get("location"))
             link = await self._extract_link(container, selectors.get("link"))
+
+            logger.debug(f"title={title}, link={link}, fetch_detail={crawler_config.get('fetch_detail')}")
 
             if not title:
                 logger.warning("No title found in container")
@@ -131,14 +139,28 @@ class Crawler:
             if link and base_url:
                 link = urljoin(base_url, link)
 
+            description = ""
+            requirements = None
+
+            # Fetch detail page if enabled
+            fetch_detail = crawler_config.get("fetch_detail")
+            logger.debug(f"fetch_detail={fetch_detail}, link exists={link is not None}")
+            if fetch_detail and link:
+                logger.debug(f"Calling _fetch_job_detail for {link}")
+                description, requirements = await self._fetch_job_detail(
+                    link, selectors
+                )
+            else:
+                logger.debug(f"Skipping detail fetch (fetch_detail={fetch_detail}, link={link is not None})")
+
             return JobPosting(
                 id=None,
                 title=title,
                 company=company_name,
                 location=location or "Not specified",
                 url=link,  # type: ignore[arg-type]
-                description="",
-                requirements=None,
+                description=description,
+                requirements=requirements,
                 salary_min=None,
                 salary_max=None,
                 posted_date=None,
@@ -147,6 +169,8 @@ class Crawler:
             )
         except Exception as e:
             logger.warning(f"Error extracting job from container: {e}")
+            import traceback
+            logger.debug(f"Exception traceback: {traceback.format_exc()}")
             return None
 
     async def _extract_text(self, element, selector: Optional[str]) -> Optional[str]:
@@ -174,6 +198,108 @@ class Crawler:
         except Exception as e:
             logger.debug(f"Error extracting link with selector {selector}: {e}")
         return None
+
+    async def _fetch_job_detail(
+        self, job_url: str, selectors: Dict[str, str]
+    ) -> tuple[str, Optional[str]]:
+        """Fetch job description and requirements from detail page."""
+        if not self.context:
+            logger.debug("No context available")
+            return "", None
+
+        detail_page = None
+        try:
+            logger.debug(f"Fetching detail for {job_url}")
+            detail_page = await self.context.new_page()
+            detail_page.set_default_timeout(self.timeout_ms)
+            await detail_page.goto(job_url, wait_until="networkidle")
+            await detail_page.wait_for_timeout(1000)
+            logger.debug("Page loaded, extracting description")
+
+            description = ""
+            requirements = None
+
+            # Try to extract description
+            desc_selector = selectors.get("description_selector")
+            if desc_selector:
+                desc_elem = await detail_page.query_selector(desc_selector)
+                if desc_elem:
+                    # Check if element is an iframe
+                    tag_name = await desc_elem.evaluate("el => el.tagName.toLowerCase()")
+                    if tag_name == "iframe":
+                        # For iframe: query selector within the frame
+                        inner_selector = selectors.get("inner_description_selector")
+                        if inner_selector:
+                            description = await self._fetch_iframe_via_frame(detail_page, inner_selector)
+                        else:
+                            # Fallback: get all text from iframe body
+                            description = await self._fetch_iframe_via_frame(detail_page, None)
+                    else:
+                        # Regular element - extract text
+                        desc_text = await desc_elem.text_content()
+                        description = desc_text.strip() if desc_text else ""
+
+            # Try to extract requirements
+            req_selector = selectors.get("requirements_selector")
+            if req_selector:
+                req_elem = await detail_page.query_selector(req_selector)
+                if req_elem:
+                    req_text = await req_elem.text_content()
+                    requirements = req_text.strip() if req_text else None
+
+            logger.debug(f"Fetched detail: {len(description)} chars")
+            return description, requirements
+
+        except Exception as e:
+            logger.debug(f"Error fetching job detail: {e}")
+            import traceback
+            logger.info(f"DEBUG: Traceback: {traceback.format_exc()}")
+            return "", None
+        finally:
+            if detail_page:
+                await detail_page.close()
+
+    async def _fetch_iframe_via_frame(self, page: Page, inner_selector: Optional[str] = None) -> str:
+        """Access iframe content via Playwright frame API."""
+        try:
+            # Wait for iframe to load
+            await page.wait_for_load_state("networkidle")
+            await page.wait_for_timeout(500)
+
+            # Get all frames from page
+            frames = page.frames
+            logger.debug(f"Found {len(frames)} frames on page")
+
+            # Try each frame to find content
+            for i, frame in enumerate(frames):
+                try:
+                    if inner_selector:
+                        # Query for specific selector within frame
+                        elem = await frame.query_selector(inner_selector)
+                        if elem:
+                            content = await elem.text_content()
+                            content = content.strip() if content else ""
+                            if content:
+                                logger.debug(f"Found selector in frame {i}: {len(content)} chars")
+                                return content
+                    else:
+                        # Get all text content from frame body
+                        content = await frame.evaluate("() => document.body.innerText")
+                        if isinstance(content, str):
+                            content_len = len(content.strip())
+                            if content_len > 100:
+                                logger.debug(f"Using frame {i} with {content_len} chars")
+                                return content.strip()
+                except Exception as e:
+                    logger.debug(f"Frame {i} error: {e}")
+                    continue
+
+            logger.debug("No substantial content found in any frame")
+            return ""
+
+        except Exception as e:
+            logger.debug(f"Error accessing iframe via frame API: {e}")
+            return ""
 
     async def crawl_multiple(
         self, companies: Dict[str, Dict[str, Any]]
