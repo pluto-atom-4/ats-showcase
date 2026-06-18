@@ -186,6 +186,14 @@ class JobReviewer:
         typer.echo(f"   Location: {location}")
         typer.echo(f"   Tokens: {tokens} | Cost: ${cost:.6f}")
 
+        # Show content preview if available
+        content = preprocessed.get("clean_text", "")
+        if content:
+            preview = content.split("\n")[2:5]  # Show lines after title/location
+            if preview:
+                preview_text = " ".join(preview)[:80]
+                typer.echo(f"   Content: {preview_text}...")
+
         while True:
             prompt = "   Action (c=confirm/r=reject/s=skip/q=quit): "
             action = typer.prompt(prompt).strip().lower()
@@ -261,8 +269,12 @@ class JobReviewer:
         stats = ReviewStats()
         typer.echo(f"\n👀 Starting job review ({len(extracted_jobs)} jobs total)\n")
 
+        # Get source filename for job_id prefix
+        source_name = extracted_path.stem  # e.g., "carbonrobotics_jobs"
+
         for idx, job in enumerate(extracted_jobs):
-            job_id = job.get("id", f"job_{idx}")
+            # Match job_id format from preprocessing: "{source}_{index}"
+            job_id = f"{source_name}_{idx + 1}"
             preprocessed = preprocessed_map.get(job_id, {})
 
             try:
