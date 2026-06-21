@@ -941,10 +941,28 @@ def export(
     template: str = typer.Option("detailed", help="Template: detailed or summary"),
     include_recommendations: bool = typer.Option(True, help="Include LLM recommendations"),
     include_stats: bool = typer.Option(True, help="Include analytics section"),
+    from_date: Optional[str] = typer.Option(None, help="Filter from date (YYYY-MM-DD)"),
+    to_date: Optional[str] = typer.Option(None, help="Filter to date (YYYY-MM-DD)"),
 ) -> None:
-    """Export assessment results to Markdown report."""
+    """Export assessment results to Markdown report.
+
+    Examples:
+        # Export all assessments
+        uv run python -m src.cli export
+
+        # Export with score range
+        uv run python -m src.cli export --min-score 70 --max-score 100
+
+        # Export with date range
+        uv run python -m src.cli export --from-date 2026-05-01 --to-date 2026-05-31
+
+        # Combined filters
+        uv run python -m src.cli export --from-date 2026-05-01 --to-date 2026-05-31 --min-score 75
+    """
+    from src.storage.export import parse_date_str
+
     try:
-        # Validate inputs
+        # Validate score inputs
         if not 0 <= min_score <= 100:
             typer.echo("❌ min_score must be 0-100", err=True)
             raise typer.Exit(1)
@@ -954,6 +972,18 @@ def export(
         if min_score > max_score:
             typer.echo("❌ min_score must be <= max_score", err=True)
             raise typer.Exit(1)
+
+        # Parse and validate dates
+        date_from = None
+        date_to = None
+        try:
+            if from_date:
+                date_from = parse_date_str(from_date)
+            if to_date:
+                date_to = parse_date_str(to_date)
+        except ValueError as e:
+            typer.echo(f"❌ {e}", err=True)
+            raise typer.Exit(1) from e
 
         # Load assessment store
         db_path = "data/ats_playground.db"
@@ -975,10 +1005,17 @@ def export(
             template_style=template,
             include_recommendations=include_recommendations,
             include_stats=include_stats,
+            date_from=date_from,
+            date_to=date_to,
         )
 
         # Generate report
-        typer.echo(f"📊 Generating report (score {min_score}-{max_score})...")
+        filter_msg = f"score {min_score}-{max_score}"
+        if from_date or to_date:
+            date_range = f"{from_date or 'any'} to {to_date or 'any'}"
+            filter_msg += f", date {date_range}"
+        typer.echo(f"📊 Generating report ({filter_msg})...")
+
         exporter = MarkdownExporter(store, config)
         report = (
             exporter.generate_summary() if template == "summary" else exporter.generate_report()
@@ -993,7 +1030,8 @@ def export(
         filtered_in_range = len(store.get_assessments_by_score(min_score, max_score))
         file_size_kb = output_path.stat().st_size / 1024
 
-        typer.echo(f"✅ Exported {filtered_in_range}/{total} jobs to {output}")
+        typer.echo(f"✅ Exported to {output}")
+        typer.echo(f"   Filtered: {filtered_in_range}/{total} jobs")
         typer.echo(f"   File size: {file_size_kb:.1f} KB")
         typer.echo(f"   Template: {template}")
 
