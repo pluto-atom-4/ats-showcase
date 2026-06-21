@@ -2,13 +2,14 @@
 
 import json
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from storage.assessment_store import AssessmentStore
-from storage.export import ExportConfig, MarkdownExporter
+from storage.export import ExportConfig, MarkdownExporter, parse_date_str
 
 # ============================================================================
 # FIXTURES
@@ -152,6 +153,46 @@ class TestExportConfig:
         assert config_dict["min_score"] == 75
         assert config_dict["template_style"] == "summary"
         assert config_dict["include_recommendations"] is True
+
+    def test_date_filter_valid(self):
+        """Test date filtering with valid dates."""
+        date_from = parse_date_str("2026-05-01")
+        date_to = parse_date_str("2026-05-31")
+        config = ExportConfig(date_from=date_from, date_to=date_to)
+        assert config.date_from == date_from
+        assert config.date_to == date_to
+
+    def test_date_filter_invalid_range(self):
+        """Test date filtering with from > to."""
+        date_from = parse_date_str("2026-05-31")
+        date_to = parse_date_str("2026-05-01")
+        with pytest.raises(ValueError, match="date_from must be <= date_to"):
+            ExportConfig(date_from=date_from, date_to=date_to)
+
+    def test_date_filter_equal_dates(self):
+        """Test date filtering with equal dates."""
+        date = parse_date_str("2026-05-15")
+        config = ExportConfig(date_from=date, date_to=date)
+        assert config.date_from == date
+        assert config.date_to == date
+
+    def test_parse_date_str_valid(self):
+        """Test parsing valid date strings."""
+        date = parse_date_str("2026-05-15")
+        assert date.year == 2026
+        assert date.month == 5
+        assert date.day == 15
+        assert date.tzinfo == timezone.utc
+
+    def test_parse_date_str_invalid_format(self):
+        """Test parsing invalid date format."""
+        with pytest.raises(ValueError, match="Invalid date format"):
+            parse_date_str("05-15-2026")
+
+    def test_parse_date_str_invalid_date(self):
+        """Test parsing invalid date."""
+        with pytest.raises(ValueError, match="Invalid date format"):
+            parse_date_str("2026-13-01")  # Invalid month
 
 
 # ============================================================================
@@ -302,6 +343,87 @@ class TestMarkdownExporter:
         # With stats should include analytics section
         assert "## Analytics" in report_with
         assert "## Analytics" not in report_without
+
+    def test_filter_by_date_from(self, store_with_assessments):
+        """Test filtering by from_date only."""
+        # All test assessments are created with CURRENT_TIMESTAMP in DB
+        # Test with past date - should include all assessments
+        date_from = parse_date_str("2020-01-01")
+        config = ExportConfig(date_from=date_from)
+        exporter = MarkdownExporter(store_with_assessments, config)
+        assessments = exporter._get_filtered_assessments()
+
+        # All assessments should be included (they're on or after the date)
+        assert len(assessments) == 3
+
+    def test_filter_by_date_to(self, store_with_assessments):
+        """Test filtering by to_date only."""
+        # Test with future date - should include all assessments
+        date_to = parse_date_str("2099-12-31")
+        config = ExportConfig(date_to=date_to)
+        exporter = MarkdownExporter(store_with_assessments, config)
+        assessments = exporter._get_filtered_assessments()
+
+        # All assessments should be included (they're on or before the date)
+        assert len(assessments) == 3
+
+    def test_filter_by_date_range(self, store_with_assessments):
+        """Test filtering by date range."""
+        # Use a wide range that includes today's date
+        date_from = parse_date_str("2020-01-01")
+        date_to = parse_date_str("2099-12-31")
+        config = ExportConfig(date_from=date_from, date_to=date_to)
+        exporter = MarkdownExporter(store_with_assessments, config)
+        assessments = exporter._get_filtered_assessments()
+
+        # All assessments should be included
+        assert len(assessments) == 3
+
+    def test_filter_by_date_excludes_before(self, store_with_assessments):
+        """Test that date filter excludes assessments before from_date."""
+        # Use a future date that no assessments will meet
+        date_from = parse_date_str("2099-12-31")
+        config = ExportConfig(date_from=date_from)
+        exporter = MarkdownExporter(store_with_assessments, config)
+        assessments = exporter._get_filtered_assessments()
+
+        # No assessments should be included (all are in the past)
+        assert len(assessments) == 0
+
+    def test_filter_by_date_excludes_after(self, store_with_assessments):
+        """Test that date filter excludes assessments after to_date."""
+        # Use a past date that no assessments will meet
+        date_to = parse_date_str("2020-01-01")
+        config = ExportConfig(date_to=date_to)
+        exporter = MarkdownExporter(store_with_assessments, config)
+        assessments = exporter._get_filtered_assessments()
+
+        # No assessments should be included (all are in the future)
+        assert len(assessments) == 0
+
+    def test_date_filter_in_report_header(self, store_with_assessments):
+        """Test that date filter appears in report header."""
+        date_from = parse_date_str("2020-01-01")
+        date_to = parse_date_str("2099-12-31")
+        config = ExportConfig(date_from=date_from, date_to=date_to)
+        exporter = MarkdownExporter(store_with_assessments, config)
+        report = exporter.generate_report()
+
+        # Should show date range in header
+        assert "Date: 2020-01-01 to 2099-12-31" in report
+        assert "**Filters:**" in report
+
+    def test_date_filter_with_score_filter(self, store_with_assessments):
+        """Test combining date and score filters."""
+        date_from = parse_date_str("2020-01-01")
+        config = ExportConfig(min_score=75, date_from=date_from)
+        exporter = MarkdownExporter(store_with_assessments, config)
+        assessments = exporter._get_filtered_assessments()
+
+        # Should include jobs with score >= 75 and date >= 2020-01-01
+        # job1 (92), job2 (78) qualify
+        assert len(assessments) == 2
+        assert all(a["overall_score"] >= 75 for a in assessments)
 
 
 # ============================================================================

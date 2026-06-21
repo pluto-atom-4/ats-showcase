@@ -10,6 +10,15 @@ from storage.assessment_store import AssessmentStore
 logger = logging.getLogger(__name__)
 
 
+def parse_date_str(date_str: str) -> datetime:
+    """Parse ISO 8601 date string (YYYY-MM-DD) to datetime."""
+    try:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        return dt.replace(tzinfo=timezone.utc)
+    except ValueError as e:
+        raise ValueError(f"Invalid date format: {date_str}. Use YYYY-MM-DD") from e
+
+
 @dataclass
 class ExportConfig:
     """Configuration for export operations."""
@@ -20,6 +29,8 @@ class ExportConfig:
     template_style: str = "detailed"  # detailed, summary
     include_recommendations: bool = True
     include_stats: bool = True
+    date_from: Optional[datetime] = None
+    date_to: Optional[datetime] = None
 
     def __post_init__(self):
         """Validate configuration."""
@@ -33,6 +44,11 @@ class ExportConfig:
             raise ValueError("sort_by must be 'score', 'company', or 'location'")
         if self.template_style not in ("detailed", "summary"):
             raise ValueError("template_style must be 'detailed' or 'summary'")
+
+        # Validate date parameters
+        if self.date_from and self.date_to:
+            if self.date_from > self.date_to:
+                raise ValueError("date_from must be <= date_to")
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -108,6 +124,44 @@ class MarkdownExporter:
 
         return "\n".join(sections)
 
+    def _filter_by_date_range(self, assessments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Filter assessments by date range."""
+        if not self.config.date_from and not self.config.date_to:
+            return assessments
+
+        filtered = []
+        for assessment in assessments:
+            assessed_date_str = assessment.get("assessed_date")
+            if not assessed_date_str:
+                continue
+
+            # Parse assessed_date string to datetime
+            try:
+                if isinstance(assessed_date_str, datetime):
+                    assessed_date = assessed_date_str
+                else:
+                    assessed_date = datetime.fromisoformat(assessed_date_str.replace("Z", "+00:00"))
+
+                # Normalize to UTC if naive datetime
+                if assessed_date.tzinfo is None:
+                    assessed_date = assessed_date.replace(tzinfo=timezone.utc)
+                elif assessed_date.tzinfo != timezone.utc:
+                    assessed_date = assessed_date.astimezone(timezone.utc)
+
+            except (ValueError, AttributeError):
+                logger.warning(f"Could not parse date for job {assessment.get('job_id')}")
+                continue
+
+            # Check range
+            if self.config.date_from and assessed_date < self.config.date_from:
+                continue
+            if self.config.date_to and assessed_date > self.config.date_to:
+                continue
+
+            filtered.append(assessment)
+
+        return filtered
+
     def _get_filtered_assessments(self) -> List[Dict[str, Any]]:
         """
         Get assessments filtered and sorted per config.
@@ -118,6 +172,9 @@ class MarkdownExporter:
         assessments: List[Dict[str, Any]] = self.store.get_assessments_by_score(
             min_score=self.config.min_score, max_score=self.config.max_score
         )
+
+        # Apply date range filtering
+        assessments = self._filter_by_date_range(assessments)
 
         # Sort by configured field
         if self.config.sort_by == "score":
@@ -143,8 +200,17 @@ class MarkdownExporter:
             "",
         ]
 
+        # Show filters applied
+        filters = []
         if self.config.min_score > 0 or self.config.max_score < 100:
-            lines.append(f"**Score Range:** {self.config.min_score}-{self.config.max_score}")
+            filters.append(f"Score: {self.config.min_score}-{self.config.max_score}")
+        if self.config.date_from or self.config.date_to:
+            date_from_str = self.config.date_from.strftime("%Y-%m-%d") if self.config.date_from else "any"
+            date_to_str = self.config.date_to.strftime("%Y-%m-%d") if self.config.date_to else "any"
+            filters.append(f"Date: {date_from_str} to {date_to_str}")
+
+        if filters:
+            lines.append(f"**Filters:** {' | '.join(filters)}")
             lines.append("")
 
         # Cost summary
