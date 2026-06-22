@@ -29,6 +29,10 @@ class TestEnvLoading:
         # Verify main function exists
         assert hasattr(cli, "main"), "main function not defined in cli.py"
 
+    @pytest.mark.skipif(
+        os.getenv("CI") == "true",
+        reason=".env not present in CI environment (git-ignored for security)",
+    )
     def test_env_file_exists(self):
         """Test .env file exists in project root."""
         env_file = Path(".env")
