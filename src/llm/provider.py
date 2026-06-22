@@ -83,7 +83,14 @@ class LLMProvider:
         """
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not self.api_key:
-            raise ValueError("ANTHROPIC_API_KEY not set and api_key not provided")
+            error_msg = (
+                "ANTHROPIC_API_KEY not found.\n"
+                "  • Set ANTHROPIC_API_KEY in .env file (recommended)\n"
+                "  • Or export ANTHROPIC_API_KEY in your shell\n"
+                "  • Or pass api_key parameter to LLMProvider()"
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         try:
             import anthropic

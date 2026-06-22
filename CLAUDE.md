@@ -12,9 +12,11 @@ For GitHub Copilot CLI plugin setup → see **PLUGIN.md**
 uv sync                                          # Install dependencies
 uv run python -m spacy download en_core_web_md  # Download NLP model
 uv run playwright install                        # Download Chromium
-cp .env.example .env                             # Create env file (add ANTHROPIC_API_KEY)
+cp .env.example .env                             # Create env file with ANTHROPIC_API_KEY
 uv run python src/storage/db.py --init          # Initialize SQLite
 ```
+
+**Note**: `.env` is loaded automatically by CLI. No need to `export ANTHROPIC_API_KEY`.
 
 ### Development Commands
 ```bash
