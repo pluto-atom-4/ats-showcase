@@ -605,6 +605,89 @@ def get_recent_assessments(storage: StorageClient, days: int = 7) -> List[Dict]:
     return [dict(row) for row in cursor.fetchall()]
 ```
 
+### Date Range Filtering
+
+Filter assessments by date range for targeted exports and analysis:
+
+```python
+from storage.export import parse_date_str, ExportConfig, MarkdownExporter
+
+# Parse date strings (ISO 8601 format: YYYY-MM-DD)
+date_from = parse_date_str("2025-06-01")
+date_to = parse_date_str("2025-12-31")
+
+# Create config with date filters
+config = ExportConfig(
+    date_from=date_from,
+    date_to=date_to,
+    min_score=75,
+    max_score=95
+)
+
+# Generate filtered report
+exporter = MarkdownExporter(store, config)
+report = exporter.generate_report()
+
+# Date filtering semantics:
+# - date_from: Include assessments on or after this date (inclusive)
+# - date_to: Include assessments on or before this date (inclusive)
+# - Both can be used together for a precise date range
+# - Filters applied after score filtering
+```
+
+## Data Lifecycle: Purging Old Assessments
+
+Purge old assessments by date range with safety features:
+
+```python
+from storage.assessment_store import AssessmentStore
+
+store = AssessmentStore()
+
+# Preview what would be deleted (dry-run mode is default)
+result = store.purge_by_date(before_date="2025-04-01", dry_run=True)
+print(f"Would delete {result['count']} assessments")
+# Output: {'count': 42, 'dry_run': True, 'before_date': '2025-04-01', 'after_date': None}
+
+# Actually delete assessments (requires dry_run=False explicitly)
+result = store.purge_by_date(before_date="2025-04-01", dry_run=False)
+print(f"Deleted {result['count']} assessments")
+# Output: {'count': 42, 'dry_run': False, 'before_date': '2025-04-01', 'after_date': None}
+
+# Purge with date range (delete assessments between two dates)
+result = store.purge_by_date(
+    after_date="2025-01-01",
+    before_date="2025-03-31",
+    dry_run=False
+)
+print(f"Deleted {result['count']} assessments from Q1 2025")
+
+# Purge semantics:
+# - before_date: Delete assessments with assessed_date < date
+# - after_date: Delete assessments with assessed_date > date
+# - Combines with AND logic for precise range control
+# - Dates in ISO 8601 format: YYYY-MM-DD
+# - Cleans up both main table and FTS5 index atomically
+```
+
+### Safety Features
+
+Default behaviors prevent accidental deletion:
+
+```python
+# Safe by default: dry_run=True (preview only)
+result = store.purge_by_date(before_date="2025-04-01")
+# Returns count but DOES NOT delete
+
+# Requires explicit flag for deletion
+result = store.purge_by_date(before_date="2025-04-01", dry_run=False)
+# Now actually deletes
+
+# CLI enforces dual-flag requirement
+# Must provide BOTH: --no-dry-run AND --confirm
+# If only one provided, operation fails safely
+```
+
 ## Export to Markdown
 
 ```python
