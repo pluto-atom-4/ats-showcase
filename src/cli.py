@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 import typer
+from dotenv import load_dotenv
 
 from browser.crawler import Crawler
 from storage.assessment_store import AssessmentStore
@@ -1240,6 +1241,7 @@ def stats(
 
 def main() -> None:
     """Main entry point."""
+    load_dotenv()
     app()
 
 
