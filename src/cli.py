@@ -1052,6 +1052,122 @@ def export(
 
 
 @app.command()
+def purge(
+    before_date: Optional[str] = typer.Option(None, help="Delete assessments before date (YYYY-MM-DD)"),
+    after_date: Optional[str] = typer.Option(None, help="Delete assessments after date (YYYY-MM-DD)"),
+    dry_run: bool = typer.Option(True, help="Preview deletions without actually deleting"),
+    confirm: bool = typer.Option(False, help="Required flag to confirm actual deletion"),
+) -> None:
+    """Purge old assessments by date range.
+
+    Examples:
+        # Preview purge (dry-run)
+        uv run python -m src.cli purge --before-date 2026-04-01
+
+        # Actually delete (requires --confirm)
+        uv run python -m src.cli purge --before-date 2026-04-01 --no-dry-run --confirm
+    """
+    from src.storage.export import parse_date_str
+
+    try:
+        if not before_date and not after_date:
+            typer.echo("❌ Specify at least one date filter (--before-date or --after-date)", err=True)
+            raise typer.Exit(1)
+
+        # Parse dates
+        before_parsed = None
+        after_parsed = None
+
+        try:
+            if before_date:
+                before_parsed = parse_date_str(before_date)
+            if after_date:
+                after_parsed = parse_date_str(after_date)
+        except ValueError as e:
+            typer.echo(f"❌ {e}", err=True)
+            raise typer.Exit(1) from e
+
+        # Validate date range
+        if before_parsed and after_parsed and after_parsed >= before_parsed:
+            typer.echo(
+                "❌ Invalid range: after_date must be before before_date",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        # Load store
+        db_path = "data/ats_playground.db"
+        store = AssessmentStore(db_path)
+        total = store.count_assessments()
+
+        if total == 0:
+            typer.echo("⚠️  No assessments in database", err=True)
+            raise typer.Exit(1)
+
+        # Dry run to show what would be deleted
+        result = store.purge_by_date(
+            before_date=before_date,
+            after_date=after_date,
+            dry_run=True,
+        )
+
+        affected_count = result["count"]
+
+        if affected_count == 0:
+            typer.echo("ℹ️  No assessments match the date filter")
+            raise typer.Exit(0)
+
+        # Show preview
+        typer.echo("")
+        typer.echo("🗑️  Purge Preview:")
+        typer.echo(f"   Assessments to delete: {affected_count}/{total}")
+        if before_date:
+            typer.echo(f"   Before date: {before_date}")
+        if after_date:
+            typer.echo(f"   After date: {after_date}")
+        typer.echo("")
+
+        # Safety check
+        if not dry_run:
+            if not confirm:
+                typer.echo("❌ Destructive operation requires --confirm flag", err=True)
+                example = (
+                    "uv run python -m src.cli purge --before-date 2026-04-01 "
+                    "--no-dry-run --confirm"
+                )
+                typer.echo(f"   Example: {example}", err=True)
+                raise typer.Exit(1)
+
+            # Final confirmation
+            typer.echo("⚠️  WARNING: This will permanently delete the assessments!")
+            response = typer.prompt("Type 'DELETE' to confirm")
+
+            if response != "DELETE":
+                typer.echo("❌ Purge cancelled")
+                raise typer.Exit(1)
+
+            # Perform actual delete
+            result = store.purge_by_date(
+                before_date=before_date,
+                after_date=after_date,
+                dry_run=False,
+            )
+
+            typer.echo("")
+            typer.echo(f"✅ Purged {result['count']} assessments")
+            typer.echo(f"   Remaining: {total - result['count']} assessments")
+        else:
+            typer.echo("ℹ️  Use --no-dry-run --confirm to actually delete these assessments")
+
+    except typer.Exit:
+        raise
+    except Exception as e:
+        logger.error(f"Purge failed: {e}", exc_info=True)
+        typer.echo(f"❌ Purge failed: {e}", err=True)
+        raise typer.Exit(1) from None
+
+
+@app.command()
 def query(
     keyword: str = typer.Option(..., help="Search keyword"),
     min_score: Optional[int] = typer.Option(None, help="Minimum score filter"),
