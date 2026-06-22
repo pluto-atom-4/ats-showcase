@@ -528,22 +528,89 @@ ats-showcase query \
 ---
 
 ### export
-**Purpose**: Generate reports
+**Purpose**: Generate reports with optional date and score filtering
 
 ```bash
+# Export all assessments
+ats-showcase export --output report.md
+
+# Export with score filter
+ats-showcase export --min-score 75 --max-score 95 --output report.md
+
+# Export with date filter
+ats-showcase export --from-date 2025-06-01 --to-date 2025-12-31 --output report.md
+
+# Export with combined filters
 ats-showcase export \
-  --format markdown \
-  --output data/assessments/report.md \
-  --min-score 0.75
+  --from-date 2025-06-01 \
+  --to-date 2025-12-31 \
+  --min-score 80 \
+  --sort-by company \
+  --template-style summary \
+  --output report.md
 ```
 
 **Options**:
-- `--format TEXT` - md|csv|json (default: markdown)
-- `--output PATH` - Output file (default: auto-generated)
-- `--min-score FLOAT` - Export threshold (default: 0.0)
-- `--group-by TEXT` - Group by: score|company|recommendation (default: score)
+- `--output PATH` - Output file path
+- `--min-score INT` - Minimum score filter (0-100, default: 0)
+- `--max-score INT` - Maximum score filter (0-100, default: 100)
+- `--from-date TEXT` - Export assessments from date (YYYY-MM-DD)
+- `--to-date TEXT` - Export assessments to date (YYYY-MM-DD)
+- `--sort-by TEXT` - Sort by: score|company|location (default: score)
+- `--template-style TEXT` - detailed|summary (default: detailed)
 
-**Output**: Report file in requested format
+**Date Filtering**:
+- Dates in ISO 8601 format (YYYY-MM-DD)
+- `--from-date` includes assessments on that date and after
+- `--to-date` includes assessments on that date and before
+- Both can be used together for a date range
+- If neither specified, no date filtering applied
+
+**Output**: Markdown report with filtered assessments and applied filters shown in header
+
+---
+
+### purge
+**Purpose**: Delete old assessments by date range with safety features
+
+```bash
+# Preview what would be deleted (dry-run mode is default)
+uv run python -m src.cli purge --before-date 2025-04-01
+
+# Actually delete assessments before date (requires --confirm)
+uv run python -m src.cli purge --before-date 2025-04-01 --no-dry-run --confirm
+
+# Delete assessments after a date
+uv run python -m src.cli purge --after-date 2025-01-01 --no-dry-run --confirm
+
+# Delete within date range
+uv run python -m src.cli purge \
+  --after-date 2025-01-01 \
+  --before-date 2025-03-31 \
+  --no-dry-run \
+  --confirm
+```
+
+**Options**:
+- `--before-date TEXT` - Delete assessments before date (YYYY-MM-DD)
+- `--after-date TEXT` - Delete assessments after date (YYYY-MM-DD)
+- `--dry-run` / `--no-dry-run` - Preview or actually delete (default: dry-run)
+- `--confirm` / `--no-confirm` - Required flag for actual deletion (default: no-confirm)
+
+**Safety Features**:
+- Default dry-run mode: Shows count without deleting
+- Must explicitly use `--no-dry-run` to delete
+- Must explicitly use `--confirm` to permit deletion
+- Both flags required together for actual deletion
+- Fails safely if only one flag provided
+
+**Date Semantics**:
+- `--before-date X` removes assessments with assessed_date < X
+- `--after-date X` removes assessments with assessed_date > X
+- Both can be combined for a date range
+- Dates in ISO 8601 format (YYYY-MM-DD)
+
+**Output**: Count of records to be deleted (dry-run) or deleted (actual)
 
 ---
 

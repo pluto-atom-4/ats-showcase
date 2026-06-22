@@ -456,3 +456,73 @@ class AssessmentStore:
         )
         self.conn.commit()
         logger.debug(f"Deleted assessment for job {job_id}")
+
+    def purge_by_date(
+        self,
+        before_date: Optional[str] = None,
+        after_date: Optional[str] = None,
+        dry_run: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Purge assessments by date range.
+
+        Args:
+            before_date: Delete assessments before this date (YYYY-MM-DD)
+            after_date: Delete assessments after this date (YYYY-MM-DD)
+            dry_run: If True, don't actually delete (preview only)
+
+        Returns:
+            Dictionary with purge results:
+                {
+                    "count": int (records purged),
+                    "dry_run": bool,
+                    "before_date": str or None,
+                    "after_date": str or None
+                }
+        """
+        if not self.conn:
+            return {"count": 0, "dry_run": dry_run, "before_date": before_date, "after_date": after_date}
+
+        cursor = self.conn.cursor()
+
+        # Build WHERE clause
+        where_parts = []
+        params = []
+
+        if before_date:
+            where_parts.append("assessed_date < ?")
+            params.append(before_date)
+
+        if after_date:
+            where_parts.append("assessed_date > ?")
+            params.append(after_date)
+
+        if not where_parts:
+            return {"count": 0, "dry_run": dry_run, "before_date": before_date, "after_date": after_date}
+
+        where_clause = " AND ".join(where_parts)
+
+        # Get affected records
+        cursor.execute(f"SELECT COUNT(*) as count FROM job_assessments WHERE {where_clause}", params)
+        affected_count = cursor.fetchone()["count"]
+
+        if affected_count == 0:
+            return {"count": 0, "dry_run": dry_run, "before_date": before_date, "after_date": after_date}
+
+        # Only delete if not dry_run
+        if not dry_run:
+            cursor.execute(f"DELETE FROM job_assessments WHERE {where_clause}", params)
+            cursor.execute(
+                f"DELETE FROM job_assessments_fts WHERE job_id IN "
+                f"(SELECT job_id FROM job_assessments WHERE {where_clause})",
+                params,
+            )
+            self.conn.commit()
+            logger.info(f"Purged {affected_count} assessments (before={before_date}, after={after_date})")
+
+        return {
+            "count": affected_count,
+            "dry_run": dry_run,
+            "before_date": before_date,
+            "after_date": after_date,
+        }

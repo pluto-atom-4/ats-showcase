@@ -119,6 +119,7 @@ python -m src.setup.validate_nlp_setup
 - **🤖 LLM assessment** – Claude 3.5 Sonnet with batch processing, rate limiting, detailed scoring
 - **💾 Data persistence** – SQLite with FTS5 full-text search, structured export to Markdown
 - **📊 Cost analytics** – Real-time token tracking, per-job cost breakdown, total spend accounting
+- **📅 Date-range filtering** – Filter exports by assessment date, purge old records with safety confirmations
 - **⚡ Performance** – Crawl 100+ jobs/min, assess 2–5 jobs/min (Claude limit), query <100ms (indexed)
 
 ## 💻 Tech Stack
@@ -201,8 +202,21 @@ uv run python -m src.cli assess --cv data/cv.json --confirmed-only
 # Search by keyword
 uv run python -m src.cli query --keyword "python" --min-score 75
 
-# Export to Markdown
-uv run python -m src.cli export --format md --output data/assessments/report.md
+# Export to Markdown (all assessments)
+uv run python -m src.cli export --output data/assessments/report.md
+
+# Export with date filtering (new feature)
+uv run python -m src.cli export \
+  --from-date 2025-06-01 \
+  --to-date 2025-12-31 \
+  --min-score 80 \
+  --output data/assessments/recent_high_matches.md
+
+# Purge old assessments (with safety features - dry-run by default)
+uv run python -m src.cli purge --before-date 2025-04-01
+
+# Actually delete old assessments (requires --no-dry-run AND --confirm)
+uv run python -m src.cli purge --before-date 2025-04-01 --no-dry-run --confirm
 ```
 
 **6. View Statistics** and token usage:
