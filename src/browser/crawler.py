@@ -128,6 +128,7 @@ class Crawler:
             title = await self._extract_text(container, selectors.get("title"))
             location = await self._extract_text(container, selectors.get("location"))
             link = await self._extract_link(container, selectors.get("link"))
+            job_id = await self._extract_text(container, selectors.get("job_id"))
 
             logger.debug(f"title={title}, link={link}, fetch_detail={crawler_config.get('fetch_detail')}")
 
@@ -154,7 +155,7 @@ class Crawler:
                 logger.debug(f"Skipping detail fetch (fetch_detail={fetch_detail}, link={link is not None})")
 
             return JobPosting(
-                id=None,
+                id=job_id,
                 title=title,
                 company=company_name,
                 location=location or "Not specified",
