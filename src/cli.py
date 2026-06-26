@@ -10,6 +10,7 @@ import typer
 from dotenv import load_dotenv
 
 from browser.crawler import Crawler
+from formatters.markdown_viewer import MarkdownReportViewer
 from storage.assessment_store import AssessmentStore
 from storage.export import ExportConfig, MarkdownExporter
 
@@ -1044,6 +1045,78 @@ def export(
     except Exception as e:
         logger.error(f"Export failed: {e}", exc_info=True)
         typer.echo(f"❌ Export failed: {e}", err=True)
+        raise typer.Exit(1) from None
+
+
+@app.command()
+def view(
+    report_path: str = typer.Option(
+        "data/assessments/report.md",
+        "--report",
+        "-r",
+        help="Path to report.md file to view",
+    ),
+    template: str = typer.Option(
+        "full",
+        "--template",
+        "-t",
+        help="View template: 'full' (all), 'summary' (headers + stats), or 'topn' (top N matches)",
+    ),
+    topn: int = typer.Option(
+        5,
+        "--topn",
+        help="Number of top matches to show (with --template topn)",
+    ),
+    min_score: float = typer.Option(
+        0.0,
+        "--min-score",
+        help="Filter: only show jobs with score >= min_score",
+    ),
+    max_score: float = typer.Option(
+        100.0,
+        "--max-score",
+        help="Filter: only show jobs with score <= max_score",
+    ),
+    highlight: bool = typer.Option(
+        True,
+        "--highlight/--no-highlight",
+        help="Enable/disable syntax highlighting and colors",
+    ),
+    no_pager: bool = typer.Option(
+        False,
+        "--no-pager",
+        help="Disable pager (print entire report at once)",
+    ),
+) -> None:
+    """
+    View formatted assessment report with rich markdown rendering.
+
+    Examples:
+        uv run python -m src.cli view
+        uv run python -m src.cli view --template summary
+        uv run python -m src.cli view --template topn --topn 3
+        uv run python -m src.cli view --min-score 80 --max-score 95
+    """
+    try:
+        typer.echo("📋 Loading report...")
+
+        viewer = MarkdownReportViewer()
+        viewer.view_report(
+            report_path=report_path,
+            template=template,
+            topn=topn,
+            min_score=min_score,
+            max_score=max_score,
+            highlight=highlight,
+            use_pager=not no_pager,
+        )
+
+    except FileNotFoundError as e:
+        typer.echo(f"❌ {e}", err=True)
+        raise typer.Exit(1) from None
+    except Exception as e:
+        logger.error(f"View failed: {e}", exc_info=True)
+        typer.echo(f"❌ View failed: {e}", err=True)
         raise typer.Exit(1) from None
 
 
