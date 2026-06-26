@@ -570,6 +570,47 @@ ats-showcase export \
 
 ---
 
+### view
+**Purpose**: Display assessment report with rich markdown formatting and filtering
+
+```bash
+# View full report with formatting
+uv run python -m src.cli view
+
+# View summary only (headers + scores)
+uv run python -m src.cli view --template summary
+
+# View top 3 matches
+uv run python -m src.cli view --template topn --topn 3
+
+# Filter by score range
+uv run python -m src.cli view --min-score 80 --max-score 95
+
+# View custom report file
+uv run python -m src.cli view --report custom_assessments/june_report.md
+
+# Plain text (no colors)
+uv run python -m src.cli view --no-highlight
+```
+
+**Options**:
+- `--report PATH` - Path to report.md file (default: data/assessments/report.md)
+- `--template TEXT` - View template: full|summary|topn (default: full)
+- `--topn INT` - Number of top matches (default: 5, used with --template topn)
+- `--min-score FLOAT` - Filter: only show jobs with score >= min_score (default: 0.0)
+- `--max-score FLOAT` - Filter: only show jobs with score <= max_score (default: 100.0)
+- `--highlight / --no-highlight` - Enable/disable colors (default: enabled)
+- `--no-pager` - Print entire report without pager
+
+**Templates**:
+- `full` - Complete report with all job details and filtering
+- `summary` - Headers and summary statistics only
+- `topn` - Top N matching jobs with full details
+
+**Output**: Colored markdown report with organized sections, syntax highlighting, and score-based coloring
+
+---
+
 ### purge
 **Purpose**: Delete old assessments by date range with safety features
 
