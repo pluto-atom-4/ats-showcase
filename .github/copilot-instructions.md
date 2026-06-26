@@ -2,6 +2,42 @@
 
 > **For comprehensive architecture, design decisions, and detailed workflows, see [CLAUDE.md](../CLAUDE.md)**
 
+## Architecture: Progressive Disclosure (2026 Best Practices)
+
+This repository uses a **layered context model** to keep agent context focused and prevent bloat:
+
+- **Root [CLAUDE.md](../CLAUDE.md)** (~100 lines): Quick commands, hard constraints, tech stack overview
+- **Phase-specific rules** (`.claude/rules/`): Detailed patterns for each workflow phase
+  - `crawl.md` – Playwright, CSS selectors, rate limiting
+  - `preprocess.md` – MarkItDown, spaCy, semantic chunking, token counting
+  - `verify.md` – Interactive CLI, user verification, status flow
+  - `assess.md` – Claude API integration, prompts, rate limiting, cost tracking
+  - `storage.md` – SQLite schema, FTS5, markdown export, query patterns
+  - `cli.md` – Typer patterns, command organization
+- **Atomic workflows** (`.claude/skills/`): Executable playbooks with auto-trigger frontmatter
+  - `crawl-jobs/SKILL.md` – Crawl + preprocess workflow
+  - `assess-jobs/SKILL.md` – Review + assess workflow
+
+**Result**: Agents auto-load relevant rules when touching files, preventing context deprioritization.
+
+## Cross-Platform Configuration (Symlink Strategy)
+
+To use the same rules across Claude Code, Cursor, VSCode Copilot, and GitHub Copilot CLI:
+
+```bash
+# Create symlinks from project root (deferred - documented for Phase 2)
+ln -sf .claude .ai              # Cursor reads .ai by convention
+ln -sf .claude .cursor          # Some editors check .cursor
+ln -sf CLAUDE.md COPILOT.md     # GitHub Copilot reads COPILOT.md
+```
+
+**Editors recognize:**
+- **Cursor**: `.ai/`, `.cursor/` directories
+- **VSCode Copilot**: `CLAUDE.md` in root
+- **GitHub Copilot CLI**: `CLAUDE.md` or this file (`.github/copilot-instructions.md`)
+
+Single source of truth: all editors share `.claude/rules/` and `.claude/skills/`.
+
 ## Claude Code Settings
 
 This repository uses `.claude/settings.json` with:
