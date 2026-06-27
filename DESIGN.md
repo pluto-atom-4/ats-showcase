@@ -2,6 +2,16 @@
 
 Detailed architecture, module structure, and implementation patterns for ATS Playground.
 
+**Phase-specific rules** (Progressive Disclosure model):
+- `.claude/rules/crawl.md` – Playwright patterns, CSS selectors, async coordination
+- `.claude/rules/preprocess.md` – MarkItDown, spaCy, semantic chunking, token counting
+- `.claude/rules/verify.md` – Interactive CLI, user verification, status flow
+- `.claude/rules/assess.md` – Claude API integration, prompts, rate limiting
+- `.claude/rules/storage.md` – SQLite schema, FTS5, markdown export, query patterns
+- `.claude/rules/cli.md` – Typer patterns, command organization, help text
+
+This doc contains high-level architecture. For implementation details, see phase-specific rules above.
+
 ## Core Design: Local Preprocessing for Token Savings
 
 The system reduces LLM costs **80–90%** by preprocessing jobs locally before sending to Claude. Raw HTML (~6,000 tokens per job) is cleaned and chunked to ~700 tokens locally, cutting costs from $0.60 to $0.07 per 100 jobs.
@@ -61,42 +71,41 @@ EXPORT (src/storage/)
 - Split at sentence boundaries using spaCy NLP, not random token breaks
 - Preserves meaning: "Requires 5+ years MES. Must know Wonderware." stays together
 - Target ~400 tokens per chunk (safe for LLM context)
-- See `src/tokenization/chunking.py`
+- → See `.claude/rules/preprocess.md`
 
 **2. Token Counting Before LLM**
 - Always use tiktoken to estimate tokens **before** sending to LLM
 - Show user cost estimate: `tokens × $0.003 input per 1M tokens`
 - Track actual tokens returned from Claude and compare
-- Enables transparency + cost accountability
+- → See `.claude/rules/assess.md` (cost tracking)
 
 **3. HTML Cleaning Precedence**
 - Primary: MarkItDown (preserves structure, Microsoft-maintained)
 - Fallback: BeautifulSoup + lxml (if MarkItDown unavailable or too slow)
-- Store clean text output, not raw HTML, to save space
+- → See `.claude/rules/preprocess.md`
 
 **4. User Verification Before Assessment**
 - Show extracted job + estimated cost before LLM call
 - User confirms/edits/rejects → status saved in DB
 - Prevents sending low-confidence extractions to expensive API
-- Assessment only runs on "confirmed" jobs by default
+- → See `.claude/rules/verify.md`
 
 **5. SQLite + FTS5 for Search**
 - Jobs indexed by full-text search (FTS5 extension)
 - Queries complete in <100ms even with 1000+ jobs
-- Schema: `jobs` (main), `assessments` (related), `cost_tracking` (analytics)
-- No external database needed; all data in `data/ats_playground.db`
+- → See `.claude/rules/storage.md`
 
 **6. Claude 3.5 Sonnet (Not Batch API)**
 - Chosen for balance: fast enough for interactive workflows, cost-effective
 - Batch API not used because output is needed immediately for verification
-- Rate limits: ~10 RPM, ~50k TPM (respects this in `src/llm/`)
-- Retries with exponential backoff (max 3 attempts) on transient errors
+- Rate limits: ~10 RPM, ~50k TPM
+- → See `.claude/rules/assess.md`
 
 **7. Typer for CLI (Not Click Directly)**
 - Async-ready: allows concurrent crawling/assessment
 - Built-in help + type hints
-- Sub-apps for phase organization (`crawl`, `preprocess`, `assess`, etc.)
-- See `src/cli.py` for command registration pattern
+- Sub-apps for phase organization
+- → See `.claude/rules/cli.md`
 
 ## Data Flow & State
 
@@ -167,7 +176,7 @@ clean_text = parse_html(raw_html)
 
 ## Important Non-Obvious Behavior
 
-- **Chunks are sentences, not fixed-size windows**: Splitting at sentence boundaries (spaCy) means chunk sizes vary (100–600 tokens). This is intentional—preserves meaning better than token-based splits.
-- **Confirmed status required for assessment**: By default, `assess` only processes jobs where `status == "confirmed"`. Use `--confirmed-only` flag to enforce; omit it to also assess "pending_review" jobs (for testing).
-- **Cost estimates are pre-API**: Token counts in the UI are estimates from tiktoken. Actual tokens from Claude may differ slightly due to special tokens, prompt overhead, etc. Differences tracked in cost_tracking table.
-- **SQLite is single-writer**: Don't run multiple assessment processes concurrently on the same DB (they will lock). Use a queue or single-process pattern.
+- **Chunks are sentences, not fixed-size windows**: Splitting at sentence boundaries (spaCy) means chunk sizes vary (100–600 tokens). Intentional—preserves meaning better than token-based splits. → `.claude/rules/preprocess.md`
+- **Confirmed status required for assessment**: By default, `assess` only processes jobs where `status == "confirmed"`. Use `--confirmed-only` flag to enforce. → `.claude/rules/verify.md`
+- **Cost estimates are pre-API**: tiktoken estimates. Actual Claude tokens may differ slightly. Differences tracked in cost_tracking table. → `.claude/rules/assess.md`
+- **SQLite is single-writer**: Don't run multiple assessment processes concurrently on same DB (lock). Use queue/single-process. → `.claude/rules/storage.md`
