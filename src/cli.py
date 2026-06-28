@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from browser.crawler import Crawler
 from formatters.markdown_viewer import MarkdownReportViewer
+from integrity import DataExporter, DataPurger, IntegrityChecker
 from storage.assessment_store import AssessmentStore
 from storage.export import ExportConfig, MarkdownExporter
 
@@ -1310,6 +1311,341 @@ def stats(
     # TODO: Implement stats logic
     logger.info("Displaying statistics")
     typer.echo("📈 Statistics:")
+
+
+# ============================================================================
+# INTEGRITY COMMANDS
+# ============================================================================
+
+integrity_app = typer.Typer(
+    name="integrity",
+    help="Database integrity checking and repair",
+    invoke_without_command=False,
+)
+app.add_typer(integrity_app, name="integrity")
+
+
+@integrity_app.command()
+def check(
+    output: Optional[str] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Save report to file (default: display to stdout)",
+    ),
+    format: str = typer.Option(
+        "markdown",
+        "--format",
+        "-f",
+        help="Report format: markdown, json, or csv",
+    ),
+    db_path: str = typer.Option(
+        "data/ats_playground.db",
+        "--db",
+        help="Path to assessment database",
+    ),
+) -> None:
+    """Run comprehensive database integrity checks.
+
+    Examples:
+        uv run python -m src.cli integrity check
+        uv run python -m src.cli integrity check --output report.md
+        uv run python -m src.cli integrity check --format json
+    """
+    try:
+        if format != "json":
+            typer.echo("🔍 Running integrity checks...")
+
+        checker = IntegrityChecker(db_path)
+        report = checker.run_full_check()
+
+        if format == "json":
+            # JSON format
+            output_data = {
+                "timestamp": report.timestamp.isoformat(),
+                "total_checks": report.total_checks,
+                "total_issues": len(report.issues_found),
+                "records_affected": report.total_records_affected,
+                "summary": report.summary_by_type,
+                "issues": [
+                    {
+                        "type": issue.issue_type,
+                        "severity": issue.severity,
+                        "table": issue.table,
+                        "record_id": issue.record_id,
+                        "details": issue.details,
+                        "action": issue.suggested_action,
+                    }
+                    for issue in report.issues_found
+                ],
+                "recommendations": report.purge_recommendations,
+            }
+            output_text = json.dumps(output_data, indent=2, default=str)
+        else:
+            # Markdown format (default)
+            output_text = _generate_integrity_markdown(report)
+
+        if output:
+            output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(output_text, encoding="utf-8")
+            typer.echo(f"✅ Report saved to {output}")
+        else:
+            typer.echo(output_text)
+
+        # Summary (only for non-JSON formats)
+        if format != "json":
+            typer.echo("")
+            typer.echo("📊 Scan Results:")
+            typer.echo(f"   Total issues: {len(report.issues_found)}")
+            typer.echo(f"   Records affected: {report.total_records_affected}")
+            typer.echo(f"   Errors: {report.error_count}")
+            typer.echo(f"   Warnings: {report.warning_count}")
+
+            if report.purge_recommendations:
+                typer.echo("")
+                typer.echo("💡 Recommended actions:")
+                for rec in report.purge_recommendations:
+                    typer.echo(f"   • {rec}")
+
+        logger.info(f"Integrity check complete: {len(report.issues_found)} issues found")
+
+    except Exception as e:
+        logger.error(f"Integrity check failed: {e}", exc_info=True)
+        typer.echo(f"❌ Check failed: {e}", err=True)
+        raise typer.Exit(1) from None
+
+
+@integrity_app.command(name="purge")
+def purge_integrity(
+    issue_type: Optional[str] = typer.Option(
+        None,
+        "--type",
+        help="Issue type to purge (e.g., orphaned_assessments, invalid_scores)",
+    ),
+    backup_dir: Optional[str] = typer.Option(
+        None,
+        "--backup-dir",
+        help="Directory for backup files (auto-created if not specified)",
+    ),
+    dry_run: bool = typer.Option(
+        True,
+        "--dry-run/--no-dry-run",
+        help="Preview deletions without modifying database",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Required flag for actual (non-dry-run) deletion",
+    ),
+    db_path: str = typer.Option(
+        "data/ats_playground.db",
+        "--db",
+        help="Path to assessment database",
+    ),
+) -> None:
+    """Purge invalid data with safety guarantees.
+
+    Examples:
+        # Dry-run (default): preview what would be deleted
+        uv run python -m src.cli integrity purge --type orphaned_assessments
+
+        # Actual deletion with backup
+        uv run python -m src.cli integrity purge --type orphaned_assessments \\
+          --no-dry-run --force --backup-dir ./backups
+    """
+    try:
+        if not issue_type:
+            typer.echo("❌ Specify --type to purge", err=True)
+            typer.echo("   Available types: orphaned_assessments, orphaned_preprocessed, invalid_scores,", err=True)
+            typer.echo("                    malformed_recommendations, fts_orphans", err=True)
+            raise typer.Exit(1)
+
+        purger = DataPurger(db_path)
+        count = 0
+        affected_ids = []
+
+        # Map issue types to purger methods
+        if issue_type == "orphaned_assessments":
+            count, affected_ids = purger.purge_orphaned_assessments(dry_run=dry_run)
+        elif issue_type == "orphaned_preprocessed":
+            count, affected_ids = purger.purge_orphaned_preprocessed(dry_run=dry_run)
+        elif issue_type == "invalid_scores":
+            count, affected_ids = purger.purge_invalid_scores(dry_run=dry_run)
+        elif issue_type == "malformed_recommendations":
+            count, affected_ids = purger.purge_malformed_recommendations(dry_run=dry_run)
+        elif issue_type == "fts_orphans":
+            count, affected_ids = purger.purge_fts_orphans(dry_run=dry_run)
+        else:
+            typer.echo(f"❌ Unknown issue type: {issue_type}", err=True)
+            raise typer.Exit(1)
+
+        if count == 0:
+            typer.echo(f"ℹ️  No {issue_type} records found")
+            raise typer.Exit(0)
+
+        # Show result
+        if dry_run:
+            typer.echo(f"🗑️  [DRY RUN] Would delete {count} records")
+            if affected_ids:
+                typer.echo(f"   Records: {', '.join(affected_ids[:5])}")
+                if len(affected_ids) > 5:
+                    typer.echo(f"            ... and {len(affected_ids) - 5} more")
+            typer.echo("")
+            typer.echo("💡 Use --no-dry-run --force to actually delete")
+        else:
+            # Actual delete - require confirmation
+            if not force:
+                typer.echo("❌ Actual deletion requires --force flag", err=True)
+                raise typer.Exit(1)
+
+            # Backup if requested
+            if backup_dir:
+                backup_path = Path(backup_dir) / f"integrity_backup_{issue_type}"
+                backup_path.mkdir(parents=True, exist_ok=True)
+
+                # Create a simple CSV backup of the deleted IDs
+                backup_file = backup_path / f"{issue_type}.txt"
+                backup_file.write_text("\n".join(affected_ids), encoding="utf-8")
+                typer.echo(f"✅ Backed up {count} records to {backup_file}")
+
+            typer.echo(f"✅ Deleted {count} {issue_type} records")
+            logger.info(f"Purged {count} {issue_type} records")
+
+    except typer.Exit:
+        raise
+    except Exception as e:
+        logger.error(f"Purge failed: {e}", exc_info=True)
+        typer.echo(f"❌ Purge failed: {e}", err=True)
+        raise typer.Exit(1) from None
+
+
+@integrity_app.command()
+def repair(
+    dry_run: bool = typer.Option(
+        True,
+        "--dry-run/--no-dry-run",
+        help="Preview repairs without modifying database",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Required flag for actual (non-dry-run) repair",
+    ),
+    db_path: str = typer.Option(
+        "data/ats_playground.db",
+        "--db",
+        help="Path to assessment database",
+    ),
+) -> None:
+    """Auto-repair safe integrity issues (FTS rebuild, soft-delete malformed JSON).
+
+    Examples:
+        # Preview repairs
+        uv run python -m src.cli integrity repair
+
+        # Apply repairs
+        uv run python -m src.cli integrity repair --no-dry-run --force
+    """
+    try:
+        typer.echo("🔧 Running auto-repair (safe operations only)...")
+        purger = DataPurger(db_path)
+
+        results = []
+
+        # Rebuild FTS index
+        fts_count, _ = purger.purge_fts_orphans(dry_run=dry_run)
+        if fts_count > 0:
+            results.append(("FTS orphans", fts_count))
+
+        # Soft-delete malformed recommendations
+        malformed_count, _ = purger.purge_malformed_recommendations(dry_run=dry_run)
+        if malformed_count > 0:
+            results.append(("Malformed recommendations", malformed_count))
+
+        if not results:
+            typer.echo("ℹ️  No safe repairs needed")
+            raise typer.Exit(0)
+
+        # Show results
+        if dry_run:
+            typer.echo("🔧 [DRY RUN] Would repair:")
+            for issue_type, count in results:
+                typer.echo(f"   • {issue_type}: {count} records")
+            typer.echo("")
+            typer.echo("💡 Use --no-dry-run --force to apply repairs")
+        else:
+            if not force:
+                typer.echo("❌ Actual repair requires --force flag", err=True)
+                raise typer.Exit(1)
+            typer.echo("✅ Repaired:")
+            for issue_type, count in results:
+                typer.echo(f"   • {issue_type}: {count} records")
+
+        logger.info(f"Repair complete: {len(results)} operations performed")
+
+    except typer.Exit:
+        raise
+    except Exception as e:
+        logger.error(f"Repair failed: {e}", exc_info=True)
+        typer.echo(f"❌ Repair failed: {e}", err=True)
+        raise typer.Exit(1) from None
+
+
+def _generate_integrity_markdown(report) -> str:
+    """Generate markdown report from IntegrityReport."""
+    lines = [
+        "# Database Integrity Report",
+        f"Generated: {report.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        "",
+        "## Summary",
+        f"- **Total Issues**: {len(report.issues_found)}",
+        f"- **Errors**: {report.error_count}",
+        f"- **Warnings**: {report.warning_count}",
+        f"- **Info**: {report.info_count}",
+        f"- **Records Affected**: {report.total_records_affected}",
+        "",
+        "## Issues by Type",
+        "| Type | Count | Severity |",
+        "|------|-------|----------|",
+    ]
+
+    for issue_type, count in sorted(report.summary_by_type.items()):
+        severity = next(
+            (issue.severity for issue in report.issues_found if issue.issue_type == issue_type),
+            "unknown",
+        )
+        lines.append(f"| {issue_type} | {count} | {severity} |")
+
+    lines.extend([
+        "",
+        "## Issue Details",
+        "",
+    ])
+
+    severity_order = {"error": 0, "warning": 1, "info": 2}
+    for issue in sorted(
+        report.issues_found,
+        key=lambda x: (severity_order[x.severity], x.issue_type),
+    ):
+        lines.extend([
+            f"### {issue.issue_type} ({issue.severity})",
+            f"- **Table**: {issue.table}",
+            f"- **Record ID**: {issue.record_id}",
+            f"- **Details**: {issue.details}",
+            f"- **Action**: {issue.suggested_action}",
+            "",
+        ])
+
+    if report.purge_recommendations:
+        lines.extend([
+            "## Recommended Actions",
+            "",
+        ])
+        for rec in report.purge_recommendations:
+            lines.append(f"- {rec}")
+
+    return "\n".join(lines)
 
 
 def main() -> None:
