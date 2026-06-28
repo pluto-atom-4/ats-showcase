@@ -1,7 +1,8 @@
 """Safe data purging with dry-run capability and transaction support."""
 
 import logging
-from typing import List, Tuple
+import sqlite3
+from typing import List, Tuple, cast
 
 from src.storage.assessment_store import AssessmentStore
 
@@ -15,7 +16,7 @@ class DataPurger:
         """Initialize purger with database path."""
         self.db_path = db_path
         self.store = AssessmentStore(db_path)
-        self.conn = self.store.conn
+        self.conn: sqlite3.Connection = cast(sqlite3.Connection, self.store.conn)
 
     def purge_orphaned_assessments(
         self, dry_run: bool = True

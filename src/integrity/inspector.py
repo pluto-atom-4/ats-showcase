@@ -2,8 +2,9 @@
 
 import json
 import logging
+import sqlite3
 from datetime import datetime
-from typing import List
+from typing import List, cast
 
 from src.integrity.models import IntegrityIssue, IntegrityReport
 from src.storage.assessment_store import AssessmentStore
@@ -18,7 +19,7 @@ class IntegrityChecker:
         """Initialize checker with database path."""
         self.db_path = db_path
         self.store = AssessmentStore(db_path)
-        self.conn = self.store.conn
+        self.conn: sqlite3.Connection = cast(sqlite3.Connection, self.store.conn)
         self.issues: List[IntegrityIssue] = []
 
     def check_orphaned_assessments(self) -> List[IntegrityIssue]:
