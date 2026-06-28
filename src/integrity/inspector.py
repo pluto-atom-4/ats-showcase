@@ -214,7 +214,7 @@ class IntegrityChecker:
                         table="job_assessments_fts",
                         record_id=f"{len(rows)} orphaned entries",
                         details=f"Found {len(rows)} orphaned entries in FTS5 index",
-                        suggested_action="Rebuild FTS5 index (VACUUM and REINDEX)",
+                        suggested_action="Delete orphaned entries and rebuild FTS5 index",
                     )
                 )
             logger.info(f"Found {len(rows)} orphaned FTS entries")
@@ -367,7 +367,7 @@ class IntegrityChecker:
         if "malformed_json" in issue_types:
             recommendations.append("purge_malformed_recommendations (soft delete)")
         if "fts_orphan" in issue_types:
-            recommendations.append("purge_fts_orphans (rebuild index)")
+            recommendations.append("purge_fts_orphans (delete and rebuild index)")
         if "duplicate_assessment" in issue_types:
             recommendations.append("resolve_duplicate_assessments (manual review)")
 
