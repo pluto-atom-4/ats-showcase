@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 from browser.crawler import Crawler
 from formatters.markdown_viewer import MarkdownReportViewer
-from integrity import DataExporter, DataPurger, IntegrityChecker
+from integrity import DataPurger, IntegrityChecker
 from storage.assessment_store import AssessmentStore
 from storage.export import ExportConfig, MarkdownExporter
 

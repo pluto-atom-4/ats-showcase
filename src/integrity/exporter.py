@@ -110,55 +110,7 @@ class DataExporter:
     def export_report_to_markdown(self, report: IntegrityReport, output_file: str) -> int:
         """Export full integrity report to Markdown."""
         try:
-            lines = []
-            lines.append("# Database Integrity Report")
-            lines.append(f"\nGenerated: {report.timestamp.isoformat()} UTC\n")
-
-            # Summary
-            lines.append("## Summary")
-            lines.append(f"- **Total Issues Found**: {len(report.issues_found)}")
-            lines.append(f"- **Total Checks Run**: {report.total_checks}")
-            lines.append(f"- **Records Affected**: {report.total_records_affected}")
-            lines.append(f"- **Errors**: {report.error_count}")
-            lines.append(f"- **Warnings**: {report.warning_count}")
-            lines.append(f"- **Info**: {report.info_count}\n")
-
-            # Issues by type
-            if report.summary_by_type:
-                lines.append("## Issues by Type")
-                lines.append("| Type | Count |")
-                lines.append("|------|-------|")
-                for issue_type, count in sorted(report.summary_by_type.items()):
-                    lines.append(f"| {issue_type} | {count} |")
-                lines.append("")
-
-            # Recommended purges
-            if report.purge_recommendations:
-                lines.append("## Recommended Actions")
-                for i, rec in enumerate(report.purge_recommendations, 1):
-                    lines.append(f"{i}. {rec}")
-                lines.append("")
-
-            # Detailed issues
-            if report.issues_found:
-                lines.append("## Detailed Issues\n")
-                by_severity: dict[str, list] = {
-                    "error": [],
-                    "warning": [],
-                    "info": [],
-                }
-                for issue in report.issues_found:
-                    by_severity[issue.severity].append(issue)
-
-                for severity in ["error", "warning", "info"]:
-                    if by_severity[severity]:
-                        lines.append(f"### {severity.upper()}\n")
-                        for issue in by_severity[severity]:
-                            lines.append(f"- **{issue.record_id}** ({issue.table})")
-                            lines.append(f"  - Type: {issue.issue_type}")
-                            lines.append(f"  - Details: {issue.details}")
-                            lines.append(f"  - Action: {issue.suggested_action}\n")
-
+            lines = self._build_report_markdown(report)
             with open(output_file, "w") as f:
                 f.write("\n".join(lines))
 
@@ -167,6 +119,71 @@ class DataExporter:
         except Exception as e:
             logger.error(f"Error exporting report to {output_file}: {e}")
             return 0
+
+    def _build_report_markdown(self, report: IntegrityReport) -> list[str]:
+        """Build markdown lines for integrity report."""
+        lines = []
+        lines.append("# Database Integrity Report")
+        lines.append(f"\nGenerated: {report.timestamp.isoformat()} UTC\n")
+        lines.extend(self._build_summary_section(report))
+        lines.extend(self._build_issues_by_type_section(report))
+        lines.extend(self._build_recommendations_section(report))
+        lines.extend(self._build_detailed_issues_section(report))
+        return lines
+
+    def _build_summary_section(self, report: IntegrityReport) -> list[str]:
+        """Build summary section of report."""
+        lines = ["## Summary"]
+        lines.append(f"- **Total Issues Found**: {len(report.issues_found)}")
+        lines.append(f"- **Total Checks Run**: {report.total_checks}")
+        lines.append(f"- **Records Affected**: {report.total_records_affected}")
+        lines.append(f"- **Errors**: {report.error_count}")
+        lines.append(f"- **Warnings**: {report.warning_count}")
+        lines.append(f"- **Info**: {report.info_count}\n")
+        return lines
+
+    def _build_issues_by_type_section(self, report: IntegrityReport) -> list[str]:
+        """Build issues by type table section."""
+        if not report.summary_by_type:
+            return []
+        lines = ["## Issues by Type", "| Type | Count |", "|------|-------|"]
+        for issue_type, count in sorted(report.summary_by_type.items()):
+            lines.append(f"| {issue_type} | {count} |")
+        lines.append("")
+        return lines
+
+    def _build_recommendations_section(self, report: IntegrityReport) -> list[str]:
+        """Build recommended actions section."""
+        if not report.purge_recommendations:
+            return []
+        lines = ["## Recommended Actions"]
+        for i, rec in enumerate(report.purge_recommendations, 1):
+            lines.append(f"{i}. {rec}")
+        lines.append("")
+        return lines
+
+    def _build_detailed_issues_section(self, report: IntegrityReport) -> list[str]:
+        """Build detailed issues section grouped by severity."""
+        if not report.issues_found:
+            return []
+        lines = ["## Detailed Issues\n"]
+        by_severity: dict[str, list] = {
+            "error": [],
+            "warning": [],
+            "info": [],
+        }
+        for issue in report.issues_found:
+            by_severity[issue.severity].append(issue)
+
+        for severity in ["error", "warning", "info"]:
+            if by_severity[severity]:
+                lines.append(f"### {severity.upper()}\n")
+                for issue in by_severity[severity]:
+                    lines.append(f"- **{issue.record_id}** ({issue.table})")
+                    lines.append(f"  - Type: {issue.issue_type}")
+                    lines.append(f"  - Details: {issue.details}")
+                    lines.append(f"  - Action: {issue.suggested_action}\n")
+        return lines
 
     def generate_backup(self, issues: List[IntegrityIssue], output_dir: str) -> Dict[str, str]:
         """Generate full backup of issues grouped by type."""

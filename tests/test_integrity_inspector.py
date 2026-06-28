@@ -123,7 +123,12 @@ def test_check_orphaned_assessments_with_orphan(checker):
     # Create assessment without job
     conn = inspector.conn
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "orphaned_job",
             75,
@@ -155,7 +160,12 @@ def test_check_invalid_scores_with_invalid(checker):
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
     )
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "job1",
             150,  # Invalid: > 100
@@ -187,7 +197,12 @@ def test_check_malformed_recommendations(checker):
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
     )
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "job1",
             75,
@@ -218,7 +233,12 @@ def test_check_duplicate_assessments(checker):
     )
     # The schema enforces UNIQUE(job_id), so we can't insert duplicates
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "job1",
             75,
@@ -248,7 +268,11 @@ def test_check_status_inconsistencies(checker):
         ("job1", "Title", "Company", "Location", "Desc", "confirmed"),
     )
     conn.execute(
-        "INSERT INTO job_reviews (job_id, title, location, status, reason, tokens, estimated_cost) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_reviews "
+            "(job_id, title, location, status, reason, tokens, estimated_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ),
         ("job1", "Title", "Location", "rejected", "Bad fit", 100, 0.01),
     )
     conn.commit()
@@ -281,7 +305,12 @@ def test_full_check_with_multiple_issues(checker):
 
     # Add orphaned assessment
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "orphaned_job",
             75,
@@ -301,7 +330,12 @@ def test_full_check_with_multiple_issues(checker):
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
     )
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "job1",
             150,
@@ -338,7 +372,12 @@ def test_check_missing_preprocessing(checker):
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
     )
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "job1",
             75,
@@ -384,7 +423,12 @@ def test_purge_recommendations_ordered(checker):
 
     # Add multiple issue types
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "orphaned_job",
             75,

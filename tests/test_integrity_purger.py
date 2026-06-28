@@ -83,7 +83,7 @@ def _create_test_db(db_path: str):
     )
 
     # Create assessment tables using AssessmentStore
-    store = AssessmentStore(db_path)
+    AssessmentStore(db_path)
 
     conn.commit()
     conn.close()
@@ -110,7 +110,12 @@ def test_purge_orphaned_assessments_dry_run(purger):
 
     # Create orphaned assessment
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "orphaned_job",
             75,
@@ -144,7 +149,12 @@ def test_purge_orphaned_assessments_actual_delete(purger):
 
     # Create orphaned assessment
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "orphaned_job",
             75,
@@ -182,7 +192,12 @@ def test_purge_invalid_scores_dry_run(purger):
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
     )
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "job1",
             150,
@@ -226,7 +241,12 @@ def test_purge_invalid_scores_actual_delete(purger):
 
     # Valid assessment
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "job1",
             75,
@@ -242,7 +262,12 @@ def test_purge_invalid_scores_actual_delete(purger):
 
     # Invalid assessment
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "job2",
             150,
@@ -282,7 +307,12 @@ def test_purge_malformed_recommendations_soft_delete(purger):
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
     )
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "job1",
             75,
@@ -323,19 +353,35 @@ def test_cascade_delete_job_dry_run(purger):
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
     )
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         ("job1", 75, 80, 70, 60, "[]", "Test", 100, 0.01),
     )
     conn.execute(
-        "INSERT INTO preprocessed_jobs (job_id, clean_text, chunks, token_count, estimated_cost) VALUES (?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO preprocessed_jobs "
+            "(job_id, clean_text, chunks, token_count, estimated_cost) "
+            "VALUES (?, ?, ?, ?, ?)"
+        ),
         ("job1", "text", "chunk1", 100, 0.01),
     )
     conn.execute(
-        "INSERT INTO cost_tracking (job_id, phase, input_tokens, output_tokens, cost) VALUES (?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO cost_tracking "
+            "(job_id, phase, input_tokens, output_tokens, cost) "
+            "VALUES (?, ?, ?, ?, ?)"
+        ),
         ("job1", "assess", 100, 50, 0.01),
     )
     conn.execute(
-        "INSERT INTO job_reviews (job_id, title, location, status) VALUES (?, ?, ?, ?)",
+        (
+            "INSERT INTO job_reviews "
+            "(job_id, title, location, status) VALUES (?, ?, ?, ?)"
+        ),
         ("job1", "Title", "Location", "pending"),
     )
     conn.commit()
@@ -363,19 +409,35 @@ def test_cascade_delete_job_actual(purger):
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
     )
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         ("job1", 75, 80, 70, 60, "[]", "Test", 100, 0.01),
     )
     conn.execute(
-        "INSERT INTO preprocessed_jobs (job_id, clean_text, chunks, token_count, estimated_cost) VALUES (?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO preprocessed_jobs "
+            "(job_id, clean_text, chunks, token_count, estimated_cost) "
+            "VALUES (?, ?, ?, ?, ?)"
+        ),
         ("job1", "text", "chunk1", 100, 0.01),
     )
     conn.execute(
-        "INSERT INTO cost_tracking (job_id, phase, input_tokens, output_tokens, cost) VALUES (?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO cost_tracking "
+            "(job_id, phase, input_tokens, output_tokens, cost) "
+            "VALUES (?, ?, ?, ?, ?)"
+        ),
         ("job1", "assess", 100, 50, 0.01),
     )
     conn.execute(
-        "INSERT INTO job_reviews (job_id, title, location, status) VALUES (?, ?, ?, ?)",
+        (
+            "INSERT INTO job_reviews "
+            "(job_id, title, location, status) VALUES (?, ?, ?, ?)"
+        ),
         ("job1", "Title", "Location", "pending"),
     )
     conn.commit()
@@ -420,7 +482,12 @@ def test_purge_by_date_range_dry_run(purger):
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
     )
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost, assessed_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost, assessed_date) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "job1",
             75,
@@ -455,7 +522,12 @@ def test_transaction_rollback_on_error(purger):
 
     # Create invalid state (assessment without job, will cause issues)
     conn.execute(
-        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, overall_score, tech_score, seniority_score, location_score, "
+            "recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
         (
             "orphaned_job",
             75,
