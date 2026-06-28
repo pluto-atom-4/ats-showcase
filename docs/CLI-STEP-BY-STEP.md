@@ -895,9 +895,37 @@ uv run python -m src.cli export --min-score 80
 
 ---
 
+## Phase 6: INTEGRITY - Database Health Check & Repair
+
+Detect and fix corrupted data: orphaned records, invalid scores, malformed JSON.
+
+**See [INTEGRITY.md](./INTEGRITY.md) for comprehensive guide.**
+
+### Quick Start
+
+```bash
+# Health check
+uv run python -m src.cli integrity check
+
+# Auto-repair (safe operations)
+uv run python -m src.cli integrity repair --no-dry-run --force
+
+# Purge invalid assessments (with backup)
+uv run python -m src.cli integrity purge --type invalid_scores \
+  --backup-dir ./backups --no-dry-run --force
+```
+
+### When to Run
+
+- **After crawl**: Verify no duplicates
+- **After assess**: Verify no invalid scores or malformed JSON
+- **Before export**: Ensure clean data in report
+
+---
+
 ## Document Version
 
-- **Version:** 1.0
-- **Last Updated:** 2026-06-16
+- **Version:** 1.1
+- **Last Updated:** 2026-06-28
 - **Status:** Complete
-- **Coverage:** All 8 CLI commands with options, examples, workflows
+- **Coverage:** Phases 1-6 (crawl, preprocess, review, assess, export, integrity) with options, examples, workflows
