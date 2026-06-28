@@ -104,6 +104,7 @@ python -m src.setup.validate_nlp_setup
 | 👀 **VERIFY** | [VERIFY.md](./docs/VERIFY.md) | Interactive CLI, user confirmation, cost transparency |
 | 🤖 **ASSESS** | [ASSESS.md](./docs/ASSESS.md) | Claude API, prompts, rate limiting, cost tracking |
 | 💾 **STORAGE** | [STORAGE.md](./docs/STORAGE.md) | SQLite schema, FTS5 search, markdown export |
+| 🔧 **INTEGRITY** | [INTEGRITY.md](./docs/INTEGRITY.md) | Database health check, repair orphaned data, safe purge |
 | 📝 **CLI** | [CLI.md](./docs/CLI.md) | Command reference, Typer framework, workflows |
 
 **System design**:
