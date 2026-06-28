@@ -204,7 +204,7 @@ class DataPurger:
             return 0, []
 
     def purge_fts_orphans(self, dry_run: bool = True) -> Tuple[int, List[str]]:
-        """Rebuild FTS5 index to remove orphaned entries."""
+        """Delete orphaned FTS5 entries and rebuild index."""
         try:
             cursor = self.conn.cursor()
 
@@ -223,19 +223,38 @@ class DataPurger:
                 return 0, []
 
             if dry_run:
-                logger.info(f"[DRY RUN] Would rebuild FTS index (removes {orphan_count} orphaned entries)")
+                logger.info(
+                    f"[DRY RUN] Would delete {orphan_count} orphaned FTS entries "
+                    f"and rebuild index"
+                )
                 return orphan_count, []
 
             self.conn.execute("BEGIN TRANSACTION")
             try:
-                # Rebuild FTS index
+                # Delete orphaned FTS entries
+                cursor.execute(
+                    """
+                    DELETE FROM job_assessments_fts
+                    WHERE rowid NOT IN (SELECT rowid FROM job_assessments)
+                    """
+                )
+                deleted_count = cursor.rowcount
+
+                # Rebuild FTS index to optimize
                 cursor.execute("REINDEX job_assessments_fts")
+
                 self.conn.commit()
-                logger.info(f"Rebuilt FTS index (removed {orphan_count} orphaned entries)")
-                return orphan_count, []
+
+                # Vacuum to reclaim space (must be outside transaction)
+                self.conn.execute("VACUUM")
+
+                logger.info(
+                    f"Deleted {deleted_count} orphaned FTS entries and rebuilt index"
+                )
+                return deleted_count, []
             except Exception as e:
                 self.conn.rollback()
-                logger.error(f"Error rebuilding FTS index: {e}")
+                logger.error(f"Error purging FTS orphans: {e}")
                 raise
         except Exception as e:
             logger.error(f"Error purging FTS orphans: {e}")
