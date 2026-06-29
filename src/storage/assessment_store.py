@@ -175,19 +175,28 @@ class AssessmentStore:
         return results
 
     def get_assessments_by_score(
-        self, min_score: float = 70, max_score: float = 100
+        self, min_score: float = 70, max_score: float = 100, company: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Get all assessments within score range."""
+        """Get assessments within score range, optionally filtered by company."""
         if not self.conn:
             return []
 
         cursor = self.conn.cursor()
-        cursor.execute(
-            """SELECT * FROM job_assessments
-               WHERE overall_score >= ? AND overall_score <= ?
-               ORDER BY overall_score DESC""",
-            (min_score, max_score),
-        )
+
+        if company:
+            cursor.execute(
+                """SELECT * FROM job_assessments
+                   WHERE overall_score >= ? AND overall_score <= ? AND company = ?
+                   ORDER BY overall_score DESC""",
+                (min_score, max_score, company),
+            )
+        else:
+            cursor.execute(
+                """SELECT * FROM job_assessments
+                   WHERE overall_score >= ? AND overall_score <= ?
+                   ORDER BY overall_score DESC""",
+                (min_score, max_score),
+            )
 
         results = []
         for row in cursor.fetchall():
@@ -321,15 +330,17 @@ class AssessmentStore:
         keyword: str,
         min_score: int = 0,
         max_score: int = 100,
+        company: Optional[str] = None,
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
         """
-        Search assessments by keyword with score filtering.
+        Search assessments by keyword with optional company and score filters.
 
         Args:
             keyword: Search term
             min_score: Minimum score filter
             max_score: Maximum score filter
+            company: Optional company filter
             limit: Maximum results to return
 
         Returns:
@@ -341,17 +352,31 @@ class AssessmentStore:
         cursor = self.conn.cursor()
 
         try:
-            cursor.execute(
-                """SELECT ja.* FROM job_assessments ja
-                   WHERE ja.job_id IN (
-                       SELECT job_id FROM job_assessments_fts
-                       WHERE job_assessments_fts MATCH ?
-                   )
-                   AND ja.overall_score BETWEEN ? AND ?
-                   ORDER BY ja.overall_score DESC
-                   LIMIT ?""",
-                (keyword, min_score, max_score, limit),
-            )
+            if company:
+                cursor.execute(
+                    """SELECT ja.* FROM job_assessments ja
+                       WHERE ja.job_id IN (
+                           SELECT job_id FROM job_assessments_fts
+                           WHERE job_assessments_fts MATCH ?
+                       )
+                       AND ja.overall_score BETWEEN ? AND ?
+                       AND ja.company = ?
+                       ORDER BY ja.overall_score DESC
+                       LIMIT ?""",
+                    (keyword, min_score, max_score, company, limit),
+                )
+            else:
+                cursor.execute(
+                    """SELECT ja.* FROM job_assessments ja
+                       WHERE ja.job_id IN (
+                           SELECT job_id FROM job_assessments_fts
+                           WHERE job_assessments_fts MATCH ?
+                       )
+                       AND ja.overall_score BETWEEN ? AND ?
+                       ORDER BY ja.overall_score DESC
+                       LIMIT ?""",
+                    (keyword, min_score, max_score, limit),
+                )
 
             results = []
             for row in cursor.fetchall():
@@ -365,15 +390,16 @@ class AssessmentStore:
             logger.warning(f"Keyword search failed: {e}")
             return []
 
-    def get_top_keywords(self, limit: int = 20) -> List[tuple]:
+    def get_top_keywords(self, limit: int = 20, company: Optional[str] = None) -> List[tuple]:
         """
-        Get top keywords from job descriptions.
+        Extract top keywords from job titles and summaries.
 
         Args:
             limit: Maximum keywords to return
+            company: Optional company filter
 
         Returns:
-            List of (keyword, frequency) tuples
+            List of (keyword, frequency) tuples sorted by frequency
         """
         if not self.conn:
             return []
@@ -381,19 +407,46 @@ class AssessmentStore:
         cursor = self.conn.cursor()
 
         try:
-            cursor.execute(
-                """SELECT COUNT(*) as freq FROM job_assessments
-                   GROUP BY title, company
-                   ORDER BY freq DESC
-                   LIMIT ?""",
-                (limit,),
+            # Get all titles and summaries
+            if company:
+                cursor.execute(
+                    """SELECT title, summary FROM job_assessments WHERE company = ?""",
+                    (company,),
+                )
+            else:
+                cursor.execute("""SELECT title, summary FROM job_assessments""")
+
+            text = " ".join(
+                [
+                    (row["title"] or "") + " " + (row["summary"] or "")
+                    for row in cursor.fetchall()
+                ]
             )
 
-            keywords = []
-            for row in cursor.fetchall():
-                keywords.append((row["freq"], row["freq"]))
+            if not text.strip():
+                return []
 
-            return keywords
+            # Extract keywords: split by whitespace, filter short words, count
+            keywords_freq: Dict[str, int] = {}
+            for word in text.lower().split():
+                # Remove punctuation and filter short words
+                word = word.strip(".,;:!?()-").strip()
+                if len(word) > 3 and word not in (
+                    "and",
+                    "the",
+                    "for",
+                    "with",
+                    "from",
+                    "this",
+                    "that",
+                ):
+                    keywords_freq[word] = keywords_freq.get(word, 0) + 1
+
+            # Sort by frequency, return top N
+            sorted_keywords = sorted(
+                keywords_freq.items(), key=lambda x: x[1], reverse=True
+            )
+            return sorted_keywords[:limit]
         except sqlite3.OperationalError:
             return []
 
@@ -456,6 +509,103 @@ class AssessmentStore:
         )
         self.conn.commit()
         logger.debug(f"Deleted assessment for job {job_id}")
+
+    def get_companies(self) -> List[str]:
+        """Get list of distinct companies with assessments."""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT DISTINCT company FROM job_assessments WHERE company IS NOT NULL ORDER BY company")
+        return [row["company"] for row in cursor.fetchall()]
+
+    def get_company_summary(self) -> List[Dict[str, Any]]:
+        """Get aggregated stats per company."""
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """SELECT
+               company,
+               COUNT(*) as count,
+               ROUND(AVG(overall_score), 2) as avg_score,
+               MAX(overall_score) as max_score,
+               MIN(overall_score) as min_score,
+               ROUND(SUM(actual_cost), 4) as total_cost
+               FROM job_assessments
+               WHERE company IS NOT NULL
+               GROUP BY company
+               ORDER BY count DESC"""
+        )
+
+        results = []
+        for row in cursor.fetchall():
+            results.append(
+                {
+                    "company": row["company"],
+                    "count": row["count"],
+                    "avg_score": row["avg_score"],
+                    "max_score": row["max_score"],
+                    "min_score": row["min_score"],
+                    "total_cost": row["total_cost"],
+                }
+            )
+
+        return results
+
+    def get_stats_by_company(self, company: str) -> Dict[str, Any]:
+        """Get detailed statistics for a specific company."""
+        if not self.conn:
+            return {}
+
+        cursor = self.conn.cursor()
+
+        # Count by score range
+        cursor.execute(
+            """SELECT COUNT(*) as count FROM job_assessments
+               WHERE company = ? AND overall_score >= 75""",
+            (company,),
+        )
+        high_score = cursor.fetchone()["count"]
+
+        cursor.execute(
+            """SELECT COUNT(*) as count FROM job_assessments
+               WHERE company = ? AND overall_score BETWEEN 50 AND 74""",
+            (company,),
+        )
+        mid_score = cursor.fetchone()["count"]
+
+        cursor.execute(
+            """SELECT COUNT(*) as count FROM job_assessments
+               WHERE company = ? AND overall_score < 50""",
+            (company,),
+        )
+        low_score = cursor.fetchone()["count"]
+
+        cursor.execute(
+            """SELECT
+               COUNT(*) as total,
+               ROUND(AVG(overall_score), 2) as avg_score,
+               ROUND(SUM(actual_cost), 4) as total_cost,
+               SUM(tokens_used) as total_tokens
+               FROM job_assessments WHERE company = ?""",
+            (company,),
+        )
+        stats = dict(cursor.fetchone())
+
+        return {
+            "company": company,
+            "total_assessments": stats["total"],
+            "avg_score": stats["avg_score"],
+            "total_cost": stats["total_cost"],
+            "total_tokens": stats["total_tokens"],
+            "score_distribution": {
+                "high (75+)": high_score,
+                "medium (50-74)": mid_score,
+                "low (<50)": low_score,
+            },
+        }
 
     def purge_by_date(
         self,

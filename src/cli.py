@@ -1256,10 +1256,11 @@ def query(
     keyword: str = typer.Option(..., help="Search keyword"),
     min_score: Optional[int] = typer.Option(None, help="Minimum score filter"),
     max_score: Optional[int] = typer.Option(None, help="Maximum score filter"),
+    company: Optional[str] = typer.Option(None, help="Filter by company name"),
     limit: int = typer.Option(10, help="Maximum results"),
     json_output: bool = typer.Option(False, help="Output as JSON"),
 ) -> None:
-    """Search stored assessments by keyword and score."""
+    """Search stored assessments by keyword, score, and company."""
     try:
         # Load assessment store
         db_path = "data/ats_playground.db"
@@ -1270,8 +1271,14 @@ def query(
         max_s = max_score if max_score is not None else 100
 
         # Search
-        typer.echo(f"🔍 Searching for '{keyword}' (score {min_s}-{max_s}, limit {limit})...\n")
-        results = store.search_by_keyword(keyword, min_score=min_s, max_score=max_s, limit=limit)
+        filter_info = f"(score {min_s}-{max_s}"
+        if company:
+            filter_info += f", company={company}"
+        filter_info += f", limit {limit})"
+        typer.echo(f"🔍 Searching for '{keyword}' {filter_info}...\n")
+        results = store.search_by_keyword(
+            keyword, min_score=min_s, max_score=max_s, company=company, limit=limit
+        )
 
         if not results:
             typer.echo(f"⚠️  No results found for '{keyword}' in score range {min_s}-{max_s}")
