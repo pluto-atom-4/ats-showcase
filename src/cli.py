@@ -1298,7 +1298,7 @@ def query(
         if not results:
             search_desc = f"'{keyword}'" if keyword else f"company '{company}'"
             typer.echo(f"⚠️  No results found for {search_desc} in score range {min_s}-{max_s}")
-            raise typer.Exit(0)
+            return
 
         if json_output:
             # JSON output
