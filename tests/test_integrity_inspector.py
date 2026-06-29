@@ -292,7 +292,7 @@ def test_run_full_check(checker):
 
     assert isinstance(report, IntegrityReport)
     assert report.timestamp is not None
-    assert report.total_checks == 11
+    assert report.total_checks == 12
     assert isinstance(report.issues_found, list)
     assert isinstance(report.summary_by_type, dict)
 
@@ -548,3 +548,72 @@ def test_check_fts_data_consistency_null_job_ids(checker):
     assert len(issues) == 1
     assert issues[0].issue_type == "fts_data_mismatch"
     assert "NULL job_id" in issues[0].details
+
+
+def test_check_job_reviews_anomalies_null_job_id(checker):
+    """job_reviews with NULL job_ids should be detected."""
+    inspector, store, db_path = checker
+
+    conn = inspector.conn
+
+    # Create orphaned job_reviews with NULL job_id
+    conn.execute(
+        (
+            "INSERT INTO job_reviews "
+            "(job_id, title, location, status, reason, tokens, estimated_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ),
+        (None, "Deep Learning Engineer", "Remote", "confirmed", None, 100, 0.01),
+    )
+    conn.commit()
+
+    issues = inspector.check_job_reviews_anomalies()
+    assert len(issues) == 1
+    assert issues[0].issue_type == "orphaned_job_review"
+    assert "NULL job_id" in issues[0].details
+
+
+def test_check_job_reviews_anomalies_orphaned_id(checker):
+    """job_reviews with non-existent job_id should be detected."""
+    inspector, store, db_path = checker
+
+    conn = inspector.conn
+
+    # Create assessment
+    conn.execute(
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, title, company, summary, overall_score, tech_score, "
+            "seniority_score, location_score, recommendations, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
+        (
+            "real_job",
+            "Engineer",
+            "Company",
+            "Summary",
+            75,
+            80,
+            70,
+            60,
+            "[]",
+            100,
+            0.01,
+        ),
+    )
+
+    # Create review with non-existent job_id
+    conn.execute(
+        (
+            "INSERT INTO job_reviews "
+            "(job_id, title, location, status, reason, tokens, estimated_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ),
+        ("nonexistent_job", "Title", "Remote", "confirmed", None, 100, 0.01),
+    )
+    conn.commit()
+
+    issues = inspector.check_job_reviews_anomalies()
+    assert len(issues) == 1
+    assert issues[0].issue_type == "orphaned_job_review"
+    assert "not in job_assessments" in issues[0].details

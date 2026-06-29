@@ -360,6 +360,55 @@ class DataPurger:
             logger.error(f"Error purging by date range: {e}")
             return 0, []
 
+    def purge_orphaned_job_reviews(self, dry_run: bool = True) -> Tuple[int, List[str]]:
+        """Delete orphaned job_reviews records (NULL job_id or non-existent job_id)."""
+        try:
+            cursor = self.conn.cursor()
+
+            # Check if job_reviews table exists
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='job_reviews'"
+            )
+            if not cursor.fetchone():
+                logger.info("job_reviews table not found, nothing to purge")
+                return 0, []
+
+            # Find orphaned records
+            query = """
+                SELECT job_id FROM job_reviews
+                WHERE job_id IS NULL
+                   OR job_id NOT IN (SELECT DISTINCT job_id FROM job_assessments)
+            """
+            cursor.execute(query)
+            orphaned = [row[0] for row in cursor.fetchall()]
+
+            if not orphaned:
+                logger.info("No orphaned job_reviews found")
+                return 0, []
+
+            if dry_run:
+                logger.info(
+                    f"[DRY RUN] Would delete {len(orphaned)} orphaned job_reviews"
+                )
+                return len(orphaned), orphaned
+
+            self.conn.execute("BEGIN TRANSACTION")
+            try:
+                cursor.execute(
+                    "DELETE FROM job_reviews WHERE job_id IS NULL OR job_id NOT IN "
+                    "(SELECT DISTINCT job_id FROM job_assessments)"
+                )
+                self.conn.commit()
+                logger.info(f"Deleted {len(orphaned)} orphaned job_reviews")
+                return len(orphaned), orphaned
+            except Exception as e:
+                self.conn.rollback()
+                logger.error(f"Error deleting orphaned job_reviews: {e}")
+                raise
+        except Exception as e:
+            logger.error(f"Error purging orphaned job_reviews: {e}")
+            return 0, []
+
     def rebuild_fts_index(self, dry_run: bool = True) -> Tuple[int, List[str]]:
         """Rebuild FTS5 index to refresh indexed content from main table.
 

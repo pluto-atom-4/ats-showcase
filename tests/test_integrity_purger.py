@@ -653,3 +653,95 @@ def test_rebuild_fts_index_actual(purger):
     cursor.execute("SELECT COUNT(*) FROM job_assessments_fts WHERE job_id IS NULL")
     null_count = cursor.fetchone()[0]
     assert null_count == 0
+
+
+def test_purge_orphaned_job_reviews_dry_run(purger):
+    """Dry-run should not delete job_reviews."""
+    p, store, db_path = purger
+
+    conn = p.conn
+
+    # Create assessment and orphaned review
+    conn.execute(
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, title, company, summary, overall_score, tech_score, "
+            "seniority_score, location_score, recommendations, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
+        ("job1", "Engineer", "TechCorp", "Summary", 75, 80, 70, 60, "[]", 100, 0.01),
+    )
+    conn.execute(
+        (
+            "INSERT INTO job_reviews "
+            "(job_id, title, location, status, reason, tokens, estimated_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ),
+        (None, "Title", "Remote", "confirmed", None, 100, 0.01),
+    )
+    conn.commit()
+
+    # Verify review exists
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM job_reviews")
+    before = cursor.fetchone()[0]
+    assert before == 1
+
+    # Dry run
+    count, ids = p.purge_orphaned_job_reviews(dry_run=True)
+    assert count == 1
+
+    # Verify review still exists
+    cursor.execute("SELECT COUNT(*) FROM job_reviews")
+    after = cursor.fetchone()[0]
+    assert after == 1
+
+
+def test_purge_orphaned_job_reviews_actual(purger):
+    """Should delete orphaned job_reviews."""
+    p, store, db_path = purger
+
+    conn = p.conn
+
+    # Create assessment and orphaned reviews
+    conn.execute(
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, title, company, summary, overall_score, tech_score, "
+            "seniority_score, location_score, recommendations, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
+        ("job1", "Engineer", "TechCorp", "Summary", 75, 80, 70, 60, "[]", 100, 0.01),
+    )
+    conn.execute(
+        (
+            "INSERT INTO job_reviews "
+            "(job_id, title, location, status, reason, tokens, estimated_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ),
+        (None, "Title1", "Remote", "confirmed", None, 100, 0.01),
+    )
+    conn.execute(
+        (
+            "INSERT INTO job_reviews "
+            "(job_id, title, location, status, reason, tokens, estimated_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ),
+        ("orphaned_job", "Title2", "Remote", "confirmed", None, 100, 0.01),
+    )
+    conn.commit()
+
+    # Verify reviews exist
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM job_reviews")
+    before = cursor.fetchone()[0]
+    assert before == 2
+
+    # Actual delete
+    count, ids = p.purge_orphaned_job_reviews(dry_run=False)
+    assert count == 2
+
+    # Verify reviews deleted
+    cursor.execute("SELECT COUNT(*) FROM job_reviews")
+    after = cursor.fetchone()[0]
+    assert after == 0
