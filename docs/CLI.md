@@ -506,24 +506,31 @@ ats-showcase assess \
 ---
 
 ### query
-**Purpose**: Search assessment results
+**Purpose**: Search assessment results by keyword, score, and company
 
 ```bash
-ats-showcase query \
-  --search "Python" \
-  --min-score 0.75 \
-  --company TechCorp \
-  --limit 20
+# Basic search
+uv run python -m src.cli query --keyword "Python"
+
+# Search with score filter
+uv run python -m src.cli query --keyword "Python" --min-score 75 --max-score 100
+
+# Search within specific company
+uv run python -m src.cli query --keyword "engineer" --company "Google"
+
+# Combined filters
+uv run python -m src.cli query --keyword "Python" --company "Google" --min-score 80 --limit 5
 ```
 
 **Options**:
-- `--search TEXT` - Keyword search (FTS5) (optional)
-- `--min-score FLOAT` - Filter by match score (default: 0.0)
-- `--company TEXT` - Filter by company (optional)
-- `--recommendation TEXT` - Filter: strong_match|moderate_match|weak_match (optional)
-- `--limit INT` - Result limit (default: 20)
+- `--keyword TEXT` - Search keyword (required)
+- `--min-score INT` - Minimum score filter (0-100, default: 0)
+- `--max-score INT` - Maximum score filter (0-100, default: 100)
+- `--company TEXT` - Filter by company name (optional)
+- `--limit INT` - Maximum results (default: 10)
+- `--json-output` - Output as JSON format (default: false)
 
-**Output**: Formatted table of results
+**Output**: Formatted table with job titles, companies, scores, and tech/seniority ratings
 
 ---
 

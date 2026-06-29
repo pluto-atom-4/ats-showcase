@@ -518,23 +518,32 @@ Example output:
 ### Search Assessments by Keyword
 
 ```bash
-uv run python -m src.cli query \
-  --keyword "python" \
-  --min-score 75 \
-  --max-score 100 \
-  --limit 10 \
-  --json-output false
+# Basic search
+uv run python -m src.cli query --keyword "python"
+
+# Search with score filter
+uv run python -m src.cli query --keyword "python" --min-score 75 --limit 5
+
+# Search by company
+uv run python -m src.cli query --keyword "engineer" --company "Google"
+
+# Combined filters
+uv run python -m src.cli query --keyword "python" --company "TechCorp" --min-score 80
+
+# JSON output
+uv run python -m src.cli query --keyword "kubernetes" --json-output
 ```
 
 ### Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--keyword` | *required* | Search term |
-| `--min-score` | None | Minimum score filter |
-| `--max-score` | None | Maximum score filter |
-| `--limit` | `10` | Maximum results |
-| `--json-output` | `false` | Output as JSON (true/false) |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--keyword` | TEXT | *required* | Search keyword (FTS5) |
+| `--min-score` | INT | 0 | Minimum score (0-100) |
+| `--max-score` | INT | 100 | Maximum score (0-100) |
+| `--company` | TEXT | None | Filter by company name |
+| `--limit` | INT | 10 | Maximum results |
+| `--json-output` | BOOL | false | JSON format output |
 
 ### Example Usage
 
