@@ -1253,15 +1253,20 @@ def purge(
 
 @app.command()
 def query(
-    keyword: str = typer.Option(..., help="Search keyword"),
+    keyword: Optional[str] = typer.Option(None, help="Search keyword (optional if company specified)"),
     min_score: Optional[int] = typer.Option(None, help="Minimum score filter"),
     max_score: Optional[int] = typer.Option(None, help="Maximum score filter"),
     company: Optional[str] = typer.Option(None, help="Filter by company name"),
     limit: int = typer.Option(10, help="Maximum results"),
     json_output: bool = typer.Option(False, help="Output as JSON"),
 ) -> None:
-    """Search stored assessments by keyword, score, and company."""
+    """Search stored assessments by keyword, score, and/or company."""
     try:
+        # Validate: need at least keyword or company
+        if not keyword and not company:
+            typer.echo("❌ Specify --keyword and/or --company", err=True)
+            raise typer.Exit(1)
+
         # Load assessment store
         db_path = "data/ats_playground.db"
         store = AssessmentStore(db_path)
@@ -1271,17 +1276,28 @@ def query(
         max_s = max_score if max_score is not None else 100
 
         # Search
-        filter_info = f"(score {min_s}-{max_s}"
-        if company:
-            filter_info += f", company={company}"
-        filter_info += f", limit {limit})"
-        typer.echo(f"🔍 Searching for '{keyword}' {filter_info}...\n")
-        results = store.search_by_keyword(
-            keyword, min_score=min_s, max_score=max_s, company=company, limit=limit
-        )
+        if keyword:
+            # Keyword + optional company search
+            filter_info = f"'{keyword}' (score {min_s}-{max_s}"
+            if company:
+                filter_info += f", company={company}"
+            filter_info += f", limit {limit})"
+            typer.echo(f"🔍 Searching for {filter_info}...\n")
+            results = store.search_by_keyword(
+                keyword, min_score=min_s, max_score=max_s, company=company, limit=limit
+            )
+        else:
+            # Company-only search (no keyword)
+            filter_info = f"(company={company}, score {min_s}-{max_s}, limit {limit})"
+            typer.echo(f"🔍 Listing jobs at {filter_info}...\n")
+            results = store.get_assessments_by_score(
+                min_score=min_s, max_score=max_s, company=company
+            )
+            results = results[:limit]
 
         if not results:
-            typer.echo(f"⚠️  No results found for '{keyword}' in score range {min_s}-{max_s}")
+            search_desc = f"'{keyword}'" if keyword else f"company '{company}'"
+            typer.echo(f"⚠️  No results found for {search_desc} in score range {min_s}-{max_s}")
             raise typer.Exit(0)
 
         if json_output:
@@ -1309,9 +1325,10 @@ def query(
             typer.echo("")
             avg_score = sum(r.get("overall_score", 0) for r in results) / len(results)
             typer.echo(f"📊 Average score: {avg_score:.1f}")
-            typer.echo(f"💡 Tip: Use 'export-results --min-score {min_s}' to get a full report")
+            typer.echo(f"💡 Tip: Use 'export --min-score {min_s}' to get a full report")
 
-        logger.info(f"Search complete: found {len(results)} results for '{keyword}'")
+        search_desc = f"keyword='{keyword}'" if keyword else f"company='{company}'"
+        logger.info(f"Search complete: found {len(results)} results for {search_desc}")
 
     except Exception as e:
         logger.error(f"Search failed: {e}", exc_info=True)
