@@ -292,7 +292,7 @@ def test_run_full_check(checker):
 
     assert isinstance(report, IntegrityReport)
     assert report.timestamp is not None
-    assert report.total_checks == 9
+    assert report.total_checks == 11
     assert isinstance(report.issues_found, list)
     assert isinstance(report.summary_by_type, dict)
 
@@ -450,3 +450,101 @@ def test_purge_recommendations_ordered(checker):
     # High priority items should appear first
     if "orphaned_assessment" in report.summary_by_type:
         assert any("orphaned" in rec for rec in report.purge_recommendations)
+
+
+def test_check_fts_data_consistency_clean(checker):
+    """FTS with matching job_ids should have no issues."""
+    inspector, store, db_path = checker
+
+    # Create job and assessment
+    conn = inspector.conn
+    conn.execute(
+        "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
+        ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
+    )
+    conn.execute(
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, title, company, summary, overall_score, tech_score, "
+            "seniority_score, location_score, recommendations, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
+        (
+            "job1",
+            "Title",
+            "Company",
+            "Summary",
+            75,
+            80,
+            70,
+            60,
+            "[]",
+            100,
+            0.01,
+        ),
+    )
+    conn.commit()
+
+    # Populate FTS with valid data
+    conn.execute(
+        (
+            "INSERT INTO job_assessments_fts "
+            "(rowid, job_id, title, company, summary, recommendations) "
+            "VALUES (?, ?, ?, ?, ?, ?)"
+        ),
+        (1, "job1", "Title", "Company", "Summary", "[]"),
+    )
+    conn.commit()
+
+    issues = inspector.check_fts_data_consistency()
+    assert len(issues) == 0
+
+
+def test_check_fts_data_consistency_null_job_ids(checker):
+    """FTS with NULL job_ids should be detected."""
+    inspector, store, db_path = checker
+
+    # Create job and assessment
+    conn = inspector.conn
+    conn.execute(
+        "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
+        ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
+    )
+    conn.execute(
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, title, company, summary, overall_score, tech_score, "
+            "seniority_score, location_score, recommendations, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
+        (
+            "job1",
+            "Title",
+            "Company",
+            "Summary",
+            75,
+            80,
+            70,
+            60,
+            "[]",
+            100,
+            0.01,
+        ),
+    )
+    conn.commit()
+
+    # Create FTS entry with NULL job_id (simulating out-of-sync)
+    conn.execute(
+        (
+            "INSERT INTO job_assessments_fts "
+            "(rowid, job_id, title, company, summary, recommendations) "
+            "VALUES (?, ?, ?, ?, ?, ?)"
+        ),
+        (1, None, "Title", "Company", "Summary", "[]"),
+    )
+    conn.commit()
+
+    issues = inspector.check_fts_data_consistency()
+    assert len(issues) == 1
+    assert issues[0].issue_type == "fts_data_mismatch"
+    assert "NULL job_id" in issues[0].details

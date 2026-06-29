@@ -556,3 +556,100 @@ def test_transaction_rollback_on_error(purger):
     cursor.execute("SELECT COUNT(*) FROM job_assessments WHERE job_id = ?", ("orphaned_job",))
     final = cursor.fetchone()[0]
     assert final == 0
+
+
+def test_rebuild_fts_index_dry_run(purger):
+    """Dry-run should not modify FTS index."""
+    p, store, db_path = purger
+
+    conn = p.conn
+
+    # Create job and assessment with FTS entry
+    conn.execute(
+        "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
+        ("job1", "Engineer", "TechCorp", "Remote", "Desc", "pending_review"),
+    )
+    conn.execute(
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, title, company, summary, overall_score, tech_score, "
+            "seniority_score, location_score, recommendations, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
+        ("job1", "Engineer", "TechCorp", "Summary", 75, 80, 70, 60, "[]", 100, 0.01),
+    )
+    conn.execute(
+        (
+            "INSERT INTO job_assessments_fts "
+            "(rowid, job_id, title, company, summary, recommendations) "
+            "VALUES (?, ?, ?, ?, ?, ?)"
+        ),
+        (1, None, "Engineer", "TechCorp", "Summary", "[]"),
+    )
+    conn.commit()
+
+    # Verify FTS has NULL job_id before
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM job_assessments_fts WHERE job_id IS NULL")
+    before = cursor.fetchone()[0]
+    assert before == 1
+
+    # Dry run
+    count, ids = p.rebuild_fts_index(dry_run=True)
+    assert count == 1
+
+    # Verify FTS still has NULL job_id
+    cursor.execute("SELECT COUNT(*) FROM job_assessments_fts WHERE job_id IS NULL")
+    after = cursor.fetchone()[0]
+    assert after == 1
+
+
+def test_rebuild_fts_index_actual(purger):
+    """Rebuild should refresh FTS entries from main table."""
+    p, store, db_path = purger
+
+    conn = p.conn
+
+    # Create job and assessment with FTS entry that has NULL job_id
+    conn.execute(
+        "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
+        ("job1", "Engineer", "TechCorp", "Remote", "Desc", "pending_review"),
+    )
+    conn.execute(
+        (
+            "INSERT INTO job_assessments "
+            "(job_id, title, company, summary, overall_score, tech_score, "
+            "seniority_score, location_score, recommendations, tokens_used, actual_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ),
+        ("job1", "Engineer", "TechCorp", "Summary", 75, 80, 70, 60, "[]", 100, 0.01),
+    )
+    conn.execute(
+        (
+            "INSERT INTO job_assessments_fts "
+            "(rowid, job_id, title, company, summary, recommendations) "
+            "VALUES (?, ?, ?, ?, ?, ?)"
+        ),
+        (1, None, "Engineer", "TechCorp", "Summary", "[]"),
+    )
+    conn.commit()
+
+    # Verify FTS has NULL job_id before
+    cursor = conn.cursor()
+    cursor.execute("SELECT job_id FROM job_assessments_fts WHERE rowid = 1")
+    before = cursor.fetchone()[0]
+    assert before is None
+
+    # Actual rebuild
+    count, ids = p.rebuild_fts_index(dry_run=False)
+    assert count == 1
+
+    # Verify FTS now has correct job_id
+    cursor.execute("SELECT job_id FROM job_assessments_fts WHERE rowid = 1")
+    after = cursor.fetchone()[0]
+    assert after == "job1"
+
+    # Verify no NULL job_ids in FTS
+    cursor.execute("SELECT COUNT(*) FROM job_assessments_fts WHERE job_id IS NULL")
+    null_count = cursor.fetchone()[0]
+    assert null_count == 0

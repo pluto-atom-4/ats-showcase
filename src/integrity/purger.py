@@ -4,6 +4,7 @@ import logging
 import sqlite3
 from typing import List, Tuple, cast
 
+from src.id_generation import generate_job_id
 from src.storage.assessment_store import AssessmentStore
 
 logger = logging.getLogger(__name__)
@@ -357,4 +358,129 @@ class DataPurger:
                 raise
         except Exception as e:
             logger.error(f"Error purging by date range: {e}")
+            return 0, []
+
+    def rebuild_fts_index(self, dry_run: bool = True) -> Tuple[int, List[str]]:
+        """Rebuild FTS5 index to refresh indexed content from main table.
+
+        Deletes all FTS entries and repopulates from job_assessments.
+        """
+        try:
+            cursor = self.conn.cursor()
+
+            # Count current entries
+            cursor.execute("SELECT COUNT(*) FROM job_assessments")
+            total_count = cursor.fetchone()[0]
+
+            if dry_run:
+                logger.info(f"[DRY RUN] Would rebuild FTS5 index for {total_count} entries")
+                return total_count, []
+
+            self.conn.execute("BEGIN TRANSACTION")
+            try:
+                # Delete all FTS entries
+                cursor.execute("DELETE FROM job_assessments_fts")
+
+                # Re-populate from main table
+                cursor.execute(
+                    """
+                    INSERT INTO job_assessments_fts
+                    (rowid, job_id, title, company, summary, recommendations)
+                    SELECT rowid, job_id, title, company, summary, recommendations
+                    FROM job_assessments
+                    """
+                )
+
+                # Optimize FTS index
+                cursor.execute("REINDEX job_assessments_fts")
+
+                self.conn.commit()
+                logger.info(f"Rebuilt FTS5 index for {total_count} entries")
+                return total_count, []
+            except Exception as e:
+                self.conn.rollback()
+                logger.error(f"Error rebuilding FTS index: {e}")
+                raise
+        except Exception as e:
+            logger.error(f"Error in rebuild_fts_index: {e}")
+            return 0, []
+
+    def regenerate_null_job_ids(self, dry_run: bool = True) -> Tuple[int, List[str]]:
+        """Regenerate job_id for assessments with NULL job_id using title/company/location.
+
+        First removes duplicate assessments (keeping first/best), then regenerates job_ids.
+        """
+        try:
+            cursor = self.conn.cursor()
+
+            # Find assessments with NULL job_id
+            query = """
+                SELECT rowid, title, company, location
+                FROM job_assessments
+                WHERE job_id IS NULL
+                ORDER BY rowid
+            """
+            cursor.execute(query)
+            null_records = cursor.fetchall()
+
+            if not null_records:
+                logger.info("No assessments with NULL job_id found")
+                return 0, []
+
+            # Group by title/company/location to find duplicates
+            seen_jobs = {}  # (title, company, location) -> rowid
+            duplicates = []
+            for rowid, title, company, location in null_records:
+                key = (title, company, location)
+                if key in seen_jobs:
+                    duplicates.append(rowid)
+                else:
+                    seen_jobs[key] = rowid
+
+            if dry_run:
+                logger.info(
+                    f"[DRY RUN] Would delete {len(duplicates)} duplicate assessments "
+                    f"and regenerate job_id for {len(seen_jobs)} unique assessments"
+                )
+                return len(null_records), []
+
+            self.conn.execute("BEGIN TRANSACTION")
+            try:
+                updated_count = 0
+
+                # First, delete duplicate assessments
+                if duplicates:
+                    cursor.execute(
+                        "DELETE FROM job_assessments WHERE rowid IN ({})".format(
+                            ",".join("?" * len(duplicates))
+                        ),
+                        duplicates,
+                    )
+                    logger.info(f"Deleted {len(duplicates)} duplicate assessments")
+
+                # Then, regenerate job_id for unique assessments
+                for (title, company, location), rowid in seen_jobs.items():
+                    new_job_id = generate_job_id(
+                        company=company or "Unknown",
+                        title=title or "Unknown",
+                        location=location or "Not specified",
+                        url=None,
+                    )
+                    cursor.execute(
+                        "UPDATE job_assessments SET job_id = ? WHERE rowid = ?",
+                        (new_job_id, rowid),
+                    )
+                    updated_count += cursor.rowcount
+
+                self.conn.commit()
+                logger.info(
+                    f"Deleted {len(duplicates)} duplicates and regenerated job_id for {updated_count} assessments"
+                )
+                return len(null_records), []
+            except Exception as e:
+                self.conn.rollback()
+                logger.error(f"Error regenerating job_ids: {e}")
+                raise
+        except Exception as e:
+            logger.error(f"Error in regenerate_null_job_ids: {e}")
             return 0, []
