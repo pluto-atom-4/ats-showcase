@@ -6,14 +6,17 @@ Comprehensive guide to detecting, inspecting, and safely repairing database anom
 
 ## Overview
 
-The integrity module performs **9 automated checks** to detect:
+The integrity module performs **12 automated checks** to detect:
 - Orphaned records (assessments/preprocessed data without matching jobs)
 - Invalid scores (outside 0-100 range)
 - Malformed JSON in recommendations field
 - Missing preprocessing data for assessments
 - Orphaned FTS (full-text search) index entries
+- FTS data consistency issues (NULL job_ids in FTS)
+- NULL job_ids in assessments (should be auto-generated)
 - Status inconsistencies between tables
 - Dangling cost tracking entries
+- Duplicate assessments for same job_id
 
 **Safety first**: All destructive operations use dry-run mode by default. Requires explicit `--force` flag for actual deletion.
 
@@ -55,7 +58,7 @@ Generated: 2026-06-28 14:23:00 UTC
 
 ## Summary
 - **Total Issues Found**: 12
-- **Total Checks Run**: 9
+- **Total Checks Run**: 11
 - **Records Affected**: 8
 - **Errors**: 5
 - **Warnings**: 7
@@ -83,7 +86,7 @@ Generated: 2026-06-28 14:23:00 UTC
   - Action: Delete orphaned assessment record
 ```
 
-### 9 Checks Explained
+### 12 Checks Explained
 
 1. **Orphaned Assessments**: assessments without matching job_id in jobs table
 2. **Orphaned Preprocessed**: preprocessed_jobs without matching job_id
@@ -91,9 +94,12 @@ Generated: 2026-06-28 14:23:00 UTC
 4. **Malformed JSON**: recommendations field fails JSON parsing
 5. **Duplicate Assessments**: multiple assessments for same job_id (UNIQUE constraint prevents, but check validates)
 6. **Missing Preprocessing**: assessments without corresponding preprocessed_jobs record
-7. **FTS Orphans**: full-text search index entries without matching assessment
-8. **Status Inconsistencies**: jobs.status ≠ job_reviews.status
-9. **Missing Cost Tracking**: cost_tracking entries without matching job_id
+7. **FTS Orphans**: full-text search index entries without matching assessment (by rowid)
+8. **FTS Data Consistency**: FTS entries with NULL job_id (out of sync with main table)
+9. **NULL Job IDs**: assessments with NULL job_id (should be auto-generated from title/company/location)
+10. **Status Inconsistencies**: jobs.status ≠ job_reviews.status
+11. **Missing Cost Tracking**: cost_tracking entries without matching job_id
+12. **Orphaned Job Reviews**: job_reviews with NULL or invalid job_id (should reference job_assessments)
 
 ---
 
@@ -116,7 +122,7 @@ uv run python -m src.cli integrity purge --type orphaned_assessments \
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--type` | TEXT | Required | Issue type to purge: `orphaned_assessments`, `orphaned_preprocessed`, `invalid_scores`, `malformed_recommendations`, `fts_orphans` |
+| `--type` | TEXT | Required | Issue type to purge: `orphaned_assessments`, `orphaned_preprocessed`, `invalid_scores`, `malformed_recommendations`, `fts_orphans`, `fts_data_mismatch`, `null_job_ids`, `orphaned_job_reviews` |
 | `--backup-dir` | TEXT | `./backups/{timestamp}` | Directory for backup files before deletion |
 | `--dry-run` | FLAG | True | Preview deletions without modifying database |
 | `--no-dry-run` | FLAG | False | Actually perform deletions (requires --force) |
@@ -189,8 +195,24 @@ uv run python -m src.cli integrity check --output after.md
 - Recommendation: Safe to run automatically
 
 **fts_orphans**
-- Rebuilds FTS5 full-text search index
+- Rebuilds FTS5 full-text search index, removes orphaned rowid entries
 - Risk: None (structural cleanup only)
+
+**fts_data_mismatch**
+- Rebuilds FTS5 index to refresh indexed content from main table
+- Fixes out-of-sync entries (e.g., NULL job_ids in FTS)
+- Risk: None (refreshes data from source)
+
+**null_job_ids**
+- Regenerates missing job_ids for assessments using title/company/location
+- Deduplicates assessments with identical title/company/location (keeps first)
+- Risk: None (generates deterministic IDs, removes duplicates)
+
+**orphaned_job_reviews**
+- Deletes job_reviews with NULL or non-existent job_id
+- Detects orphaned records (job_reviews.job_id not in job_assessments)
+- Background: job_reviews table has FK to jobs(id), but assessments are stored in job_assessments
+- Risk: None (orphaned records are disconnected from assessment workflow)
 
 ---
 
@@ -492,6 +514,7 @@ uv run python -m src.cli export --output data/assessments/report.md
 
 ## Document Version
 
-- **Version**: 1.0
+- **Version**: 1.2
 - **Last Updated**: 2026-06-28
 - **Coverage**: All 3 integrity commands (check, purge, repair) with workflows, safety mechanisms, troubleshooting
+- **Changes**: Added orphaned job_reviews detection/purge and FTS consistency repair (12 checks total)

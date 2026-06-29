@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from browser.crawler import Crawler
 from formatters.markdown_viewer import MarkdownReportViewer
+from id_generation import generate_job_id
 from integrity import DataPurger, IntegrityChecker
 from storage.assessment_store import AssessmentStore
 from storage.export import ExportConfig, MarkdownExporter
@@ -701,8 +702,16 @@ def preprocess(
                     token_count = sum(counter.count_tokens(c) for c in chunks)
                     estimated_cost = counter.estimate_cost(token_count)
 
+                    # Use job.id if available, otherwise generate from job details
+                    job_id = job.id or generate_job_id(
+                        company=job.company,
+                        title=job.title,
+                        location=job.location or "Not specified",
+                        url=str(job.url) if job.url else None,
+                    )
+
                     preprocessed = PreprocessedJob(
-                        job_id=f"{job_file.stem}_{i}",
+                        job_id=job_id,
                         clean_text=clean_text,
                         sentences=clean_text.split("\n"),
                         chunks=chunks,

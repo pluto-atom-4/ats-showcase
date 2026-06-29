@@ -255,10 +255,22 @@ class IntegrityChecker:
         return issues
 
     def check_status_inconsistencies(self) -> List[IntegrityIssue]:
-        """Find mismatched job.status vs job_reviews.status."""
-        issues = []
+        """Find mismatched job.status vs job_reviews.status.
+
+        NOTE: jobs table doesn't exist in current schema (job_assessments only).
+        This check is deprecated. Kept for backward compatibility.
+        """
+        issues: List[IntegrityIssue] = []
         try:
             cursor = self.conn.cursor()
+            # Check if jobs table exists
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='jobs'"
+            )
+            if not cursor.fetchone():
+                logger.info("Skipping status inconsistency check (jobs table not found)")
+                return issues
+
             query = """
                 SELECT j.id, j.status, r.status
                 FROM jobs j
@@ -275,13 +287,91 @@ class IntegrityChecker:
                         severity="warning",
                         table="job_reviews",
                         record_id=job_id,
-                        details=f"Status mismatch: jobs.status='{job_status}' vs job_reviews.status='{review_status}'",
+                        details=(
+                            f"Status mismatch: jobs.status='{job_status}' vs "
+                            f"job_reviews.status='{review_status}'"
+                        ),
                         suggested_action="Update job_reviews.status to match jobs.status",
                     )
                 )
             logger.info(f"Found {len(issues)} status inconsistencies")
         except Exception as e:
             logger.error(f"Error checking status inconsistencies: {e}")
+
+        return issues
+
+    def check_job_reviews_anomalies(self) -> List[IntegrityIssue]:
+        """Find orphaned or invalid job_reviews records.
+
+        Checks for:
+        - NULL job_ids (should reference job_assessments.job_id)
+        - Reviews with job_id not in job_assessments
+        """
+        issues: List[IntegrityIssue] = []
+        try:
+            cursor = self.conn.cursor()
+
+            # Check if job_reviews table exists
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='job_reviews'"
+            )
+            if not cursor.fetchone():
+                logger.info("job_reviews table not found, skipping anomaly check")
+                return issues
+
+            # Check for NULL job_ids
+            cursor.execute("SELECT COUNT(*) FROM job_reviews WHERE job_id IS NULL")
+            null_count = cursor.fetchone()[0]
+
+            if null_count > 0:
+                issues.append(
+                    IntegrityIssue(
+                        issue_type="orphaned_job_review",
+                        severity="error",
+                        table="job_reviews",
+                        record_id=f"{null_count} reviews with NULL job_id",
+                        details=(
+                            f"Found {null_count} job_reviews with NULL job_id "
+                            "(should reference job_assessments.job_id)"
+                        ),
+                        suggested_action=(
+                            "Purge NULL job_reviews records or migrate to reference "
+                            "job_assessments"
+                        ),
+                    )
+                )
+
+            # Check for reviews referencing non-existent job_assessments
+            cursor.execute(
+                """
+                SELECT COUNT(DISTINCT r.job_id)
+                FROM job_reviews r
+                WHERE r.job_id IS NOT NULL
+                AND r.job_id NOT IN (SELECT DISTINCT job_id FROM job_assessments)
+                """
+            )
+            orphan_count = cursor.fetchone()[0]
+
+            if orphan_count > 0:
+                issues.append(
+                    IntegrityIssue(
+                        issue_type="orphaned_job_review",
+                        severity="error",
+                        table="job_reviews",
+                        record_id=f"{orphan_count} reviews with invalid job_id",
+                        details=(
+                            f"Found {orphan_count} job_reviews with job_id not in "
+                            "job_assessments"
+                        ),
+                        suggested_action="Purge orphaned job_reviews records",
+                    )
+                )
+
+            logger.info(
+                f"Found {null_count} NULL and {orphan_count} orphaned job_reviews"
+            )
+        except Exception as e:
+            logger.error(f"Error checking job_reviews anomalies: {e}")
 
         return issues
 
@@ -316,6 +406,79 @@ class IntegrityChecker:
 
         return issues
 
+    def check_fts_data_consistency(self) -> List[IntegrityIssue]:
+        """Find FTS entries with NULL or mismatched job_id values."""
+        issues: List[IntegrityIssue] = []
+        try:
+            cursor = self.conn.cursor()
+            # Check for NULL job_ids in FTS
+            query = """
+                SELECT COUNT(*)
+                FROM job_assessments_fts
+                WHERE job_id IS NULL
+            """
+            cursor.execute(query)
+            null_count = cursor.fetchone()[0]
+
+            if null_count > 0:
+                issues.append(
+                    IntegrityIssue(
+                        issue_type="fts_data_mismatch",
+                        severity="error",
+                        table="job_assessments_fts",
+                        record_id=f"{null_count} entries with NULL job_id",
+                        details=(
+                            f"Found {null_count} FTS entries with NULL job_id "
+                            "(FTS index out of sync with main table)"
+                        ),
+                        suggested_action=(
+                            "Rebuild FTS5 index to refresh indexed content "
+                            "from main table"
+                        ),
+                    )
+                )
+            logger.info(f"Found {null_count} FTS entries with NULL job_id")
+        except Exception as e:
+            logger.error(f"Error checking FTS data consistency: {e}")
+
+        return issues
+
+    def check_null_job_ids(self) -> List[IntegrityIssue]:
+        """Find assessments with NULL job_id."""
+        issues: List[IntegrityIssue] = []
+        try:
+            cursor = self.conn.cursor()
+            query = """
+                SELECT COUNT(*)
+                FROM job_assessments
+                WHERE job_id IS NULL
+            """
+            cursor.execute(query)
+            count = cursor.fetchone()[0]
+
+            if count > 0:
+                issues.append(
+                    IntegrityIssue(
+                        issue_type="null_job_id",
+                        severity="error",
+                        table="job_assessments",
+                        record_id=f"{count} assessments with NULL job_id",
+                        details=(
+                            f"Found {count} assessments with NULL job_id "
+                            "(should be generated from title/company/location)"
+                        ),
+                        suggested_action=(
+                            "Regenerate job_id from assessment data or re-run "
+                            "preprocess with fixed ID generation"
+                        ),
+                    )
+                )
+            logger.info(f"Found {count} assessments with NULL job_id")
+        except Exception as e:
+            logger.error(f"Error checking NULL job_ids: {e}")
+
+        return issues
+
     def run_full_check(self) -> IntegrityReport:
         """Execute all integrity checks and return aggregated report."""
         logger.info("Starting full integrity check")
@@ -328,9 +491,12 @@ class IntegrityChecker:
         self.issues.extend(self.check_malformed_recommendations())
         self.issues.extend(self.check_missing_preprocessing())
         self.issues.extend(self.check_fts_orphans())
+        self.issues.extend(self.check_fts_data_consistency())
         self.issues.extend(self.check_duplicate_assessments())
         self.issues.extend(self.check_status_inconsistencies())
         self.issues.extend(self.check_missing_cost_tracking())
+        self.issues.extend(self.check_null_job_ids())
+        self.issues.extend(self.check_job_reviews_anomalies())
 
         # Aggregate results
         summary_by_type: dict[str, int] = {}
@@ -341,7 +507,7 @@ class IntegrityChecker:
 
         report = IntegrityReport(
             timestamp=datetime.utcnow(),
-            total_checks=9,
+            total_checks=12,
             issues_found=self.issues,
             summary_by_type=summary_by_type,
             total_records_affected=affected_records,
@@ -359,16 +525,32 @@ class IntegrityChecker:
         issue_types = {issue.issue_type for issue in self.issues}
 
         if "orphaned_assessment" in issue_types:
-            recommendations.append("purge_orphaned_assessments (high priority)")
+            recommendations.append(
+                "integrity purge --type orphaned_assessments (high priority)"
+            )
         if "orphaned_preprocessed" in issue_types:
-            recommendations.append("purge_orphaned_preprocessed (high priority)")
+            recommendations.append(
+                "integrity purge --type orphaned_preprocessed (high priority)"
+            )
         if "invalid_score" in issue_types:
-            recommendations.append("purge_invalid_scores (high priority)")
+            recommendations.append("integrity purge --type invalid_scores (high priority)")
         if "malformed_json" in issue_types:
-            recommendations.append("purge_malformed_recommendations (soft delete)")
+            recommendations.append(
+                "integrity purge --type malformed_recommendations (soft delete)"
+            )
         if "fts_orphan" in issue_types:
-            recommendations.append("purge_fts_orphans (delete and rebuild index)")
+            recommendations.append("integrity purge --type fts_orphans")
+        if "fts_data_mismatch" in issue_types:
+            recommendations.append("integrity purge --type fts_data_mismatch")
+        if "null_job_id" in issue_types:
+            recommendations.append(
+                "integrity purge --type null_job_ids or re-run preprocess"
+            )
+        if "orphaned_job_review" in issue_types:
+            recommendations.append("integrity purge --type orphaned_job_reviews")
         if "duplicate_assessment" in issue_types:
-            recommendations.append("resolve_duplicate_assessments (manual review)")
+            recommendations.append(
+                "resolve_duplicate_assessments (manual review required)"
+            )
 
         return recommendations
