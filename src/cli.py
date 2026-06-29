@@ -1289,7 +1289,7 @@ def query(
 
             for idx, job in enumerate(results, 1):
                 company = str(job.get("company", "N/A"))[:15].ljust(15)
-                title = str(job.get("job_title", "N/A"))[:24].ljust(24)
+                title = str(job.get("title", "N/A"))[:24].ljust(24)
                 overall = int(job.get("overall_score", 0))
                 tech = int(job.get("tech_score", 0))
                 seniority = int(job.get("seniority_score", 0))
