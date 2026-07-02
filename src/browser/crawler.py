@@ -1,6 +1,7 @@
 """Playwright-based web crawler for extracting job postings from company websites."""
 
 import logging
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
@@ -182,6 +183,34 @@ class Crawler:
             logger.debug(f"Exception traceback: {traceback.format_exc()}")
             return None
 
+    def _normalize_description(self, description: str) -> str:
+        """
+        Normalize job description by adding separators between metadata labels and values.
+
+        Handles concatenated metadata like 'remote typeHybrid' -> 'remote type Hybrid'
+        and between metadata fields like ')locationsSeattle' -> ')\nlocations Seattle'
+        """
+        if not description:
+            return description
+
+        # Step 1: Add newline before metadata labels that aren't already separated
+        # Pattern: non-whitespace followed by a metadata label (case-insensitive)
+        metadata_labels_pattern = (
+            r"(?<![:\s\n/])((?:remote\s+type|locations|time\s+type|posted\s+on|"
+            r"time\s+left\s+to\s+apply|job\s+requisition\s+id|Job\s+Description)"
+            r"(?=\s|$|[A-Z]))"
+        )
+        result = re.sub(metadata_labels_pattern, r"\n\1", description, flags=re.IGNORECASE)
+
+        # Step 2: Add space between metadata label and its value (label followed by capital)
+        pattern = re.compile(
+            r"((?:remote\s+type|locations|time\s+type|posted\s+on|time\s+left\s+to\s+apply|job\s+requisition\s+id|Job\s+Description))\s*([A-Z])",
+            re.IGNORECASE
+        )
+        result = pattern.sub(r"\1 \2", result)
+
+        return result
+
     async def _extract_text(self, element, selector: Optional[str]) -> Optional[str]:
         """Extract text from element using selector."""
         if not selector:
@@ -255,6 +284,9 @@ class Crawler:
                 if req_elem:
                     req_text = await req_elem.text_content()
                     requirements = req_text.strip() if req_text else None
+
+            # Normalize description to add separators between metadata labels
+            description = self._normalize_description(description)
 
             logger.debug(f"Fetched detail: {len(description)} chars")
             return description, requirements
