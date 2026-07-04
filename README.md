@@ -48,6 +48,48 @@ See [docs/CLI.md](./docs/CLI.md#configuration-management) for detailed config ex
 
 **Setup Troubleshooting?** See [docs/SETUP.md](./docs/SETUP.md) for detailed Python 3.12 configuration, system dependencies, and troubleshooting.
 
+## 🌍 Environment Configuration
+
+ATS Playground requires environment variables for API keys and configuration. Set them in `.env` (created during quick start).
+
+### Required Variables
+
+```bash
+# Copy template
+cp .env.example .env
+
+# Edit .env with your values
+```
+
+| Variable | Example | Required? | Purpose |
+|----------|---------|-----------|---------|
+| `ANTHROPIC_API_KEY` | `sk-ant-...` | ✅ Yes | Claude API authentication. Get from [console.anthropic.com](https://console.anthropic.com) |
+| `SPACY_MODEL` | `en_core_web_md` | ✅ Yes | NLP model for sentence segmentation (downloaded in quick start) |
+| `DATABASE_PATH` | `data/ats_playground.db` | ❌ No | SQLite database file (default: shown) |
+| `LOG_LEVEL` | `INFO` | ❌ No | Logging verbosity: DEBUG, INFO, WARNING, ERROR (default: INFO) |
+| `PLAYWRIGHT_HEADLESS` | `true` | ❌ No | Browser headless mode: true (default), false (see browser) |
+
+### Getting an API Key
+
+1. Visit [console.anthropic.com](https://console.anthropic.com)
+2. Sign up or log in
+3. Navigate to API Keys
+4. Click "Create Key"
+5. Copy the key (starts with `sk-ant-`)
+6. Paste into `.env`: `ANTHROPIC_API_KEY=sk-ant-...`
+
+### Verification
+
+```bash
+# Verify all environment variables are set
+python -m src.setup.validate_nlp_setup
+
+# Should show:
+# ✅ ANTHROPIC_API_KEY loaded
+# ✅ SPACY_MODEL loaded
+# ✅ DATABASE_PATH ready
+```
+
 ## 🔍 Code Quality Assurance (Issue #6)
 
 Optional: Automatically catch code quality issues before committing:
@@ -433,6 +475,8 @@ MIT — Use freely in commercial or personal projects. See [LICENSE](LICENSE) fo
 **Resources**:
 - 📖 **Full Documentation**: [docs/README.md](./docs/README.md)
 - 🚀 **Quick Start**: [.github/copilot-instructions.md](./.github/copilot-instructions.md)
+- 🏗️ **Architecture & Design**: [DESIGN.md](./DESIGN.md) (semantic tokens, system design, core principles)
+- 🎯 **Design Decisions**: [docs/ARCHITECTURE-DECISIONS.md](./docs/ARCHITECTURE-DECISIONS.md) (framework selection, why we chose X over Y)
 - 🐛 **Troubleshooting**: [COMPATIBILITY.md](./docs/COMPATIBILITY.md)
 - 📝 **All Commands**: [CLI.md](./docs/CLI.md)
 
