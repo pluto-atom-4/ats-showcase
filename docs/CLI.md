@@ -447,19 +447,24 @@ ats-showcase crawl \
 **Purpose**: Clean HTML, chunk text, count tokens
 
 ```bash
-ats-showcase preprocess \
-  --file data/extracted_jobs/TechCorp_jobs.json \
-  --output data/preprocessed_jobs/ \
-  --strategy semantic
+# Single company
+ats-showcase preprocess
+
+# Multi-company (automatic - processes all *_jobs.json files)
+ats-showcase preprocess --show-estimates
 ```
 
 **Options**:
-- `--file PATH` - Input jobs JSON (required)
-- `--output PATH` - Output directory (default: data/preprocessed_jobs)
-- `--strategy TEXT` - Chunking strategy: semantic|fixed (default: semantic)
-- `--chunk-size INT` - Target tokens per chunk (default: 400)
+- `--batch-size INT` - Jobs per batch (default: 10)
+- `--show-estimates` - Display token/cost estimates for first 3 jobs
 
-**Output**: JSON with cleaned chunks, token counts, cost estimates
+**Behavior**:
+- ✅ Auto-discovers all `*_jobs.json` files in `data/extracted_jobs/`
+- ✅ Merges all companies into **single** `preprocessed_jobs.json`
+- ✅ Skips `preprocessed_jobs.json` to avoid re-processing
+- Works for multi-company `--config-dir` crawls automatically
+
+**Output**: Single `preprocessed_jobs.json` with cleaned chunks, token counts, cost estimates
 
 ---
 
@@ -467,19 +472,26 @@ ats-showcase preprocess \
 **Purpose**: User verification before LLM processing
 
 ```bash
-ats-showcase review \
-  --file data/extracted_jobs/TechCorp_jobs.json \
-  --interactive \
-  --show-costs
+# Single company (legacy, backward compatible)
+ats-showcase review --extracted data/extracted_jobs/companya_jobs.json
+
+# Multi-company (RECOMMENDED)
+ats-showcase review --merge-all
 ```
 
 **Options**:
-- `--file PATH` - Jobs to review (required)
-- `--interactive/--batch` - Interactive vs batch review (default: interactive)
-- `--show-costs/--hide-costs` - Show token costs (default: show)
-- `--auto-confirm` - Auto-confirm jobs (use with caution!)
+- `--extracted PATH` - Path to single extracted jobs JSON (optional if using `--merge-all`)
+- `--preprocessed PATH` - Path to preprocessed jobs JSON (default: data/extracted_jobs/preprocessed_jobs.json)
+- `--merge-all` - **[RECOMMENDED]** Auto-discover and process all extracted company files together
 
-**Output**: Marked jobs as "confirmed"/"rejected" in database
+**Multi-Company Workflow**:
+When using `--merge-all`:
+- ✅ Auto-discovers all `*_jobs.json` files in `data/extracted_jobs/`
+- ✅ Processes ALL jobs from all companies in one interactive session
+- ✅ Pairs with multi-company `preprocessed_jobs.json` created by preprocess
+- Works seamlessly with `crawl --config-dir` pipelines
+
+**Output**: Updated job statuses ("confirmed"/"rejected") in database
 
 ---
 
