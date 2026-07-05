@@ -203,9 +203,19 @@ Per-job cost:
 
 ### Command
 
+**Single company (backward compatible):**
+
 ```bash
 uv run python -m src.cli review \
   --extracted data/extracted_jobs/companya_jobs.json \
+  --preprocessed data/extracted_jobs/preprocessed_jobs.json
+```
+
+**Multiple companies (recommended):**
+
+```bash
+uv run python -m src.cli review \
+  --merge-all \
   --preprocessed data/extracted_jobs/preprocessed_jobs.json
 ```
 
@@ -213,8 +223,29 @@ uv run python -m src.cli review \
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--extracted` | `data/extracted_jobs/carbonrobotics_jobs.json` | Path to extracted jobs JSON |
+| `--extracted` | None (auto-detected) | Path to single extracted jobs JSON (ignored if `--merge-all` is used) |
 | `--preprocessed` | `data/extracted_jobs/preprocessed_jobs.json` | Path to preprocessed jobs JSON |
+| `--merge-all` | `false` | **[Recommended for multi-company]** Auto-discover all extracted company files and process them together |
+
+### Multi-Company Workflow
+
+When you've crawled multiple companies with `--config-dir`, use `--merge-all` to review all jobs at once:
+
+```bash
+# Step 1: Crawl all companies
+uv run python -m src.cli crawl --config-dir ./config
+
+# Step 2: Preprocess all jobs (automatic merge)
+uv run python -m src.cli preprocess
+
+# Step 3: Review all companies interactively
+uv run python -m src.cli review --merge-all
+
+# Step 4: Assess all confirmed jobs
+uv run python -m src.cli assess --cv data/cv.json
+```
+
+This processes all extracted files from all companies seamlessly.
 
 ### Interactive Flow
 

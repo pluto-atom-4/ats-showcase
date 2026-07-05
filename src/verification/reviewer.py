@@ -9,7 +9,7 @@ import logging
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -228,14 +228,16 @@ class JobReviewer:
 
     def review_batch(
         self,
-        extracted_file: str,
+        extracted_files: Union[List[Path], str, Path],
         preprocessed_file: str,
     ) -> ReviewStats:
         """
         Review multiple jobs interactively.
 
         Args:
-            extracted_file: Path to extracted jobs JSON
+            extracted_files: Path(s) to extracted jobs JSON. Can be:
+                - List of Path objects (multi-company)
+                - Single Path or str (backward compat)
             preprocessed_file: Path to preprocessed jobs JSON
 
         Returns:
@@ -243,23 +245,20 @@ class JobReviewer:
         """
         import typer
 
-        # Load jobs
-        extracted_path = Path(extracted_file)
+        # Handle backward compat: convert single path to list
+        if isinstance(extracted_files, (str, Path)):
+            extracted_files = [Path(extracted_files)]
+        else:
+            extracted_files = [Path(f) if isinstance(f, str) else f for f in extracted_files]
+
+        # Validate preprocessed file exists
         preprocessed_path = Path(preprocessed_file)
-
-        if not extracted_path.exists():
-            logger.error(f"Extracted jobs file not found: {extracted_file}")
-            typer.echo(f"❌ File not found: {extracted_file}", err=True)
-            raise typer.Exit(1)
-
         if not preprocessed_path.exists():
             logger.error(f"Preprocessed jobs file not found: {preprocessed_file}")
             typer.echo(f"❌ File not found: {preprocessed_file}", err=True)
             raise typer.Exit(1)
 
-        with open(extracted_path) as f:
-            extracted_jobs = json.load(f)
-
+        # Load preprocessed jobs
         with open(preprocessed_path) as f:
             preprocessed_jobs = json.load(f)
 
@@ -267,20 +266,36 @@ class JobReviewer:
         preprocessed_map = {j["job_id"]: j for j in preprocessed_jobs}
 
         stats = ReviewStats()
-        typer.echo(f"\n👀 Starting job review ({len(extracted_jobs)} jobs total)\n")
 
-        # Get source filename for job_id prefix
-        source_name = extracted_path.stem  # e.g., "carbonrobotics_jobs"
+        # Load and review all extracted files
+        all_extracted_jobs = []
+        for extracted_path in extracted_files:
+            if not extracted_path.exists():
+                logger.error(f"Extracted jobs file not found: {extracted_path}")
+                typer.echo(f"❌ File not found: {extracted_path}", err=True)
+                raise typer.Exit(1)
 
-        for idx, job in enumerate(extracted_jobs):
-            # Match job_id format from preprocessing: "{source}_{index}"
-            job_id = f"{source_name}_{idx + 1}"
-            preprocessed = preprocessed_map.get(job_id, {})
+            with open(extracted_path) as f:
+                extracted_jobs = json.load(f)
+            all_extracted_jobs.append((extracted_path, extracted_jobs))
 
-            try:
-                self.review_job_interactive(idx, len(extracted_jobs), job, preprocessed, stats)
-            except typer.Exit:
-                raise
+        total_jobs = sum(len(jobs) for _, jobs in all_extracted_jobs)
+        typer.echo(f"\n👀 Starting job review ({total_jobs} jobs total)\n")
+
+        job_counter = 0
+        for extracted_path, extracted_jobs in all_extracted_jobs:
+            source_name = extracted_path.stem  # e.g., "carbonrobotics_jobs"
+            for idx, job in enumerate(extracted_jobs):
+                # Match job_id format from preprocessing: "{source}_{index}"
+                job_id = f"{source_name}_{idx + 1}"
+                preprocessed = preprocessed_map.get(job_id, {})
+
+                try:
+                    self.review_job_interactive(job_counter, total_jobs, job, preprocessed, stats)
+                except typer.Exit:
+                    raise
+
+                job_counter += 1
 
         # Display summary
         typer.echo(stats.get_summary())
