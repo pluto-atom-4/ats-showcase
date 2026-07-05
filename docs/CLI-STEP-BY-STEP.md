@@ -130,9 +130,8 @@ Increase `--timeout` (in milliseconds): `--timeout 60000` (60 seconds)
 ### Command
 
 ```bash
-uv run python -m src.cli preprocess \
-  --batch-size 10 \
-  --show-estimates
+# Single or multi-company (auto-detects all extracted files)
+uv run python -m src.cli preprocess --show-estimates
 ```
 
 ### Options
@@ -140,18 +139,30 @@ uv run python -m src.cli preprocess \
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--batch-size` | `10` | Number of jobs per batch (for memory management) |
-| `--show-estimates` | `false` | Display token/cost estimates for first 3 jobs |
+| `--show-estimates` | `false` | Display token/cost estimates for first 3 jobs per file |
+
+### Multi-Company Auto-Merge ✓
+
+When using `crawl --config-dir` for multiple companies:
+- ✅ Auto-discovers **all** `*_jobs.json` files in `data/extracted_jobs/`
+- ✅ Processes each company file automatically
+- ✅ **Merges all into single** `preprocessed_jobs.json` (no manual steps)
+- Zero additional configuration needed
 
 ### What It Does
 
-1. **Cleans HTML** - Removes markup, normalizes text
-2. **Chunks text** - Splits into semantic chunks (sentence-based)
-3. **Counts tokens** - Estimates Claude API tokens using tiktoken
-4. **Estimates costs** - Calculates API cost per job
+1. **Scans directory** - Finds all `*_jobs.json` files (skips `preprocessed_jobs.json`)
+2. **Cleans HTML** - Removes markup, normalizes text
+3. **Chunks text** - Splits into semantic chunks (sentence-based)
+4. **Counts tokens** - Estimates Claude API tokens using tiktoken
+5. **Estimates costs** - Calculates API cost per job
+6. **Merges all** - Combines all companies into single output file
 
 ### Output
 
-Saves preprocessed jobs to: `data/extracted_jobs/preprocessed_jobs.json`
+Saves **merged** preprocessed jobs to: `data/extracted_jobs/preprocessed_jobs.json`
+- Contains jobs from all crawled companies
+- Single file (automatic merge from all sources)
 
 Example output:
 
@@ -203,18 +214,50 @@ Per-job cost:
 
 ### Command
 
+**Single company (legacy):**
+
 ```bash
 uv run python -m src.cli review \
-  --extracted data/extracted_jobs/companya_jobs.json \
-  --preprocessed data/extracted_jobs/preprocessed_jobs.json
+  --extracted data/extracted_jobs/companya_jobs.json
+```
+
+**Multiple companies (RECOMMENDED):**
+
+```bash
+uv run python -m src.cli review --merge-all
 ```
 
 ### Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--extracted` | `data/extracted_jobs/carbonrobotics_jobs.json` | Path to extracted jobs JSON |
-| `--preprocessed` | `data/extracted_jobs/preprocessed_jobs.json` | Path to preprocessed jobs JSON |
+| `--extracted` | None | Path to single extracted jobs JSON (only if NOT using `--merge-all`) |
+| `--preprocessed` | `data/extracted_jobs/preprocessed_jobs.json` | Path to preprocessed jobs JSON (auto-discovered) |
+| `--merge-all` | `false` | **[RECOMMENDED for multi-company]** Auto-discover and process all extracted company files together |
+
+### Multi-Company Workflow ✓
+
+Complete end-to-end pipeline for multiple companies:
+
+```bash
+# Step 1: Crawl all companies → separate extracted_*.json files
+uv run python -m src.cli crawl --config-dir ./config
+
+# Step 2: Preprocess → auto-merges all into single preprocessed_jobs.json
+uv run python -m src.cli preprocess
+
+# Step 3: Review --merge-all → processes all jobs from all companies
+uv run python -m src.cli review --merge-all
+
+# Step 4: Assess → evaluates all confirmed jobs
+uv run python -m src.cli assess --cv data/cv.json
+```
+
+**How `--merge-all` works:**
+- ✅ Auto-discovers all `*_jobs.json` files in `data/extracted_jobs/`
+- ✅ Skips `preprocessed_jobs.json` automatically
+- ✅ Reviews all jobs from all companies in one interactive session
+- ✅ No manual file selection needed
 
 ### Interactive Flow
 

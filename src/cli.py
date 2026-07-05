@@ -712,6 +712,7 @@ def preprocess(
 
                     preprocessed = PreprocessedJob(
                         job_id=job_id,
+                        company=job.company,
                         clean_text=clean_text,
                         sentences=clean_text.split("\n"),
                         chunks=chunks,
@@ -763,11 +764,16 @@ def preprocess(
 
 @app.command()
 def review(
-    extracted: str = typer.Option(
-        "data/extracted_jobs/carbonrobotics_jobs.json", help="Path to extracted jobs JSON"
+    extracted: Optional[str] = typer.Option(
+        None, help="Path to extracted jobs JSON (auto-detected if not specified)"
     ),
     preprocessed: str = typer.Option(
         "data/extracted_jobs/preprocessed_jobs.json", help="Path to preprocessed jobs JSON"
+    ),
+    merge_all: bool = typer.Option(
+        False,
+        "--merge-all",
+        help="[RECOMMENDED for multi-company] Auto-discover and process all extracted company files",
     ),
 ) -> None:
     """Interactively review extracted jobs before LLM assessment."""
@@ -776,8 +782,30 @@ def review(
     logger.info("Starting job review")
 
     try:
+        extracted_dir = Path("data/extracted_jobs")
+
+        if merge_all:
+            # Auto-discover all company files
+            extracted_files = sorted(extracted_dir.glob("*_jobs.json"))
+            extracted_files = [f for f in extracted_files if "preprocessed" not in f.name]
+            if not extracted_files:
+                typer.echo("❌ No extracted job files found in data/extracted_jobs/", err=True)
+                raise typer.Exit(1)
+            logger.info(
+                f"Processing {len(extracted_files)} extracted files: {[f.name for f in extracted_files]}"
+            )
+        else:
+            # Legacy mode: use provided path or hardcoded default
+            if extracted is None:
+                extracted = "data/extracted_jobs/carbonrobotics_jobs.json"
+                logger.warning(
+                    "⚠️  Using hardcoded default for review. "
+                    "For multi-company workflows, use: review --merge-all"
+                )
+            extracted_files = [Path(extracted)]
+
         reviewer = JobReviewer()
-        stats = reviewer.review_batch(extracted, preprocessed)
+        stats = reviewer.review_batch(extracted_files, preprocessed)
         logger.info(f"Review complete: {stats.confirmed} confirmed, {stats.rejected} rejected")
 
     except Exception as e:
