@@ -54,6 +54,7 @@ class PreprocessedJob(BaseModel):
     )
 
     job_id: str = Field(..., description="Reference to original job")
+    company: Optional[str] = Field(None, description="Company name")
     clean_text: str = Field(..., description="Cleaned HTML -> text")
     sentences: List[str] = Field(..., description="Sentence-segmented text")
     chunks: List[str] = Field(..., description="Semantic chunks")

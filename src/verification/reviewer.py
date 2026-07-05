@@ -66,6 +66,7 @@ class JobReviewer:
         job_id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         location TEXT,
+        company TEXT,
         status TEXT NOT NULL DEFAULT 'pending',
         reason TEXT,
         tokens INTEGER,
@@ -114,6 +115,7 @@ class JobReviewer:
         reason: Optional[str] = None,
         tokens: int = 0,
         estimated_cost: float = 0.0,
+        company: Optional[str] = None,
     ) -> None:
         """Save review decision to database."""
         if not self.conn:
@@ -121,12 +123,13 @@ class JobReviewer:
         cursor = self.conn.cursor()
         cursor.execute(
             """INSERT OR REPLACE INTO job_reviews
-               (job_id, title, location, status, reason, tokens, estimated_cost, reviewed_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (job_id, title, location, company, status, reason, tokens, estimated_cost, reviewed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 job_id,
                 title,
                 location,
+                company,
                 status,
                 reason,
                 tokens,
@@ -169,6 +172,7 @@ class JobReviewer:
         job_id = job.get("id", f"job_{job_idx}")
         title = job.get("title", "Unknown")
         location = job.get("location", "Unknown")
+        company = preprocessed.get("company")
         tokens = preprocessed.get("token_count", 0)
         cost = preprocessed.get("estimated_cost", 0.0)
 
@@ -200,7 +204,7 @@ class JobReviewer:
 
             if action == "c":
                 self.save_review(
-                    job_id, title, location, status="confirmed", tokens=tokens, estimated_cost=cost
+                    job_id, title, location, status="confirmed", tokens=tokens, estimated_cost=cost, company=company
                 )
                 stats.add_confirmed(tokens, cost)
                 typer.echo(f"   ✓ Confirmed ({stats.confirmed}/{stats.total} confirmed)")
@@ -209,7 +213,7 @@ class JobReviewer:
             elif action == "r":
                 reason_prompt = "   Rejection reason (tech/location/seniority/other): "
                 reason = typer.prompt(reason_prompt).strip().lower()
-                self.save_review(job_id, title, location, status="rejected", reason=reason)
+                self.save_review(job_id, title, location, status="rejected", reason=reason, company=company)
                 stats.add_rejected(reason)
                 typer.echo("   ✗ Rejected")
                 break

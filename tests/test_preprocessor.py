@@ -54,3 +54,39 @@ def test_token_pricing():
     # Check pricing is set
     assert counter.CLAUDE_PRICING["input"] > 0
     assert counter.CLAUDE_PRICING["output"] > 0
+
+
+@pytest.mark.unit
+def test_preprocessed_job_company_field():
+    """Test that PreprocessedJob model includes company field."""
+    from datetime import UTC, datetime
+
+    from models.job import PreprocessedJob
+
+    # Create preprocessed job with company
+    job = PreprocessedJob(
+        job_id="test_job_1",
+        company="Test Company",
+        clean_text="Senior Developer position",
+        sentences=["Senior Developer position"],
+        chunks=["Senior Developer position"],
+        token_count=50,
+        estimated_cost=0.00015,
+        processed_date=datetime.now(UTC),
+    )
+
+    # Verify company field is preserved
+    assert job.company == "Test Company"
+    assert job.job_id == "test_job_1"
+    assert job.token_count == 50
+
+    # Test with None company
+    job_no_company = PreprocessedJob(
+        job_id="test_job_2",
+        clean_text="Senior Developer position",
+        sentences=["Senior Developer position"],
+        chunks=["Senior Developer position"],
+        token_count=50,
+        estimated_cost=0.00015,
+    )
+    assert job_no_company.company is None

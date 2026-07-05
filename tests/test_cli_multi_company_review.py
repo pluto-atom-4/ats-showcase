@@ -85,15 +85,12 @@ class TestMultiCompanyReview:
             for idx, job in enumerate(jobs):
                 preprocessed_job = {
                     "job_id": f"{source_name}_{idx + 1}",
-                    "title": job["title"],
                     "company": job["company"],
-                    "location": job["location"],
-                    "url": job["url"],
                     "clean_text": f"{job['title']}\n{job['location']}\n{job['description']}",
+                    "sentences": [job["title"], job["location"], job["description"]],
                     "chunks": [job["description"]],
                     "token_count": 150,
                     "estimated_cost": 0.00045,
-                    "status": "pending_review",
                 }
                 preprocessed_jobs.append(preprocessed_job)
 

@@ -712,6 +712,7 @@ def preprocess(
 
                     preprocessed = PreprocessedJob(
                         job_id=job_id,
+                        company=job.company,
                         clean_text=clean_text,
                         sentences=clean_text.split("\n"),
                         chunks=chunks,
