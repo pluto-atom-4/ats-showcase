@@ -187,6 +187,8 @@ class JobReviewer:
 
         # Display job
         typer.echo(f"\n🔍 Job {job_idx + 1} of {total_jobs}: {title}")
+        if company:
+            typer.echo(f"   Company: {company}")
         typer.echo(f"   Location: {location}")
         typer.echo(f"   Tokens: {tokens} | Cost: ${cost:.6f}")
 
