@@ -91,6 +91,32 @@ class TestJobReviewer:
 
         reviewer._close_db()
 
+    def test_save_and_retrieve_review_with_company(self, temp_db):
+        """Test saving and retrieving reviews with company field."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        # Save a confirmed job with company
+        reviewer.save_review(
+            job_id="job_1",
+            title="Senior Engineer",
+            location="SF",
+            company="TechCorp",
+            status="confirmed",
+            tokens=150,
+            estimated_cost=0.00045,
+        )
+
+        # Retrieve and verify
+        status = reviewer.get_review_status("job_1")
+        assert status == "confirmed"
+
+        # Verify company is stored
+        confirmed = reviewer.get_confirmed_jobs()
+        assert len(confirmed) == 1
+        assert confirmed[0]["company"] == "TechCorp"
+
+        reviewer._close_db()
+
     def test_save_rejection_with_reason(self, temp_db):
         """Test saving rejections with reasons."""
         reviewer = JobReviewer(db_path=temp_db)
