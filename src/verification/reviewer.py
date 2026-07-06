@@ -290,8 +290,8 @@ class JobReviewer:
         for extracted_path, extracted_jobs in all_extracted_jobs:
             source_name = extracted_path.stem  # e.g., "carbonrobotics_jobs"
             for idx, job in enumerate(extracted_jobs):
-                # Match job_id format from preprocessing: "{source}_{index}"
-                job_id = f"{source_name}_{idx + 1}"
+                # Use actual job ID from extracted job for lookup in preprocessed_map
+                job_id = job.get("id", f"{source_name}_{idx + 1}")
                 preprocessed = preprocessed_map.get(job_id, {})
 
                 try:

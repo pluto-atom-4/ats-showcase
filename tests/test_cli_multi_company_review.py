@@ -80,11 +80,10 @@ class TestMultiCompanyReview:
         """Create preprocessed jobs matching all extracted companies."""
         preprocessed_jobs = []
 
-        for filename, (_filepath, jobs) in sample_extracted_files.items():
-            source_name = filename.replace("_jobs.json", "")
-            for idx, job in enumerate(jobs):
+        for _filename, (_filepath, jobs) in sample_extracted_files.items():
+            for _idx, job in enumerate(jobs):
                 preprocessed_job = {
-                    "job_id": f"{source_name}_{idx + 1}",
+                    "job_id": job["id"],
                     "company": job["company"],
                     "clean_text": f"{job['title']}\n{job['location']}\n{job['description']}",
                     "sentences": [job["title"], job["location"], job["description"]],
@@ -247,5 +246,56 @@ class TestMultiCompanyReview:
         # 4 files with 2, 1, 1 jobs respectively = 4 total jobs
         assert job_count_processed == 4
         assert stats.total == 4
+
+        reviewer._close_db()
+
+    def test_company_field_preserved_in_database(self, temp_dir, sample_extracted_files, sample_preprocessed):
+        """Test that company field is correctly preserved from preprocessed data during review (Issue #96)."""
+        preprocessed_path, preprocessed_jobs = sample_preprocessed
+        extracted_files = [f[0] for f in sample_extracted_files.values()]
+
+        db_path = temp_dir / "test.db"
+        reviewer = JobReviewer(str(db_path))
+
+        # Build expected company map from preprocessed jobs
+        expected_companies = {j["job_id"]: j["company"] for j in preprocessed_jobs}
+
+        def capture_and_save_review(self, job_idx, total_jobs, job, preprocessed, stats):
+            """Mock that actually saves to database and verifies company field."""
+            job_id = job.get("id", f"job_{job_idx}")
+            title = job.get("title", "Unknown")
+            location = job.get("location", "Unknown")
+            company = preprocessed.get("company")
+            tokens = preprocessed.get("token_count", 0)
+            cost = preprocessed.get("estimated_cost", 0.0)
+
+            # Verify company is not None (this is the bug we're testing)
+            assert company is not None, f"Company should not be None for job {job_id}"
+
+            # Save to database (same as real code)
+            self.save_review(job_id, title, location, status="confirmed", tokens=tokens,
+                           estimated_cost=cost, company=company)
+
+            stats.total += 1
+            stats.add_confirmed(tokens, cost)
+
+        with patch.object(JobReviewer, "review_job_interactive", capture_and_save_review):
+            stats = reviewer.review_batch(extracted_files, str(preprocessed_path))
+
+        assert stats.confirmed == 4
+        assert stats.total == 4
+
+        # Verify all confirmed jobs have company in database
+        cursor = reviewer.conn.cursor()
+        cursor.execute("SELECT job_id, company FROM job_reviews WHERE status='confirmed'")
+        db_results = cursor.fetchall()
+
+        assert len(db_results) == 4, "Should have 4 confirmed jobs in database"
+
+        for row in db_results:
+            job_id = row[0]
+            company = row[1]
+            assert company is not None, f"Company should not be NULL in database for job {job_id}"
+            assert company == expected_companies[job_id], f"Company mismatch for job {job_id}"
 
         reviewer._close_db()
