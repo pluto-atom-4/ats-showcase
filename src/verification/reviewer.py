@@ -78,6 +78,19 @@ class JobReviewer:
     )
     """
 
+    REVIEW_AUDIT_TABLE_SQL = """
+    CREATE TABLE IF NOT EXISTS review_audit (
+        audit_id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL,
+        prior_status TEXT,
+        new_status TEXT NOT NULL,
+        prior_reviewed_at TIMESTAMP,
+        reviewed_at TIMESTAMP,
+        re_review_reason TEXT,
+        FOREIGN KEY (job_id) REFERENCES job_reviews(job_id)
+    )
+    """
+
     def __init__(self, db_path: str = "data/ats_playground.db"):
         """Initialize job reviewer with database."""
         self.db_path = db_path
@@ -91,6 +104,7 @@ class JobReviewer:
         self.conn.row_factory = sqlite3.Row
         cursor = self.conn.cursor()
         cursor.execute(self.REVIEW_TABLE_SQL)
+        cursor.execute(self.REVIEW_AUDIT_TABLE_SQL)
         self.conn.commit()
         logger.info("Initialized review database")
 
@@ -141,6 +155,49 @@ class JobReviewer:
         )
         self.conn.commit()
         logger.debug(f"Saved review: {job_id} -> {status}")
+
+    def get_prior_review(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """Get prior review decision and timestamp."""
+        if not self.conn:
+            return None
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT status, reviewed_at FROM job_reviews WHERE job_id = ?", (job_id,)
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def save_re_review_audit(
+        self,
+        job_id: str,
+        prior_status: str,
+        new_status: str,
+        prior_reviewed_at: str,
+        re_review_reason: Optional[str] = None,
+    ) -> None:
+        """Track re-review decision in audit table."""
+        if not self.conn:
+            return
+        cursor = self.conn.cursor()
+        import uuid
+
+        audit_id = str(uuid.uuid4())
+        cursor.execute(
+            """INSERT INTO review_audit
+               (audit_id, job_id, prior_status, new_status, prior_reviewed_at, reviewed_at, re_review_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                audit_id,
+                job_id,
+                prior_status,
+                new_status,
+                prior_reviewed_at,
+                datetime.now(timezone.utc).isoformat(),
+                re_review_reason,
+            ),
+        )
+        self.conn.commit()
+        logger.debug(f"Saved re-review audit: {job_id} {prior_status} -> {new_status}")
 
     def get_confirmed_jobs(self) -> List[Dict[str, Any]]:
         """Get all confirmed jobs from database."""
@@ -239,6 +296,7 @@ class JobReviewer:
         job: Dict[str, Any],
         preprocessed: Dict[str, Any],
         stats: ReviewStats,
+        allow_re_review: bool = False,
     ) -> None:
         """
         Interactively review a single job posting.
@@ -249,6 +307,7 @@ class JobReviewer:
             job: Job posting dict
             preprocessed: Preprocessed job data
             stats: ReviewStats to track decisions
+            allow_re_review: Show prior decisions and allow re-review option
         """
         import typer
 
@@ -261,59 +320,166 @@ class JobReviewer:
 
         # Check if already reviewed
         existing_status = self.get_review_status(job_id)
-        if existing_status:
+        prior_review = None
+        if existing_status and not allow_re_review:
             logger.debug(f"Job {job_id} already reviewed as {existing_status}, skipping")
             stats.add_skipped()
             return
 
-        stats.total += 1
+        # If re-review allowed, check for prior decision
+        if allow_re_review and existing_status:
+            prior_review = self.get_prior_review(job_id)
 
-        # Display job
+        if not allow_re_review:
+            stats.total += 1
+        else:
+            stats.total += 1
+
+        self._display_job_details(
+            job_idx, total_jobs, title, company, location, tokens, cost, preprocessed, prior_review
+        )
+
+        while True:
+            prompt_text = "   Action (c=confirm/r=reject/s=skip/q=quit"
+            if prior_review:
+                prompt_text += "/e=re-review"
+            prompt_text += "): "
+            action = typer.prompt(prompt_text).strip().lower()
+
+            if self._process_user_action(
+                action, job_id, title, location, tokens, cost, company, prior_review, stats
+            ):
+                break
+
+    def _save_re_review_if_changed(
+        self,
+        job_id: str,
+        prior_review: Optional[Dict[str, Any]],
+        new_status: str,
+        re_review_reason: str,
+    ) -> None:
+        """Save re-review audit if status changed."""
+        if prior_review:
+            prior_status = prior_review.get("prior_status")
+            prior_reviewed_at = prior_review.get("reviewed_at")
+            if prior_status and prior_status != new_status:
+                self.save_re_review_audit(
+                    job_id,
+                    prior_status=prior_status,
+                    new_status=new_status,
+                    prior_reviewed_at=prior_reviewed_at or "",
+                    re_review_reason=re_review_reason,
+                )
+
+    def _handle_confirm_action(
+        self,
+        job_id: str,
+        title: str,
+        location: str,
+        tokens: int,
+        cost: float,
+        company: Optional[str],
+        prior_review: Optional[Dict[str, Any]],
+        stats: "ReviewStats",
+    ) -> None:
+        """Handle confirm action."""
+        self.save_review(
+            job_id, title, location, status="confirmed", tokens=tokens, estimated_cost=cost, company=company
+        )
+        self._save_re_review_if_changed(
+            job_id, prior_review, "confirmed", "User re-reviewed and changed decision"
+        )
+        stats.add_confirmed(tokens, cost)
+
+    def _handle_reject_action(
+        self,
+        job_id: str,
+        title: str,
+        location: str,
+        company: Optional[str],
+        prior_review: Optional[Dict[str, Any]],
+        stats: "ReviewStats",
+    ) -> str:
+        """Handle reject action and return reason."""
+        reason_prompt = "   Rejection reason (tech/location/seniority/other): "
+        reason: str = typer.prompt(reason_prompt).strip().lower()
+        self.save_review(job_id, title, location, status="rejected", reason=reason, company=company)
+        self._save_re_review_if_changed(
+            job_id, prior_review, "rejected", f"User re-reviewed and rejected ({reason})"
+        )
+        stats.add_rejected(reason)
+        return reason
+
+    def _display_job_details(
+        self,
+        job_idx: int,
+        total_jobs: int,
+        title: str,
+        company: Optional[str],
+        location: str,
+        tokens: int,
+        cost: float,
+        preprocessed: Dict[str, Any],
+        prior_review: Optional[Dict[str, Any]],
+    ) -> None:
+        """Display job details for review."""
         typer.echo(f"\n🔍 Job {job_idx + 1} of {total_jobs}: {title}")
         if company:
             typer.echo(f"   Company: {company}")
         typer.echo(f"   Location: {location}")
         typer.echo(f"   Tokens: {tokens} | Cost: ${cost:.6f}")
 
-        # Show content preview if available
+        if prior_review:
+            prior_status = prior_review.get("prior_status", "unknown")
+            reviewed_at = prior_review.get("reviewed_at", "unknown")
+            typer.echo(f"   [Prior: {prior_status} on {reviewed_at}]")
+
         content = preprocessed.get("clean_text", "")
         if content:
-            preview = content.split("\n")[2:5]  # Show lines after title/location
+            preview = content.split("\n")[2:5]
             if preview:
                 preview_text = " ".join(preview)[:80]
                 typer.echo(f"   Content: {preview_text}...")
 
-        while True:
-            prompt = "   Action (c=confirm/r=reject/s=skip/q=quit): "
-            action = typer.prompt(prompt).strip().lower()
-
-            if action == "c":
-                self.save_review(
-                    job_id, title, location, status="confirmed", tokens=tokens, estimated_cost=cost, company=company
-                )
-                stats.add_confirmed(tokens, cost)
-                typer.echo(f"   ✓ Confirmed ({stats.confirmed}/{stats.total} confirmed)")
-                break
-
-            elif action == "r":
-                reason_prompt = "   Rejection reason (tech/location/seniority/other): "
-                reason = typer.prompt(reason_prompt).strip().lower()
-                self.save_review(job_id, title, location, status="rejected", reason=reason, company=company)
-                stats.add_rejected(reason)
-                typer.echo("   ✗ Rejected")
-                break
-
-            elif action == "s":
-                stats.add_skipped()
-                typer.echo("   ⊘ Skipped (will review later)")
-                break
-
-            elif action == "q":
-                typer.echo("\n⏹️  Review interrupted by user")
-                raise typer.Exit(0)
-
-            else:
-                typer.echo("   ❌ Invalid action. Use c/r/s/q")
+    def _process_user_action(
+        self,
+        action: str,
+        job_id: str,
+        title: str,
+        location: str,
+        tokens: int,
+        cost: float,
+        company: Optional[str],
+        prior_review: Optional[Dict[str, Any]],
+        stats: "ReviewStats",
+    ) -> bool:
+        """Process user action. Return True if action breaks loop, False to continue."""
+        if action == "c":
+            self._handle_confirm_action(
+                job_id, title, location, tokens, cost, company, prior_review, stats
+            )
+            typer.echo(f"   ✓ Confirmed ({stats.confirmed}/{stats.total} confirmed)")
+            return True
+        elif action == "r":
+            self._handle_reject_action(
+                job_id, title, location, company, prior_review, stats
+            )
+            typer.echo("   ✗ Rejected")
+            return True
+        elif action == "s":
+            stats.add_skipped()
+            typer.echo("   ⊘ Skipped (will review later)")
+            return True
+        elif action == "q":
+            typer.echo("\n⏹️  Review interrupted by user")
+            raise typer.Exit(0)
+        elif action == "e" and prior_review:
+            typer.echo("   📝 Re-reviewing job...")
+            return False
+        else:
+            msg = "   ❌ Invalid action. Use c/r/s/e/q" if prior_review else "   ❌ Invalid action. Use c/r/s/q"
+            typer.echo(msg)
+            return False
 
     def review_batch(
         self,
@@ -322,6 +488,7 @@ class JobReviewer:
         skip_before_date: Optional[str] = None,
         skip_rejected: bool = True,
         skip_assessed: bool = True,
+        allow_re_review: bool = False,
     ) -> ReviewStats:
         """
         Review multiple jobs interactively with optional filtering.
@@ -334,6 +501,7 @@ class JobReviewer:
             skip_before_date: Skip jobs crawled before this date (ISO format, e.g. "2026-07-01")
             skip_rejected: Skip jobs with 'rejected' status (default True)
             skip_assessed: Skip jobs that have been assessed (default True)
+            allow_re_review: Show prior decisions and allow re-review choice (default False)
 
         Returns:
             ReviewStats with final counts
@@ -398,7 +566,10 @@ class JobReviewer:
                     continue
 
                 try:
-                    self.review_job_interactive(job_counter, total_jobs, job, preprocessed, stats)
+                    self.review_job_interactive(
+                        job_counter, total_jobs, job, preprocessed, stats,
+                        allow_re_review=allow_re_review
+                    )
                 except typer.Exit:
                     raise
 
