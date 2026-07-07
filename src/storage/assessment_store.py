@@ -831,3 +831,139 @@ class AssessmentStore:
             results.append(dict(row))
 
         return results
+
+    def get_pipeline_stats(self) -> Dict[str, int]:
+        """Get job counts by status.
+
+        Returns:
+            Dict with keys: pending_review, confirmed, rejected, assessed
+        """
+        if not self.conn:
+            return {}
+
+        cursor = self.conn.cursor()
+        stats = {
+            "pending_review": 0,
+            "confirmed": 0,
+            "rejected": 0,
+            "assessed": 0,
+        }
+
+        try:
+            # Try job_reviews table first (has status field)
+            cursor.execute(
+                "SELECT status, COUNT(*) as count FROM job_reviews GROUP BY status"
+            )
+            for row in cursor.fetchall():
+                status = row["status"]
+                count = row["count"]
+                if status in stats:
+                    stats[status] = count
+        except sqlite3.OperationalError:
+            logger.debug("job_reviews table not found, pipeline stats unavailable")
+            return {}
+
+        # Add count of assessed jobs
+        try:
+            cursor.execute("SELECT COUNT(*) as count FROM job_assessments")
+            row = cursor.fetchone()
+            if row:
+                stats["assessed"] = row["count"]
+        except sqlite3.OperationalError:
+            pass
+
+        return stats
+
+    def _fetch_jobs_for_filter_stats(
+        self, cursor: sqlite3.Cursor
+    ) -> list:
+        """Fetch jobs for filter stats, trying multiple query variants."""
+        queries = [
+            # Try job_reviews.crawled_at first (test fixture schema)
+            """SELECT jr.job_id, jr.status, jr.crawled_at,
+               CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed
+               FROM job_reviews jr
+               LEFT JOIN job_assessments ja ON jr.job_id = ja.job_id""",
+            # Try jobs.crawled_at via join (production schema)
+            """SELECT jr.job_id, jr.status, j.crawled_at,
+               CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed
+               FROM job_reviews jr
+               LEFT JOIN job_assessments ja ON jr.job_id = ja.job_id
+               LEFT JOIN jobs j ON jr.job_id = j.id""",
+            # Fallback without crawled_at
+            """SELECT jr.job_id, jr.status, NULL as crawled_at,
+               CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed
+               FROM job_reviews jr
+               LEFT JOIN job_assessments ja ON jr.job_id = ja.job_id""",
+        ]
+        for query in queries:
+            try:
+                cursor.execute(query)
+                return cursor.fetchall()
+            except sqlite3.OperationalError:
+                continue
+        return []
+
+    def _should_skip_job(
+        self,
+        status: str,
+        is_assessed: int,
+        crawled_at: Optional[str],
+        skip_rejected: bool,
+        skip_assessed: bool,
+        skip_before_date: Optional[str],
+    ) -> tuple[bool, Optional[str]]:
+        """Determine if job should be skipped based on filters."""
+        if skip_rejected and status == "rejected":
+            return True, "rejected"
+        if skip_assessed and is_assessed:
+            return True, "already_assessed"
+        if skip_before_date and crawled_at and crawled_at < skip_before_date:
+            return True, "crawled_before_date"
+        return False, None
+
+    def get_stats_with_filters(
+        self,
+        skip_rejected: bool = True,
+        skip_assessed: bool = True,
+        skip_before_date: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get pipeline stats showing what would be skipped with filters."""
+        if not self.conn:
+            return {}
+
+        cursor = self.conn.cursor()
+        stats: Dict[str, Any] = {
+            "total": 0,
+            "would_process": 0,
+            "would_skip": 0,
+            "reasons": {"rejected": 0, "already_assessed": 0, "crawled_before_date": 0},
+        }
+
+        try:
+            rows = self._fetch_jobs_for_filter_stats(cursor)
+            if not rows:
+                return {}
+
+            stats["total"] = len(rows)
+            for row in rows:
+                should_skip, reason = self._should_skip_job(
+                    row["status"],
+                    row["is_assessed"],
+                    row["crawled_at"],
+                    skip_rejected,
+                    skip_assessed,
+                    skip_before_date,
+                )
+                if should_skip:
+                    stats["would_skip"] += 1
+                    if reason:
+                        stats["reasons"][reason] += 1
+                else:
+                    stats["would_process"] += 1
+
+        except sqlite3.OperationalError as e:
+            logger.debug(f"Error computing filter stats: {e}")
+            return {}
+
+        return stats

@@ -786,6 +786,9 @@ def review(
     skip_assessed: bool = typer.Option(
         True, "--skip-assessed", help="Skip jobs already assessed (default: True)"
     ),
+    show_stats: bool = typer.Option(
+        False, "--show-stats", help="Display pipeline statistics before review"
+    ),
 ) -> None:
     """Interactively review extracted jobs before LLM assessment."""
     from src.verification import JobReviewer
@@ -816,6 +819,14 @@ def review(
             extracted_files = [Path(extracted)]
 
         reviewer = JobReviewer()
+
+        if show_stats:
+            reviewer.display_pipeline_stats(
+                skip_before_date=skip_before_date,
+                skip_rejected=skip_rejected,
+                skip_assessed=skip_assessed,
+            )
+
         stats = reviewer.review_batch(
             extracted_files,
             preprocessed,
