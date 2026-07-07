@@ -789,6 +789,9 @@ def review(
     show_stats: bool = typer.Option(
         False, "--show-stats", help="Display pipeline statistics before review"
     ),
+    allow_re_review: bool = typer.Option(
+        False, "--allow-re-review", help="Show prior decisions and allow re-review"
+    ),
 ) -> None:
     """Interactively review extracted jobs before LLM assessment."""
     from src.verification import JobReviewer
@@ -833,6 +836,7 @@ def review(
             skip_before_date=skip_before_date,
             skip_rejected=skip_rejected,
             skip_assessed=skip_assessed,
+            allow_re_review=allow_re_review,
         )
         logger.info(f"Review complete: {stats.confirmed} confirmed, {stats.rejected} rejected")
 
@@ -914,7 +918,9 @@ def assess(
             skipped_low_score = 0
 
             for job in confirmed_jobs:
-                job_id = job.get("job_id")
+                job_id = job.get("job_id", "")
+                if not job_id:
+                    continue
                 existing_assessment = assessment_store.get_assessment_by_id(job_id)
 
                 if existing_assessment and existing_assessment.get("overall_score", 0) < score_threshold:

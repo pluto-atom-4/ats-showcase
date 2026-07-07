@@ -260,7 +260,7 @@ class TestMultiCompanyReview:
         # Build expected company map from preprocessed jobs
         expected_companies = {j["job_id"]: j["company"] for j in preprocessed_jobs}
 
-        def capture_and_save_review(self, job_idx, total_jobs, job, preprocessed, stats):
+        def capture_and_save_review(self, job_idx, total_jobs, job, preprocessed, stats, allow_re_review=False):
             """Mock that actually saves to database and verifies company field."""
             job_id = job.get("id", f"job_{job_idx}")
             title = job.get("title", "Unknown")
