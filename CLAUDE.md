@@ -9,6 +9,7 @@ ATS Playground: CV-to-jobs assessment system. Crawls career pages, preprocesses 
 - **Don't send raw HTML to Claude**: Always preprocess (clean + chunk). Raw HTML ~6,000 tokens per job
 - **Don't skip verification**: Always show user cost estimate before API calls
 - **Don't force uniform token counts in chunks**: Splits at sentence boundaries (spaCy). Chunks vary 100–600 tokens intentionally
+- **Don't re-assess already reviewed jobs**: Use pipeline control flags (--skip-assessed, --skip-rejected) to skip jobs
 
 ## Setup
 
@@ -32,6 +33,11 @@ uv run python -m src.cli preprocess --show-estimates
 uv run python -m src.cli review --interactive
 uv run python -m src.cli assess --cv data/cv.json
 uv run python -m src.cli export --output data/assessments/report.md
+
+# Review with pipeline control (skip already-assessed/rejected jobs)
+uv run python -m src.cli review --merge-all --skip-assessed --skip-rejected
+# Skip jobs crawled before a date (selective re-assessment)
+uv run python -m src.cli review --merge-all --skip-before-date 2026-07-01
 ```
 
 ## Verification Commands
@@ -58,6 +64,34 @@ tail -f logs/app.log                             # Watch logs
 
 - **Crawl + Preprocess**: `.claude/skills/crawl-jobs/SKILL.md`
 - **Review + Assess**: `.claude/skills/assess-jobs/SKILL.md`
+
+## Pipeline Control (Issue #100)
+
+Skip re-assessing jobs using filtering options on the `review` command:
+
+```bash
+# Skip previously rejected jobs (default: True)
+uv run python -m src.cli review --merge-all --skip-rejected
+
+# Skip already assessed jobs (default: True)
+uv run python -m src.cli review --merge-all --skip-assessed
+
+# Skip jobs crawled before a date (selective re-assessment)
+uv run python -m src.cli review --merge-all --skip-before-date 2026-07-01
+
+# Combine filters
+uv run python -m src.cli review --merge-all --skip-before-date 2026-07-01 --skip-rejected --skip-assessed
+```
+
+**Database Schema for Filtering:**
+- `jobs.crawled_at` (TEXT, ISO format) – Timestamp when job was extracted
+- `job_reviews.status` (TEXT) – pending, confirmed, rejected
+- `job_assessments` (table) – Tracks jobs already assessed by Claude
+
+**Implementation:** Phase 2-3 (issue #100) adds:
+- `get_jobs_needing_assessment()` – Returns confirmed jobs without assessments
+- `get_jobs_since()` – Date-based filtering for selective re-crawl
+- `should_skip_job()` – Combines review status, assessment, and date checks
 
 ## Tech Stack
 
