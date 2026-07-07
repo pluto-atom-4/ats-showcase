@@ -695,6 +695,168 @@ ats-showcase stats \
 
 ---
 
+## Issue #102: Pipeline Control & Visibility Features
+
+Comprehensive pipeline management tools for visibility, filtering, and workflow control.
+
+### Phase 1: Pipeline Visibility (--show-stats)
+**Purpose**: Display job counts by status before processing
+
+```bash
+# Show pipeline stats with current filtering
+uv run python -m src.cli review --merge-all --show-stats
+
+# Output example:
+# ================================================================================
+# 📊 PIPELINE STATUS
+# ================================================================================
+#
+# Total jobs:          127
+#   • Pending review:  8      ← Ready for review
+#   • Confirmed:       92     ← Ready for assessment
+#   • Rejected:        23     ← Will be skipped
+#   • Assessed:        4      ← Already processed
+#
+# Applying filters: --skip-rejected=True --skip-assessed=True
+#   → Will process:  8 jobs
+#   → Will skip:     119 jobs
+#
+# Skip breakdown:
+#     • Rejected:       23
+#     • Already assessed: 4
+```
+
+**Use Case**: Understand job distribution before interactive review starts
+
+---
+
+### Phase 2: Score Threshold Filtering (--score-threshold)
+**Purpose**: Skip jobs with low prior CV match scores during assessment
+
+```bash
+# Only assess jobs with prior match score ≥ 75%
+uv run python -m src.cli assess --cv data/cv.json --score-threshold 75
+
+# Query with score filter
+uv run python -m src.cli query --keyword "python" --score-threshold 80
+```
+
+**Options**:
+- `--score-threshold FLOAT` - Minimum prior match score to assess (0.0-100.0, default: 0)
+- Applied before API calls to save cost and time
+
+**Behavior**:
+- Jobs without prior assessment → processed normally
+- Jobs with prior_match_score < threshold → skipped
+- Jobs with prior_match_score >= threshold → assessed
+
+**Use Case**: "Only review jobs with 75%+ CV match confidence"
+
+---
+
+### Phase 3: Interactive Re-Review (--allow-re-review)
+**Purpose**: Show prior decisions and allow users to change job status
+
+```bash
+# Review with prior decision visibility
+uv run python -m src.cli review --interactive --allow-re-review
+
+# Output example:
+# Job 1 of 8
+# ──────────────────────────────────────────────────────
+# Title:       Senior Python Developer
+# Company:     TechCorp
+# Location:    Remote
+# Prior decision: confirmed on 2026-07-01 14:22
+#
+# Tokens: 742 (estimated $0.002)
+# ──────────────────────────────────────────────────────
+# [Confirm] [Reject] [Skip] [Re-review]: _
+```
+
+**Options**:
+- `--allow-re-review` - Show prior decisions + allow status changes (default: False)
+
+**Interactive Choices**:
+- `[Confirm]` - Keep current status (confirmed)
+- `[Reject]` - Mark as rejected
+- `[Skip]` - Skip to next job
+- `[Re-review]` - Change prior decision to new status
+- `[q]uit` - Exit review
+
+**Database Updates**:
+- `job_reviews.reviewed_at` - Timestamp when status last changed
+- `re_review_audit` table - Tracks all status changes with reasoning
+
+**Use Case**: "Revisit decisions from previous review sessions"
+
+---
+
+### Phase 4: Job Timeline Visibility (crawled_at, preprocessed_at, reviewed_at, assessed_at)
+**Purpose**: Track and display full job lifecycle timestamps
+
+Timestamps recorded at each phase:
+
+```bash
+# Timestamps displayed during interactive review
+uv run python -m src.cli review --interactive
+
+# Output example:
+# Job: Machine Learning Engineer @ TechCorp
+# ──────────────────────────────────────────────────────
+# 📅 Timeline:
+#   Crawled:      2026-07-01 10:00   (when extracted from career page)
+#   Preprocessed: 2026-07-01 10:05   (when cleaned & chunked)
+#   Reviewed:     2026-07-01 14:22   (when status confirmed/rejected)
+#   Assessed:     not processed      (when Claude scored it)
+#
+# Tokens: 742 (estimated $0.002)
+# ──────────────────────────────────────────────────────
+# [Confirm] [Reject] [Skip]:
+```
+
+**Timeline Events**:
+- `crawled_at` - Set when job first extracted from career page
+- `preprocessed_at` - Set when HTML cleaned & text chunked
+- `reviewed_at` - Set when user confirms/rejects status
+- `assessed_at` - Set when Claude assessment completes
+
+**Implementation**:
+- Preprocess command auto-sets `preprocessed_at` for all jobs
+- Timeline display built into interactive review
+- Schema migration handles existing databases gracefully
+- Timestamps stored as ISO 8601 format in database
+
+**Use Case**: "Understand the journey of each job through the pipeline"
+
+---
+
+### Combined Workflow: All Issue #102 Features
+
+```bash
+# Show stats + review with filters + timeline + re-review
+uv run python -m src.cli review \
+  --merge-all \
+  --show-stats \
+  --skip-rejected \
+  --skip-assessed \
+  --allow-re-review \
+  --interactive
+
+# Expected output:
+# 1. Pipeline stats shown first (Phase 1)
+# 2. Interactive review starts (Phase 3 + Phase 4)
+# 3. Timeline visible for each job (Phase 4)
+# 4. Prior decisions shown with re-review option (Phase 3)
+#
+# Then assess with score filtering (Phase 2)
+uv run python -m src.cli assess \
+  --cv data/cv.json \
+  --score-threshold 75
+```
+
+---
+
 ### Full Workflow
 **Purpose**: Execute all phases sequentially
 
