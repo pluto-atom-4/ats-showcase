@@ -186,3 +186,206 @@ class TestJobReviewer:
         status = reviewer2.get_review_status("job_1")
         assert status == "confirmed"
         reviewer2._close_db()
+
+
+class TestFilteringMethods:
+    """Test Phase 3 filtering methods."""
+
+    @pytest.fixture
+    def temp_db(self):
+        """Create temporary database for testing."""
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        yield db_path
+        Path(db_path).unlink(missing_ok=True)
+
+    def test_check_review_status_rejected(self, temp_db):
+        """Test filtering rejected jobs."""
+        reviewer = JobReviewer(db_path=temp_db)
+        reviewer.save_review("job_1", "Engineer", "SF", "rejected", reason="location")
+
+        skip, reason = reviewer._check_review_status("job_1", skip_rejected=True)
+        assert skip is True
+        assert reason == "previously_rejected"
+
+        reviewer._close_db()
+
+    def test_check_review_status_no_skip_rejected(self, temp_db):
+        """Test not filtering rejected jobs when skip_rejected=False."""
+        reviewer = JobReviewer(db_path=temp_db)
+        reviewer.save_review("job_1", "Engineer", "SF", "rejected", reason="location")
+
+        skip, reason = reviewer._check_review_status("job_1", skip_rejected=False)
+        assert skip is False
+        assert reason is None
+
+        reviewer._close_db()
+
+    def test_check_review_status_confirmed(self, temp_db):
+        """Test filtering already confirmed jobs."""
+        reviewer = JobReviewer(db_path=temp_db)
+        reviewer.save_review("job_1", "Engineer", "SF", "confirmed", tokens=100)
+
+        skip, reason = reviewer._check_review_status("job_1", skip_rejected=True)
+        assert skip is True
+        assert reason == "already_confirmed"
+
+        reviewer._close_db()
+
+    def test_check_review_status_not_reviewed(self, temp_db):
+        """Test non-reviewed job doesn't skip."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        skip, reason = reviewer._check_review_status("job_1", skip_rejected=True)
+        assert skip is False
+        assert reason is None
+
+        reviewer._close_db()
+
+    def test_check_assessment_status_assessed(self, temp_db):
+        """Test filtering assessed jobs."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        # Create job_assessments table
+        if reviewer.conn:
+            cursor = reviewer.conn.cursor()
+            cursor.execute(
+                """CREATE TABLE IF NOT EXISTS job_assessments (
+                   job_id TEXT PRIMARY KEY,
+                   overall_score REAL
+                )"""
+            )
+            cursor.execute("INSERT INTO job_assessments VALUES ('job_1', 85.0)")
+            reviewer.conn.commit()
+
+        skip, reason = reviewer._check_assessment_status("job_1")
+        assert skip is True
+        assert reason == "already_assessed"
+
+        reviewer._close_db()
+
+    def test_check_assessment_status_not_assessed(self, temp_db):
+        """Test non-assessed job doesn't skip."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        # Create table but leave empty
+        if reviewer.conn:
+            cursor = reviewer.conn.cursor()
+            cursor.execute(
+                """CREATE TABLE IF NOT EXISTS job_assessments (
+                   job_id TEXT PRIMARY KEY,
+                   overall_score REAL
+                )"""
+            )
+            reviewer.conn.commit()
+
+        skip, reason = reviewer._check_assessment_status("job_1")
+        assert skip is False
+        assert reason is None
+
+        reviewer._close_db()
+
+    def test_check_crawled_date_before_threshold(self, temp_db):
+        """Test filtering jobs crawled before date."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        # Create jobs table with crawled_at
+        if reviewer.conn:
+            cursor = reviewer.conn.cursor()
+            cursor.execute(
+                """CREATE TABLE IF NOT EXISTS jobs (
+                   id TEXT PRIMARY KEY,
+                   crawled_at TEXT
+                )"""
+            )
+            cursor.execute("INSERT INTO jobs VALUES ('job_1', '2026-06-01')")
+            reviewer.conn.commit()
+
+        skip, reason = reviewer._check_crawled_date("job_1", "2026-07-01")
+        assert skip is True
+        assert "crawled_before" in reason
+
+        reviewer._close_db()
+
+    def test_check_crawled_date_after_threshold(self, temp_db):
+        """Test job crawled after threshold doesn't skip."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        # Create jobs table
+        if reviewer.conn:
+            cursor = reviewer.conn.cursor()
+            cursor.execute(
+                """CREATE TABLE IF NOT EXISTS jobs (
+                   id TEXT PRIMARY KEY,
+                   crawled_at TEXT
+                )"""
+            )
+            cursor.execute("INSERT INTO jobs VALUES ('job_1', '2026-07-05')")
+            reviewer.conn.commit()
+
+        skip, reason = reviewer._check_crawled_date("job_1", "2026-07-01")
+        assert skip is False
+        assert reason is None
+
+        reviewer._close_db()
+
+    def test_should_skip_job_all_filters(self, temp_db):
+        """Test should_skip_job with all filters combined."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        # Setup: rejected job + jobs table
+        reviewer.save_review("job_1", "Engineer", "SF", "rejected", reason="location")
+        if reviewer.conn:
+            cursor = reviewer.conn.cursor()
+            cursor.execute(
+                """CREATE TABLE IF NOT EXISTS jobs (
+                   id TEXT PRIMARY KEY,
+                   crawled_at TEXT
+                )"""
+            )
+            cursor.execute("INSERT INTO jobs VALUES ('job_1', '2026-06-01')")
+            reviewer.conn.commit()
+
+        # Should skip due to rejection
+        skip, reason = reviewer.should_skip_job(
+            "job_1", skip_before_date="2026-07-01", skip_rejected=True, skip_assessed=False
+        )
+        assert skip is True
+        assert reason == "previously_rejected"
+
+        reviewer._close_db()
+
+    def test_should_skip_job_date_filter_only(self, temp_db):
+        """Test should_skip_job date filter only."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        if reviewer.conn:
+            cursor = reviewer.conn.cursor()
+            cursor.execute(
+                """CREATE TABLE IF NOT EXISTS jobs (
+                   id TEXT PRIMARY KEY,
+                   crawled_at TEXT
+                )"""
+            )
+            cursor.execute("INSERT INTO jobs VALUES ('job_1', '2026-06-01')")
+            reviewer.conn.commit()
+
+        skip, reason = reviewer.should_skip_job(
+            "job_1", skip_before_date="2026-07-01", skip_rejected=False, skip_assessed=False
+        )
+        assert skip is True
+        assert "crawled_before" in reason
+
+        reviewer._close_db()
+
+    def test_should_skip_job_no_filters(self, temp_db):
+        """Test should_skip_job with no matching filters."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        skip, reason = reviewer.should_skip_job(
+            "job_1", skip_before_date=None, skip_rejected=False, skip_assessed=False
+        )
+        assert skip is False
+        assert reason is None
+
+        reviewer._close_db()
