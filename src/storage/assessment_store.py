@@ -874,83 +874,93 @@ class AssessmentStore:
 
         return stats
 
+    def _fetch_jobs_for_filter_stats(
+        self, cursor: sqlite3.Cursor
+    ) -> list:
+        """Fetch jobs for filter stats, trying multiple query variants."""
+        queries = [
+            # Try job_reviews.crawled_at first (test fixture schema)
+            """SELECT jr.job_id, jr.status, jr.crawled_at,
+               CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed
+               FROM job_reviews jr
+               LEFT JOIN job_assessments ja ON jr.job_id = ja.job_id""",
+            # Try jobs.crawled_at via join (production schema)
+            """SELECT jr.job_id, jr.status, j.crawled_at,
+               CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed
+               FROM job_reviews jr
+               LEFT JOIN job_assessments ja ON jr.job_id = ja.job_id
+               LEFT JOIN jobs j ON jr.job_id = j.id""",
+            # Fallback without crawled_at
+            """SELECT jr.job_id, jr.status, NULL as crawled_at,
+               CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed
+               FROM job_reviews jr
+               LEFT JOIN job_assessments ja ON jr.job_id = ja.job_id""",
+        ]
+        for query in queries:
+            try:
+                cursor.execute(query)
+                return cursor.fetchall()
+            except sqlite3.OperationalError:
+                continue
+        return []
+
+    def _should_skip_job(
+        self,
+        status: str,
+        is_assessed: int,
+        crawled_at: Optional[str],
+        skip_rejected: bool,
+        skip_assessed: bool,
+        skip_before_date: Optional[str],
+    ) -> tuple[bool, Optional[str]]:
+        """Determine if job should be skipped based on filters."""
+        if skip_rejected and status == "rejected":
+            return True, "rejected"
+        if skip_assessed and is_assessed:
+            return True, "already_assessed"
+        if skip_before_date and crawled_at and crawled_at < skip_before_date:
+            return True, "crawled_before_date"
+        return False, None
+
     def get_stats_with_filters(
         self,
         skip_rejected: bool = True,
         skip_assessed: bool = True,
         skip_before_date: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Get pipeline stats showing what would be skipped with filters.
-
-        Args:
-            skip_rejected: Skip jobs marked as rejected
-            skip_assessed: Skip jobs already assessed
-            skip_before_date: Skip jobs crawled before this ISO date
-
-        Returns:
-            Dict with keys:
-                - total: total jobs
-                - would_process: jobs that match filters
-                - would_skip: jobs that don't match
-                - reasons: breakdown of skip reasons
-        """
+        """Get pipeline stats showing what would be skipped with filters."""
         if not self.conn:
             return {}
 
         cursor = self.conn.cursor()
-        reasons_dict: Dict[str, int] = {
-            "rejected": 0,
-            "already_assessed": 0,
-            "crawled_before_date": 0,
-        }
         stats: Dict[str, Any] = {
             "total": 0,
             "would_process": 0,
             "would_skip": 0,
-            "reasons": reasons_dict,
+            "reasons": {"rejected": 0, "already_assessed": 0, "crawled_before_date": 0},
         }
 
         try:
-            # Get all jobs
-            cursor.execute(
-                """SELECT jr.job_id, jr.status, jr.crawled_at,
-                          CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed
-                   FROM job_reviews jr
-                   LEFT JOIN job_assessments ja ON jr.job_id = ja.job_id"""
-            )
-            rows = cursor.fetchall()
+            rows = self._fetch_jobs_for_filter_stats(cursor)
+            if not rows:
+                return {}
+
             stats["total"] = len(rows)
-
             for row in rows:
-                status = row["status"]
-                crawled_at = row["crawled_at"] if row["crawled_at"] else None
-                is_assessed = row["is_assessed"]
-
-                should_skip = False
-                skip_reason: Optional[str] = None
-
-                # Check skip_rejected filter
-                if skip_rejected and status == "rejected":
-                    should_skip = True
-                    skip_reason = "rejected"
-
-                # Check skip_assessed filter
-                if not should_skip and skip_assessed and is_assessed:
-                    should_skip = True
-                    skip_reason = "already_assessed"
-
-                # Check skip_before_date filter
-                if not should_skip and skip_before_date and crawled_at:
-                    if crawled_at < skip_before_date:
-                        should_skip = True
-                        skip_reason = "crawled_before_date"
-
+                should_skip, reason = self._should_skip_job(
+                    row["status"],
+                    row["is_assessed"],
+                    row["crawled_at"],
+                    skip_rejected,
+                    skip_assessed,
+                    skip_before_date,
+                )
                 if should_skip:
-                    stats["would_skip"] = stats["would_skip"] + 1  # type: ignore
-                    if skip_reason:
-                        reasons_dict[skip_reason] += 1
+                    stats["would_skip"] += 1
+                    if reason:
+                        stats["reasons"][reason] += 1
                 else:
-                    stats["would_process"] = stats["would_process"] + 1  # type: ignore
+                    stats["would_process"] += 1
 
         except sqlite3.OperationalError as e:
             logger.debug(f"Error computing filter stats: {e}")
