@@ -28,7 +28,7 @@ def _create_test_db(db_path: str):
             salary_min FLOAT,
             salary_max FLOAT,
             posted_date DATETIME,
-            crawled_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            crawled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             status TEXT DEFAULT 'pending_review',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

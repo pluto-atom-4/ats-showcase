@@ -175,7 +175,7 @@ class Crawler:
                 salary_max=None,
                 posted_date=None,
                 status="pending_review",
-                crawled_date=datetime.utcnow(),
+                crawled_at=datetime.utcnow(),
             )
         except Exception as e:
             logger.warning(f"Error extracting job from container: {e}")
