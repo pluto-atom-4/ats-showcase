@@ -851,6 +851,9 @@ def review(
 def assess(
     cv: str = typer.Option(..., help="CV file path (json or txt)"),
     confirmed_only: bool = typer.Option(True, help="Only assess confirmed jobs"),
+    score_threshold: Optional[float] = typer.Option(
+        None, "--score-threshold", help="Skip jobs with prior score < threshold (0-100)"
+    ),
 ) -> None:
     """Assess CV fit for confirmed jobs using Claude 3.5 Sonnet."""
     import json
@@ -898,6 +901,36 @@ def assess(
 
         # Initialize assessment store
         assessment_store = AssessmentStore()
+
+        # Apply score threshold filter if specified
+        if score_threshold is not None:
+            if not (0 <= score_threshold <= 100):
+                typer.echo("❌ score_threshold must be 0-100", err=True)
+                raise typer.Exit(1)
+
+            # Filter jobs: skip those with prior assessment score < threshold
+            original_count = len(confirmed_jobs)
+            filtered_jobs = []
+            skipped_low_score = 0
+
+            for job in confirmed_jobs:
+                job_id = job.get("job_id")
+                existing_assessment = assessment_store.get_assessment_by_id(job_id)
+
+                if existing_assessment and existing_assessment.get("overall_score", 0) < score_threshold:
+                    skipped_low_score += 1
+                else:
+                    filtered_jobs.append(job)
+
+            confirmed_jobs = filtered_jobs
+            typer.echo(
+                f"📊 Score threshold filter: {original_count} jobs → {len(confirmed_jobs)} jobs\n"
+                f"   Skipped {skipped_low_score} jobs with score < {score_threshold}\n"
+            )
+
+            if not confirmed_jobs:
+                typer.echo("❌ No jobs match score threshold criteria.", err=True)
+                raise typer.Exit(1)
 
         # Load preprocessed jobs for context
         preprocessed_path = Path("data/extracted_jobs/preprocessed_jobs.json")
