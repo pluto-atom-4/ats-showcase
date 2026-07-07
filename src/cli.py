@@ -775,6 +775,17 @@ def review(
         "--merge-all",
         help="[RECOMMENDED for multi-company] Auto-discover and process all extracted company files",
     ),
+    skip_before_date: Optional[str] = typer.Option(
+        None,
+        "--skip-before-date",
+        help="Skip jobs crawled before this date (ISO format, e.g. 2026-07-01)",
+    ),
+    skip_rejected: bool = typer.Option(
+        True, "--skip-rejected", help="Skip jobs with 'rejected' status (default: True)"
+    ),
+    skip_assessed: bool = typer.Option(
+        True, "--skip-assessed", help="Skip jobs already assessed (default: True)"
+    ),
 ) -> None:
     """Interactively review extracted jobs before LLM assessment."""
     from src.verification import JobReviewer
@@ -805,7 +816,13 @@ def review(
             extracted_files = [Path(extracted)]
 
         reviewer = JobReviewer()
-        stats = reviewer.review_batch(extracted_files, preprocessed)
+        stats = reviewer.review_batch(
+            extracted_files,
+            preprocessed,
+            skip_before_date=skip_before_date,
+            skip_rejected=skip_rejected,
+            skip_assessed=skip_assessed,
+        )
         logger.info(f"Review complete: {stats.confirmed} confirmed, {stats.rejected} rejected")
 
     except Exception as e:

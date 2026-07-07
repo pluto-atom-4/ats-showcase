@@ -676,3 +676,158 @@ class AssessmentStore:
             "before_date": before_date,
             "after_date": after_date,
         }
+
+    def get_assessment_status(self, job_id: str) -> Optional[str]:
+        """
+        Get assessment status for a job: pending, confirmed, rejected, or assessed.
+
+        Returns:
+            Status string or None if job not found
+        """
+        if not self.conn:
+            return None
+
+        cursor = self.conn.cursor()
+
+        # Check if assessed
+        cursor.execute("SELECT COUNT(*) as count FROM job_assessments WHERE job_id = ?", (job_id,))
+        if cursor.fetchone()["count"] > 0:
+            return "assessed"
+
+        # Check job status in job_reviews table if it exists
+        try:
+            cursor.execute("SELECT status FROM job_reviews WHERE job_id = ?", (job_id,))
+            row = cursor.fetchone()
+            if row:
+                status = row["status"]
+                return str(status) if status else "pending"
+        except sqlite3.OperationalError:
+            pass
+
+        return "pending"
+
+    def get_jobs_needing_assessment(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Get confirmed jobs that have not been assessed yet.
+
+        Joins job_reviews (or jobs table) with assessments to find gaps.
+
+        Args:
+            limit: Maximum jobs to return
+
+        Returns:
+            List of jobs needing assessment
+        """
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+
+        try:
+            # Try joining with job_reviews table first
+            cursor.execute(
+                """SELECT jr.* FROM job_reviews jr
+                   LEFT JOIN job_assessments ja ON jr.job_id = ja.job_id
+                   WHERE jr.status = 'confirmed' AND ja.job_id IS NULL
+                   ORDER BY jr.crawled_at DESC
+                   LIMIT ?""",
+                (limit,),
+            )
+        except sqlite3.OperationalError:
+            # Fallback to jobs table if job_reviews doesn't exist
+            try:
+                cursor.execute(
+                    """SELECT j.* FROM jobs j
+                       LEFT JOIN job_assessments ja ON j.id = ja.job_id
+                       WHERE j.status = 'confirmed' AND ja.job_id IS NULL
+                       ORDER BY j.crawled_at DESC
+                       LIMIT ?""",
+                    (limit,),
+                )
+            except sqlite3.OperationalError:
+                return []
+
+        results = []
+        for row in cursor.fetchall():
+            results.append(dict(row))
+
+        return results
+
+    def get_jobs_by_score_threshold(
+        self, min_score: float = 0, max_score: float = 100, limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        Get assessments within score range.
+
+        Args:
+            min_score: Minimum score (0-100)
+            max_score: Maximum score (0-100)
+            limit: Maximum results
+
+        Returns:
+            List of assessments
+        """
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """SELECT * FROM job_assessments
+               WHERE overall_score >= ? AND overall_score <= ?
+               ORDER BY overall_score DESC
+               LIMIT ?""",
+            (min_score, max_score, limit),
+        )
+
+        results = []
+        for row in cursor.fetchall():
+            result = dict(row)
+            if result.get("recommendations"):
+                result["recommendations"] = json.loads(result["recommendations"])
+            results.append(result)
+
+        return results
+
+    def get_jobs_since(self, crawled_at_date: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Get jobs crawled since a specific date.
+
+        Args:
+            crawled_at_date: Date string (YYYY-MM-DD or ISO format)
+            limit: Maximum results
+
+        Returns:
+            List of job data with assessment status
+        """
+        if not self.conn:
+            return []
+
+        cursor = self.conn.cursor()
+
+        try:
+            # Try job_reviews table first
+            cursor.execute(
+                """SELECT jr.* FROM job_reviews jr
+                   WHERE jr.crawled_at >= ?
+                   ORDER BY jr.crawled_at DESC
+                   LIMIT ?""",
+                (crawled_at_date, limit),
+            )
+        except sqlite3.OperationalError:
+            # Fallback to jobs table
+            try:
+                cursor.execute(
+                    """SELECT j.* FROM jobs j
+                       WHERE j.crawled_at >= ?
+                       ORDER BY j.crawled_at DESC
+                       LIMIT ?""",
+                    (crawled_at_date, limit),
+                )
+            except sqlite3.OperationalError:
+                return []
+
+        results = []
+        for row in cursor.fetchall():
+            results.append(dict(row))
+
+        return results

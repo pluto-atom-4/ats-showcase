@@ -88,13 +88,14 @@ SCHEMA = {
             salary_min REAL,
             salary_max REAL,
             posted_date DATETIME,
-            crawled_date DATETIME NOT NULL,
+            crawled_at DATETIME NOT NULL,
             status TEXT DEFAULT 'pending_review',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(url)
         );
         CREATE INDEX IF NOT EXISTS idx_jobs_company ON jobs(company);
         CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+        CREATE INDEX IF NOT EXISTS idx_jobs_crawled_at ON jobs(crawled_at DESC);
     """,
     "preprocessed_jobs": """
         CREATE TABLE IF NOT EXISTS preprocessed_jobs (

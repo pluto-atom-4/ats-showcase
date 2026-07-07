@@ -149,6 +149,87 @@ class JobReviewer:
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
+    def _check_review_status(
+        self, job_id: str, skip_rejected: bool
+    ) -> tuple[bool, Optional[str]]:
+        """Check if job should be skipped based on review status."""
+        cursor = self.conn.cursor()  # type: ignore
+        cursor.execute("SELECT status FROM job_reviews WHERE job_id = ?", (job_id,))
+        review_row = cursor.fetchone()
+        if review_row:
+            status = review_row["status"]
+            if skip_rejected and status == "rejected":
+                return True, "previously_rejected"
+            if status == "confirmed":
+                return True, "already_confirmed"
+        return False, None
+
+    def _check_assessment_status(self, job_id: str) -> tuple[bool, Optional[str]]:
+        """Check if job should be skipped based on assessment status."""
+        try:
+            cursor = self.conn.cursor()  # type: ignore
+            cursor.execute("SELECT COUNT(*) as count FROM job_assessments WHERE job_id = ?", (job_id,))
+            if cursor.fetchone()["count"] > 0:
+                return True, "already_assessed"
+        except sqlite3.OperationalError:
+            pass
+        return False, None
+
+    def _check_crawled_date(self, job_id: str, skip_before_date: str) -> tuple[bool, Optional[str]]:
+        """Check if job should be skipped based on crawled_at date."""
+        try:
+            cursor = self.conn.cursor()  # type: ignore
+            cursor.execute("SELECT crawled_at FROM jobs WHERE id = ?", (job_id,))
+            job_row = cursor.fetchone()
+            if job_row and job_row["crawled_at"]:
+                crawled_at = str(job_row["crawled_at"])
+                if crawled_at < skip_before_date:
+                    return True, f"crawled_before_{skip_before_date}"
+        except sqlite3.OperationalError:
+            pass
+        return False, None
+
+    def should_skip_job(
+        self,
+        job_id: str,
+        skip_before_date: Optional[str] = None,
+        skip_rejected: bool = True,
+        skip_assessed: bool = True,
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Determine if job should be skipped during review based on filtering rules.
+
+        Args:
+            job_id: Job to check
+            skip_before_date: Skip jobs crawled before this date (ISO format)
+            skip_rejected: Skip jobs with 'rejected' status
+            skip_assessed: Skip jobs that have been assessed
+
+        Returns:
+            Tuple of (should_skip: bool, reason: Optional[str])
+        """
+        if not self.conn:
+            return False, None
+
+        # Check review status
+        skip, reason = self._check_review_status(job_id, skip_rejected)
+        if skip:
+            return skip, reason
+
+        # Check if assessed
+        if skip_assessed:
+            skip, reason = self._check_assessment_status(job_id)
+            if skip:
+                return skip, reason
+
+        # Check crawled_at date
+        if skip_before_date:
+            skip, reason = self._check_crawled_date(job_id, skip_before_date)
+            if skip:
+                return skip, reason
+
+        return False, None
+
     def review_job_interactive(
         self,
         job_idx: int,
@@ -236,15 +317,21 @@ class JobReviewer:
         self,
         extracted_files: Union[List[Path], str, Path],
         preprocessed_file: str,
+        skip_before_date: Optional[str] = None,
+        skip_rejected: bool = True,
+        skip_assessed: bool = True,
     ) -> ReviewStats:
         """
-        Review multiple jobs interactively.
+        Review multiple jobs interactively with optional filtering.
 
         Args:
             extracted_files: Path(s) to extracted jobs JSON. Can be:
                 - List of Path objects (multi-company)
                 - Single Path or str (backward compat)
             preprocessed_file: Path to preprocessed jobs JSON
+            skip_before_date: Skip jobs crawled before this date (ISO format, e.g. "2026-07-01")
+            skip_rejected: Skip jobs with 'rejected' status (default True)
+            skip_assessed: Skip jobs that have been assessed (default True)
 
         Returns:
             ReviewStats with final counts
@@ -295,6 +382,18 @@ class JobReviewer:
                 # Use actual job ID from extracted job for lookup in preprocessed_map
                 job_id = job.get("id", f"{source_name}_{idx + 1}")
                 preprocessed = preprocessed_map.get(job_id, {})
+
+                # Phase 3: Check if job should be skipped based on filters
+                should_skip, skip_reason = self.should_skip_job(
+                    job_id,
+                    skip_before_date=skip_before_date,
+                    skip_rejected=skip_rejected,
+                    skip_assessed=skip_assessed,
+                )
+                if should_skip:
+                    stats.add_skipped()
+                    logger.debug(f"Skipped job {job_id}: {skip_reason}")
+                    continue
 
                 try:
                     self.review_job_interactive(job_counter, total_jobs, job, preprocessed, stats)

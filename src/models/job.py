@@ -31,7 +31,7 @@ class JobPosting(BaseModel):
     salary_min: Optional[float] = Field(None, description="Minimum salary")
     salary_max: Optional[float] = Field(None, description="Maximum salary")
     posted_date: Optional[datetime] = Field(None, description="When posted")
-    crawled_date: datetime = Field(
+    crawled_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC), description="When crawled"
     )
     status: str = Field(

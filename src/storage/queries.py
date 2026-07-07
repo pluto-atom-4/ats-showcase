@@ -29,7 +29,7 @@ class JobQueries:
             query += f" AND status = '{status}'"
         if company:
             query += f" AND company = '{company}'"
-        query += f" ORDER BY crawled_date DESC LIMIT {limit}"
+        query += f" ORDER BY crawled_at DESC LIMIT {limit}"
         return query
 
     @staticmethod
