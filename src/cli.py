@@ -918,7 +918,9 @@ def assess(
             skipped_low_score = 0
 
             for job in confirmed_jobs:
-                job_id = job.get("job_id")
+                job_id = job.get("job_id", "")
+                if not job_id:
+                    continue
                 existing_assessment = assessment_store.get_assessment_by_id(job_id)
 
                 if existing_assessment and existing_assessment.get("overall_score", 0) < score_threshold:
