@@ -93,6 +93,40 @@ uv run python -m src.cli review --merge-all --skip-before-date 2026-07-01 --skip
 - `get_jobs_since()` – Date-based filtering for selective re-crawl
 - `should_skip_job()` – Combines review status, assessment, and date checks
 
+## Pipeline Visibility (Issue #102 Phase 1)
+
+Show job counts by status and filter impact before review:
+
+```bash
+# Display pipeline stats before review
+uv run python -m src.cli review --merge-all --show-stats
+
+# Output example:
+# ================================================================================
+# 📊 PIPELINE STATUS
+# ================================================================================
+#
+# Total jobs:          127
+#   • Pending review:  8      ← Ready for review
+#   • Confirmed:       92     ← Ready for assessment
+#   • Rejected:        23     ← Will be skipped
+#   • Assessed:        4      ← Already processed
+#
+# Applying filters: --skip-rejected=True --skip-assessed=True
+#   → Will process:  8 jobs
+#   → Will skip:     119 jobs
+#
+# Skip breakdown:
+#     • Rejected:       23
+#     • Already assessed: 4
+```
+
+**Implementation:** Issue #102 Phase 1 adds:
+- `get_pipeline_stats()` – Returns job counts by status (pending_review, confirmed, rejected, assessed)
+- `get_stats_with_filters()` – Shows what would be processed/skipped with active filters
+- `display_pipeline_stats()` – Formats stats for CLI display (handles missing tables gracefully)
+- `--show-stats` flag – Displays stats before review workflow starts
+
 ## Tech Stack
 
 - **Browser**: Playwright (async, JS rendering)
