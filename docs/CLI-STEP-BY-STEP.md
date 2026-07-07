@@ -711,6 +711,296 @@ uv run python -m src.cli export --min-score 85 --sort-by location
 
 ---
 
+## Issue #102: Pipeline Control & Visibility Features
+
+Advanced pipeline management with four phases: visibility, filtering, re-review, and timeline tracking.
+
+### Phase 1: Show Pipeline Status Before Review
+
+Display job distribution before interactive review starts:
+
+```bash
+uv run python -m src.cli review --merge-all --show-stats
+```
+
+**Output example:**
+
+```
+================================================================================
+📊 PIPELINE STATUS
+================================================================================
+
+Total jobs:          127
+  • Pending review:  8      ← Ready for review
+  • Confirmed:       92     ← Ready for assessment
+  • Rejected:        23     ← Will be skipped
+  • Assessed:        4      ← Already processed
+
+Applying filters: --skip-rejected=True --skip-assessed=True
+  → Will process:  8 jobs
+  → Will skip:     119 jobs
+
+Skip breakdown:
+    • Rejected:       23
+    • Already assessed: 4
+```
+
+**Use case:** "Before I start reviewing, show me how many jobs to expect"
+
+---
+
+### Phase 2: Filter Assessment by Score Threshold
+
+Only assess jobs with high confidence matches (by prior CV score):
+
+```bash
+# Assess only jobs with 75%+ prior match score
+uv run python -m src.cli assess --cv data/cv.json --score-threshold 75
+
+# Query with score filter
+uv run python -m src.cli query --keyword "python" --score-threshold 80
+```
+
+**How it works:**
+
+1. Jobs without prior assessment → assessed normally
+2. Jobs with prior_match_score < threshold → skipped
+3. Jobs with prior_match_score >= threshold → assessed
+
+**Output:**
+
+```
+📄 Loaded CV from: data/cv.json
+
+🤖 Starting assessment (score threshold: 75%)
+
+ℹ️  Filtering jobs by prior match score...
+  Total confirmed: 92
+  Skipped (score < 75): 18
+  Will process: 74
+
+✅ Processing...
+✅ Job 1/74: Senior Python Developer
+   Tech: 85/100 | Seniority: 75/100 | Overall: 82/100
+   Cost: $0.0006
+```
+
+**Use case:** "Don't waste API calls on low-confidence jobs"
+
+---
+
+### Phase 3: Interactive Re-Review with Prior Decisions
+
+Show what you decided before and allow changes:
+
+```bash
+# Review with prior decision tracking
+uv run python -m src.cli review --interactive --allow-re-review
+```
+
+**Interactive flow:**
+
+```
+[1/8] Software Engineer - San Francisco
+  Company: TechCorp
+  Location: San Francisco, CA
+  Prior decision: confirmed on 2026-07-01 14:22
+
+  Tokens: 342 | Cost: $0.0021
+  ──────────────────────────────────────────
+  [Confirm] [Reject] [Skip] [Re-review]: _
+```
+
+**What happens:**
+
+- Shows your prior decision with timestamp
+- Allows you to keep it or change it
+- Audit trail records all changes
+- `re_review_audit` table tracks history
+
+**Use case:** "Review decisions are never locked - revisit anytime"
+
+---
+
+### Phase 4: Job Timeline Visibility
+
+Track full job lifecycle from crawl to assessment:
+
+**Timeline shown during review:**
+
+```bash
+uv run python -m src.cli review --interactive
+```
+
+**Display:**
+
+```
+[1/8] Machine Learning Engineer @ TechCorp
+────────────────────────────────────────────────────
+
+📅 Timeline:
+  Crawled:      2026-07-01 10:00   ← Extracted from career page
+  Preprocessed: 2026-07-01 10:05   ← Cleaned & chunked
+  Reviewed:     2026-07-01 14:22   ← Status confirmed
+  Assessed:     not processed       ← Waiting for Claude
+
+Tokens: 742 (estimated $0.002)
+────────────────────────────────────────────────────
+[Confirm] [Reject] [Skip]: _
+```
+
+**Timestamps recorded at:**
+
+1. **Crawled** - When job extracted from career page
+2. **Preprocessed** - When HTML cleaned and text chunked
+3. **Reviewed** - When you confirm/reject status
+4. **Assessed** - When Claude scores the job
+
+**Automatic recording:**
+
+- `preprocess` command auto-sets preprocessed_at
+- Timeline persists across multiple reviews
+- Timestamps stored as ISO 8601 (UTC)
+
+**Use case:** "Understand the journey of each job through the pipeline"
+
+---
+
+### Combined Workflow: All Issue #102 Features
+
+Complete end-to-end with all four phases:
+
+```bash
+# Step 1: Crawl multiple companies
+uv run python -m src.cli crawl --config-dir ./config
+
+# Step 2: Preprocess (auto-records preprocessed_at for all jobs)
+uv run python -m src.cli preprocess --show-estimates
+
+# Step 3: Review with stats + timeline + re-review
+uv run python -m src.cli review \
+  --merge-all \
+  --show-stats \
+  --skip-rejected \
+  --skip-assessed \
+  --allow-re-review \
+  --interactive
+
+# Step 4: Assess with score threshold filtering
+uv run python -m src.cli assess \
+  --cv data/cv.json \
+  --score-threshold 75
+
+# Step 5: Export results
+uv run python -m src.cli export --min-score 80
+```
+
+**What you see at each step:**
+
+```
+Phase 1 - Show Stats:
+  → "Total jobs: 127, Pending: 8, Will process: 8"
+
+Phase 3 - Review with Timeline:
+  → Each job shows its crawled/preprocessed/reviewed timestamps
+  → Prior decisions shown with option to re-review
+
+Phase 2 - Score Filtering:
+  → "Skipped 18 jobs with score < 75%"
+  → "Processing 74 high-confidence jobs"
+
+Result:
+  → Only high-quality matches in final report
+```
+
+---
+
+### Selective Re-Assessment Workflow
+
+Re-crawl some companies and reassess selectively:
+
+```bash
+# Step 1: Re-crawl specific company (updates crawled_at)
+uv run python -m src.cli crawl --config config/techcorp.json
+
+# Step 2: Preprocess new jobs
+uv run python -m src.cli preprocess --show-estimates
+
+# Step 3: Review only newly crawled jobs (by date)
+uv run python -m src.cli review \
+  --merge-all \
+  --skip-before-date 2026-07-05 \
+  --skip-assessed \
+  --interactive
+
+# Step 4: Assess
+uv run python -m src.cli assess --cv data/cv.json
+```
+
+**Timeline tracking enables this:**
+
+- New jobs have fresh crawled_at timestamps
+- `--skip-before-date` filters to only new ones
+- Old assessments preserved in database
+
+---
+
+### Common Issue #102 Patterns
+
+**Pattern 1: High-Confidence Workflow (Minimal API Cost)**
+
+```bash
+uv run python -m src.cli review --merge-all --show-stats
+# Review jobs, focus on high-quality ones
+
+uv run python -m src.cli assess --cv data/cv.json --score-threshold 80
+# Only assess jobs with 80%+ prior match
+
+uv run python -m src.cli export --min-score 75
+# Show only top matches
+```
+
+**Cost:** ~$0.01 for 100 jobs (vs $0.30 without filtering)
+
+---
+
+**Pattern 2: Iterative Refinement (Multi-Review)**
+
+```bash
+# First pass: Quick review
+uv run python -m src.cli review --merge-all --interactive
+
+# Assess
+uv run python -m src.cli assess --cv data/cv.json
+
+# Second pass: Re-review with prior decisions visible
+uv run python -m src.cli review --merge-all --allow-re-review --interactive
+
+# Final assess (only new jobs)
+uv run python -m src.cli assess --cv data/cv.json
+```
+
+**Benefit:** Change decisions without losing history
+
+---
+
+**Pattern 3: Quality Gate (No Low Scores)**
+
+```bash
+# Review all jobs
+uv run python -m src.cli review --merge-all --show-stats --interactive
+
+# Assess with confidence threshold
+uv run python -m src.cli assess --cv data/cv.json --score-threshold 70
+
+# Export only 80+ matches
+uv run python -m src.cli export --min-score 80
+```
+
+**Result:** Only highest-quality opportunities in report
+
+---
+
 ## Common Patterns
 
 ### Pattern 1: Single Command (Easiest)

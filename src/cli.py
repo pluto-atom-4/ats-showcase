@@ -676,7 +676,7 @@ def preprocess(
     chunker = SemanticChunker(target_chunk_size=400)
     counter = TokenCounter()
 
-    all_preprocessed = []
+    all_preprocessed: list[PreprocessedJob] = []
     total_tokens = 0
     total_cost = 0.0
     failed_count = 0
@@ -755,6 +755,20 @@ def preprocess(
             json.dump(jobs_output, f, indent=2, default=str)
 
         typer.echo(f"   ✓ Saved to: {output_file}")
+
+        # Record preprocessing timestamp for timeline tracking
+        try:
+            from src.verification import JobReviewer
+
+            db_path = Path("data/ats_playground.db")
+            if db_path.exists():
+                reviewer = JobReviewer(str(db_path))
+                for prep_job in all_preprocessed:
+                    reviewer.set_preprocessed_at(prep_job.job_id)
+                reviewer._close_db()
+                typer.echo(f"   ✓ Updated {len(all_preprocessed)} job timelines")
+        except Exception as e:
+            logger.warning(f"Could not update preprocessing timestamps: {e}")
 
 
 # ============================================================================

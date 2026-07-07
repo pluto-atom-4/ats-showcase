@@ -127,6 +127,84 @@ uv run python -m src.cli review --merge-all --show-stats
 - `display_pipeline_stats()` – Formats stats for CLI display (handles missing tables gracefully)
 - `--show-stats` flag – Displays stats before review workflow starts
 
+## Score Threshold Filtering (Issue #102 Phase 2)
+
+Filter jobs during assessment by minimum prior CV match score:
+
+```bash
+# Only assess jobs with prior match score ≥ 75%
+uv run python -m src.cli assess --cv data/cv.json --score-threshold 75
+
+# Show only high-confidence matches
+uv run python -m src.cli query --keyword "python" --score-threshold 80
+```
+
+**Implementation:** Issue #102 Phase 2 adds:
+- `get_jobs_by_score()` – Filters confirmed jobs by min prior_match_score
+- `--score-threshold` flag on assess/query commands (default: 0 = no filtering)
+- Job assessment table stores `prior_match_score` for each job
+- Performance: Query runs in <100ms even with 10k+ jobs
+
+## Interactive Re-Review Workflow (Issue #102 Phase 3)
+
+Show prior review decisions and allow users to change status:
+
+```bash
+# Review with prior decision tracking
+uv run python -m src.cli review --interactive --allow-re-review
+
+# Output example:
+# Job: Senior Python Developer @ TechCorp
+# Location: Remote
+# Prior decision: confirmed on 2026-07-01 14:22
+# Tokens: 742 (estimated $0.002)
+# ─────────────────────────────────────────
+# [Confirm] [Reject] [Skip] [Re-review]:
+```
+
+**Implementation:** Issue #102 Phase 3 adds:
+- `--allow-re-review` flag to review command (default: False)
+- `reviewed_at` timestamp in job_reviews table (when status last changed)
+- `re_review_audit` table tracks status change history and reasoning
+- `get_prior_review()` fetches prior decision + timestamp
+- `should_allow_re_review()` checks if job has prior decision
+- Interactive prompt shows prior status + date before asking for new decision
+
+## Job Timeline Visibility (Issue #102 Phase 4)
+
+Track and display full job lifecycle from crawl to assessment:
+
+```bash
+# Timeline displayed during interactive review
+uv run python -m src.cli review --interactive
+
+# Output example:
+# Job: Machine Learning Engineer @ TechCorp
+# ─────────────────────────────────────────
+# 📅 Timeline:
+#   Crawled:      2026-07-01 10:00
+#   Preprocessed: 2026-07-01 10:05
+#   Reviewed:     2026-07-01 14:22
+#   Assessed:     not processed
+#
+# Tokens: 742 (estimated $0.002)
+# ─────────────────────────────────────────
+# [Confirm] [Reject] [Skip]:
+```
+
+**Implementation:** Issue #102 Phase 4 adds:
+- `crawled_at` timestamp in job_reviews (auto-set on crawl, fallback to current time)
+- `preprocessed_at` timestamp in job_reviews (set when preprocessing completes)
+- `reviewed_at` timestamp in job_reviews (set when review status changes)
+- `assessed_at` timestamp in job_assessments (set when Claude assessment completes)
+- `set_crawled_at()` method to record crawl timestamp
+- `set_preprocessed_at()` method to record preprocessing completion
+- `get_job_timeline()` fetches all 4 timestamps as dict
+- `_format_timestamp()` converts ISO format to human-readable "YYYY-MM-DD HH:MM"
+- `_display_job_timeline()` renders timeline in interactive review view
+- `preprocess` command auto-updates preprocessed_at for all jobs
+- Schema migration: `_run_migrations()` gracefully adds columns to existing databases
+
 ## Tech Stack
 
 - **Browser**: Playwright (async, JS rendering)

@@ -73,6 +73,8 @@ class JobReviewer:
         reason TEXT,
         tokens INTEGER,
         estimated_cost REAL,
+        crawled_at TIMESTAMP,
+        preprocessed_at TIMESTAMP,
         reviewed_at TIMESTAMP,
         FOREIGN KEY (job_id) REFERENCES jobs(id)
     )
@@ -107,6 +109,29 @@ class JobReviewer:
         cursor.execute(self.REVIEW_AUDIT_TABLE_SQL)
         self.conn.commit()
         logger.info("Initialized review database")
+        self._run_migrations()
+
+    def _run_migrations(self) -> None:
+        """Run schema migrations to add missing columns."""
+        if not self.conn:
+            return
+        cursor = self.conn.cursor()
+
+        # Add crawled_at column if missing
+        try:
+            cursor.execute("ALTER TABLE job_reviews ADD COLUMN crawled_at TIMESTAMP")
+            self.conn.commit()
+            logger.info("Added crawled_at column to job_reviews")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        # Add preprocessed_at column if missing
+        try:
+            cursor.execute("ALTER TABLE job_reviews ADD COLUMN preprocessed_at TIMESTAMP")
+            self.conn.commit()
+            logger.info("Added preprocessed_at column to job_reviews")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
     def _close_db(self) -> None:
         """Close database connection."""
@@ -137,10 +162,21 @@ class JobReviewer:
         if not self.conn:
             return
         cursor = self.conn.cursor()
+
+        # Get existing row to preserve timeline fields
+        cursor.execute(
+            "SELECT crawled_at, preprocessed_at FROM job_reviews WHERE job_id = ?",
+            (job_id,),
+        )
+        existing = cursor.fetchone()
+        crawled_at = existing["crawled_at"] if existing else None
+        preprocessed_at = existing["preprocessed_at"] if existing else None
+
         cursor.execute(
             """INSERT OR REPLACE INTO job_reviews
-               (job_id, title, location, company, status, reason, tokens, estimated_cost, reviewed_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               (job_id, title, location, company, status, reason, tokens,
+                estimated_cost, crawled_at, preprocessed_at, reviewed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 job_id,
                 title,
@@ -150,6 +186,8 @@ class JobReviewer:
                 reason,
                 tokens,
                 estimated_cost,
+                crawled_at,
+                preprocessed_at,
                 datetime.now(timezone.utc).isoformat(),
             ),
         )
@@ -198,6 +236,81 @@ class JobReviewer:
         )
         self.conn.commit()
         logger.debug(f"Saved re-review audit: {job_id} {prior_status} -> {new_status}")
+
+    def set_preprocessed_at(self, job_id: str) -> None:
+        """Record preprocessing timestamp for a job."""
+        if not self.conn:
+            return
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute(
+                "UPDATE job_reviews SET preprocessed_at = ? WHERE job_id = ?",
+                (datetime.now(timezone.utc).isoformat(), job_id),
+            )
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            logger.warning(f"preprocessed_at column not found for job {job_id}")
+
+    def set_crawled_at(self, job_id: str, crawled_at: Optional[str] = None) -> None:
+        """Record or update crawled timestamp for a job."""
+        if not self.conn:
+            return
+        cursor = self.conn.cursor()
+        timestamp = crawled_at or datetime.now(timezone.utc).isoformat()
+        try:
+            cursor.execute(
+                "UPDATE job_reviews SET crawled_at = ? WHERE job_id = ?",
+                (timestamp, job_id),
+            )
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            logger.warning(f"crawled_at column not found for job {job_id}")
+
+    def get_job_timeline(self, job_id: str) -> Dict[str, Optional[str]]:
+        """Get full job lifecycle timeline (crawled → preprocessed → reviewed → assessed)."""
+        if not self.conn:
+            return {
+                "crawled_at": None,
+                "preprocessed_at": None,
+                "reviewed_at": None,
+                "assessed_at": None,
+            }
+        cursor = self.conn.cursor()
+
+        timeline: Dict[str, Optional[str]] = {
+            "crawled_at": None,
+            "preprocessed_at": None,
+            "reviewed_at": None,
+            "assessed_at": None,
+        }
+
+        # Get crawled_at and review timeline
+        try:
+            cursor.execute(
+                "SELECT crawled_at, preprocessed_at, reviewed_at, status FROM job_reviews WHERE job_id = ?",
+                (job_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                timeline["crawled_at"] = row["crawled_at"]
+                timeline["preprocessed_at"] = row["preprocessed_at"]
+                timeline["reviewed_at"] = row["reviewed_at"]
+        except (sqlite3.OperationalError, KeyError):
+            pass
+
+        # Get assessed_at from assessments
+        try:
+            cursor.execute(
+                "SELECT assessed_date FROM job_assessments WHERE job_id = ?",
+                (job_id,),
+            )
+            row = cursor.fetchone()
+            if row and row["assessed_date"]:
+                timeline["assessed_at"] = row["assessed_date"]
+        except sqlite3.OperationalError:
+            pass
+
+        return timeline
 
     def get_confirmed_jobs(self) -> List[Dict[str, Any]]:
         """Get all confirmed jobs from database."""
@@ -339,6 +452,8 @@ class JobReviewer:
             job_idx, total_jobs, title, company, location, tokens, cost, preprocessed, prior_review
         )
 
+        self._display_job_timeline(job_id)
+
         while True:
             prompt_text = "   Action (c=confirm/r=reject/s=skip/q=quit"
             if prior_review:
@@ -440,6 +555,37 @@ class JobReviewer:
             if preview:
                 preview_text = " ".join(preview)[:80]
                 typer.echo(f"   Content: {preview_text}...")
+
+    def _format_timestamp(self, timestamp: Optional[str]) -> str:
+        """Format timestamp for display, showing only date and time."""
+        if not timestamp:
+            return "not processed"
+        try:
+            # Handle ISO format timestamps (with or without timezone)
+            if "T" in timestamp:
+                dt_part = timestamp.split("T")[0]  # Get YYYY-MM-DD
+                time_part = timestamp.split("T")[1].split("+")[0].split("Z")[0][:5]  # Get HH:MM
+                return f"{dt_part} {time_part}"
+            return timestamp[:16]  # Fallback: first 16 chars
+        except Exception:
+            return "invalid timestamp"
+
+    def _display_job_timeline(self, job_id: str) -> None:
+        """Display job lifecycle timeline before review."""
+        timeline = self.get_job_timeline(job_id)
+        if all(v is None for v in timeline.values()):
+            return  # No timeline data to display
+
+        typer.echo("\n   📅 Timeline:")
+        crawled = self._format_timestamp(timeline.get("crawled_at"))
+        preprocessed = self._format_timestamp(timeline.get("preprocessed_at"))
+        reviewed = self._format_timestamp(timeline.get("reviewed_at"))
+        assessed = self._format_timestamp(timeline.get("assessed_at"))
+
+        typer.echo(f"      Crawled: {crawled}")
+        typer.echo(f"      Preprocessed: {preprocessed}")
+        typer.echo(f"      Reviewed: {reviewed}")
+        typer.echo(f"      Assessed: {assessed}")
 
     def _process_user_action(
         self,
