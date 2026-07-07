@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+import typer
+
 logger = logging.getLogger(__name__)
 
 
@@ -406,3 +408,63 @@ class JobReviewer:
         typer.echo(stats.get_summary())
 
         return stats
+
+    def display_pipeline_stats(
+        self,
+        skip_before_date: Optional[str] = None,
+        skip_rejected: bool = True,
+        skip_assessed: bool = True,
+    ) -> None:
+        """Display pipeline statistics showing job counts by status and filter effects."""
+        from src.storage.assessment_store import AssessmentStore
+
+        store = AssessmentStore(self.db_path)
+
+        # Get base pipeline stats
+        stats = store.get_pipeline_stats()
+        if not stats:
+            typer.echo("⚠️  No pipeline statistics available (database tables not initialized)")
+            return
+
+        # Get filter impact stats
+        filter_stats = store.get_stats_with_filters(
+            skip_rejected=skip_rejected,
+            skip_assessed=skip_assessed,
+            skip_before_date=skip_before_date,
+        )
+
+        typer.echo("\n" + "=" * 80)
+        typer.echo("📊 PIPELINE STATUS")
+        typer.echo("=" * 80)
+
+        total_jobs = (
+            stats.get("pending_review", 0)
+            + stats.get("confirmed", 0)
+            + stats.get("rejected", 0)
+        )
+        typer.echo(f"\nTotal jobs:          {total_jobs}")
+        typer.echo(f"  • Pending review:  {stats.get('pending_review', 0):<6} ← Ready for review")
+        typer.echo(f"  • Confirmed:       {stats.get('confirmed', 0):<6} ← Ready for assessment")
+        typer.echo(f"  • Rejected:        {stats.get('rejected', 0):<6} ← Will be skipped")
+        typer.echo(f"  • Assessed:        {stats.get('assessed', 0):<6} ← Already processed")
+
+        if filter_stats and filter_stats.get("total", 0) > 0:
+            filters_msg = f"--skip-rejected={skip_rejected} --skip-assessed={skip_assessed}"
+            if skip_before_date:
+                filters_msg += f" --skip-before-date {skip_before_date}"
+            typer.echo(f"\nApplying filters: {filters_msg}")
+
+            typer.echo(f"  → Will process:  {filter_stats.get('would_process', 0)} jobs")
+            typer.echo(f"  → Will skip:     {filter_stats.get('would_skip', 0)} jobs")
+
+            reasons = filter_stats.get("reasons", {})
+            if reasons and filter_stats.get("would_skip", 0) > 0:
+                typer.echo("\nSkip breakdown:")
+                if reasons.get("rejected", 0) > 0:
+                    typer.echo(f"    • Rejected:       {reasons.get('rejected', 0)}")
+                if reasons.get("already_assessed", 0) > 0:
+                    typer.echo(f"    • Already assessed: {reasons.get('already_assessed', 0)}")
+                if reasons.get("crawled_before_date", 0) > 0:
+                    typer.echo(f"    • Crawled before date: {reasons.get('crawled_before_date', 0)}")
+
+        typer.echo("=" * 80 + "\n")

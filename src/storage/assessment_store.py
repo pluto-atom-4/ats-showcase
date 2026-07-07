@@ -831,3 +831,129 @@ class AssessmentStore:
             results.append(dict(row))
 
         return results
+
+    def get_pipeline_stats(self) -> Dict[str, int]:
+        """Get job counts by status.
+
+        Returns:
+            Dict with keys: pending_review, confirmed, rejected, assessed
+        """
+        if not self.conn:
+            return {}
+
+        cursor = self.conn.cursor()
+        stats = {
+            "pending_review": 0,
+            "confirmed": 0,
+            "rejected": 0,
+            "assessed": 0,
+        }
+
+        try:
+            # Try job_reviews table first (has status field)
+            cursor.execute(
+                "SELECT status, COUNT(*) as count FROM job_reviews GROUP BY status"
+            )
+            for row in cursor.fetchall():
+                status = row["status"]
+                count = row["count"]
+                if status in stats:
+                    stats[status] = count
+        except sqlite3.OperationalError:
+            logger.debug("job_reviews table not found, pipeline stats unavailable")
+            return {}
+
+        # Add count of assessed jobs
+        try:
+            cursor.execute("SELECT COUNT(*) as count FROM job_assessments")
+            row = cursor.fetchone()
+            if row:
+                stats["assessed"] = row["count"]
+        except sqlite3.OperationalError:
+            pass
+
+        return stats
+
+    def get_stats_with_filters(
+        self,
+        skip_rejected: bool = True,
+        skip_assessed: bool = True,
+        skip_before_date: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get pipeline stats showing what would be skipped with filters.
+
+        Args:
+            skip_rejected: Skip jobs marked as rejected
+            skip_assessed: Skip jobs already assessed
+            skip_before_date: Skip jobs crawled before this ISO date
+
+        Returns:
+            Dict with keys:
+                - total: total jobs
+                - would_process: jobs that match filters
+                - would_skip: jobs that don't match
+                - reasons: breakdown of skip reasons
+        """
+        if not self.conn:
+            return {}
+
+        cursor = self.conn.cursor()
+        reasons_dict: Dict[str, int] = {
+            "rejected": 0,
+            "already_assessed": 0,
+            "crawled_before_date": 0,
+        }
+        stats: Dict[str, Any] = {
+            "total": 0,
+            "would_process": 0,
+            "would_skip": 0,
+            "reasons": reasons_dict,
+        }
+
+        try:
+            # Get all jobs
+            cursor.execute(
+                """SELECT jr.job_id, jr.status, jr.crawled_at,
+                          CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed
+                   FROM job_reviews jr
+                   LEFT JOIN job_assessments ja ON jr.job_id = ja.job_id"""
+            )
+            rows = cursor.fetchall()
+            stats["total"] = len(rows)
+
+            for row in rows:
+                status = row["status"]
+                crawled_at = row["crawled_at"] if row["crawled_at"] else None
+                is_assessed = row["is_assessed"]
+
+                should_skip = False
+                skip_reason: Optional[str] = None
+
+                # Check skip_rejected filter
+                if skip_rejected and status == "rejected":
+                    should_skip = True
+                    skip_reason = "rejected"
+
+                # Check skip_assessed filter
+                if not should_skip and skip_assessed and is_assessed:
+                    should_skip = True
+                    skip_reason = "already_assessed"
+
+                # Check skip_before_date filter
+                if not should_skip and skip_before_date and crawled_at:
+                    if crawled_at < skip_before_date:
+                        should_skip = True
+                        skip_reason = "crawled_before_date"
+
+                if should_skip:
+                    stats["would_skip"] = stats["would_skip"] + 1  # type: ignore
+                    if skip_reason:
+                        reasons_dict[skip_reason] += 1
+                else:
+                    stats["would_process"] = stats["would_process"] + 1  # type: ignore
+
+        except sqlite3.OperationalError as e:
+            logger.debug(f"Error computing filter stats: {e}")
+            return {}
+
+        return stats
