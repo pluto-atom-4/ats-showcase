@@ -740,6 +740,10 @@ class JobReviewer:
         typer.echo(f"\n👀 Starting job review ({total_jobs} jobs total)\n")
 
         job_counter = 0
+        # When re-review is allowed, show all jobs regardless of review status or assessment
+        effective_mode = "all" if allow_re_review else mode
+        effective_skip_rejected = False if allow_re_review else skip_rejected
+        effective_skip_assessed = False if allow_re_review else skip_assessed
         for extracted_path, extracted_jobs in all_extracted_jobs:
             source_name = extracted_path.stem  # e.g., "carbonrobotics_jobs"
             for idx, job in enumerate(extracted_jobs):
@@ -750,10 +754,10 @@ class JobReviewer:
                 # Phase 3: Check if job should be skipped based on filters
                 should_skip, skip_reason = self.should_skip_job(
                     job_id,
-                    mode=mode,
+                    mode=effective_mode,
                     skip_before_date=skip_before_date,
-                    skip_rejected=skip_rejected,
-                    skip_assessed=skip_assessed,
+                    skip_rejected=effective_skip_rejected,
+                    skip_assessed=effective_skip_assessed,
                 )
                 if should_skip:
                     stats.add_skipped()
