@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from src.tui.models.state import PhaseMetrics, PhaseStatus, StateManager
+from tui.models.state import PhaseMetrics, PhaseStatus, StateManager
 
 
 class TestPhaseMetrics:
