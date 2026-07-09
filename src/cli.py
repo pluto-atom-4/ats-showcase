@@ -26,6 +26,17 @@ logger = logging.getLogger(__name__)
 
 
 
+def load_companies_config(
+    config: Optional[str] = None, config_dir: Optional[str] = None
+) -> dict:
+    """Load companies from config file or directory."""
+    if config:
+        return load_companies_from_file(Path(config))
+    elif config_dir:
+        return load_companies_from_directory(Path(config_dir))
+    return {}
+
+
 def load_companies_from_file(config_path: Path) -> dict:
     """Load companies from a single config file."""
     if not config_path.exists():
@@ -141,18 +152,18 @@ def all(
 
     if use_tui:
         try:
-            from tui.dashboard import ATPDashboard
-            from tui.models.state import StateManager
+            from src.tui.dashboard import ATPDashboardApp
+            from src.tui.models.state import StateManager
 
             state = StateManager()
-            state.config_file = Path(config) if config else None
-            state.config_dir = Path(config_dir) if config_dir else None
-            state.cv_file = Path(cv)
-            state.headless = headless
-            state.confirmed_only = confirmed_only
 
-            dashboard = ATPDashboard(state)
-            dashboard.run()
+            # Load companies configuration
+            companies = load_companies_config(config, config_dir)
+
+            app = ATPDashboardApp(
+                state, companies=companies, cv_file=cv, headless=headless
+            )
+            app.run()
             return
         except ImportError as e:
             typer.echo(
