@@ -65,9 +65,26 @@ tail -f logs/app.log                             # Watch logs
 - **Crawl + Preprocess**: `.claude/skills/crawl-jobs/SKILL.md`
 - **Review + Assess**: `.claude/skills/assess-jobs/SKILL.md`
 
-## Pipeline Control (Issue #100)
+## Pipeline Control (Issue #100 & #116)
 
-Skip re-assessing jobs using filtering options on the `review` command:
+### Review Mode Filtering (Issue #116)
+
+Use `--mode` flag to control which jobs are reviewed:
+
+```bash
+# Review only unreviewed jobs (default, new-only mode)
+uv run python -m src.cli review --merge-all --mode new-only
+
+# Review all jobs, including previously reviewed ones
+uv run python -m src.cli review --merge-all --mode all
+
+# Re-review all, but skip rejected jobs
+uv run python -m src.cli review --merge-all --mode all --skip-rejected
+```
+
+### Status & Date Filtering
+
+Skip re-assessing jobs using filtering options:
 
 ```bash
 # Skip previously rejected jobs (default: True)
@@ -79,8 +96,8 @@ uv run python -m src.cli review --merge-all --skip-assessed
 # Skip jobs crawled before a date (selective re-assessment)
 uv run python -m src.cli review --merge-all --skip-before-date 2026-07-01
 
-# Combine filters
-uv run python -m src.cli review --merge-all --skip-before-date 2026-07-01 --skip-rejected --skip-assessed
+# Combine mode + status + date filters
+uv run python -m src.cli review --merge-all --mode all --skip-rejected=False --skip-before-date 2026-07-01
 ```
 
 **Database Schema for Filtering:**
@@ -144,6 +161,33 @@ uv run python -m src.cli query --keyword "python" --score-threshold 80
 - `--score-threshold` flag on assess/query commands (default: 0 = no filtering)
 - Job assessment table stores `prior_match_score` for each job
 - Performance: Query runs in <100ms even with 10k+ jobs
+
+## Assess Mode Filtering (Issue #116)
+
+Use `--mode` and `--since` flags to control which jobs are assessed:
+
+```bash
+# Assess only unassessed jobs (default, new-only mode)
+uv run python -m src.cli assess --cv data/cv.json --mode new-only
+
+# Re-assess all confirmed jobs
+uv run python -m src.cli assess --cv data/cv.json --mode all
+
+# Re-assess only low-scoring jobs
+uv run python -m src.cli assess --cv data/cv.json --mode new-only --score-threshold 60
+
+# Re-assess jobs crawled since cutoff date
+uv run python -m src.cli assess --cv data/cv.json --mode new-only --since 2026-07-05
+
+# Combine multiple filters
+uv run python -m src.cli assess --cv data/cv.json --mode all --score-threshold 50 --since 2026-07-01
+```
+
+**Implementation:** Issue #116 adds:
+- `--mode` flag: "new-only" (default) or "all"
+- `--since` flag: Re-assess jobs crawled on/after date (ISO format)
+- Filters apply in layers: mode → status → date
+- Backward compatible: existing workflow unchanged
 
 ## Interactive Re-Review Workflow (Issue #102 Phase 3)
 

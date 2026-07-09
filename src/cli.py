@@ -836,6 +836,11 @@ def review(
         "--merge-all",
         help="[RECOMMENDED for multi-company] Auto-discover and process all extracted company files",
     ),
+    mode: str = typer.Option(
+        "new-only",
+        "--mode",
+        help="Review mode: 'new-only' (unreviewed jobs) or 'all' (all jobs)",
+    ),
     skip_before_date: Optional[str] = typer.Option(
         None,
         "--skip-before-date",
@@ -891,9 +896,15 @@ def review(
                 skip_assessed=skip_assessed,
             )
 
+        # Validate mode
+        if mode not in ("new-only", "all"):
+            typer.echo(f"❌ Invalid mode: {mode}. Must be 'new-only' or 'all'", err=True)
+            raise typer.Exit(1)
+
         stats = reviewer.review_batch(
             extracted_files,
             preprocessed,
+            mode=mode,
             skip_before_date=skip_before_date,
             skip_rejected=skip_rejected,
             skip_assessed=skip_assessed,
@@ -916,8 +927,16 @@ def review(
 def assess(
     cv: str = typer.Option(..., help="CV file path (json or txt)"),
     confirmed_only: bool = typer.Option(True, help="Only assess confirmed jobs"),
+    mode: str = typer.Option(
+        "new-only",
+        "--mode",
+        help="Assess mode: 'new-only' (unassessed jobs) or 'all' (all confirmed jobs)",
+    ),
     score_threshold: Optional[float] = typer.Option(
-        None, "--score-threshold", help="Skip jobs with prior score < threshold (0-100)"
+        None, "--score-threshold", help="Re-assess jobs with prior score < threshold (0-100)"
+    ),
+    since: Optional[str] = typer.Option(
+        None, "--since", help="Re-assess jobs crawled on/after this date (ISO format, e.g. 2026-07-01)"
     ),
 ) -> None:
     """Assess CV fit for confirmed jobs using Claude 3.5 Sonnet."""
@@ -954,6 +973,23 @@ def assess(
             typer.echo("   Set ANTHROPIC_API_KEY environment variable", err=True)
             raise typer.Exit(1) from e
 
+        # Validate mode
+        if mode not in ("new-only", "all"):
+            typer.echo(f"❌ Invalid mode: {mode}. Must be 'new-only' or 'all'", err=True)
+            raise typer.Exit(1)
+
+        # Validate since date format if provided
+        if since is not None:
+            try:
+                from datetime import datetime
+                datetime.fromisoformat(since)
+            except ValueError as e:
+                typer.echo(
+                    f"❌ Invalid since date format: {since}. Use ISO format (e.g., 2026-07-01)",
+                    err=True,
+                )
+                raise typer.Exit(1) from e
+
         # Get confirmed jobs from database
         reviewer = JobReviewer()
         confirmed_jobs = reviewer.get_confirmed_jobs()
@@ -966,6 +1002,16 @@ def assess(
 
         # Initialize assessment store
         assessment_store = AssessmentStore()
+
+        # Apply mode filter (new-only vs all)
+        original_count = len(confirmed_jobs)
+        if mode == "new-only":
+            # Filter: only jobs without assessments
+            confirmed_jobs = [
+                j for j in confirmed_jobs
+                if not assessment_store.get_assessment_by_id(j.get("job_id", ""))
+            ]
+            typer.echo(f"📊 Mode filter (new-only): {original_count} → {len(confirmed_jobs)} jobs\n")
 
         # Apply score threshold filter if specified
         if score_threshold is not None:
@@ -997,6 +1043,32 @@ def assess(
 
             if not confirmed_jobs:
                 typer.echo("❌ No jobs match score threshold criteria.", err=True)
+                raise typer.Exit(1)
+
+        # Apply since (date) filter if specified
+        if since is not None:
+            original_count = len(confirmed_jobs)
+            filtered_jobs = []
+
+            for job in confirmed_jobs:
+                job_id = job.get("job_id", "")
+                crawled_at = job.get("crawled_at")
+
+                if crawled_at and crawled_at >= since:
+                    filtered_jobs.append(job)
+                elif not crawled_at:
+                    # If crawled_at is missing, include job to be safe
+                    filtered_jobs.append(job)
+
+            confirmed_jobs = filtered_jobs
+            skipped_before_date = original_count - len(confirmed_jobs)
+            typer.echo(
+                f"📊 Date filter (since {since}): {original_count} → {len(confirmed_jobs)} jobs\n"
+                f"   Skipped {skipped_before_date} jobs crawled before {since}\n"
+            )
+
+            if not confirmed_jobs:
+                typer.echo("❌ No jobs match date filter criteria.", err=True)
                 raise typer.Exit(1)
 
         # Load preprocessed jobs for context

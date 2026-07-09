@@ -324,16 +324,21 @@ class JobReviewer:
     def _check_review_status(
         self, job_id: str, skip_rejected: bool
     ) -> tuple[bool, Optional[str]]:
-        """Check if job should be skipped based on review status."""
+        """Check if job should be skipped based on review status.
+
+        Only skips if skip_rejected=True and job status is 'rejected'.
+        Confirmed jobs are not skipped here; mode filter handles that.
+        """
+        if not skip_rejected:
+            return False, None
+
         cursor = self.conn.cursor()  # type: ignore
         cursor.execute("SELECT status FROM job_reviews WHERE job_id = ?", (job_id,))
         review_row = cursor.fetchone()
         if review_row:
             status = review_row["status"]
-            if skip_rejected and status == "rejected":
+            if status == "rejected":
                 return True, "previously_rejected"
-            if status == "confirmed":
-                return True, "already_confirmed"
         return False, None
 
     def _check_assessment_status(self, job_id: str) -> tuple[bool, Optional[str]]:
@@ -361,9 +366,27 @@ class JobReviewer:
             pass
         return False, None
 
+    def _check_mode_filter(self, job_id: str, mode: str) -> tuple[bool, Optional[str]]:
+        """Check if job should be skipped based on mode filter.
+
+        new-only: Skip if job already in job_reviews (already reviewed)
+        all: Don't skip based on mode
+        """
+        if mode == "all":
+            return False, None
+
+        if mode == "new-only":
+            cursor = self.conn.cursor()  # type: ignore
+            cursor.execute("SELECT job_id FROM job_reviews WHERE job_id = ?", (job_id,))
+            if cursor.fetchone():
+                return True, "already_reviewed"
+
+        return False, None
+
     def should_skip_job(
         self,
         job_id: str,
+        mode: str = "new-only",
         skip_before_date: Optional[str] = None,
         skip_rejected: bool = True,
         skip_assessed: bool = True,
@@ -373,6 +396,7 @@ class JobReviewer:
 
         Args:
             job_id: Job to check
+            mode: Review mode: 'new-only' (unreviewed) or 'all' (all jobs)
             skip_before_date: Skip jobs crawled before this date (ISO format)
             skip_rejected: Skip jobs with 'rejected' status
             skip_assessed: Skip jobs that have been assessed
@@ -382,6 +406,11 @@ class JobReviewer:
         """
         if not self.conn:
             return False, None
+
+        # Check mode filter first
+        skip, reason = self._check_mode_filter(job_id, mode)
+        if skip:
+            return skip, reason
 
         # Check review status
         skip, reason = self._check_review_status(job_id, skip_rejected)
@@ -631,6 +660,7 @@ class JobReviewer:
         self,
         extracted_files: Union[List[Path], str, Path],
         preprocessed_file: str,
+        mode: str = "new-only",
         skip_before_date: Optional[str] = None,
         skip_rejected: bool = True,
         skip_assessed: bool = True,
@@ -644,6 +674,7 @@ class JobReviewer:
                 - List of Path objects (multi-company)
                 - Single Path or str (backward compat)
             preprocessed_file: Path to preprocessed jobs JSON
+            mode: Review mode: 'new-only' (unreviewed) or 'all' (all jobs)
             skip_before_date: Skip jobs crawled before this date (ISO format, e.g. "2026-07-01")
             skip_rejected: Skip jobs with 'rejected' status (default True)
             skip_assessed: Skip jobs that have been assessed (default True)
@@ -702,6 +733,7 @@ class JobReviewer:
                 # Phase 3: Check if job should be skipped based on filters
                 should_skip, skip_reason = self.should_skip_job(
                     job_id,
+                    mode=mode,
                     skip_before_date=skip_before_date,
                     skip_rejected=skip_rejected,
                     skip_assessed=skip_assessed,
