@@ -48,6 +48,31 @@ See [docs/CLI.md](./docs/CLI.md#configuration-management) for detailed config ex
 
 **Setup Troubleshooting?** See [docs/SETUP.md](./docs/SETUP.md) for detailed Python 3.12 configuration, system dependencies, and troubleshooting.
 
+## 📊 Interactive Dashboard (TUI)
+
+Run the workflow with an interactive text-based dashboard for real-time progress tracking:
+
+```bash
+# Auto-detect TUI from terminal (runs in TUI if interactive)
+python -m src.cli --all --cv data/cv.json --config config/companies.json
+
+# Force TUI mode
+python -m src.cli --all --cv data/cv.json --config config/companies.json --tui
+
+# Force text-only mode
+python -m src.cli --all --cv data/cv.json --config config/companies.json --no-tui
+```
+
+**Dashboard Features**:
+- 🕷️ **Real-time progress bars** for crawl, preprocess, assess, and export phases
+- 💰 **Live cost tracking** - tokens used and USD spent per phase
+- 🏆 **Top matches display** - see top 5 job matches as they're assessed
+- ⏸️ **Pause/resume** - control workflow with `[p]` to pause, `[r]` to resume
+- 🎯 **Phase status** - visual indicators for each workflow phase
+- ⌨️ **Keyboard shortcuts**: `[q]` to quit, `[p]` to pause/resume
+
+**When TUI is disabled**: Falls back to traditional text output (useful for CI/CD or piped output).
+
 ## 🌍 Environment Configuration
 
 ATS Playground requires environment variables for API keys and configuration. Set them in `.env` (created during quick start).
