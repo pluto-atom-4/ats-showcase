@@ -393,3 +393,143 @@ class TestFilteringMethods:
         assert reason is None
 
         reviewer._close_db()
+
+
+class TestSkipAction:
+    """Test skip action persistence (Issue #119)."""
+
+    @pytest.fixture
+    def temp_db(self):
+        """Create temporary database for testing."""
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        yield db_path
+        Path(db_path).unlink(missing_ok=True)
+
+    def test_skip_saves_pending_review_status(self, temp_db):
+        """Test that skip action saves job with status='pending_review'."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        reviewer.save_review(
+            job_id="job_1",
+            title="Engineer",
+            location="SF",
+            status="pending_review",
+            company="TechCorp",
+        )
+
+        status = reviewer.get_review_status("job_1")
+        assert status == "pending_review"
+
+        reviewer._close_db()
+
+    def test_skip_persists_across_sessions(self, temp_db):
+        """Test that skipped jobs persist to database and can be retrieved."""
+        # First session: skip a job
+        reviewer1 = JobReviewer(db_path=temp_db)
+        reviewer1.save_review(
+            job_id="job_1",
+            title="Senior Python Dev",
+            location="Remote",
+            status="pending_review",
+            company="TechCorp",
+        )
+        reviewer1._close_db()
+
+        # Second session: verify job exists with pending_review status
+        reviewer2 = JobReviewer(db_path=temp_db)
+        status = reviewer2.get_review_status("job_1")
+        assert status == "pending_review"
+        reviewer2._close_db()
+
+    def test_skip_creates_job_reviews_entry(self, temp_db):
+        """Test that skip action creates an entry in job_reviews table."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        reviewer.save_review(
+            job_id="job_1",
+            title="Role",
+            location="NYC",
+            status="pending_review",
+            company="Corp",
+        )
+
+        # Verify entry exists
+        if reviewer.conn:
+            cursor = reviewer.conn.cursor()
+            cursor.execute("SELECT * FROM job_reviews WHERE job_id = ?", ("job_1",))
+            row = cursor.fetchone()
+            assert row is not None
+            assert row["status"] == "pending_review"
+            assert row["title"] == "Role"
+            assert row["company"] == "Corp"
+
+        reviewer._close_db()
+
+    def test_confirm_reject_skip_all_recorded(self, temp_db):
+        """Test that confirm, reject, and skip all create database records."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        # Confirm
+        reviewer.save_review("job_1", "Engineer", "SF", "confirmed", tokens=100)
+        # Reject
+        reviewer.save_review("job_2", "Designer", "NYC", "rejected", reason="location")
+        # Skip
+        reviewer.save_review("job_3", "Manager", "LA", "pending_review")
+
+        assert reviewer.get_review_status("job_1") == "confirmed"
+        assert reviewer.get_review_status("job_2") == "rejected"
+        assert reviewer.get_review_status("job_3") == "pending_review"
+
+        # Verify all 3 are in database
+        if reviewer.conn:
+            cursor = reviewer.conn.cursor()
+            cursor.execute("SELECT COUNT(*) as count FROM job_reviews")
+            count = cursor.fetchone()["count"]
+            assert count == 3
+
+        reviewer._close_db()
+
+    def test_skipped_job_reappears_in_new_only_mode(self, temp_db):
+        """Test that skipped (pending_review) jobs reappear when using mode='new-only'."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        # Skip a job (status="pending_review")
+        reviewer.save_review("job_1", "Engineer", "SF", "pending_review")
+
+        # In new-only mode, pending_review jobs should be re-presented (not skipped)
+        skip, reason = reviewer.should_skip_job(
+            "job_1", mode="new-only", skip_before_date=None, skip_rejected=True, skip_assessed=False
+        )
+        assert skip is False
+        assert reason is None
+
+        reviewer._close_db()
+
+    def test_confirmed_job_skipped_in_new_only_mode(self, temp_db):
+        """Test that confirmed jobs are skipped in new-only mode."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        reviewer.save_review("job_1", "Engineer", "SF", "confirmed", tokens=100)
+
+        skip, reason = reviewer.should_skip_job(
+            "job_1", mode="new-only", skip_before_date=None, skip_rejected=True, skip_assessed=False
+        )
+        assert skip is True
+        assert reason == "already_reviewed"
+
+        reviewer._close_db()
+
+    def test_rejected_job_skipped_in_new_only_mode(self, temp_db):
+        """Test that rejected jobs are skipped in new-only mode."""
+        reviewer = JobReviewer(db_path=temp_db)
+
+        reviewer.save_review("job_1", "Designer", "NYC", "rejected", reason="location")
+
+        skip, reason = reviewer.should_skip_job(
+            "job_1", mode="new-only", skip_before_date=None, skip_rejected=True, skip_assessed=False
+        )
+        assert skip is True
+        assert reason == "already_reviewed"
+
+        reviewer._close_db()
