@@ -369,16 +369,20 @@ class JobReviewer:
     def _check_mode_filter(self, job_id: str, mode: str) -> tuple[bool, Optional[str]]:
         """Check if job should be skipped based on mode filter.
 
-        new-only: Skip if job already in job_reviews (already reviewed)
+        new-only: Skip if job status is 'confirmed' or 'rejected' (already reviewed)
         all: Don't skip based on mode
+
+        Note: Skipped jobs (pending_review) are NOT skipped in new-only mode
+        so they can be re-reviewed in subsequent runs.
         """
         if mode == "all":
             return False, None
 
         if mode == "new-only":
             cursor = self.conn.cursor()  # type: ignore
-            cursor.execute("SELECT job_id FROM job_reviews WHERE job_id = ?", (job_id,))
-            if cursor.fetchone():
+            cursor.execute("SELECT status FROM job_reviews WHERE job_id = ?", (job_id,))
+            row = cursor.fetchone()
+            if row and row["status"] in ("confirmed", "rejected"):
                 return True, "already_reviewed"
 
         return False, None
@@ -554,6 +558,18 @@ class JobReviewer:
         stats.add_rejected(reason)
         return reason
 
+    def _handle_skip_action(
+        self,
+        job_id: str,
+        title: str,
+        location: str,
+        company: Optional[str],
+        stats: "ReviewStats",
+    ) -> None:
+        """Handle skip action. Preserves job as pending_review for future review."""
+        self.save_review(job_id, title, location, status="pending_review", company=company)
+        stats.add_skipped()
+
     def _display_job_details(
         self,
         job_idx: int,
@@ -643,7 +659,7 @@ class JobReviewer:
             typer.echo("   ✗ Rejected")
             return True
         elif action == "s":
-            stats.add_skipped()
+            self._handle_skip_action(job_id, title, location, company, stats)
             typer.echo("   ⊘ Skipped (will review later)")
             return True
         elif action == "q":
