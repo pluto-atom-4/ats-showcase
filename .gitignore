@@ -113,6 +113,10 @@ models/
 !src/models/
 !src/models/*.py
 
+# Exception: src/tui/models/ package is Python code, not cached models
+!src/tui/models/
+!src/tui/models/*.py
+
 # Docker
 .dockerignore
 *.container
