@@ -113,6 +113,11 @@ def all(
     config_dir: Optional[str] = typer.Option(None, help="Directory with JSON config files"),
     headless: bool = typer.Option(True, help="Run browser in headless mode"),
     confirmed_only: bool = typer.Option(False, help="Skip unconfirmed jobs"),
+    tui: Optional[bool] = typer.Option(
+        None,
+        help="Use TUI dashboard (auto-detected from TTY if not specified)",
+    ),
+    no_tui: bool = typer.Option(False, help="Force text output, disable TUI"),
 ) -> None:
     """
     Run full workflow: crawl → preprocess → review → assess → export.
@@ -122,8 +127,39 @@ def all(
 
     Example:
         python -m src.cli all --cv data/cv.json --config config/companies.json
-        python -m src.cli all --cv data/cv.json --config-dir ./config
+        python -m src.cli all --cv data/cv.json --config-dir ./config --tui
     """
+    import sys
+
+    # Determine if TUI should be used
+    if no_tui:
+        use_tui = False
+    elif tui is not None:
+        use_tui = tui
+    else:
+        use_tui = sys.stdout.isatty() and sys.stdin.isatty()
+
+    if use_tui:
+        try:
+            from tui.dashboard import ATPDashboard
+            from tui.models.state import StateManager
+
+            state = StateManager()
+            state.config_file = Path(config) if config else None
+            state.config_dir = Path(config_dir) if config_dir else None
+            state.cv_file = Path(cv)
+            state.headless = headless
+            state.confirmed_only = confirmed_only
+
+            dashboard = ATPDashboard(state)
+            dashboard.run()
+            return
+        except ImportError as e:
+            typer.echo(
+                f"⚠️  TUI not available: {e}. Falling back to text output.",
+                err=True,
+            )
+            use_tui = False
     import time
 
     logger.info("Running full workflow")
