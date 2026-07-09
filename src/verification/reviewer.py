@@ -195,12 +195,12 @@ class JobReviewer:
         logger.debug(f"Saved review: {job_id} -> {status}")
 
     def get_prior_review(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Get prior review decision and timestamp."""
+        """Get prior review decision, crawled date, and timestamps."""
         if not self.conn:
             return None
         cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT status, reviewed_at FROM job_reviews WHERE job_id = ?", (job_id,)
+            "SELECT status, reviewed_at, crawled_at FROM job_reviews WHERE job_id = ?", (job_id,)
         )
         row = cursor.fetchone()
         return dict(row) if row else None
@@ -574,9 +574,10 @@ class JobReviewer:
         typer.echo(f"   Tokens: {tokens} | Cost: ${cost:.6f}")
 
         if prior_review:
-            prior_status = prior_review.get("prior_status", "unknown")
-            reviewed_at = prior_review.get("reviewed_at", "unknown")
-            typer.echo(f"   [Prior: {prior_status} on {reviewed_at}]")
+            status = prior_review.get("status", "unknown")
+            reviewed_at = self._format_timestamp(prior_review.get("reviewed_at"))
+            crawled_at = self._format_timestamp(prior_review.get("crawled_at"))
+            typer.echo(f"   Status: {status} | Crawled: {crawled_at} | Reviewed: {reviewed_at}")
 
         content = preprocessed.get("clean_text", "")
         if content:
