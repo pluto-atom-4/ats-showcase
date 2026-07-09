@@ -22,7 +22,7 @@ class TestDashboard:
         """Dashboard initializes without errors."""
         dashboard = ATPDashboard(state_manager)
         assert dashboard.state is state_manager
-        assert dashboard.title == "ATS Playground - TUI Dashboard"
+        assert dashboard.title == "ATS Showcase - TUI Dashboard"
 
     def test_dashboard_has_bindings(self, state_manager):
         """Dashboard has required keyboard bindings."""
@@ -39,7 +39,7 @@ class TestHeaderPanel:
         """HeaderPanel renders without errors."""
         header = HeaderPanel(state_manager)
         content = header.render()
-        assert "ATS Playground" in content
+        assert "ATS Showcase" in content
         assert "$" in content  # Cost symbol
 
 
