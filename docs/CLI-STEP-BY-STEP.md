@@ -20,7 +20,46 @@ uv run python -m src.cli all --cv data/cv.json --config-dir ./config
 
 ---
 
+## Quick Start with Interactive Dashboard
+
+ATS Playground includes an interactive Textual dashboard that shows real-time progress, live cost tracking, and top job matches as the workflow runs.
+
+**Dashboard auto-launches in interactive terminals:**
+
+```bash
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json
+# Dashboard appears automatically (no --tui flag needed)
+```
+
+**Explicitly enable dashboard:**
+
+```bash
+uv run python -m src.cli all --tui --cv data/cv.json --config config/companies.json
+```
+
+**Force text-only mode (useful for CI/headless):**
+
+```bash
+uv run python -m src.cli all --no-tui --cv data/cv.json --config config/companies.json
+```
+
+**Dashboard shows:**
+- Real-time crawl progress (companies, jobs extracted)
+- Preprocessing tokens and cost
+- Assessment scores and top 5 matches live
+- Overall token usage and cost accumulation
+- Phase status indicators (✅ running, ⏳ in progress, ⚪ pending)
+
+**Keyboard controls:**
+- `p` - Pause/resume workflow
+- `r` - Resume from pause
+- `q` - Quit dashboard
+
+---
+
 ## Full Workflow (8 Commands)
+
+> **Note:** The interactive TUI dashboard is available when running the complete workflow with the `all` command (see Quick Start above). Individual phase commands (crawl, preprocess, assess, export) use text-based output only. For step-by-step phases with TUI visualization, use `uv run python -m src.cli all --tui`.
 
 ### Phase 0: Prerequisites
 
