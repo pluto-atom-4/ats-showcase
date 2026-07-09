@@ -2,17 +2,17 @@
 
 import pytest
 
-from tui.dashboard import ATPDashboard, HeaderPanel
-from tui.models.state import PhaseStatus, StateManager
-from tui.panels.assess_panel import AssessPanel
-from tui.panels.base import BasePanelWidget
-from tui.panels.crawl_panel import CrawlPanel
-from tui.panels.export_panel import ExportPanel
-from tui.panels.preprocess_panel import PreprocessPanel
-from tui.widgets.cost_tracker import CostTracker
-from tui.widgets.job_table import JobTable
-from tui.widgets.phase_indicator import PhaseIndicator
-from tui.widgets.progress_bar import TUIProgressBar
+from src.tui.dashboard import ATPDashboard, HeaderPanel
+from src.tui.models.state import PhaseStatus, StateManager
+from src.tui.panels.assess_panel import AssessPanel
+from src.tui.panels.base import BasePanelWidget
+from src.tui.panels.crawl_panel import CrawlPanel
+from src.tui.panels.export_panel import ExportPanel
+from src.tui.panels.preprocess_panel import PreprocessPanel
+from src.tui.widgets.cost_tracker import CostTracker
+from src.tui.widgets.job_table import JobTable
+from src.tui.widgets.phase_indicator import PhaseIndicator
+from src.tui.widgets.progress_bar import TUIProgressBar
 
 
 class TestDashboard:

@@ -2,7 +2,7 @@
 
 import pytest
 
-from tui.models.state import StateManager
+from src.tui.models.state import StateManager
 
 
 @pytest.fixture
