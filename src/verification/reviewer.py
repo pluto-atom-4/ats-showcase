@@ -516,7 +516,7 @@ class JobReviewer:
         stats: "ReviewStats",
     ) -> str:
         """Handle reject action and return reason."""
-        reason_prompt = "   Rejection reason (tech/location/seniority/other): "
+        reason_prompt = "   Rejection reason (tech/location/seniority/other)"
         reason: str = typer.prompt(reason_prompt).strip().lower()
         self.save_review(job_id, title, location, status="rejected", reason=reason, company=company)
         self._save_re_review_if_changed(
