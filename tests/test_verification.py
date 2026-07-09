@@ -222,13 +222,17 @@ class TestFilteringMethods:
         reviewer._close_db()
 
     def test_check_review_status_confirmed(self, temp_db):
-        """Test filtering already confirmed jobs."""
+        """Test that confirmed jobs are NOT skipped by status filter alone.
+
+        Mode filter (new-only vs all) handles skipping already-reviewed jobs.
+        Status filter only checks skip_rejected flag.
+        """
         reviewer = JobReviewer(db_path=temp_db)
         reviewer.save_review("job_1", "Engineer", "SF", "confirmed", tokens=100)
 
         skip, reason = reviewer._check_review_status("job_1", skip_rejected=True)
-        assert skip is True
-        assert reason == "already_confirmed"
+        assert skip is False  # Confirmed jobs not skipped by status filter
+        assert reason is None
 
         reviewer._close_db()
 
@@ -346,9 +350,9 @@ class TestFilteringMethods:
             cursor.execute("INSERT INTO jobs VALUES ('job_1', '2026-06-01')")
             reviewer.conn.commit()
 
-        # Should skip due to rejection
+        # Should skip due to rejection (test with mode="all" to bypass mode filter)
         skip, reason = reviewer.should_skip_job(
-            "job_1", skip_before_date="2026-07-01", skip_rejected=True, skip_assessed=False
+            "job_1", mode="all", skip_before_date="2026-07-01", skip_rejected=True, skip_assessed=False
         )
         assert skip is True
         assert reason == "previously_rejected"
@@ -371,7 +375,7 @@ class TestFilteringMethods:
             reviewer.conn.commit()
 
         skip, reason = reviewer.should_skip_job(
-            "job_1", skip_before_date="2026-07-01", skip_rejected=False, skip_assessed=False
+            "job_1", mode="all", skip_before_date="2026-07-01", skip_rejected=False, skip_assessed=False
         )
         assert skip is True
         assert "crawled_before" in reason
@@ -383,7 +387,7 @@ class TestFilteringMethods:
         reviewer = JobReviewer(db_path=temp_db)
 
         skip, reason = reviewer.should_skip_job(
-            "job_1", skip_before_date=None, skip_rejected=False, skip_assessed=False
+            "job_1", mode="all", skip_before_date=None, skip_rejected=False, skip_assessed=False
         )
         assert skip is False
         assert reason is None
