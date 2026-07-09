@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class Database:
-    """SQLite database manager for ATS Playground."""
+    """SQLite database manager for ATS Showcase."""
 
     def __init__(self, db_path: str = "data/ats_playground.db"):
         """
