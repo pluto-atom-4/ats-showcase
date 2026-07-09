@@ -1,4 +1,4 @@
-"""Pydantic data models for ATS Playground."""
+"""Pydantic data models for ATS Showcase."""
 
 from models.job import Assessment, JobPosting, PreprocessedJob
 

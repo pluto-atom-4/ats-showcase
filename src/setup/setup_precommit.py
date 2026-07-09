@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Pre-commit setup utility for ATS Playground.
+Pre-commit setup utility for ATS Showcase.
 
 Automatically installs and configures pre-commit hooks to catch code quality
 issues (formatting, linting, type checking, tests) before commits.
@@ -183,7 +183,7 @@ class PreCommitSetup:
         Returns:
             0 if successful, 1 if failed
         """
-        self._print_header("🚀 Pre-commit Setup for ATS Playground")
+        self._print_header("🚀 Pre-commit Setup for ATS Showcase")
 
         # Step 1: Check prerequisites
         self._print_step("1", "Checking prerequisites")
@@ -257,7 +257,7 @@ class PreCommitSetup:
 def main() -> int:
     """CLI entry point for pre-commit setup."""
     parser = argparse.ArgumentParser(
-        description="Set up pre-commit hooks for ATS Playground",
+        description="Set up pre-commit hooks for ATS Showcase",
         epilog="See docs/QUALITY-ASSURANCE.md for detailed documentation",
     )
     parser.add_argument(

@@ -1,1 +1,1 @@
-"""Text User Interface for ATS Playground workflow orchestration."""
+"""Text User Interface for ATS Showcase workflow orchestration."""

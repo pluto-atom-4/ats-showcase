@@ -1,4 +1,4 @@
-"""Typer CLI for ATS Playground workflow orchestration."""
+"""Typer CLI for ATS Showcase workflow orchestration."""
 
 import asyncio
 import json
@@ -107,7 +107,7 @@ def filter_enabled_companies(companies: dict) -> tuple[dict, list[str]]:
 
 app = typer.Typer(
     name="ats-cli",
-    help="ATS Playground: Intelligent job assessment with AI",
+    help="ATS Showcase: Intelligent job assessment with AI",
     invoke_without_command=False,
 )
 

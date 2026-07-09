@@ -1,4 +1,4 @@
-"""Main TUI Dashboard for ATS Playground workflow orchestration."""
+"""Main TUI Dashboard for ATS Showcase workflow orchestration."""
 
 import asyncio
 import logging
@@ -32,7 +32,7 @@ class HeaderPanel(Static):
         """Render header with workflow status and total cost."""
         from src.tui.utils.formatters import format_cost, format_tokens
 
-        title = "🎯 ATS Playground - Workflow Dashboard"
+        title = "🎯 ATS Showcase - Workflow Dashboard"
         tokens = format_tokens(self.state.total_tokens_used)
         cost = format_cost(self.state.total_cost_usd)
 
@@ -41,7 +41,7 @@ class HeaderPanel(Static):
 
 class ATPDashboard(Screen):
     """
-    Main TUI Dashboard for ATS Playground workflow.
+    Main TUI Dashboard for ATS Showcase workflow.
 
     Layout:
     ┌─────────────────────────────────────┐
@@ -98,7 +98,7 @@ class ATPDashboard(Screen):
     ):
         super().__init__()
         self.state = state
-        self.title = "ATS Playground - TUI Dashboard"
+        self.title = "ATS Showcase - TUI Dashboard"
         self.current_phase = "crawl"
         self.companies = companies or {}
         self.cv_file = cv_file
@@ -376,7 +376,7 @@ class ATPDashboard(Screen):
 
             # Build markdown content
             lines = [
-                "# ATS Playground Assessment Report",
+                "# ATS Showcase Assessment Report",
                 f"\nGenerated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
                 "\n## Summary",
                 f"- Total jobs assessed: {len(self.state.jobs)}",

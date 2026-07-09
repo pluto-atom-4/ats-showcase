@@ -1,4 +1,4 @@
-"""Job verification and review module for ATS Playground.
+"""Job verification and review module for ATS Showcase.
 
 This module provides interactive job review capabilities, allowing users to
 confirm, reject, or skip jobs before expensive LLM API calls in Phase 4.
