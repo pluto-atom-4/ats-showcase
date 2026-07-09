@@ -458,7 +458,7 @@ class JobReviewer:
             prompt_text = "   Action (c=confirm/r=reject/s=skip/q=quit"
             if prior_review:
                 prompt_text += "/e=re-review"
-            prompt_text += "): "
+            prompt_text += ")"
             action = typer.prompt(prompt_text).strip().lower()
 
             if self._process_user_action(
