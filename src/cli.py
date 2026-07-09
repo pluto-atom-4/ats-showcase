@@ -152,7 +152,7 @@ def all(
 
     if use_tui:
         try:
-            from src.tui.dashboard import ATPDashboard
+            from src.tui.dashboard import ATPDashboardApp
             from src.tui.models.state import StateManager
 
             state = StateManager()
@@ -160,10 +160,10 @@ def all(
             # Load companies configuration
             companies = load_companies_config(config, config_dir)
 
-            dashboard = ATPDashboard(
+            app = ATPDashboardApp(
                 state, companies=companies, cv_file=cv, headless=headless
             )
-            dashboard.run()
+            app.run()
             return
         except ImportError as e:
             typer.echo(

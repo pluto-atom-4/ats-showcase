@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from textual.app import ComposeResult
+from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import Static
@@ -435,3 +435,36 @@ class ATPDashboard(Screen):
             logger.exception(f"Export phase error: {e}")
             self.state.error_phase("export", str(e))
             raise
+
+
+class ATPDashboardApp(App):
+    """Textual App wrapper for ATPDashboard screen."""
+
+    CSS = """
+    Screen {
+        layout: vertical;
+    }
+    """
+
+    def __init__(
+        self,
+        state: StateManager,
+        companies: Optional[Dict[str, Any]] = None,
+        cv_file: Optional[str] = None,
+        headless: bool = True,
+    ):
+        super().__init__()
+        self.state = state
+        self.companies = companies or {}
+        self.cv_file = cv_file
+        self.headless = headless
+
+    def on_mount(self) -> None:
+        """Mount dashboard screen when app starts."""
+        dashboard = ATPDashboard(
+            self.state,
+            companies=self.companies,
+            cv_file=self.cv_file,
+            headless=self.headless,
+        )
+        self.push_screen(dashboard)
