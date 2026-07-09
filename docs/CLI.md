@@ -420,6 +420,167 @@ def assess_command(
     console.print(table)
 ```
 
+## Interactive TUI Dashboard
+
+ATS Playground includes an optional **Textual-based interactive dashboard** for real-time workflow visualization. The dashboard runs the complete workflow (crawl → preprocess → assess → export) with live progress tracking, cost accumulation, and pause/resume controls.
+
+### Enabling the Dashboard
+
+The dashboard is **automatically enabled** when running in an interactive terminal:
+
+```bash
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json
+# Dashboard auto-launches if stdout/stdin are TTYs
+```
+
+### Explicit Control
+
+```bash
+# Force enable TUI (interactive dashboard)
+uv run python -m src.cli all --tui --cv data/cv.json --config config/companies.json
+
+# Force disable TUI (text-only output, suitable for CI/pipes)
+uv run python -m src.cli all --no-tui --cv data/cv.json --config config/companies.json
+```
+
+### Dashboard Layout
+
+```
+┌──────────────────────────────────────────────────┐
+│ 🎯 ATS Playground - Workflow Dashboard          │
+│ Tokens: 45,230 | Total Cost: $0.1357            │
+├──────────────────────────────────────────────────┤
+│ ✅ Crawl | ⏳ Preprocess | ⚪ Assess | ⚪ Export │
+├──────────────────────────────────────────────────┤
+│                                                  │
+│  🕷️ CRAWL PHASE | RUNNING                       │
+│  Companies: 12 | Jobs Extracted: 347 | Failed: 0│
+│  ████████░░░░░░░░░░░░ 45% (6/12)                │
+│  ETA: 2m 15s | Speed: 0.5 jobs/sec              │
+│  Tokens: 1,230 | Cost: $0.0037                  │
+│                                                  │
+├──────────────────────────────────────────────────┤
+│ [p]ause [r]esume [q]uit                         │
+└──────────────────────────────────────────────────┘
+```
+
+### Keyboard Bindings
+
+| Key | Action |
+|-----|--------|
+| `p` | Pause/Resume workflow |
+| `r` | Resume from pause |
+| `q` | Quit dashboard (stops workflow) |
+
+### Dashboard Phases
+
+The dashboard displays each phase sequentially with real-time updates:
+
+1. **Crawl Phase** - Extract jobs from career pages
+   - Companies processed / total
+   - Jobs extracted per company
+   - Network errors (if any)
+   - Running token count
+
+2. **Preprocess Phase** - Clean & chunk job descriptions
+   - Jobs processed / total
+   - Token count per job
+   - Running cost estimate
+   - Chunking speed (tokens/sec)
+
+3. **Assess Phase** - Claude API matching
+   - Jobs assessed / total
+   - Top 5 matches displayed live
+   - Running cost + actual tokens used
+   - Overall/tech/seniority scores per job
+
+4. **Export Phase** - Generate markdown report
+   - Report file path
+   - Generation status
+   - Final cost summary
+
+### CLI vs TUI Comparison
+
+| Aspect | CLI Mode (`--no-tui`) | TUI Dashboard |
+|--------|----------------------|---------------|
+| **Output** | Line-by-line text to stdout | Real-time interactive panels |
+| **Interactivity** | None | Pause/resume, keyboard controls |
+| **Progress Display** | Progress bars, final summary | Live phase-by-phase updates |
+| **Cost Tracking** | Reported at end | Real-time counter |
+| **Top Matches** | Printed after assess complete | Updated live during assess |
+| **Suitable For** | Headless/CI/piping | Interactive terminal usage |
+| **Log Output** | All logs to stdout/file | Logs to file, TUI for status |
+
+### When to Use Each Mode
+
+**Use Interactive TUI Dashboard (`--tui`):**
+- Running in interactive terminal (not piped/redirected)
+- Want real-time progress visualization
+- Need to pause/resume long workflows
+- Want live cost tracking
+- Assessing large job sets (100+ jobs)
+
+**Use CLI Text Mode (`--no-tui`):**
+- Headless/remote environments (SSH with limited terminal support)
+- Piping output to files or other commands
+- CI/CD pipelines
+- Parsing output programmatically
+- Running in limited terminal (no color/ANSI support)
+
+### Auto-Detection Logic
+
+When neither `--tui` nor `--no-tui` is specified, the CLI auto-detects:
+
+```python
+use_tui = sys.stdout.isatty() and sys.stdin.isatty()
+```
+
+This enables the dashboard only when both stdout and stdin are connected to a terminal, ensuring headless/piped execution automatically falls back to text mode.
+
+### Examples
+
+**Interactive workflow with dashboard (auto-detected):**
+```bash
+uv run python -m src.cli all \
+  --cv data/my_cv.json \
+  --config config/companies.json
+```
+
+**Explicit TUI mode for testing:**
+```bash
+uv run python -m src.cli all \
+  --tui \
+  --cv data/my_cv.json \
+  --config config/companies.json \
+  --headless
+```
+
+**CI/headless with text output:**
+```bash
+uv run python -m src.cli all \
+  --no-tui \
+  --cv data/my_cv.json \
+  --config config/companies.json \
+  2>&1 | tee assessment.log
+```
+
+### Troubleshooting
+
+**Dashboard doesn't appear (expected TUI, got text):**
+- Check terminal is interactive (not piped)
+- Explicitly use `--tui` flag to force enable
+- Verify stdout/stdin are TTYs: `isatty` test
+
+**Terminal rendering issues (garbled text):**
+- Update terminal emulator (Textual requires modern terminal)
+- Disable colors: Not supported yet (Textual always uses colors)
+- Try `--no-tui` mode as fallback
+
+**Dashboard freezes or hangs:**
+- Press `q` to quit (safe even if workflow mid-phase)
+- Check logs in `logs/app.log` for errors
+- Report issue with terminal version and size
+
 ## Complete Command Reference
 
 ### crawl
