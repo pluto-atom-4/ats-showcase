@@ -5,6 +5,7 @@ We appreciate your interest in contributing to the ATS Playground project! This 
 ## Table of Contents
 
 - [Getting Started](#getting-started)
+- [Understanding Agent Roles](#understanding-agent-roles)
 - [GitHub Copilot CLI Setup](#github-copilot-cli-setup)
 - [Development Workflow](#development-workflow)
 - [Code Quality Standards](#code-quality-standards)
@@ -65,6 +66,24 @@ black --version
 ruff --version
 mypy --version
 ```
+
+## Understanding Agent Roles
+
+ATS Playground uses a **multi-agent coordination model** to organize development work. Read [AGENTS.md](./AGENTS.md) to understand:
+
+- **Architect/Planner**: Designs features, writes tasks.md, reads DESIGN.md
+- **Coder/Implementer**: Writes production code, implements features from tasks.md
+- **Reviewer/Tester**: Runs tests, verifies code quality, validates against tests
+
+**Key Concept**: Work flows through handovers: Architect → tasks.md → Coder → Pull Request → Reviewer → Merge
+
+See [AGENTS.md](./AGENTS.md) for:
+- Detailed role responsibilities and boundaries
+- Handover protocol and escalation rules (Three-Strike Rule)
+- Permission matrix (what each agent can access)
+- State locking for sub-agent recovery
+
+This structure keeps work organized and prevents bottlenecks when multiple agents collaborate.
 
 ## GitHub Copilot CLI Setup
 

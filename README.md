@@ -352,6 +352,28 @@ Tests cover:
 - ✅ SQLite queries & exports
 - ✅ CLI commands & arguments
 
+## 📑 Configuration File Map
+
+**For new developers**: Read these files in order to understand the project structure and development workflow.
+
+| File | Purpose | Read When |
+|------|---------|-----------|
+| [CLAUDE.md](./CLAUDE.md) | Core rules, quick commands, never-do-this guardrails | Setting up your environment |
+| [AGENTS.md](./AGENTS.md) | Agent roles, handover protocol, escalation rules | Understanding multi-agent coordination |
+| [DESIGN.md](./DESIGN.md) | Architecture, module structure, design decisions | Learning project design patterns |
+| [.claude/settings.json](./.claude/settings.json) | Model tier pinning, permissions, orchestration layer | Configuring Claude Code behavior |
+| [.claude/rules/](./claude/rules/) | Phase-specific guidance (crawl, preprocess, assess, etc.) | Working on a specific phase |
+| [.github/instructions/](./github/instructions/) | CLI usage, code patterns, topic-scoped rules | Writing code or using CLI commands |
+| [docs/COMPATIBILITY.md](./docs/COMPATIBILITY.md) | Troubleshooting, version matrix, environment setup | Debugging issues |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | Contributing guidelines, PR process | Ready to contribute |
+
+**Quick Navigation:**
+- **I want to run the code** → [CLAUDE.md](./CLAUDE.md) § Quick Workflow
+- **I want to understand the design** → [DESIGN.md](./DESIGN.md)
+- **I want to write code** → [.github/instructions/code-patterns.instructions.md](./.github/instructions/code-patterns.instructions.md)
+- **I need a CLI command** → [.github/instructions/cli-usage.instructions.md](./.github/instructions/cli-usage.instructions.md)
+- **I need to troubleshoot** → [docs/COMPATIBILITY.md](./docs/COMPATIBILITY.md)
+
 ## 🤝 Contributing
 
 1. **Read code standards**: [CONVENTIONS.md](./docs/CONVENTIONS.md)
