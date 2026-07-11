@@ -1,49 +1,18 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "model": "claude-haiku-4-5-20251001",
-  "modelOverride": "haiku",
-  "fastMode": false,
-  "verbose": true,
-  "autoCompactEnabled": true,
-  "autoCompactWindow": 150000,
-  "fileCheckpointingEnabled": true,
   "respectGitignore": true,
-  "claudeMdExcludes": [
-    "**/vendor/**/CLAUDE.md",
-    "**/node_modules/**/CLAUDE.md"
-  ],
-  "agentRoles": {
-    "architect": {
-      "model": "claude-opus-4-8",
-      "permissions": ["read", "view", "write:tasks.md", "write:docs/dev-note/*"],
-      "maxSteps": 15,
-      "forbidden": ["write:src/**", "write:tests/**", "bash:execute", "git:push"]
-    },
-    "coder": {
-      "model": "claude-opus-4-8",
-      "permissions": ["read", "write:src/**", "write:tests/**", "bash:compile", "bash:test"],
-      "maxSteps": 20,
-      "forbidden": ["write:CLAUDE.md", "write:AGENTS.md", "write:.claude/settings.json", "git:push:force"]
-    },
-    "reviewer": {
-      "model": "claude-sonnet-5",
-      "permissions": ["read", "bash:test", "bash:lint", "write:.test.*"],
-      "maxSteps": 10,
-      "forbidden": ["write:src/**", "git:merge", "git:push:force"]
-    }
+  "attribution": {
+    "commit": "Co-Authored-By: Claude <claude@anthropic.com>"
   },
   "permissions": {
-    "defaultMode": "default",
     "allow": [
       "Read",
       "Edit",
       "Write",
-      "Bash(git *)",
       "Bash(uv *)",
       "Bash(pytest *)",
       "Bash(black *)",
       "Bash(ruff *)",
-      "Bash(python *)",
       "Bash(ls *)",
       "Bash(grep *)",
       "Bash(find *)",
@@ -74,8 +43,10 @@
       "Write(.env*)",
       "Bash(npm *)",
       "Bash(yarn *)"
-    ]
+    ],
+    "defaultMode": "default"
   },
+  "model": "claude-haiku-4-5-20251001",
   "hooks": {
     "PostToolUse": [
       {
@@ -84,14 +55,13 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/post-edit-quality.sh",
-            "statusMessage": "Running quality checks on edited file...",
-            "timeout": 60
+            "timeout": 60,
+            "statusMessage": "Running quality checks on edited file..."
           }
         ]
       }
     ]
   },
-  "alwaysThinkingEnabled": true,
   "enabledPlugins": {
     "example-skills@anthropic-agent-skills": true,
     "pyright-lsp@claude-plugins-official": true
@@ -109,15 +79,73 @@
       ]
     }
   },
-  "attribution": {
-    "commit": "Co-Authored-By: Claude <claude@anthropic.com>"
-  },
   "spinnerTipsEnabled": true,
+  "alwaysThinkingEnabled": true,
+  "autoCompactWindow": 150000,
+  "fastMode": false,
+  "claudeMdExcludes": [
+    "**/vendor/**/CLAUDE.md",
+    "**/node_modules/**/CLAUDE.md"
+  ],
+  "verbose": true,
+  "autoCompactEnabled": true,
+  "fileCheckpointingEnabled": true,
   "showTurnDuration": false,
   "showMessageTimestamps": false,
+  "modelOverride": "haiku",
+  "agentRoles": {
+    "architect": {
+      "model": "claude-opus-4-8",
+      "permissions": [
+        "read",
+        "view",
+        "write:tasks.md",
+        "write:docs/dev-note/*"
+      ],
+      "maxSteps": 15,
+      "forbidden": [
+        "write:src/**",
+        "write:tests/**",
+        "bash:execute",
+        "git:push"
+      ]
+    },
+    "coder": {
+      "model": "claude-opus-4-8",
+      "permissions": [
+        "read",
+        "write:src/**",
+        "write:tests/**",
+        "bash:compile",
+        "bash:test"
+      ],
+      "maxSteps": 20,
+      "forbidden": [
+        "write:CLAUDE.md",
+        "write:AGENTS.md",
+        "write:.claude/settings.json",
+        "git:push:force"
+      ]
+    },
+    "reviewer": {
+      "model": "claude-sonnet-5",
+      "permissions": [
+        "read",
+        "bash:test",
+        "bash:lint",
+        "write:.test.*"
+      ],
+      "maxSteps": 10,
+      "forbidden": [
+        "write:src/**",
+        "git:merge",
+        "git:push:force"
+      ]
+    }
+  },
   "todo": false,
   "mcpServers": {
-      "playwright": {
+    "playwright": {
       "type": "local",
       "command": "npx",
       "args": [
