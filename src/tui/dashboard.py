@@ -116,9 +116,17 @@ class ATPDashboard(Screen):
 
         with Vertical(id="content"):
             yield CrawlPanel(self.state, id="crawl-panel")
-            yield PreprocessPanel(self.state, id="preprocess-panel", visible=False)
-            yield AssessPanel(self.state, id="assess-panel", visible=False)
-            yield ExportPanel(self.state, id="export-panel", visible=False)
+            preprocess_panel = PreprocessPanel(self.state, id="preprocess-panel")
+            preprocess_panel.styles.display = "none"
+            yield preprocess_panel
+
+            assess_panel = AssessPanel(self.state, id="assess-panel")
+            assess_panel.styles.display = "none"
+            yield assess_panel
+
+            export_panel = ExportPanel(self.state, id="export-panel")
+            export_panel.styles.display = "none"
+            yield export_panel
 
         yield Static("[p]ause [r]esume [q]uit", id="footer")
 
@@ -131,7 +139,7 @@ class ATPDashboard(Screen):
             "export-panel",
         ]:
             panel = self.query_one(f"#{panel_name}")
-            panel.visible = panel_name == panel_id
+            panel.styles.display = "block" if panel_name == panel_id else "none"
 
     def action_pause_resume(self) -> None:
         """Toggle pause on workflow."""
