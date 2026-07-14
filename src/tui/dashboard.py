@@ -218,6 +218,7 @@ class ATPDashboard(Screen):
                         company=job.company,
                         location=job.location or "Unknown",
                         url=str(job.url) if job.url else "",
+                        description=job.description or "",
                     )
                 self.state.increment_phase_progress("crawl")
 
@@ -383,16 +384,17 @@ class ATPDashboard(Screen):
             preprocessed_jobs = [
                 {
                     "job_id": job_id,
-                    "title": job.get("title"),
                     "company": job.get("company"),
-                    "location": job.get("location"),
-                    "url": job.get("url"),
                     "clean_text": job.get("clean_text", ""),
+                    "sentences": (
+                        job.get("clean_text", "").split("\n")
+                        if job.get("clean_text")
+                        else []
+                    ),
                     "chunks": job.get("chunks", []),
-                    "total_tokens": job.get("total_tokens", 0),
+                    "token_count": job.get("total_tokens", 0),
                     "estimated_cost": job.get("estimated_cost", 0.0),
-                    "overall_score": job.get("overall_score"),
-                    "assessment_summary": job.get("assessment_summary"),
+                    "crawled_date": datetime.now().isoformat(),
                 }
                 for job_id, job in self.state.jobs.items()
             ]
