@@ -218,11 +218,11 @@ class ATPDashboard(Screen):
             for _, jobs in results.items():
                 for job in jobs:
                     self.state.add_job(
-                        job_id=job.job_id,
+                        job_id=job.id or f"{job.company}_{job.title}",
                         title=job.title,
                         company=job.company,
                         location=job.location or "Unknown",
-                        url=job.apply_url or "",
+                        url=str(job.url) if job.url else "",
                     )
                 self.state.increment_phase_progress("crawl")
 
