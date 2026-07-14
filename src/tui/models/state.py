@@ -7,7 +7,7 @@ when mutating StateManager from async tasks to prevent race conditions.
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 class PhaseStatus(str, Enum):
@@ -92,12 +92,14 @@ class StateManager:
         self.top_matches: List[Dict[str, Any]] = []
         self.current_errors: List[str] = []
         self.paused = False
+        self.observers: List[Callable[[str], None]] = []
 
     def start_phase(self, phase: str, total_items: int) -> None:
         """Mark phase as running, set total item count."""
         self.phase_status[phase] = PhaseStatus.RUNNING
         self.phase_metrics[phase] = PhaseMetrics(total_items=total_items)
         self.phase_metrics[phase].start_time = datetime.now()
+        self._notify_observers(phase)
 
     def increment_phase_progress(
         self,
@@ -116,11 +118,14 @@ class StateManager:
             metrics.failed_items += 1
             self.current_errors.append(error)
 
+        self._notify_observers(phase)
+
     def complete_phase(self, phase: str) -> None:
         """Mark phase as complete."""
         metrics = self.phase_metrics[phase]
         metrics.end_time = datetime.now()
         self.phase_status[phase] = PhaseStatus.COMPLETED
+        self._notify_observers(phase)
 
     def error_phase(self, phase: str, error: str) -> None:
         """Mark phase as failed with error."""
@@ -128,6 +133,22 @@ class StateManager:
         metrics.end_time = datetime.now()
         self.phase_status[phase] = PhaseStatus.ERROR
         self.current_errors.append(error)
+        self._notify_observers(phase)
+
+    def subscribe(self, callback: Callable[[str], None]) -> None:
+        """Register observer callback for state changes.
+
+        Callback will be called with phase name when metrics change.
+        """
+        self.observers.append(callback)
+
+    def _notify_observers(self, phase: str) -> None:
+        """Notify all observers of state change."""
+        for callback in self.observers:
+            try:
+                callback(phase)
+            except Exception:
+                pass
 
     def add_job(self, job_id: str, title: str, company: str, **kwargs: Any) -> None:
         """Register a job being processed."""

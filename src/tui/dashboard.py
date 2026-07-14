@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.screen import Screen
@@ -180,9 +181,10 @@ class ATPDashboard(Screen):
         """Start workflow when dashboard mounts."""
         self.run_workflow()
 
-    def run_workflow(self) -> None:
+    @work(exclusive=True)
+    async def run_workflow(self) -> None:
         """Start async workflow orchestration."""
-        asyncio.create_task(self._run_workflow_async())
+        await self._run_workflow_async()
 
     async def _run_workflow_async(self) -> None:
         """Run complete workflow asynchronously."""
