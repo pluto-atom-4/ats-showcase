@@ -367,13 +367,42 @@ class ATPDashboard(Screen):
             raise
 
     async def _phase_export(self) -> None:
-        """Execute export phase with markdown report generation."""
+        """Execute export phase with markdown report and JSON persistence."""
+        import json
         from pathlib import Path
 
         self._show_panel("export-panel")
         self.state.start_phase("export", total_items=1)
 
         try:
+            # Export preprocessed jobs to JSON (persist state to disk)
+            export_dir = Path("data/extracted_jobs")
+            export_dir.mkdir(parents=True, exist_ok=True)
+            preprocessed_file = export_dir / "preprocessed_jobs.json"
+
+            preprocessed_jobs = [
+                {
+                    "job_id": job_id,
+                    "title": job.get("title"),
+                    "company": job.get("company"),
+                    "location": job.get("location"),
+                    "url": job.get("url"),
+                    "clean_text": job.get("clean_text", ""),
+                    "chunks": job.get("chunks", []),
+                    "total_tokens": job.get("total_tokens", 0),
+                    "estimated_cost": job.get("estimated_cost", 0.0),
+                    "overall_score": job.get("overall_score"),
+                    "assessment_summary": job.get("assessment_summary"),
+                }
+                for job_id, job in self.state.jobs.items()
+            ]
+
+            preprocessed_file.write_text(
+                json.dumps(preprocessed_jobs, indent=2, default=str),
+                encoding="utf-8",
+            )
+            logger.info(f"Preprocessed jobs exported to {preprocessed_file}")
+
             # Generate markdown report
             report_dir = Path("data/assessments")
             report_dir.mkdir(parents=True, exist_ok=True)
