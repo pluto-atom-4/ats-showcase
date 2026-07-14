@@ -191,3 +191,10 @@ Thumbs.db
 
 config_test
 /.playwright-mcp/
+
+# Dev temporary files
+pr-content*.json
+sub-issues-contents*.json
+gh-issue-draft*.md*
+feat-idea.md
+flaw-symptom.md
