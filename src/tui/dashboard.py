@@ -9,7 +9,7 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import Static
+from textual.widgets import Footer, Static
 
 from src.browser.crawler import Crawler
 from src.tui.models.state import PhaseStatus, StateManager
@@ -77,11 +77,6 @@ class ATPDashboard(Screen):
         height: 1fr;
         border: solid $primary;
     }
-
-    #footer {
-        height: 1;
-        background: $boost;
-    }
     """
 
     BINDINGS = [
@@ -129,7 +124,7 @@ class ATPDashboard(Screen):
             export_panel.styles.display = "none"
             yield export_panel
 
-        yield Static("[p]ause [r]esume [q]uit", id="footer")
+        yield Footer()
 
     def _show_panel(self, panel_id: str) -> None:
         """Show one panel, hide others."""
