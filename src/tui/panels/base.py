@@ -33,6 +33,16 @@ class BasePanelWidget(Container):
         self.state = state
         self.phase = phase
 
+    def on_mount(self) -> None:
+        """Subscribe to state changes and set refresh interval."""
+        self.state.subscribe(self._on_state_change)
+        self.set_interval(0.5, self.refresh)
+
+    def _on_state_change(self, phase: str) -> None:
+        """Handle state change notification."""
+        if phase == self.phase:
+            self.refresh()
+
     def get_phase_title(self) -> str:
         """Get phase display title."""
         titles = {

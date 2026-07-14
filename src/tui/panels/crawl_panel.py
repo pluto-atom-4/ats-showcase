@@ -1,7 +1,6 @@
 """Panel for crawl phase display."""
 
-
-from src.tui.models.state import StateManager
+from src.tui.models.state import PhaseStatus, StateManager
 from src.tui.panels.base import BasePanelWidget
 from src.tui.utils.formatters import format_progress_bar
 
@@ -15,12 +14,15 @@ class CrawlPanel(BasePanelWidget):
     def render(self) -> str:
         """Render crawl panel content."""
         metrics = self.state.phase_metrics["crawl"]
+        status = self.state.phase_status["crawl"]
 
         lines = [
             self.render_phase_header(),
         ]
 
-        if metrics.total_items > 0:
+        if status == PhaseStatus.RUNNING and metrics.processed_items == 0:
+            lines.append("⏳ Initializing crawler...")
+        elif metrics.total_items > 0:
             bar = format_progress_bar(metrics.progress_percent, width=50)
             lines.append(bar)
 

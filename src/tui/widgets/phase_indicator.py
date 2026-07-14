@@ -12,6 +12,15 @@ class PhaseIndicator(Static):
         super().__init__(*args, **kwargs)
         self.state = state
 
+    def on_mount(self) -> None:
+        """Subscribe to state changes and set refresh interval."""
+        self.state.subscribe(self._on_state_change)
+        self.set_interval(0.5, self.refresh)
+
+    def _on_state_change(self, phase: str) -> None:
+        """Handle state change notification."""
+        self.refresh()
+
     def get_phase_indicator(self, phase: str) -> str:
         """Get status indicator for one phase."""
         status = self.state.phase_status[phase]

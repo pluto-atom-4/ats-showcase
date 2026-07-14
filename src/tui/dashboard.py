@@ -5,10 +5,11 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import Static
+from textual.widgets import Footer, Static
 
 from src.browser.crawler import Crawler
 from src.tui.models.state import PhaseStatus, StateManager
@@ -76,11 +77,6 @@ class ATPDashboard(Screen):
         height: 1fr;
         border: solid $primary;
     }
-
-    #footer {
-        height: 1;
-        background: $boost;
-    }
     """
 
     BINDINGS = [
@@ -128,7 +124,7 @@ class ATPDashboard(Screen):
             export_panel.styles.display = "none"
             yield export_panel
 
-        yield Static("[p]ause [r]esume [q]uit", id="footer")
+        yield Footer()
 
     def _show_panel(self, panel_id: str) -> None:
         """Show one panel, hide others."""
@@ -180,9 +176,10 @@ class ATPDashboard(Screen):
         """Start workflow when dashboard mounts."""
         self.run_workflow()
 
-    def run_workflow(self) -> None:
+    @work(exclusive=True)
+    async def run_workflow(self) -> None:
         """Start async workflow orchestration."""
-        asyncio.create_task(self._run_workflow_async())
+        await self._run_workflow_async()
 
     async def _run_workflow_async(self) -> None:
         """Run complete workflow asynchronously."""
@@ -216,11 +213,12 @@ class ATPDashboard(Screen):
             for _, jobs in results.items():
                 for job in jobs:
                     self.state.add_job(
-                        job_id=job.job_id,
+                        job_id=job.id or f"{job.company}_{job.title}",
                         title=job.title,
                         company=job.company,
                         location=job.location or "Unknown",
-                        url=job.apply_url or "",
+                        url=str(job.url) if job.url else "",
+                        description=job.description or "",
                     )
                 self.state.increment_phase_progress("crawl")
 
@@ -370,13 +368,43 @@ class ATPDashboard(Screen):
             raise
 
     async def _phase_export(self) -> None:
-        """Execute export phase with markdown report generation."""
+        """Execute export phase with markdown report and JSON persistence."""
+        import json
         from pathlib import Path
 
         self._show_panel("export-panel")
         self.state.start_phase("export", total_items=1)
 
         try:
+            # Export preprocessed jobs to JSON (persist state to disk)
+            export_dir = Path("data/extracted_jobs")
+            export_dir.mkdir(parents=True, exist_ok=True)
+            preprocessed_file = export_dir / "preprocessed_jobs.json"
+
+            preprocessed_jobs = [
+                {
+                    "job_id": job_id,
+                    "company": job.get("company"),
+                    "clean_text": job.get("clean_text", ""),
+                    "sentences": (
+                        job.get("clean_text", "").split("\n")
+                        if job.get("clean_text")
+                        else []
+                    ),
+                    "chunks": job.get("chunks", []),
+                    "token_count": job.get("total_tokens", 0),
+                    "estimated_cost": job.get("estimated_cost", 0.0),
+                    "crawled_date": datetime.now().isoformat(),
+                }
+                for job_id, job in self.state.jobs.items()
+            ]
+
+            preprocessed_file.write_text(
+                json.dumps(preprocessed_jobs, indent=2, default=str),
+                encoding="utf-8",
+            )
+            logger.info(f"Preprocessed jobs exported to {preprocessed_file}")
+
             # Generate markdown report
             report_dir = Path("data/assessments")
             report_dir.mkdir(parents=True, exist_ok=True)
