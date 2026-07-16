@@ -151,12 +151,19 @@ class StateManager:
                 pass
 
     def add_job(self, job_id: str, title: str, company: str, **kwargs: Any) -> None:
-        """Register a job being processed."""
+        """Register a job being processed.
+
+        Status values:
+        - pending_review: default after crawl, waiting for user approval
+        - confirmed: user approved, will assess
+        - rejected: user rejected, skip assessment
+        - assessed: assessment complete
+        """
         self.jobs[job_id] = {
             "id": job_id,
             "title": title,
             "company": company,
-            "status": "pending",
+            "status": "pending_review",
             **kwargs,
         }
 

@@ -12,6 +12,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, Static
 
 from src.browser.crawler import Crawler
+from src.tui.dialogs.job_review import JobReviewDialog
 from src.tui.models.state import PhaseStatus, StateManager
 from src.tui.panels.assess_panel import AssessPanel
 from src.tui.panels.crawl_panel import CrawlPanel
@@ -91,6 +92,7 @@ class ATPDashboard(Screen):
         companies: Optional[Dict[str, Any]] = None,
         cv_file: Optional[str] = None,
         headless: bool = True,
+        interactive: bool = False,
     ):
         super().__init__()
         self.state = state
@@ -100,6 +102,7 @@ class ATPDashboard(Screen):
         self.cv_file = cv_file
         self.cv_text = ""
         self.headless = headless
+        self.interactive = interactive
 
         # Load CV if provided
         if cv_file:
@@ -212,15 +215,33 @@ class ATPDashboard(Screen):
 
             for _, jobs in results.items():
                 for job in jobs:
+                    job_id = job.id or f"{job.company}_{job.title}"
                     self.state.add_job(
-                        job_id=job.id or f"{job.company}_{job.title}",
+                        job_id=job_id,
                         title=job.title,
                         company=job.company,
                         location=job.location or "Unknown",
                         url=str(job.url) if job.url else "",
                         description=job.description or "",
                     )
-                self.state.increment_phase_progress("crawl")
+
+                    # Interactive approval if enabled
+                    if self.interactive:
+                        decision = await self.app.push_screen_wait(
+                            JobReviewDialog(job_id, self.state.jobs[job_id])
+                        )
+                        if decision == "confirm":
+                            self.state.update_job(job_id, status="confirmed")
+                        elif decision == "reject":
+                            self.state.update_job(job_id, status="rejected")
+                        elif decision == "skip":
+                            self.state.update_job(job_id, status="pending_review")
+                        # None means escape key, treat as skip
+                        else:
+                            self.state.update_job(job_id, status="pending_review")
+
+                    self.state.increment_phase_progress("crawl")
+                    await asyncio.sleep(0.01)
 
             logger.info(f"Crawled {total_jobs} jobs from {len(results)} companies")
             self.state.complete_phase("crawl")
@@ -311,6 +332,12 @@ class ATPDashboard(Screen):
 
             for job_id, job_data in self.state.jobs.items():
                 try:
+                    # Skip rejected jobs (filtered during interactive review)
+                    if job_data.get("status") == "rejected":
+                        logger.debug(f"Skipping rejected job {job_id}")
+                        self.state.increment_phase_progress("assess", tokens=0)
+                        continue
+
                     # Get preprocessed chunks
                     chunks = job_data.get("chunks", [])
                     if not chunks:

@@ -197,4 +197,4 @@ pr-content*.json
 sub-issues-contents*.json
 gh-issue-draft*.md*
 feat-idea.md
-flaw-symptom.md
+flaw-symptons.md

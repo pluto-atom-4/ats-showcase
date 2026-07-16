@@ -196,7 +196,7 @@ class TestStateManager:
         assert "job1" in state_manager.jobs
         assert state_manager.jobs["job1"]["title"] == "Senior Python Dev"
         assert state_manager.jobs["job1"]["company"] == "TechCorp"
-        assert state_manager.jobs["job1"]["status"] == "pending"
+        assert state_manager.jobs["job1"]["status"] == "pending_review"
 
     def test_add_job_with_kwargs(self, state_manager):
         """add_job supports additional attributes."""

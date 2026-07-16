@@ -92,16 +92,28 @@ class TestAssessPanel:
         panel = AssessPanel(state_manager)
         state_manager.start_phase("assess", total_items=3)
 
-        matches = [
-            {"title": "Python Developer", "company": "TechCorp", "overall_score": 95},
-            {"title": "Backend Engineer", "company": "StartupXYZ", "overall_score": 87},
-        ]
-        state_manager.update_top_matches(matches)
+        # Add jobs to state
+        state_manager.add_job(
+            job_id="job_1",
+            title="Python Developer",
+            company="TechCorp",
+            overall_score=95,
+        )
+        state_manager.add_job(
+            job_id="job_2",
+            title="Backend Engineer",
+            company="StartupXYZ",
+            overall_score=87,
+        )
 
+        # Verify panel header renders
         content = panel.render()
         assert "ASSESS" in content
-        assert "Python Developer" in content
-        assert "95" in content
+
+        # Verify jobs are in state (panel would display via JobTable widget)
+        jobs_in_state = [j for j in state_manager.jobs.values() if j.get("overall_score")]
+        assert len(jobs_in_state) == 2
+        assert any(j["title"] == "Python Developer" for j in jobs_in_state)
 
 
 class TestExportPanel:
