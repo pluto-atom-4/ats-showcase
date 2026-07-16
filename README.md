@@ -27,10 +27,10 @@ cp .env.example .env
 export ANTHROPIC_API_KEY="sk-ant-..."
 
 # 4. Run the full workflow
-python -m src.cli --all --cv data/cv.json --config config/companies.json
+python -m src.cli all --cv data/cv.json --config config/companies.json
 
 # Or with directory of configs (NEW - enables selective company processing):
-python -m src.cli --all --cv data/cv.json --config-dir ./config
+python -m src.cli all --cv data/cv.json --config-dir ./config
 
 # Or run individually:
 python -m src.cli crawl --config config/companies.json
@@ -54,13 +54,13 @@ Run the workflow with an interactive text-based dashboard for real-time progress
 
 ```bash
 # Auto-detect TUI from terminal (runs in TUI if interactive)
-python -m src.cli --all --cv data/cv.json --config config/companies.json
+python -m src.cli all --cv data/cv.json --config config/companies.json
 
 # Force TUI mode
-python -m src.cli --all --cv data/cv.json --config config/companies.json --tui
+python -m src.cli all --cv data/cv.json --config config/companies.json --tui
 
 # Force text-only mode
-python -m src.cli --all --cv data/cv.json --config config/companies.json --no-tui
+python -m src.cli all --cv data/cv.json --config config/companies.json --no-tui
 ```
 
 **Dashboard Features**:
@@ -240,7 +240,7 @@ uv run python -c "import spacy; print(spacy.load('en_core_web_md'))"
 ### Full Workflow (One Command)
 ```bash
 # Process all companies in config, assess against your CV
-uv run python -m src.cli --all --cv data/cv.json --config config/companies.json
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json
 ```
 
 ### Step-by-Step

@@ -25,6 +25,9 @@ class JobTable(DataTable[str]):
         self.state = state
         self.expanded_job_id: Optional[str] = None
         self.job_rows: Dict[RowKey, Dict[str, Any]] = {}
+        self.all_jobs: list[Dict[str, Any]] = []
+        self.search_query: str = ""
+        self.status_filter: Optional[str] = None
 
     def on_mount(self) -> None:
         """Setup table columns."""
@@ -39,10 +42,33 @@ class JobTable(DataTable[str]):
 
     def update_rows(self, jobs: list[Dict[str, Any]]) -> None:
         """Populate table with job data."""
+        self.all_jobs = jobs
+        self._apply_filters()
+
+    def _apply_filters(self) -> None:
+        """Apply search and status filters, then render table."""
+        filtered = self.all_jobs
+
+        # Apply search filter
+        if self.search_query:
+            query_lower = self.search_query.lower()
+            filtered = [
+                j
+                for j in filtered
+                if query_lower in j.get("title", "").lower()
+                or query_lower in j.get("company", "").lower()
+                or query_lower in j.get("location", "").lower()
+            ]
+
+        # Apply status filter
+        if self.status_filter:
+            filtered = [j for j in filtered if j.get("status") == self.status_filter]
+
+        # Clear and re-render table
         self.clear()
         self.job_rows.clear()
 
-        for job in jobs:
+        for job in filtered:
             title = truncate(job.get("title", ""), max_len=35)
             company = truncate(job.get("company", ""), max_len=20)
             overall = f"{job.get('overall_score', 0):.0f}"
@@ -52,6 +78,26 @@ class JobTable(DataTable[str]):
 
             row_key = self.add_row(title, company, overall, tech, seniority, location)
             self.job_rows[row_key] = job
+
+    def filter_by_search(self, query: str) -> None:
+        """Filter jobs by search query (title/company/location)."""
+        self.search_query = query
+        self._apply_filters()
+
+    def filter_by_status(self, status: Optional[str]) -> None:
+        """Filter jobs by status (None to clear)."""
+        self.status_filter = status
+        self._apply_filters()
+
+    def clear_filters(self) -> None:
+        """Clear all filters and show all jobs."""
+        self.search_query = ""
+        self.status_filter = None
+        self._apply_filters()
+
+    def get_filtered_count(self) -> int:
+        """Get count of currently displayed jobs."""
+        return len(self.job_rows)
 
     def get_expanded_job(self) -> Optional[Dict[str, Any]]:
         """Get currently expanded job data, or None."""
