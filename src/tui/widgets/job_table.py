@@ -3,12 +3,13 @@
 from typing import Any, Dict, Optional
 
 from textual.widgets import DataTable
+from textual.widgets.data_table import RowKey
 
 from src.tui.models.state import StateManager
 from src.tui.utils.formatters import truncate
 
 
-class JobTable(DataTable):
+class JobTable(DataTable[str]):
     """Sortable table of jobs with assessment scores.
 
     Features:
@@ -17,11 +18,13 @@ class JobTable(DataTable):
     - Track expanded row for detail panel integration
     """
 
-    def __init__(self, state: StateManager, *args, **kwargs):
+    def __init__(
+        self, state: StateManager, *args: Any, **kwargs: Any
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.state = state
         self.expanded_job_id: Optional[str] = None
-        self.job_rows: Dict[str, Dict[str, Any]] = {}  # Map row_key to job data
+        self.job_rows: Dict[RowKey, Dict[str, Any]] = {}
 
     def on_mount(self) -> None:
         """Setup table columns."""
@@ -34,7 +37,7 @@ class JobTable(DataTable):
             "Location",
         )
 
-    def update_rows(self, jobs: list) -> None:
+    def update_rows(self, jobs: list[Dict[str, Any]]) -> None:
         """Populate table with job data."""
         self.clear()
         self.job_rows.clear()

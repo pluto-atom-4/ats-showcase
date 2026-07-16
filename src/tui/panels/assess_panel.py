@@ -20,7 +20,7 @@ class AssessPanel(BasePanelWidget):
     - JobDetailsPanel shows scores, reasoning, recommendations
     """
 
-    def __init__(self, state: StateManager, **kwargs):
+    def __init__(self, state: StateManager, **kwargs: object) -> None:
         super().__init__(state, phase="assess", **kwargs)
         self.job_table: JobTable | None = None
         self.details_panel: JobDetailsPanel | None = None
