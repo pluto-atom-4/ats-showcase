@@ -12,6 +12,39 @@ ATS Playground: CV-to-jobs assessment system. Crawls career pages, preprocesses 
 - **Don't skip verification**: Always show user cost estimate before API calls
 - **Don't force uniform token counts in chunks**: Splits at sentence boundaries (spaCy). Chunks vary 100–600 tokens intentionally
 - **Don't re-assess already reviewed jobs**: Use pipeline control flags (--skip-assessed, --skip-rejected) to skip jobs
+- **Don't commit directly to main**: All changes must go through feature branches. Pre-commit hook enforces this.
+
+---
+
+## Git Workflow (Enforced)
+
+**Feature Branch Workflow**: All commits must go through feature branches. Direct commits to `main` are blocked by a pre-commit hook.
+
+**Proper workflow:**
+```bash
+# 1. Create feature branch
+git checkout -b feat/issue-XXX-description
+
+# 2. Commit changes
+git commit -m "message"
+
+# 3. Push branch
+git push -u origin feat/issue-XXX-description
+
+# 4. Create PR on GitHub
+# 5. Merge via PR (never direct push to main)
+```
+
+**Why**: Enforces code review, CI checks, and team visibility before merging.
+
+**If you see "Direct commits to main are not allowed"**: Create a feature branch and cherry-pick your commit:
+```bash
+git branch feat/recover-commit
+git checkout feat/recover-commit
+git reset HEAD~1  # Undo commit on main
+git checkout main
+git reset --hard origin/main  # Restore main to remote
+```
 
 ---
 
