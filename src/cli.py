@@ -129,6 +129,14 @@ def all(
         help="Use TUI dashboard (auto-detected from TTY if not specified)",
     ),
     no_tui: bool = typer.Option(False, help="Force text output, disable TUI"),
+    interactive: bool = typer.Option(
+        False, help="Enable interactive job review (prompt for each job)"
+    ),
+    merge_all: bool = typer.Option(
+        False,
+        "--merge-all",
+        help="Auto-discover and process all extracted company files",
+    ),
 ) -> None:
     """
     Run full workflow: crawl → preprocess → review → assess → export.
@@ -361,33 +369,51 @@ def all(
         # PHASE 3: REVIEW
         # ====================================================================
         typer.echo("=" * 80)
-        typer.echo("PHASE 3: REVIEW - Auto-confirm jobs (non-interactive mode)")
+        if interactive:
+            typer.echo("PHASE 3: REVIEW - Interactive job verification")
+        else:
+            typer.echo("PHASE 3: REVIEW - Auto-confirm jobs (non-interactive mode)")
         typer.echo("=" * 80)
 
         phase_start = time.time()
 
-        # For the `all` command, auto-confirm all jobs without interactive review
-        typer.echo("⏭️  Skipping interactive review - auto-confirming all preprocessed jobs\n")
-
-        # Load and auto-confirm preprocessed jobs
-        preprocessed_path = Path("data/extracted_jobs/preprocessed_jobs.json")
-        if preprocessed_path.exists():
-            with open(preprocessed_path) as f:
-                preprocessed_jobs = json.load(f)
-
-            # Mark all as confirmed
-            for job in preprocessed_jobs:
-                job["status"] = "confirmed"
-
-            # Save back
-            with open(preprocessed_path, "w") as f:
-                json.dump(preprocessed_jobs, f, indent=2)
-
-            confirmed_count = len(preprocessed_jobs)
-            typer.echo(f"✅ Auto-confirmed: {confirmed_count} jobs\n")
+        if interactive:
+            # Interactive mode: call review command with user prompts
+            typer.echo("🔍 Starting interactive job review...\n")
+            review(
+                extracted=None,
+                preprocessed="data/extracted_jobs/preprocessed_jobs.json",
+                merge_all=merge_all,
+                mode="new-only",
+                skip_before_date=None,
+                skip_rejected=True,
+                skip_assessed=True,
+                show_stats=False,
+            )
+            confirmed_count = 0  # Counted during review phase
         else:
-            confirmed_count = 0
-            typer.echo("⚠️  No preprocessed jobs found\n")
+            # Non-interactive mode: auto-confirm all jobs
+            typer.echo("⏭️  Skipping interactive review - auto-confirming all preprocessed jobs\n")
+
+            # Load and auto-confirm preprocessed jobs
+            preprocessed_path = Path("data/extracted_jobs/preprocessed_jobs.json")
+            if preprocessed_path.exists():
+                with open(preprocessed_path) as f:
+                    preprocessed_jobs = json.load(f)
+
+                # Mark all as confirmed
+                for job in preprocessed_jobs:
+                    job["status"] = "confirmed"
+
+                # Save back
+                with open(preprocessed_path, "w") as f:
+                    json.dump(preprocessed_jobs, f, indent=2)
+
+                confirmed_count = len(preprocessed_jobs)
+                typer.echo(f"✅ Auto-confirmed: {confirmed_count} jobs\n")
+            else:
+                confirmed_count = 0
+                typer.echo("⚠️  No preprocessed jobs found\n")
 
         phase_time = time.time() - phase_start
         typer.echo(f"⏱️  Phase 3 took {phase_time:.2f}s\n")
