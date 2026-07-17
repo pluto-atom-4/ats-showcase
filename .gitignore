@@ -198,3 +198,6 @@ sub-issues-contents*.json
 gh-issue-draft*.md*
 feat-idea.md
 flaw-symptons.md
+chore-idea.md
+issue-content.json
+updates.json

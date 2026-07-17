@@ -1718,8 +1718,18 @@ def purge_integrity(
     try:
         if not issue_type:
             typer.echo("❌ Specify --type to purge", err=True)
-            typer.echo("   Available types: orphaned_assessments, orphaned_preprocessed, invalid_scores,", err=True)
-            typer.echo("                    malformed_recommendations, fts_orphans", err=True)
+            typer.echo(
+                "   Available types: orphaned_assessments, orphaned_preprocessed,",
+                err=True,
+            )
+            typer.echo(
+                "                    orphaned_job_reviews, invalid_scores,",
+                err=True,
+            )
+            typer.echo(
+                "                    malformed_recommendations, fts_orphans",
+                err=True,
+            )
             raise typer.Exit(1)
 
         purger = DataPurger(db_path)
@@ -1731,6 +1741,8 @@ def purge_integrity(
             count, affected_ids = purger.purge_orphaned_assessments(dry_run=dry_run)
         elif issue_type == "orphaned_preprocessed":
             count, affected_ids = purger.purge_orphaned_preprocessed(dry_run=dry_run)
+        elif issue_type == "orphaned_job_reviews":
+            count, affected_ids = purger.purge_orphaned_job_reviews(dry_run=dry_run)
         elif issue_type == "invalid_scores":
             count, affected_ids = purger.purge_invalid_scores(dry_run=dry_run)
         elif issue_type == "malformed_recommendations":
