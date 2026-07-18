@@ -1,7 +1,7 @@
 """
 Compare LLM model performance for assessment task.
 
-Tests Haiku 4.5 vs Sonnet 5 vs Opus 4.1 on sample jobs.
+Tests Haiku 4.5 vs Sonnet 5 vs Opus 4.8 on sample jobs.
 """
 
 import json
@@ -18,9 +18,9 @@ class LLMComparator:
 
     # Model configs: (model_id, input_price_per_1m, output_price_per_1m)
     MODELS = {
-        "haiku": ("claude-3-5-haiku-20241022", 0.80, 4.0),
-        "sonnet": ("claude-3-5-sonnet-20241022", 3.0, 15.0),
-        "opus": ("claude-opus-4-1-20250805", 15.0, 75.0),
+        "haiku": ("claude-haiku-4-5-20251001", 0.80, 4.0),
+        "sonnet": ("claude-sonnet-5", 3.0, 15.0),
+        "opus": ("claude-opus-4-8", 15.0, 75.0),
     }
 
     def __init__(self, api_key: str):
