@@ -67,12 +67,12 @@ class AssessmentResult:
 
 
 class LLMProvider:
-    """Claude 3.5 Sonnet LLM provider for CV-to-job assessment."""
+    """Claude Sonnet 5 LLM provider for CV-to-job assessment."""
 
-    # Pricing constants (Claude 3.5 Sonnet)
-    INPUT_PRICE_PER_1M = 0.003
-    OUTPUT_PRICE_PER_1M = 0.015
-    MODEL = "claude-opus-4-1-20250805"
+    # Pricing constants (Claude Sonnet 5)
+    INPUT_PRICE_PER_1M = 3.0
+    OUTPUT_PRICE_PER_1M = 15.0
+    MODEL = "claude-sonnet-5"
 
     def __init__(self, api_key: Optional[str] = None):
         """

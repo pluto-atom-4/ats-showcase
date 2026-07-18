@@ -119,7 +119,7 @@ Read phase-specific guidance in `.claude/rules/`:
 - **NLP**: spaCy (sentence segmentation)
 - **Tokens**: tiktoken (estimates), Claude API (actual)
 - **DB**: SQLite with FTS5 full-text search
-- **LLM**: Claude 3.5 Sonnet ($0.003 per 1M input tokens)
+- **LLM**: Claude Sonnet 5 ($3.0 per 1M input tokens, $15.0 per 1M output tokens)
 - **CLI**: Typer (async-ready)
 
 ---
@@ -145,4 +145,4 @@ Read phase-specific guidance in `.claude/rules/`:
 ---
 
 **Status**: Progressive Disclosure (minimal bloat, maximum clarity)
-**Last Updated**: 2026-07-10
+**Last Updated**: 2026-07-18
