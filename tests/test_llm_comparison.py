@@ -11,7 +11,13 @@ from typing import Dict, List, Optional
 
 import pytest
 
+# Configure logging to show in pytest output
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class LLMComparator:
@@ -218,7 +224,7 @@ def test_model_comparison(tmp_path):
         pytest.skip("ANTHROPIC_API_KEY not set")
 
     # Load real data
-    logger.info("Loading CV and job chunks...")
+    print("Loading CV and job chunks...")
     try:
         cv_text = load_cv_text()
         job_chunks = load_first_job_chunks()
@@ -226,8 +232,8 @@ def test_model_comparison(tmp_path):
         pytest.skip(f"Data files not found: {e}")
         return
 
-    logger.info(f"CV length: {len(cv_text)} chars")
-    logger.info(f"Job chunks: {len(job_chunks)} chunks, total {sum(len(c) for c in job_chunks)} chars")
+    print(f"CV length: {len(cv_text)} chars")
+    print(f"Job chunks: {len(job_chunks)} chunks, total {sum(len(c) for c in job_chunks)} chars")
 
     comparator = LLMComparator(api_key)
     result = comparator.compare_models(cv_text, job_chunks)
@@ -237,30 +243,66 @@ def test_model_comparison(tmp_path):
     with open(report_path, "w") as f:
         json.dump(result, f, indent=2, default=str)
 
-    logger.info(f"\n\n{'='*70}")
-    logger.info("MODEL COMPARISON RESULTS")
-    logger.info("="*70)
+    print(f"\n\n{'='*80}")
+    print("MODEL COMPARISON RESULTS")
+    print("="*80)
+
+    # Load job info for context
+    with open("data/extracted_jobs/preprocessed_jobs.json") as f:
+        jobs = json.load(f)
+        job = jobs[0]
+        print(f"\nJob: {job.get('company', 'Unknown')} (ID: {job.get('job_id', 'N/A')})")
+        print(f"Chunks: {len(job_chunks)} | Token count: {job.get('token_count', 'N/A')}")
+
+    # Pricing table
+    print("\n" + "-"*80)
+    print("PRICING & COSTS")
+    print("-"*80)
+    print("Model            Input Price    Output Price   Cost/10k tokens")
+    for name, (_, in_price, out_price) in comparator.MODELS.items():
+        cost_per_10k = (10000 / 1_000_000) * in_price
+        print(f"{name:15} ${in_price:7.2f}/1M    ${out_price:7.2f}/1M     ${cost_per_10k:.4f}")
+
+    # Results
+    print("\n" + "-"*80)
+    print("ASSESSMENT SCORES")
+    print("-"*80)
 
     for model, scores in result["results"].items():
         if scores is None:
-            logger.error(f"\n{model.upper()}: FAILED")
+            print(f"\n{model.upper()}: ❌ FAILED")
             continue
 
-        logger.info(f"\n{model.upper()}:")
-        logger.info(
-            f"  Overall: {scores['overall_score']} | "
-            f"Tech: {scores['tech_score']} | "
-            f"Seniority: {scores['seniority_score']} | "
-            f"Location: {scores['location_score']}"
+        print(f"\n{model.upper()}:")
+        print(
+            f"  Scores:    Overall={scores['overall_score']:5.1f} | "
+            f"Tech={scores['tech_score']:5.1f} | "
+            f"Seniority={scores['seniority_score']:5.1f} | "
+            f"Location={scores['location_score']:5.1f}"
         )
-        logger.info(f"  Tokens: {scores['input_tokens']} in, {scores['output_tokens']} out")
-        logger.info(f"  Summary: {scores['summary'][:80]}...")
+        print(f"  Tokens:    {scores['input_tokens']:5d} input | {scores['output_tokens']:5d} output")
 
-    logger.info(f"\nVariance (score range): {result['variance']:.1f} points")
-    logger.info(f"Recommendation: {result['recommendation']}")
-    logger.info(f"Report saved: {report_path}\n")
+        # Calculate cost
+        in_price = comparator.MODELS[model][1]
+        out_price = comparator.MODELS[model][2]
+        in_cost = (scores['input_tokens'] / 1_000_000) * in_price
+        out_cost = (scores['output_tokens'] / 1_000_000) * out_price
+        total_cost = in_cost + out_cost
+        print(f"  Cost:      ${in_cost:.6f} (input) + ${out_cost:.6f} (output) = ${total_cost:.6f}")
+        print(f"  Summary:   {scores['summary'][:70]}...")
 
-    return result
+    # Analysis
+    print("\n" + "="*80)
+    print("ANALYSIS")
+    print("="*80)
+    print(f"Score Variance: {result['variance']:.1f} points (max - min)")
+    print("\nDecision Criteria:")
+    print("  ✅ ≤5 points   → Use Haiku (95% cost savings)")
+    print("  ⚠️  5-10 points → Use Sonnet (80% cost savings)")
+    print("  ❌ >10 points  → Keep Opus (best accuracy)")
+    print(f"\n→ RECOMMENDATION: {result['recommendation']}")
+    print(f"\nReport saved: {report_path}")
+    print("="*80)
 
 
 if __name__ == "__main__":
