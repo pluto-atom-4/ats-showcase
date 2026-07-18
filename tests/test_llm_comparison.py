@@ -63,6 +63,9 @@ class LLMComparator:
             response_text = response.content[0].text if response.content else ""
             print(f"[DEBUG] {model_id} raw response: {response_text[:200]}...")
 
+            # Save response to data/prompt-flow
+            self._save_response(model_id, response_text, response.usage)
+
             # Parse response
             try:
                 # Try to extract JSON if wrapped in markdown
@@ -165,6 +168,47 @@ Respond with JSON:
             return "⚠️  Use Sonnet (80% cost savings)"
         else:
             return "❌ Keep Opus (best accuracy)"
+
+    def _save_response(self, model_name: str, response_text: str, usage) -> None:
+        """Save raw model response to data/prompt-flow directory.
+
+        Args:
+            model_name: Model ID (e.g. claude-haiku-4-5-20251001)
+            response_text: Raw response text from API
+            usage: Response usage object with input_tokens and output_tokens
+        """
+        from datetime import datetime
+
+        flow_dir = Path("data/prompt-flow")
+        flow_dir.mkdir(parents=True, exist_ok=True)
+
+        # Determine simple model name for filename
+        if "haiku" in model_name:
+            filename = "haiku-response.json"
+        elif "sonnet" in model_name:
+            filename = "sonnet-response.json"
+        elif "opus" in model_name:
+            filename = "opus-response.json"
+        else:
+            filename = f"{model_name.split('-')[1]}-response.json"
+
+        # Build metadata
+        data = {
+            "timestamp": datetime.now().isoformat(),
+            "model_id": model_name,
+            "raw_response": response_text,
+            "usage": {
+                "input_tokens": usage.input_tokens,
+                "output_tokens": usage.output_tokens,
+            }
+        }
+
+        # Save to file
+        output_path = flow_dir / filename
+        with open(output_path, "w") as f:
+            json.dump(data, f, indent=2)
+
+        print(f"[DEBUG] Saved {model_name} response to {output_path}")
 
 
 def load_cv_text() -> str:
