@@ -55,22 +55,34 @@ class LLMComparator:
             response = self.client.messages.create(
                 model=model_id,
                 max_tokens=1024,
-                system="You are an expert recruiter. Respond with ONLY valid JSON.",
+                system="You are an expert recruiter evaluating job fit. "
+                "Respond with ONLY a valid JSON object, no markdown, no extra text.",
                 messages=[{"role": "user", "content": prompt}],
             )
 
+            response_text = response.content[0].text if response.content else ""
+            print(f"[DEBUG] {model_id} raw response: {response_text[:200]}...")
+
             # Parse response
             try:
-                assessment = json.loads(response.content[0].text)
+                # Try to extract JSON if wrapped in markdown
+                if "```json" in response_text:
+                    response_text = response_text.split("```json")[1].split("```")[0].strip()
+                elif "```" in response_text:
+                    response_text = response_text.split("```")[1].split("```")[0].strip()
+
+                assessment = json.loads(response_text)
             except (json.JSONDecodeError, IndexError) as e:
-                logger.error(f"Failed to parse JSON from {model_id}: {e}")
-                logger.error(f"Response text: {response.content[0].text if response.content else 'empty'}")
+                print(f"[ERROR] {model_id} JSON parse failed: {e}")
+                print(f"[ERROR] Response text: {response_text[:500]}")
                 return None
 
             # Validate required keys
             required_keys = {"overall_score", "tech_score", "seniority_score", "location_score"}
             if not all(k in assessment for k in required_keys):
-                logger.error(f"Missing keys in {model_id} response: {set(assessment.keys())}")
+                missing = required_keys - set(assessment.keys())
+                print(f"[ERROR] {model_id} missing keys: {missing}")
+                print(f"[ERROR] Got keys: {set(assessment.keys())}")
                 return None
 
             return {
@@ -84,7 +96,7 @@ class LLMComparator:
                 "output_tokens": response.usage.output_tokens,
             }
         except Exception as e:
-            logger.error(f"Error assessing with {model_id}: {e}")
+            print(f"[ERROR] {model_id} exception: {type(e).__name__}: {e}")
             return None
 
     def compare_models(self, cv_text: str, job_chunks: list) -> Dict:
