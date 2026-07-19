@@ -273,6 +273,13 @@ uv run python -m src.cli review --merge-all
 | `--extracted` | None | Path to single extracted jobs JSON (only if NOT using `--merge-all`) |
 | `--preprocessed` | `data/extracted_jobs/preprocessed_jobs.json` | Path to preprocessed jobs JSON (auto-discovered) |
 | `--merge-all` | `false` | **[RECOMMENDED for multi-company]** Auto-discover and process all extracted company files together |
+| `--model` | None | **[NEW]** Recalculate costs for model (haiku/sonnet/opus). Shows model-specific cost estimate |
+| `--cost-limit` | $0.10 | **[NEW]** Warn if total estimated cost exceeds this USD amount |
+| `--mode` | new-only | Review mode: 'new-only' (unreviewed) or 'all' (all jobs) |
+| `--skip-before-date` | None | Skip jobs crawled before ISO date (e.g., 2026-07-01) |
+| `--skip-rejected` | true | Skip previously rejected jobs |
+| `--skip-assessed` | true | Skip previously assessed jobs |
+| `--allow-re-review` | false | Show prior decisions and allow changing them |
 
 ### Multi-Company Workflow ✓
 
@@ -359,6 +366,39 @@ Confirm? (y/n/skip): n
 - **Save money** - Skip irrelevant jobs before LLM assessment
 - **Save time** - Skip positions you're not interested in
 - **Improve results** - Assess only relevant opportunities
+
+### Cost Recalculation (NEW)
+
+By default, cost estimates are based on the model used during preprocessing (typically Sonnet). Use `--model` to recalculate for a different model:
+
+```bash
+# See costs for Haiku (cheapest)
+uv run python -m src.cli review --merge-all --model haiku
+
+# Output includes recalculated cost estimates
+💰 Recalculating costs for Haiku model...
+✅ Recalculated costs using Haiku:
+   Original estimate: $0.0234
+   Haiku estimate:    $0.0031  (87% savings!)
+```
+
+**Use case**: "Before reviewing, show me how much Haiku would cost vs Sonnet"
+
+### Cost Warnings (NEW)
+
+Set a budget threshold to warn if review total exceeds it:
+
+```bash
+# Warn if total estimated cost > $0.05
+uv run python -m src.cli review --merge-all --cost-limit 0.05
+
+# Output at end of review:
+⚠️  WARNING: Estimated LLM cost ($0.0847) exceeds threshold ($0.05)
+   To proceed with assessment, use: assess --model <model> --cv <cv_file>
+   To adjust threshold: review --cost-limit 0.10
+```
+
+**Use case**: "Alert me if review total would exceed my budget"
 
 ---
 

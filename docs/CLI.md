@@ -630,29 +630,44 @@ ats-showcase preprocess --show-estimates
 ---
 
 ### review
-**Purpose**: User verification before LLM processing
+**Purpose**: User verification + cost transparency before LLM assessment
 
 ```bash
-# Single company (legacy, backward compatible)
-ats-showcase review --extracted data/extracted_jobs/companya_jobs.json
+# Basic: confirm/reject jobs interactively
+uv run python -m src.cli review --merge-all
 
-# Multi-company (RECOMMENDED)
-ats-showcase review --merge-all
+# With cost recalculation (NEW): Show costs for specific model
+uv run python -m src.cli review --merge-all --model haiku   # Haiku costs
+uv run python -m src.cli review --merge-all --model sonnet  # Sonnet costs (default)
+
+# With cost warning (NEW): Alert if total > threshold
+uv run python -m src.cli review --merge-all --cost-limit 0.05  # Warn if > $0.05
 ```
 
 **Options**:
 - `--extracted PATH` - Path to single extracted jobs JSON (optional if using `--merge-all`)
 - `--preprocessed PATH` - Path to preprocessed jobs JSON (default: data/extracted_jobs/preprocessed_jobs.json)
-- `--merge-all` - **[RECOMMENDED]** Auto-discover and process all extracted company files together
+- `--merge-all` - **[RECOMMENDED]** Auto-discover and process all extracted company files
+- `--model TEXT` - **[NEW]** Recalculate costs for model: haiku, sonnet, opus (default: uses preprocess estimates)
+- `--cost-limit FLOAT` - **[NEW]** Warn if estimated cost exceeds threshold USD (default: $0.10)
+- `--mode TEXT` - Review mode: 'new-only' (unreviewed, default) or 'all' (all jobs)
+- `--skip-before-date DATE` - Skip jobs crawled before ISO date (e.g., 2026-07-01)
+- `--skip-rejected` - Skip previously rejected jobs (default: true)
+- `--skip-assessed` - Skip previously assessed jobs (default: true)
+- `--allow-re-review` - Show prior decisions and allow re-review
 
-**Multi-Company Workflow**:
-When using `--merge-all`:
-- ✅ Auto-discovers all `*_jobs.json` files in `data/extracted_jobs/`
-- ✅ Processes ALL jobs from all companies in one interactive session
-- ✅ Pairs with multi-company `preprocessed_jobs.json` created by preprocess
-- Works seamlessly with `crawl --config-dir` pipelines
+**Cost Recalculation** (when `--model` specified):
+- Loads preprocessed token counts
+- Recalculates estimated cost using selected model's pricing
+- Shows: original estimate → model-specific estimate
+- Helps decide which model to use for assessment phase
 
-**Output**: Updated job statuses ("confirmed"/"rejected") in database
+**Cost Warnings** (when `--cost-limit` specified):
+- After review complete, warns if total_cost > limit
+- Suggests adjusting limit or proceeding with assessment
+- Useful for budget-conscious workflows
+
+**Output**: Job statuses ("confirmed"/"rejected") saved to database, cost summary displayed
 
 ---
 

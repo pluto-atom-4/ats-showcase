@@ -75,7 +75,9 @@ uv run python -m src.cli all --cv data/cv.json --config config/companies.json --
 # Step-by-step
 uv run python -m src.cli crawl --config config/companies.json
 uv run python -m src.cli preprocess --show-estimates
-uv run python -m src.cli review --interactive
+uv run python -m src.cli review --interactive                           # Basic review
+uv run python -m src.cli review --interactive --model haiku             # Show Haiku costs
+uv run python -m src.cli review --interactive --cost-limit 0.05         # Warn if > $0.05
 uv run python -m src.cli assess --cv data/cv.json --model sonnet
 uv run python -m src.cli export --output data/assessments/report.md
 ```

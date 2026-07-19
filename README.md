@@ -257,7 +257,15 @@ uv run python -m src.cli preprocess --batch 50 --show-estimates
 
 **3. Review** extracted jobs interactively before LLM calls:
 ```bash
+# Basic: review and confirm/reject jobs
 uv run python -m src.cli review --interactive
+
+# With cost recalculation for specific model (NEW)
+uv run python -m src.cli review --interactive --model haiku  # Show Haiku costs
+uv run python -m src.cli review --interactive --model sonnet # Show Sonnet costs
+
+# With cost warning threshold (default: $0.10)
+uv run python -m src.cli review --interactive --cost-limit 0.05  # Warn if > $0.05
 ```
 
 **4. Assess** CV fit with Claude (choose model by cost/accuracy tradeoff):
