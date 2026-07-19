@@ -82,5 +82,5 @@ Original monolithic `tui.md` retained for full implementation reference (not loa
 
 ---
 
-**Last Updated:** 2026-07-19  
+**Last Updated:** 2026-07-19
 **Token Budget:** ~1.2K (split from 6.5K original)

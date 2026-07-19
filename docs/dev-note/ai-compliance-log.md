@@ -21,12 +21,12 @@ Status: [open/resolved]
 
 ### Example Entry (Template)
 
-**Date:** 2026-07-19  
-**Violation:** AI suggested using `--skip-confirmed` flag instead of `--confirmed-only` for filtering  
-**Pattern Violated:** CLAUDE.md § NEVER DO THIS (incorrect flag name)  
-**Root Cause:** Flag documentation in CLAUDE.md unclear; example in code-patterns.md used wrong flag  
-**Action:** Clarified flag names in CLAUDE.md; added examples to .claude/rules/cli.md  
-**Status:** resolved  
+**Date:** 2026-07-19
+**Violation:** AI suggested using `--skip-confirmed` flag instead of `--confirmed-only` for filtering
+**Pattern Violated:** CLAUDE.md § NEVER DO THIS (incorrect flag name)
+**Root Cause:** Flag documentation in CLAUDE.md unclear; example in code-patterns.md used wrong flag
+**Action:** Clarified flag names in CLAUDE.md; added examples to .claude/rules/cli.md
+**Status:** resolved
 
 ---
 
@@ -55,6 +55,6 @@ Every 13 weeks, review log:
 
 ---
 
-**Last Updated:** 2026-07-19  
-**Entries:** 0 (baseline)  
+**Last Updated:** 2026-07-19
+**Entries:** 0 (baseline)
 **Next Review:** 2026-10-19

@@ -1,7 +1,7 @@
 # Context Maintenance Workflow
 
-**Automation:** GitHub Actions + Python Audit Script  
-**Frequency:** On every push/PR to main/dev  
+**Automation:** GitHub Actions + Python Audit Script
+**Frequency:** On every push/PR to main/dev
 **Owner:** AI Configuration Team
 
 ---
@@ -13,8 +13,8 @@ Automated validation of AI context files (CLAUDE.md, DESIGN.md, AGENTS.md, copil
 - Current with codebase (no stale commands/examples)
 - Linked and consistent across files
 
-**Workflow:** `.github/workflows/context-lint.yml`  
-**Audit Script:** `scripts/context-audit.py`  
+**Workflow:** `.github/workflows/context-lint.yml`
+**Audit Script:** `scripts/context-audit.py`
 **Output:** Pass/Warn/Fail with actionable recommendations
 
 ---
@@ -340,6 +340,6 @@ permissions:
 
 ---
 
-**Last Updated:** 2026-07-19  
-**Status:** Deployed  
+**Last Updated:** 2026-07-19
+**Status:** Deployed
 **Owner:** AI Configuration Team

@@ -6,8 +6,8 @@ Quarterly process for maintaining and validating AI context files.
 
 ## Quarterly Maintenance Schedule
 
-**Cadence:** Every ~13 weeks (roughly once per quarter)  
-**Effort:** ~30 minutes per quarter  
+**Cadence:** Every ~13 weeks (roughly once per quarter)
+**Effort:** ~30 minutes per quarter
 **Owner:** AI Configuration Team (rotates)
 
 **Recommended Schedule:**
@@ -275,6 +275,6 @@ See Phase 3 tuning approach for detailed refactoring strategy.
 
 ---
 
-**Last Updated:** 2026-07-19  
-**Cadence:** Quarterly  
+**Last Updated:** 2026-07-19
+**Cadence:** Quarterly
 **Next Scheduled:** 2026-10-19

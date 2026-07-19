@@ -57,10 +57,10 @@ def test_progress_bar():
     state = StateManager()
     state.start_phase("crawl", total_items=100)
     pb = TUIProgressBar(state, "crawl")
-    
+
     for i in range(45):
         state.increment_phase_progress("crawl")
-    
+
     render = pb.render()
     assert "45%" in render
 ```

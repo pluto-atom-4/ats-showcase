@@ -1,7 +1,7 @@
 # AI Configuration Audit Findings
 
-**Date:** 2026-07-19  
-**Auditor:** Phase 1 Automation  
+**Date:** 2026-07-19
+**Auditor:** Phase 1 Automation
 **Overall Status:** 4 files over budget, 1 warning; overall utilization 104%
 
 ---
@@ -169,16 +169,16 @@ Additionally, `.claude/rules/multi-agent.md` is at 108% (just over warning thres
 
 ## Files Compliant (No Action)
 
-✓ CLAUDE.md (87%)  
-✓ .claude/rules/assess.md (37%)  
-✓ .claude/rules/cli.md (59%)  
-✓ .claude/rules/crawl.md (25%)  
-✓ .claude/rules/preprocess.md (24%)  
-✓ .claude/rules/storage.md (44%)  
+✓ CLAUDE.md (87%)
+✓ .claude/rules/assess.md (37%)
+✓ .claude/rules/cli.md (59%)
+✓ .claude/rules/crawl.md (25%)
+✓ .claude/rules/preprocess.md (24%)
+✓ .claude/rules/storage.md (44%)
 ✓ .claude/rules/verify.md (29%)
 
 ---
 
-**Baseline Metrics JSON:** `docs/dev-note/context-baseline.json`  
-**Next Review Date:** 2026-10-19  
+**Baseline Metrics JSON:** `docs/dev-note/context-baseline.json`
+**Next Review Date:** 2026-10-19
 **Owner:** AI Configuration Maintenance Task

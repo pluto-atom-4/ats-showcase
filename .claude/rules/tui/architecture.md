@@ -48,7 +48,7 @@ class PhaseMetrics:
 
 class StateManager:
     """Track phase status, metrics, job data, cost."""
-    
+
     def __init__(self):
         self.phase_status: Dict[str, PhaseStatus] = {
             "crawl": PhaseStatus.IDLE,
@@ -224,5 +224,5 @@ async def all(cv: str, config: str, tui: Optional[bool] = None) -> None:
 
 ---
 
-**Last Updated:** 2026-07-19  
+**Last Updated:** 2026-07-19
 **Status:** Core concepts documented; full implementation in reference file

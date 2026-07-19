@@ -79,13 +79,13 @@ See [CLAUDE.md § Verification Commands](../CLAUDE.md#verification-commands) for
 
 ## Roles & Governance
 
-**Architect:** Design, write tasks.md, read-only codebase  
-**Coder:** Implement, write tests, create PRs  
-**Reviewer:** Verify tests, check quality, approve/block  
+**Architect:** Design, write tasks.md, read-only codebase
+**Coder:** Implement, write tests, create PRs
+**Reviewer:** Verify tests, check quality, approve/block
 
 See [AGENTS.md](../AGENTS.md) for details.
 
 ---
 
-**Last Updated:** 2026-07-19  
+**Last Updated:** 2026-07-19
 **Status:** Condensed for token compliance

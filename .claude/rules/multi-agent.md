@@ -10,41 +10,41 @@ Each phase follows: **Architect (design) → Coder (implement) → Reviewer (tes
 
 ### Crawl Phase
 
-**Architect:** Define CSS selectors in `config/companies.json`, plan rate limiting  
-**Coder:** Implement `BrowserManager`, handle Playwright lifecycle, error handling  
-**Reviewer:** Verify extraction rate, test pagination + edge cases  
+**Architect:** Define CSS selectors in `config/companies.json`, plan rate limiting
+**Coder:** Implement `BrowserManager`, handle Playwright lifecycle, error handling
+**Reviewer:** Verify extraction rate, test pagination + edge cases
 
 **Handoff:** `config/companies.json` → Crawled jobs in database
 
 ### Preprocess Phase
 
-**Architect:** Decide chunking strategy, set token thresholds  
-**Coder:** Implement `parse_html()`, `chunk_by_sentences()`, token counting  
-**Reviewer:** Verify chunk sizes reasonable (100–600 tokens), check cost estimates  
+**Architect:** Decide chunking strategy, set token thresholds
+**Coder:** Implement `parse_html()`, `chunk_by_sentences()`, token counting
+**Reviewer:** Verify chunk sizes reasonable (100–600 tokens), check cost estimates
 
 **Handoff:** MarkItDown output → Clean chunks + token counts
 
 ### Verify Phase
 
-**Architect:** Define review workflow (confirm/reject/skip flow), status transitions  
-**Coder:** Implement `JobReviewer` interactive CLI, persist status to DB  
-**Reviewer:** Test interactive prompts, re-review workflow, filtering combinations  
+**Architect:** Define review workflow (confirm/reject/skip flow), status transitions
+**Coder:** Implement `JobReviewer` interactive CLI, persist status to DB
+**Reviewer:** Test interactive prompts, re-review workflow, filtering combinations
 
 **Handoff:** User confirmations → Job reviews saved to database
 
 ### Assess Phase
 
-**Architect:** Define assessment prompt, score categories, filtering logic  
-**Coder:** Implement `LLMProvider`, retries, rate limiting, cost tracking  
-**Reviewer:** Verify JSON parsing, score ranges, cost accuracy  
+**Architect:** Define assessment prompt, score categories, filtering logic
+**Coder:** Implement `LLMProvider`, retries, rate limiting, cost tracking
+**Reviewer:** Verify JSON parsing, score ranges, cost accuracy
 
 **Handoff:** Assessment prompt → Results + cost metrics in database
 
 ### Export Phase
 
-**Architect:** Define report structure (title, summary, job table, sorting)  
-**Coder:** Implement `export_markdown()`, filtering, sorting  
-**Reviewer:** Verify markdown output, summary stats accuracy  
+**Architect:** Define report structure (title, summary, job table, sorting)
+**Coder:** Implement `export_markdown()`, filtering, sorting
+**Reviewer:** Verify markdown output, summary stats accuracy
 
 **Handoff:** Assessment data → Markdown report
 
@@ -96,5 +96,5 @@ If any phase fails 3+ times: Halt, escalate to human with context.
 
 ---
 
-**Last Updated:** 2026-07-19  
+**Last Updated:** 2026-07-19
 **Status:** Condensed to 105% of budget

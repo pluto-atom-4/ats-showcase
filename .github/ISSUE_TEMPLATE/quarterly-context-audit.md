@@ -7,8 +7,8 @@ labels: chore, documentation, ai-configuration
 
 ## Quarterly AI Configuration Audit
 
-**Quarter:** Q[N] [YEAR]  
-**Due Date:** [DATE]  
+**Quarter:** Q[N] [YEAR]
+**Due Date:** [DATE]
 **Owner:** @[assignee]
 
 ---
@@ -111,6 +111,6 @@ labels: chore, documentation, ai-configuration
 
 ---
 
-**Effort:** ~30 minutes  
-**Cadence:** Every ~13 weeks  
+**Effort:** ~30 minutes
+**Cadence:** Every ~13 weeks
 **Next Audit:** [DATE + 13 weeks]

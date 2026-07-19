@@ -1,7 +1,7 @@
 # DESIGN.md: ATS Playground Architecture
 
-**Version:** 2.0 (Anthropic standards)  
-**Last Updated:** 2026-07-19  
+**Version:** 2.0 (Anthropic standards)
+**Last Updated:** 2026-07-19
 **Status:** Condensed; TUI details → `.claude/rules/tui/`
 
 ---

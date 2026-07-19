@@ -46,5 +46,5 @@ Original monolithic guide retained as reference in parent directory if needed.
 
 ---
 
-**Last Updated:** 2026-07-19  
+**Last Updated:** 2026-07-19
 **Effort:** Split from 824 lines (6.5K tokens) to modular sub-files (~1.2K per file)

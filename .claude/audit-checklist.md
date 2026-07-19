@@ -120,6 +120,6 @@ If issues found:
 
 ---
 
-**Last Audited:** [DATE]  
-**Next Audit:** [DATE + 13 weeks]  
+**Last Audited:** [DATE]
+**Next Audit:** [DATE + 13 weeks]
 **Auditor:** [NAME]
