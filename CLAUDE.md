@@ -124,13 +124,31 @@ Read phase-specific guidance in `.claude/rules/`:
 
 ---
 
+## Keeping Context Files Updated
+
+Context files (CLAUDE.md, DESIGN.md, .claude/rules/) must remain aligned with implementation to keep AI guidance accurate.
+
+**Automated Validation:** `.github/workflows/context-lint.yml` runs on every push/PR. Blocks merge if files exceed token budgets.
+
+**Quarterly Audit:** Every ~13 weeks, review files for:
+- Staleness (deprecated tools, outdated commands)
+- Accuracy (does documentation match code?)
+- Redundancy (conflicting patterns across files?)
+
+**Process:** See [docs/dev-note/ai-config-maintenance.md](docs/dev-note/ai-config-maintenance.md)
+
+**Issue Template:** `.github/ISSUE_TEMPLATE/quarterly-context-audit.md`
+
+---
+
 ## Docs Map
 
 - **Architecture**: [DESIGN.md](DESIGN.md)
 - **Agent Roles**: [AGENTS.md](AGENTS.md)
 - **Code Patterns**: [.github/instructions/code-patterns.instructions.md](.github/instructions/code-patterns.instructions.md)
 - **Copilot**: [.github/copilot-instructions.md](.github/copilot-instructions.md)
-- **Config Audit**: [docs/dev-note/chore-124-config-audit.md](docs/dev-note/chore-124-config-audit.md)
+- **Config Maintenance**: [docs/dev-note/ai-config-maintenance.md](docs/dev-note/ai-config-maintenance.md)
+- **Compliance Log**: [docs/dev-note/ai-compliance-log.md](docs/dev-note/ai-compliance-log.md)
 
 ---
 

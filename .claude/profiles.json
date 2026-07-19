@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "description": "Claude AI configuration profiles for role-specific guidance",
+  "profiles": {
+    "local-dev": {
+      "name": "Local Development",
+      "description": "Development-focused configuration",
+      "instructions": [
+        "CLAUDE.md",
+        ".claude/rules/cli.md",
+        ".claude/rules/preprocess.md"
+      ],
+      "model": "claude-opus-4-8",
+      "context_priority": ["CLAUDE.md", ".claude/rules/"]
+    },
+    "security-audit": {
+      "name": "Security Review",
+      "description": "Focus on security and compliance",
+      "instructions": [
+        "SECURITY.md",
+        ".claude/rules/assess.md",
+        ".claude/rules/storage.md"
+      ],
+      "model": "claude-opus-4-8",
+      "context_priority": ["SECURITY.md", ".claude/rules/"]
+    },
+    "assessment": {
+      "name": "Assessment Phase",
+      "description": "Claude scoring and LLM interaction",
+      "instructions": [
+        ".claude/rules/assess.md",
+        ".claude/rules/storage.md",
+        "CLAUDE.md"
+      ],
+      "model": "claude-opus-4-8",
+      "context_priority": [".claude/rules/assess.md"]
+    },
+    "architecture": {
+      "name": "Architecture & Design",
+      "description": "System design and planning",
+      "instructions": [
+        "DESIGN.md",
+        "AGENTS.md",
+        ".claude/rules/multi-agent.md"
+      ],
+      "model": "claude-opus-4-8",
+      "context_priority": ["DESIGN.md"]
+    },
+    "tui-development": {
+      "name": "TUI Implementation",
+      "description": "Text UI (Textual) development",
+      "instructions": [
+        ".claude/rules/tui/index.md",
+        ".claude/rules/tui/architecture.md",
+        ".claude/rules/tui/patterns.md"
+      ],
+      "model": "claude-opus-4-8",
+      "context_priority": [".claude/rules/tui/"]
+    }
+  }
+}
