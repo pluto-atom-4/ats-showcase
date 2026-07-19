@@ -140,7 +140,7 @@ def all(
     model: Optional[str] = typer.Option(
         None,
         "--model",
-        help="Claude model for assessment (default: claude-sonnet-5). Supported: claude-haiku-4-5-20251001, claude-sonnet-5, claude-opus-4-8",
+        help="Claude model (haiku/sonnet/opus or full ID, default sonnet). See docs/CLI.md for pricing.",
     ),
 ) -> None:
     """
@@ -975,7 +975,7 @@ def assess(
     model: Optional[str] = typer.Option(
         None,
         "--model",
-        help="Claude model for assessment (default: claude-sonnet-5). Supported: claude-haiku-4-5-20251001, claude-sonnet-5, claude-opus-4-8",
+        help="Claude model (haiku/sonnet/opus or full ID, default sonnet). See docs/CLI.md for pricing.",
     ),
 ) -> None:
     """Assess CV fit for confirmed jobs."""

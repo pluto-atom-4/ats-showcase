@@ -6,13 +6,14 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
-from config.models import (
+from src.config.models import (
     DEFAULT_MODEL,
     get_model_display_name,
     get_model_pricing,
+    resolve_model_alias,
     validate_model,
 )
-from models.job import Assessment
+from src.models.job import Assessment
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,7 @@ class LLMProvider:
         # Set model and pricing
         if model_id:
             validate_model(model_id)
-            self.model = model_id
+            self.model = resolve_model_alias(model_id)
         else:
             self.model = DEFAULT_MODEL
 

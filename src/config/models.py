@@ -22,21 +22,50 @@ SUPPORTED_MODELS: Dict[str, Tuple[str, float, float]] = {
     ),
 }
 
+# Aliases: short names map to full model IDs
+MODEL_ALIASES: Dict[str, str] = {
+    "haiku": "claude-haiku-4-5-20251001",
+    "sonnet": "claude-sonnet-5",
+    "opus": "claude-opus-4-8",
+}
+
+
+def resolve_model_alias(model_input: str) -> str:
+    """Resolve model alias to full model ID.
+
+    Args:
+        model_input: Model ID or alias (e.g., "sonnet" or "claude-sonnet-5")
+
+    Returns:
+        Full model ID
+    """
+    # Check if it's an alias (case-insensitive)
+    lower_input = model_input.lower()
+    if lower_input in MODEL_ALIASES:
+        return MODEL_ALIASES[lower_input]
+    # Return as-is if not an alias (assume full ID)
+    return model_input
+
 
 def validate_model(model_id: str) -> None:
     """Validate model ID is supported.
 
     Args:
-        model_id: Claude model ID
+        model_id: Claude model ID or alias
 
     Raises:
         ValueError: If model not in SUPPORTED_MODELS
     """
-    if model_id not in SUPPORTED_MODELS:
+    # Resolve alias first
+    resolved_id = resolve_model_alias(model_id)
+
+    if resolved_id not in SUPPORTED_MODELS:
+        aliases = ", ".join(MODEL_ALIASES.keys())
         supported = ", ".join(SUPPORTED_MODELS.keys())
         raise ValueError(
             f"Invalid model: {model_id}\n"
-            f"  Supported: {supported}"
+            f"  Aliases: {aliases}\n"
+            f"  Full IDs: {supported}"
         )
 
 
@@ -44,7 +73,7 @@ def get_model_pricing(model_id: str) -> Tuple[float, float]:
     """Get pricing for model (input, output per 1M tokens).
 
     Args:
-        model_id: Claude model ID
+        model_id: Claude model ID or alias
 
     Returns:
         (input_price, output_price) per 1M tokens
@@ -53,7 +82,8 @@ def get_model_pricing(model_id: str) -> Tuple[float, float]:
         ValueError: If model not supported
     """
     validate_model(model_id)
-    _, input_price, output_price = SUPPORTED_MODELS[model_id]
+    resolved_id = resolve_model_alias(model_id)
+    _, input_price, output_price = SUPPORTED_MODELS[resolved_id]
     return input_price, output_price
 
 
