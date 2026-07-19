@@ -1,15 +1,15 @@
 {
-  "timestamp": "2026-07-19T11:52:08.049854",
+  "timestamp": "2026-07-19T12:34:44.959494",
   "files": [
     {
       "path": "CLAUDE.md",
-      "lines": 148,
-      "chars": 5220,
-      "tokens_estimated": 1305,
+      "lines": 166,
+      "chars": 5986,
+      "tokens_estimated": 1496,
       "budget": 1500,
       "status": "compliant",
-      "percent_of_budget": 87.0,
-      "last_modified": "2026-07-19T11:15:03.366288"
+      "percent_of_budget": 99.73333333333333,
+      "last_modified": "2026-07-19T11:54:07.533912"
     },
     {
       "path": "DESIGN.md",
@@ -127,9 +127,9 @@
     "compliant": 12,
     "warnings": 0,
     "over_budget": 0,
-    "total_tokens": 8202,
+    "total_tokens": 8393,
     "total_budget": 21000,
-    "utilization_percent": 39.1
+    "utilization_percent": 40.0
   },
   "warnings": [],
   "errors": []
