@@ -63,16 +63,21 @@ uv run python src/storage/db.py --init
 ## Quick Workflow
 
 ```bash
-# Full pipeline
-uv run python -m src.cli --all --cv data/cv.json --config config/companies.json
+# Full pipeline (default: Sonnet model)
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json
+
+# Full pipeline with Haiku (95% cost savings)
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --model claude-haiku-4-5-20251001
 
 # Step-by-step
 uv run python -m src.cli crawl --config config/companies.json
 uv run python -m src.cli preprocess --show-estimates
 uv run python -m src.cli review --interactive
-uv run python -m src.cli assess --cv data/cv.json
+uv run python -m src.cli assess --cv data/cv.json --model claude-sonnet-5
 uv run python -m src.cli export --output data/assessments/report.md
 ```
+
+**Model options**: claude-haiku-4-5-20251001 (cheap), claude-sonnet-5 (default), claude-opus-4-8 (best)
 
 **Command reference**: See [.github/instructions/cli-usage.instructions.md](.github/instructions/cli-usage.instructions.md)
 
@@ -119,7 +124,10 @@ Read phase-specific guidance in `.claude/rules/`:
 - **NLP**: spaCy (sentence segmentation)
 - **Tokens**: tiktoken (estimates), Claude API (actual)
 - **DB**: SQLite with FTS5 full-text search
-- **LLM**: Claude Sonnet 5 ($3.0 per 1M input tokens, $15.0 per 1M output tokens)
+- **LLM**: Claude (configurable via --model flag):
+  - Haiku (default for cost): $0.80/$4.0 per 1M (95% savings)
+  - Sonnet (default): $3.0/$15.0 per 1M (80% savings)
+  - Opus: $15.0/$75.0 per 1M (best accuracy)
 - **CLI**: Typer (async-ready)
 
 ---
@@ -145,4 +153,4 @@ Read phase-specific guidance in `.claude/rules/`:
 ---
 
 **Status**: Progressive Disclosure (minimal bloat, maximum clarity)
-**Last Updated**: 2026-07-18
+**Last Updated**: 2026-07-18 (model selection feature added)

@@ -657,24 +657,39 @@ When using `--merge-all`:
 ---
 
 ### assess
-**Purpose**: Claude LLM job-CV matching
+**Purpose**: Claude LLM job-CV matching with configurable model selection
 
 ```bash
-ats-showcase assess \
+# Default: Sonnet (balanced cost/quality)
+uv run python -m src.cli assess --cv data/cv.json --confirmed-only
+
+# Budget mode: Haiku (95% cost savings)
+uv run python -m src.cli assess --cv data/cv.json --model claude-haiku-4-5-20251001
+
+# Premium: Opus (best accuracy)
+uv run python -m src.cli assess --cv data/cv.json --model claude-opus-4-8
+
+# Advanced: Custom filters
+uv run python -m src.cli assess \
   --cv data/cv.json \
-  --confirmed-only \
-  --model claude-3-5-sonnet-20241022 \
-  --batch-size 10
+  --mode new-only \
+  --score-threshold 65 \
+  --since 2026-07-01 \
+  --model claude-sonnet-5
 ```
 
 **Options**:
 - `--cv PATH` - Candidate CV file (required)
 - `--confirmed-only/--all` - Filter verified jobs (default: confirmed only)
-- `--model TEXT` - Claude model selection (default: claude-3-5-sonnet-20241022)
-- `--min-score FLOAT` - Filter results >= threshold (default: 0.0)
-- `--batch-size INT` - Concurrent assessments (default: 10)
+- `--model TEXT` - Claude model selection
+  - `claude-haiku-4-5-20251001` - Budget ($0.80/$4 per 1M, 95% savings)
+  - `claude-sonnet-5` - Default ($3/$15 per 1M, 80% savings)
+  - `claude-opus-4-8` - Premium ($15/$75 per 1M, best accuracy)
+- `--mode TEXT` - 'new-only' (unassessed) or 'all' (default: new-only)
+- `--score-threshold FLOAT` - Re-assess jobs < threshold
+- `--since DATE` - Re-assess jobs after ISO date (2026-07-01)
 
-**Output**: Assessment results in CSV, cost summary printed
+**Output**: Assessment results, per-model cost summary, token usage
 
 ---
 
@@ -1019,21 +1034,43 @@ uv run python -m src.cli assess \
 ---
 
 ### Full Workflow
-**Purpose**: Execute all phases sequentially
+**Purpose**: Execute all phases sequentially (crawl→preprocess→verify→assess→export)
 
 ```bash
-ats-showcase --all \
-  --config config/companies.json \
+# Default: Sonnet model
+uv run python -m src.cli all \
   --cv data/cv.json \
-  --output data/assessments/
+  --config config/companies.json
+
+# Budget mode: Haiku (95% cost savings)
+uv run python -m src.cli all \
+  --cv data/cv.json \
+  --config config/companies.json \
+  --model claude-haiku-4-5-20251001
+
+# Premium: Opus (best accuracy)
+uv run python -m src.cli all \
+  --cv data/cv.json \
+  --config-dir ./config \
+  --model claude-opus-4-8 \
+  --interactive
 ```
 
-**Equivalent to**:
+**Options**:
+- `--cv PATH` - CV file (required)
+- `--config PATH` - Single config file or
+- `--config-dir PATH` - Directory of config files (NEW)
+- `--model TEXT` - Claude model (Haiku/Sonnet/Opus, default: Sonnet)
+- `--interactive` - Prompt before assessing each job
+- `--tui / --no-tui` - Use/disable dashboard (auto-detected)
+
+**Equivalent to** (step-by-step):
 ```bash
-ats-showcase crawl --config config/companies.json
-ats-showcase review --file data/extracted_jobs/...
-ats-showcase assess --cv data/cv.json --confirmed-only
-ats-showcase export --format markdown --output data/assessments/
+uv run python -m src.cli crawl --config config/companies.json
+uv run python -m src.cli preprocess
+uv run python -m src.cli review --interactive
+uv run python -m src.cli assess --cv data/cv.json --model claude-sonnet-5
+uv run python -m src.cli export --output data/assessments/report.md
 ```
 
 ## Error Handling Patterns

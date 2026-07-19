@@ -5,9 +5,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Status: Active](https://img.shields.io/badge/status-active-success)]()
 
-An agentic AI workflow for intelligent job assessment. Extract job postings from company websites, preprocess with NLP, verify with users, assess CV fit using Claude 3.5 Sonnet, and store results in a queryable SQLite database.
+Agentic AI workflow for intelligent job assessment. Extract job postings from company websites, preprocess with NLP, verify with users, assess CV fit using Claude (Haiku/Sonnet/Opus), and store results in a queryable SQLite database.
 
-**Cost optimized**: 80–90% token reduction through local preprocessing. ~$0.0006–0.0008 per LLM assessment.
+**Cost optimized**: 80–90% token reduction through local preprocessing. Configurable LLM model (default Sonnet). ~$0.0001–0.0008 per assessment depending on model.
 
 ## 🚀 Quick Start
 
@@ -198,7 +198,7 @@ python -m src.setup.validate_nlp_setup
 | **NLP** | spaCy (en_core_web_md), tiktoken for token counting |
 | **Text Processing** | MarkItDown (primary), BeautifulSoup4 + lxml (fallback) |
 | **CLI** | Typer (modern, async-ready), interactive prompts |
-| **LLM** | Claude 3.5 Sonnet (Anthropic SDK) |
+| **LLM** | Claude (configurable: Haiku/Sonnet/Opus, Anthropic SDK) |
 | **Database** | SQLite with FTS5 (full-text search) |
 | **Formatting** | Markdown, JSON |
 
@@ -262,7 +262,14 @@ uv run python -m src.cli review --interactive
 
 **4. Assess** CV fit with Claude (tracked cost in real-time):
 ```bash
+# Default: Claude Sonnet (balanced cost/quality)
 uv run python -m src.cli assess --cv data/cv.json --confirmed-only
+
+# Or select cheaper model: Haiku (95% savings vs Opus)
+uv run python -m src.cli assess --cv data/cv.json --model claude-haiku-4-5-20251001
+
+# Or select more capable model: Opus (best accuracy)
+uv run python -m src.cli assess --cv data/cv.json --model claude-opus-4-8
 ```
 
 **5. Query & Export** results:
@@ -445,7 +452,7 @@ uv run python src/storage/db.py --init
 | **Query** | <100 ms | SQLite FTS5 indexed search |
 | **Export** | <1 sec | Markdown generation |
 | **Database size** | ~5 MB | Per 500 assessments |
-| **LLM cost** | $0.0006–$0.0008/job | Depends on job description length |
+| **LLM cost** | $0.00009–$0.00115/job | Haiku (cheapest) to Opus (best accuracy) |
 
 See [ARCHITECTURE.md](./docs/ARCHITECTURE.md#performance) for scaling strategies.
 

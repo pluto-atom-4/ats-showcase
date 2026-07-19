@@ -367,9 +367,22 @@ Confirm? (y/n/skip): n
 ### Command
 
 ```bash
+# Default: Sonnet (balanced cost/quality)
+uv run python -m src.cli assess --cv data/cv.json
+
+# Budget mode: Haiku (95% cost savings, suitable for quick prototyping)
+uv run python -m src.cli assess --cv data/cv.json --model claude-haiku-4-5-20251001
+
+# Premium: Opus (best accuracy, costlier)
+uv run python -m src.cli assess --cv data/cv.json --model claude-opus-4-8
+
+# Advanced: Filters + model selection
 uv run python -m src.cli assess \
   --cv data/cv.json \
-  --confirmed-only true
+  --mode new-only \
+  --score-threshold 65 \
+  --since 2026-07-01 \
+  --model claude-sonnet-5
 ```
 
 ### Options
@@ -378,6 +391,18 @@ uv run python -m src.cli assess \
 |--------|---------|-------------|
 | `--cv` | *required* | Path to CV file (JSON or TXT) |
 | `--confirmed-only` | `true` | Only assess jobs with status="confirmed" |
+| `--model` | `claude-sonnet-5` | Claude model: Haiku (cheap), Sonnet (default), Opus (best) |
+| `--mode` | `new-only` | 'new-only' (unassessed) or 'all' (all confirmed) |
+| `--score-threshold` | None | Re-assess jobs below threshold |
+| `--since` | None | Re-assess jobs after ISO date (2026-07-01) |
+
+### Model Comparison
+
+| Model | Cost | Speed | Accuracy | Use Case |
+|-------|------|-------|----------|----------|
+| Haiku | $0.80/$4.0/1M | Fast | 🟡 Good | Budget, prototyping |
+| Sonnet | $3.0/$15/1M | Medium | 🟢 Great | **Default choice** |
+| Opus | $15/$75/1M | Slower | 🟢 Excellent | High accuracy needed |
 
 ### CV File Format
 
