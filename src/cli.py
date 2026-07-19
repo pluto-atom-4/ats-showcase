@@ -137,6 +137,11 @@ def all(
         "--merge-all",
         help="Auto-discover and process all extracted company files",
     ),
+    model: Optional[str] = typer.Option(
+        None,
+        "--model",
+        help="Claude model for assessment (default: claude-sonnet-5). Supported: claude-haiku-4-5-20251001, claude-sonnet-5, claude-opus-4-8",
+    ),
 ) -> None:
     """
     Run full workflow: crawl → preprocess → review → assess → export.
@@ -427,6 +432,7 @@ def all(
 
         phase_start = time.time()
 
+        from src.config.models import get_model_display_name
         from src.llm.provider import LLMProvider
 
         # Load CV
@@ -446,7 +452,9 @@ def all(
 
         # Initialize LLM provider
         try:
-            llm_provider = LLMProvider()
+            llm_provider = LLMProvider(model_id=model)
+            model_display = get_model_display_name(llm_provider.model)
+            typer.echo(f"🤖 Using {model_display} model\n")
         except ValueError as e:
             typer.echo(f"❌ LLM setup failed: {e}", err=True)
             typer.echo("   Set ANTHROPIC_API_KEY environment variable", err=True)
@@ -964,11 +972,17 @@ def assess(
     since: Optional[str] = typer.Option(
         None, "--since", help="Re-assess jobs crawled on/after this date (ISO format, e.g. 2026-07-01)"
     ),
+    model: Optional[str] = typer.Option(
+        None,
+        "--model",
+        help="Claude model for assessment (default: claude-sonnet-5). Supported: claude-haiku-4-5-20251001, claude-sonnet-5, claude-opus-4-8",
+    ),
 ) -> None:
-    """Assess CV fit for confirmed jobs using Claude 3.5 Sonnet."""
+    """Assess CV fit for confirmed jobs."""
     import json
     from pathlib import Path
 
+    from src.config.models import get_model_display_name
     from src.llm.provider import LLMProvider
     from src.storage.assessment_store import AssessmentStore
     from src.verification import JobReviewer
@@ -993,7 +1007,9 @@ def assess(
 
         # Initialize LLM provider
         try:
-            llm_provider = LLMProvider()
+            llm_provider = LLMProvider(model_id=model)
+            model_display = get_model_display_name(llm_provider.model)
+            typer.echo(f"🤖 Using {model_display} model\n")
         except ValueError as e:
             typer.echo(f"❌ LLM setup failed: {e}", err=True)
             typer.echo("   Set ANTHROPIC_API_KEY environment variable", err=True)
