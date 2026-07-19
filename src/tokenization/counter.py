@@ -3,6 +3,8 @@
 import logging
 from typing import Dict, List, Optional
 
+from src.config.models import DEFAULT_MODEL, get_model_pricing
+
 try:
     import tiktoken
 except ImportError:
@@ -14,18 +16,12 @@ logger = logging.getLogger(__name__)
 class TokenCounter:
     """Count tokens using tiktoken for Claude models."""
 
-    # Claude 3.5 pricing (USD per 1M tokens as of 2026-05-19)
-    CLAUDE_PRICING = {
-        "input": 0.003,  # $3 per 1M input tokens
-        "output": 0.015,  # $15 per 1M output tokens
-    }
-
-    def __init__(self, model: str = "claude-3-5-sonnet-20241022"):
+    def __init__(self, model: str = DEFAULT_MODEL):
         """
         Initialize token counter for Claude model.
 
         Args:
-            model: Claude model identifier
+            model: Claude model identifier (default: claude-sonnet-5)
         """
         self.model = model
         self.encoding: Optional["tiktoken.Encoding"] = None
@@ -97,19 +93,23 @@ class TokenCounter:
         """
         return {i: self.count_tokens(chunk) for i, chunk in enumerate(chunks)}
 
-    def estimate_cost(self, input_tokens: int, output_tokens: int = 100) -> float:
-        """
-        Estimate cost for API call.
+    def estimate_cost(
+        self, input_tokens: int, output_tokens: int = 300
+    ) -> float:
+        """Estimate cost for API call.
 
         Args:
             input_tokens: Number of input tokens
-            output_tokens: Expected output tokens (default: 100 for summary)
+            output_tokens: Expected output tokens (default: 300 for assessment)
+                Assumption: Job assessment responses typically 200-400 tokens
+                This 300-token estimate is more realistic than prior 100-token default
 
         Returns:
-            Estimated cost in USD
+            Estimated cost in USD (based on model's input/output rates per 1M tokens)
         """
-        input_cost = (input_tokens / 1_000_000) * self.CLAUDE_PRICING["input"]
-        output_cost = (output_tokens / 1_000_000) * self.CLAUDE_PRICING["output"]
+        input_price, output_price = get_model_pricing(self.model)
+        input_cost = (input_tokens / 1_000_000) * input_price
+        output_cost = (output_tokens / 1_000_000) * output_price
         return input_cost + output_cost
 
     def format_cost(self, cost: float) -> str:

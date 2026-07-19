@@ -48,12 +48,15 @@ def test_token_counter():
 
 @pytest.mark.unit
 def test_token_pricing():
-    """Verify token pricing constants."""
+    """Verify token pricing is available via model config."""
+    from config.models import get_model_pricing
+
     counter = TokenCounter()
 
-    # Check pricing is set
-    assert counter.CLAUDE_PRICING["input"] > 0
-    assert counter.CLAUDE_PRICING["output"] > 0
+    # Check pricing is set for the model
+    input_price, output_price = get_model_pricing(counter.model)
+    assert input_price > 0
+    assert output_price > 0
 
 
 @pytest.mark.unit
