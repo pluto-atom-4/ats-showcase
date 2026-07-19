@@ -35,7 +35,7 @@ class LLMComparator:
         import anthropic
 
         self.client = anthropic.Anthropic(api_key=api_key)
-        self.results = {}
+        self.results: dict[str, Optional[Dict]] = {}
 
     def assess_with_model(
         self, model_id: str, cv_text: str, job_chunks: list
@@ -60,7 +60,9 @@ class LLMComparator:
                 messages=[{"role": "user", "content": prompt}],
             )
 
-            response_text = response.content[0].text if response.content else ""
+            response_text = ""
+            if response.content and hasattr(response.content[0], "text"):
+                response_text = response.content[0].text
             print(f"[DEBUG] {model_id} raw response: {response_text[:200]}...")
 
             # Save response to data/prompt-flow
@@ -109,7 +111,7 @@ class LLMComparator:
             cv_text: CV text
             job_chunks: List of job description chunks from preprocessed_jobs.json
         """
-        results = {}
+        results: dict[str, Optional[Dict]] = {}
 
         for model_name, (model_id, _, _) in self.MODELS.items():
             logger.info(f"Testing {model_name} ({model_id})...")
@@ -245,7 +247,7 @@ def load_cv_text() -> str:
     return "\n".join(lines)
 
 
-def load_first_job_chunks() -> list:
+def load_first_job_chunks() -> list[str]:
     """Load first job chunks from data/extracted_jobs/preprocessed_jobs.json.
 
     Returns chunks list (same format used by assess command).
@@ -262,7 +264,7 @@ def load_first_job_chunks() -> list:
 
     job = jobs[0]
     # Use chunks (same as assess command: preprocessed.get("chunks", [clean_text]))
-    chunks = job.get("chunks")
+    chunks: list[str] = job.get("chunks", [])
 
     if not chunks:
         raise ValueError("First job has no chunks")
