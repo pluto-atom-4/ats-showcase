@@ -195,5 +195,5 @@ rm -rf .claude/skills/pre-commit-enforce
 
 ---
 
-**Status**: Ready for production  
+**Status**: Ready for production
 **Last Updated**: 2026-07-17

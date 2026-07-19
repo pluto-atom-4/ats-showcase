@@ -64,6 +64,6 @@ git push -u origin feat/issue-123-description   # Push branch
 
 ---
 
-**Install time**: < 1 minute  
-**No dependencies**: Uses bash + git  
+**Install time**: < 1 minute
+**No dependencies**: Uses bash + git
 **Cross-platform**: Works on Linux, macOS, WSL
