@@ -909,10 +909,11 @@ def review(
     model: Optional[str] = typer.Option(
         None,
         "--model",
-        help="Claude model for cost estimation (haiku/sonnet/opus or full ID, default sonnet). Recalculates costs based on model pricing.",
+        help="Claude model (haiku/sonnet/opus or full ID). Recalculates costs based on model pricing.",
     ),
 ) -> None:
     """Interactively review extracted jobs before LLM assessment."""
+    from src.config.models import get_model_display_name, resolve_model_alias
     from src.verification import JobReviewer
 
     logger.info("Starting job review")
