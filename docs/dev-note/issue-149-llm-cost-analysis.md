@@ -85,7 +85,7 @@ Stay with Opus. Requires:
 
 Requires ANTHROPIC_API_KEY:
 ```bash
-export ANTHROPIC_API_KEY='sk-ant-...'
+export ANTHROPIC_API_KEY='sk-ant-...'  # pragma: allowlist secret
 uv run pytest tests/test_llm_comparison.py -v -s
 ```
 
