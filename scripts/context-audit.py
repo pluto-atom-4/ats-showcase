@@ -110,57 +110,48 @@ def audit_file(file_path: Path, root_path: Path) -> Optional[FileMetrics]:
         return None
 
 
-def main():
-    root_path = Path(__file__).parent.parent
-    context_files = []
-
-    # Core context files
+def collect_files(root_path: Path) -> list[Path]:
+    """Collect core and rules .md files."""
     core_files = [
         root_path / "CLAUDE.md",
         root_path / "DESIGN.md",
         root_path / "AGENTS.md",
         root_path / ".github" / "copilot-instructions.md",
     ]
-
-    # Phase-specific rules
     rules_dir = root_path / ".claude" / "rules"
     if rules_dir.exists():
         core_files.extend(sorted(rules_dir.glob("*.md")))
+    return core_files
 
-    # Audit all files
-    print("🔍 Auditing context files...\n")
-    metrics_list = []
+
+def print_metrics(metrics_list: list[FileMetrics]) -> tuple[list[str], list[str]]:
+    """Print file metrics. Return warnings and errors."""
     warnings = []
     errors = []
+    for metrics in metrics_list:
+        status_icon = {
+            "compliant": "✓",
+            "warning": "⚠",
+            "over_budget": "✗",
+            "info": "ℹ",
+        }.get(metrics.status, "?")
+        print(
+            f"{status_icon} {metrics.path}\n"
+            f"   Lines: {metrics.lines} | Tokens: {metrics.tokens_estimated} | "
+            f"Budget: {metrics.budget or 'none'}"
+        )
+        if metrics.percent_of_budget:
+            print(f"   {metrics.percent_of_budget:.0f}% of budget")
+        if metrics.status == "warning":
+            warnings.append(f"{metrics.path}: {metrics.percent_of_budget:.0f}% of budget")
+        elif metrics.status == "over_budget":
+            errors.append(f"{metrics.path}: EXCEEDS budget ({metrics.percent_of_budget:.0f}%)")
+        print()
+    return warnings, errors
 
-    for file_path in core_files:
-        metrics = audit_file(file_path, root_path)
-        if metrics:
-            metrics_list.append(metrics)
-            status_icon = {
-                "compliant": "✓",
-                "warning": "⚠",
-                "over_budget": "✗",
-                "info": "ℹ",
-            }.get(metrics.status, "?")
 
-            print(
-                f"{status_icon} {metrics.path}\n"
-                f"   Lines: {metrics.lines} | Tokens: {metrics.tokens_estimated} | "
-                f"Budget: {metrics.budget or 'none'}"
-            )
-            if metrics.percent_of_budget:
-                print(f"   {metrics.percent_of_budget:.0f}% of budget")
-
-            # Collect warnings/errors
-            if metrics.status == "warning":
-                warnings.append(f"{metrics.path}: {metrics.percent_of_budget:.0f}% of budget")
-            elif metrics.status == "over_budget":
-                errors.append(f"{metrics.path}: EXCEEDS budget ({metrics.percent_of_budget:.0f}%)")
-
-            print()
-
-    # Summary
+def print_summary(metrics_list: list[FileMetrics], warnings: list[str], errors: list[str]) -> None:
+    """Print summary and issues."""
     total_tokens = sum(m.tokens_estimated for m in metrics_list)
     total_budget = sum(m.budget for m in metrics_list if m.budget)
     compliant_count = sum(1 for m in metrics_list if m.status == "compliant")
@@ -173,18 +164,22 @@ def main():
     print(f"Total tokens (estimated): {total_tokens:,}")
     print(f"Total budget: {total_budget:,}")
     print(f"Overall utilization: {(total_tokens / total_budget) * 100:.0f}%")
-
     if warnings:
         print(f"\n⚠  Warnings ({len(warnings)}):")
         for w in warnings:
             print(f"   - {w}")
-
     if errors:
         print(f"\n✗ Over Budget ({len(errors)}):")
         for e in errors:
             print(f"   - {e}")
 
-    # Export JSON
+
+def export_report(root_path: Path, metrics_list: list[FileMetrics], warnings: list[str], errors: list[str]) -> None:
+    """Export audit results to JSON."""
+    total_tokens = sum(m.tokens_estimated for m in metrics_list)
+    total_budget = sum(m.budget for m in metrics_list if m.budget)
+    compliant_count = sum(1 for m in metrics_list if m.status == "compliant")
+
     output_dir = root_path / "docs" / "dev-note"
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / "context-baseline.json"
@@ -210,6 +205,22 @@ def main():
 
     print(f"\n📊 Report exported to: {output_file}")
     print("\nNext step: Review findings in docs/dev-note/ai-config-audit-findings.md")
+
+
+def main():
+    root_path = Path(__file__).parent.parent
+    core_files = collect_files(root_path)
+
+    print("🔍 Auditing context files...\n")
+    metrics_list = []
+    for file_path in core_files:
+        metrics = audit_file(file_path, root_path)
+        if metrics:
+            metrics_list.append(metrics)
+
+    warnings, errors = print_metrics(metrics_list)
+    print_summary(metrics_list, warnings, errors)
+    export_report(root_path, metrics_list, warnings, errors)
 
 
 if __name__ == "__main__":
