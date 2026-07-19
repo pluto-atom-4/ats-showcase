@@ -660,16 +660,16 @@ When using `--merge-all`:
 **Purpose**: Claude LLM job-CV matching with configurable model selection
 
 ```bash
-# Default: Sonnet (balanced cost/quality)
+# Default: Sonnet (balanced cost/quality, $3/$15 per 1M tokens)
 uv run python -m src.cli assess --cv data/cv.json --confirmed-only
 
-# Budget mode: Haiku (95% cost savings)
-uv run python -m src.cli assess --cv data/cv.json --model claude-haiku-4-5-20251001
+# Budget mode: Haiku (95% cost savings, $0.80/$4 per 1M tokens)
+uv run python -m src.cli assess --cv data/cv.json --model haiku
 
-# Premium: Opus (best accuracy)
-uv run python -m src.cli assess --cv data/cv.json --model claude-opus-4-8
+# Premium: Opus (best accuracy, $15/$75 per 1M tokens)
+uv run python -m src.cli assess --cv data/cv.json --model opus
 
-# Advanced: Custom filters
+# Advanced: Custom filters with full model ID
 uv run python -m src.cli assess \
   --cv data/cv.json \
   --mode new-only \
@@ -678,9 +678,15 @@ uv run python -m src.cli assess \
   --model claude-sonnet-5
 ```
 
+**Model options** (use aliases or full IDs):
+- `haiku` or `claude-haiku-4-5-20251001` – Fast, cheapest ($0.80/$4/1M)
+- `sonnet` or `claude-sonnet-5` – Balanced, default ($3/$15/1M)
+- `opus` or `claude-opus-4-8` – Most capable ($15/$75/1M)
+
 **Options**:
 - `--cv PATH` - Candidate CV file (required)
 - `--confirmed-only/--all` - Filter verified jobs (default: confirmed only)
+- `--model TEXT` - Claude model: haiku, sonnet, opus, or full ID (default: sonnet)
 - `--model TEXT` - Claude model selection
   - `claude-haiku-4-5-20251001` - Budget ($0.80/$4 per 1M, 95% savings)
   - `claude-sonnet-5` - Default ($3/$15 per 1M, 80% savings)

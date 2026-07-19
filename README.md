@@ -260,15 +260,20 @@ uv run python -m src.cli preprocess --batch 50 --show-estimates
 uv run python -m src.cli review --interactive
 ```
 
-**4. Assess** CV fit with Claude (tracked cost in real-time):
+**4. Assess** CV fit with Claude (choose model by cost/accuracy tradeoff):
 ```bash
-# Default: Claude Sonnet (balanced cost/quality)
+# Default: Claude Sonnet (balanced cost/quality, $3/$15 per 1M tokens)
 uv run python -m src.cli assess --cv data/cv.json --confirmed-only
 
-# Or select cheaper model: Haiku (95% savings vs Opus)
-uv run python -m src.cli assess --cv data/cv.json --model claude-haiku-4-5-20251001
+# Or: Haiku (cheapest, 95% savings vs Opus, $0.80/$4 per 1M)
+uv run python -m src.cli assess --cv data/cv.json --model haiku
 
-# Or select more capable model: Opus (best accuracy)
+# Or: Opus (most capable, $15/$75 per 1M)
+uv run python -m src.cli assess --cv data/cv.json --model opus
+
+# Or use full model IDs (equivalent to aliases above)
+uv run python -m src.cli assess --cv data/cv.json --model claude-sonnet-5
+uv run python -m src.cli assess --cv data/cv.json --model claude-haiku-4-5-20251001
 uv run python -m src.cli assess --cv data/cv.json --model claude-opus-4-8
 ```
 

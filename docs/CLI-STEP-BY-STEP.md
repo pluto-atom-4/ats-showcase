@@ -367,16 +367,16 @@ Confirm? (y/n/skip): n
 ### Command
 
 ```bash
-# Default: Sonnet (balanced cost/quality)
+# Default: Sonnet (balanced cost/quality, $3/$15 per 1M tokens)
 uv run python -m src.cli assess --cv data/cv.json
 
-# Budget mode: Haiku (95% cost savings, suitable for quick prototyping)
-uv run python -m src.cli assess --cv data/cv.json --model claude-haiku-4-5-20251001
+# Budget mode: Haiku (95% cost savings, $0.80/$4 per 1M tokens)
+uv run python -m src.cli assess --cv data/cv.json --model haiku
 
-# Premium: Opus (best accuracy, costlier)
-uv run python -m src.cli assess --cv data/cv.json --model claude-opus-4-8
+# Premium: Opus (best accuracy, $15/$75 per 1M tokens)
+uv run python -m src.cli assess --cv data/cv.json --model opus
 
-# Advanced: Filters + model selection
+# Advanced: Filters + model selection with full model ID
 uv run python -m src.cli assess \
   --cv data/cv.json \
   --mode new-only \
@@ -391,18 +391,30 @@ uv run python -m src.cli assess \
 |--------|---------|-------------|
 | `--cv` | *required* | Path to CV file (JSON or TXT) |
 | `--confirmed-only` | `true` | Only assess jobs with status="confirmed" |
-| `--model` | `claude-sonnet-5` | Claude model: Haiku (cheap), Sonnet (default), Opus (best) |
+| `--model` | `sonnet` | Claude model: haiku, sonnet, opus (or full ID like claude-sonnet-5) |
 | `--mode` | `new-only` | 'new-only' (unassessed) or 'all' (all confirmed) |
 | `--score-threshold` | None | Re-assess jobs below threshold |
 | `--since` | None | Re-assess jobs after ISO date (2026-07-01) |
 
 ### Model Comparison
 
-| Model | Cost | Speed | Accuracy | Use Case |
-|-------|------|-------|----------|----------|
-| Haiku | $0.80/$4.0/1M | Fast | 🟡 Good | Budget, prototyping |
-| Sonnet | $3.0/$15/1M | Medium | 🟢 Great | **Default choice** |
-| Opus | $15/$75/1M | Slower | 🟢 Excellent | High accuracy needed |
+| Model | Alias | Cost (input/output per 1M) | Speed | Accuracy | Use Case |
+|-------|-------|---------------------------|-------|----------|----------|
+| Haiku | `haiku` | $0.80 / $4.0 | Fast | 🟡 Good | Budget, prototyping, volume testing |
+| Sonnet | `sonnet` | $3.0 / $15.0 | Medium | 🟢 Great | **Default choice** |
+| Opus | `opus` | $15.0 / $75.0 | Slower | 🟢 Excellent | High accuracy needed |
+
+**Using aliases:**
+```bash
+# Haiku with alias
+uv run python -m src.cli assess --cv data/cv.json --model haiku
+
+# Opus with alias (case-insensitive)
+uv run python -m src.cli assess --cv data/cv.json --model OPUS
+
+# Full model ID (also works)
+uv run python -m src.cli assess --cv data/cv.json --model claude-haiku-4-5-20251001
+```
 
 ### CV File Format
 

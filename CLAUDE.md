@@ -63,21 +63,27 @@ uv run python src/storage/db.py --init
 ## Quick Workflow
 
 ```bash
-# Full pipeline (default: Sonnet model)
+# Full pipeline (default: Sonnet model, $3/$15 per 1M tokens)
 uv run python -m src.cli all --cv data/cv.json --config config/companies.json
 
-# Full pipeline with Haiku (95% cost savings)
-uv run python -m src.cli all --cv data/cv.json --config config/companies.json --model claude-haiku-4-5-20251001
+# Full pipeline with Haiku (95% cheaper, $0.80/$4 per 1M)
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --model haiku
+
+# Full pipeline with Opus (most capable, $15/$75 per 1M)
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --model opus
 
 # Step-by-step
 uv run python -m src.cli crawl --config config/companies.json
 uv run python -m src.cli preprocess --show-estimates
 uv run python -m src.cli review --interactive
-uv run python -m src.cli assess --cv data/cv.json --model claude-sonnet-5
+uv run python -m src.cli assess --cv data/cv.json --model sonnet
 uv run python -m src.cli export --output data/assessments/report.md
 ```
 
-**Model options**: claude-haiku-4-5-20251001 (cheap), claude-sonnet-5 (default), claude-opus-4-8 (best)
+**Model options** (aliases or full IDs):
+- `haiku` or `claude-haiku-4-5-20251001` – Fast, cheap ($0.80/$4 per 1M)
+- `sonnet` or `claude-sonnet-5` – Balanced ($3/$15 per 1M, default)
+- `opus` or `claude-opus-4-8` – Most capable ($15/$75 per 1M)
 
 **Command reference**: See [.github/instructions/cli-usage.instructions.md](.github/instructions/cli-usage.instructions.md)
 
