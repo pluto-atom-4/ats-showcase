@@ -46,6 +46,20 @@ git checkout main
 git reset --hard origin/main  # Restore main to remote
 ```
 
+### Install Pre-Commit Hook
+
+One-liner to set up enforcement:
+```bash
+curl -sSL https://github.com/pluto-atom-4/pre-commit-enforce-skill/releases/download/v1.0.0/install.sh | bash
+```
+
+Or download + run locally:
+```bash
+bash .claude/skills/pre-commit-enforce/setup.sh
+```
+
+See [pre-commit-enforce skill docs](https://github.com/pluto-atom-4/pre-commit-enforce-skill) for customization (protect multiple branches, custom messages).
+
 ---
 
 ## Setup
