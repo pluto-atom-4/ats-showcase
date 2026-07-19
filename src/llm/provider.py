@@ -6,6 +6,12 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
+from config.models import (
+    DEFAULT_MODEL,
+    get_model_display_name,
+    get_model_pricing,
+    validate_model,
+)
 from models.job import Assessment
 
 logger = logging.getLogger(__name__)
