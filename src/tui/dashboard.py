@@ -588,6 +588,7 @@ class ATPDashboardApp(App):
         companies: Optional[Dict[str, Any]] = None,
         cv_file: Optional[str] = None,
         headless: bool = True,
+        interactive: bool = False,
         up_to: Optional[str] = None,
     ):
         super().__init__()
@@ -595,6 +596,7 @@ class ATPDashboardApp(App):
         self.companies = companies or {}
         self.cv_file = cv_file
         self.headless = headless
+        self.interactive = interactive
         self.up_to = up_to
 
     def on_mount(self) -> None:
@@ -604,6 +606,7 @@ class ATPDashboardApp(App):
             companies=self.companies,
             cv_file=self.cv_file,
             headless=self.headless,
+            interactive=self.interactive,
             up_to=self.up_to,
         )
         self.push_screen(dashboard)
