@@ -34,7 +34,7 @@ uv run python -m src.cli all --cv data/cv.json --config config/companies.json --
 uv run python -m src.cli all --cv data/cv.json --config config/companies.json --up-to assess
 ```
 
-**Valid phases:** `crawl`, `preprocess`, `review`, `assess`, `export`  
+**Valid phases:** `crawl`, `preprocess`, `review`, `assess`, `export`
 **Default:** No `--up-to` runs all phases
 
 ### Phase Commands (Individual Steps)
