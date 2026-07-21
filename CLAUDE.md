@@ -77,16 +77,29 @@ uv run python src/storage/db.py --init
 ## Quick Workflow
 
 ```bash
-# Full pipeline
-uv run python -m src.cli --all --cv data/cv.json --config config/companies.json
+# Full pipeline (default: Sonnet model, $3/$15 per 1M tokens)
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json
+
+# Full pipeline with Haiku (95% cheaper, $0.80/$4 per 1M)
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --model haiku
+
+# Full pipeline with Opus (most capable, $15/$75 per 1M)
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --model opus
 
 # Step-by-step
 uv run python -m src.cli crawl --config config/companies.json
 uv run python -m src.cli preprocess --show-estimates
-uv run python -m src.cli review --interactive
-uv run python -m src.cli assess --cv data/cv.json
+uv run python -m src.cli review --interactive                           # Basic review
+uv run python -m src.cli review --interactive --model haiku             # Show Haiku costs
+uv run python -m src.cli review --interactive --cost-limit 0.05         # Warn if > $0.05
+uv run python -m src.cli assess --cv data/cv.json --model sonnet
 uv run python -m src.cli export --output data/assessments/report.md
 ```
+
+**Model options** (aliases or full IDs):
+- `haiku` or `claude-haiku-4-5-20251001` – Fast, cheap ($0.80/$4 per 1M)
+- `sonnet` or `claude-sonnet-5` – Balanced ($3/$15 per 1M, default)
+- `opus` or `claude-opus-4-8` – Most capable ($15/$75 per 1M)
 
 **Command reference**: See [.github/instructions/cli-usage.instructions.md](.github/instructions/cli-usage.instructions.md)
 
@@ -133,7 +146,10 @@ Read phase-specific guidance in `.claude/rules/`:
 - **NLP**: spaCy (sentence segmentation)
 - **Tokens**: tiktoken (estimates), Claude API (actual)
 - **DB**: SQLite with FTS5 full-text search
-- **LLM**: Claude 3.5 Sonnet ($0.003 per 1M input tokens)
+- **LLM**: Claude (configurable via --model flag):
+  - Haiku (default for cost): $0.80/$4.0 per 1M (95% savings)
+  - Sonnet (default): $3.0/$15.0 per 1M (80% savings)
+  - Opus: $15.0/$75.0 per 1M (best accuracy)
 - **CLI**: Typer (async-ready)
 
 ---
@@ -177,4 +193,4 @@ Context files (CLAUDE.md, DESIGN.md, .claude/rules/) must remain aligned with im
 ---
 
 **Status**: Progressive Disclosure (minimal bloat, maximum clarity)
-**Last Updated**: 2026-07-10
+**Last Updated**: 2026-07-18 (model selection feature added)

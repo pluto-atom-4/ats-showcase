@@ -273,6 +273,13 @@ uv run python -m src.cli review --merge-all
 | `--extracted` | None | Path to single extracted jobs JSON (only if NOT using `--merge-all`) |
 | `--preprocessed` | `data/extracted_jobs/preprocessed_jobs.json` | Path to preprocessed jobs JSON (auto-discovered) |
 | `--merge-all` | `false` | **[RECOMMENDED for multi-company]** Auto-discover and process all extracted company files together |
+| `--model` | None | **[NEW]** Recalculate costs for model (haiku/sonnet/opus). Shows model-specific cost estimate |
+| `--cost-limit` | $0.10 | **[NEW]** Warn if total estimated cost exceeds this USD amount |
+| `--mode` | new-only | Review mode: 'new-only' (unreviewed) or 'all' (all jobs) |
+| `--skip-before-date` | None | Skip jobs crawled before ISO date (e.g., 2026-07-01) |
+| `--skip-rejected` | true | Skip previously rejected jobs |
+| `--skip-assessed` | true | Skip previously assessed jobs |
+| `--allow-re-review` | false | Show prior decisions and allow changing them |
 
 ### Multi-Company Workflow ✓
 
@@ -360,6 +367,39 @@ Confirm? (y/n/skip): n
 - **Save time** - Skip positions you're not interested in
 - **Improve results** - Assess only relevant opportunities
 
+### Cost Recalculation (NEW)
+
+By default, cost estimates are based on the model used during preprocessing (typically Sonnet). Use `--model` to recalculate for a different model:
+
+```bash
+# See costs for Haiku (cheapest)
+uv run python -m src.cli review --merge-all --model haiku
+
+# Output includes recalculated cost estimates
+💰 Recalculating costs for Haiku model...
+✅ Recalculated costs using Haiku:
+   Original estimate: $0.0234
+   Haiku estimate:    $0.0031  (87% savings!)
+```
+
+**Use case**: "Before reviewing, show me how much Haiku would cost vs Sonnet"
+
+### Cost Warnings (NEW)
+
+Set a budget threshold to warn if review total exceeds it:
+
+```bash
+# Warn if total estimated cost > $0.05
+uv run python -m src.cli review --merge-all --cost-limit 0.05
+
+# Output at end of review:
+⚠️  WARNING: Estimated LLM cost ($0.0847) exceeds threshold ($0.05)
+   To proceed with assessment, use: assess --model <model> --cv <cv_file>
+   To adjust threshold: review --cost-limit 0.10
+```
+
+**Use case**: "Alert me if review total would exceed my budget"
+
 ---
 
 ## Phase 4: ASSESS - AI Evaluation with Claude
@@ -367,9 +407,22 @@ Confirm? (y/n/skip): n
 ### Command
 
 ```bash
+# Default: Sonnet (balanced cost/quality, $3/$15 per 1M tokens)
+uv run python -m src.cli assess --cv data/cv.json
+
+# Budget mode: Haiku (95% cost savings, $0.80/$4 per 1M tokens)
+uv run python -m src.cli assess --cv data/cv.json --model haiku
+
+# Premium: Opus (best accuracy, $15/$75 per 1M tokens)
+uv run python -m src.cli assess --cv data/cv.json --model opus
+
+# Advanced: Filters + model selection with full model ID
 uv run python -m src.cli assess \
   --cv data/cv.json \
-  --confirmed-only true
+  --mode new-only \
+  --score-threshold 65 \
+  --since 2026-07-01 \
+  --model claude-sonnet-5
 ```
 
 ### Options
@@ -378,6 +431,30 @@ uv run python -m src.cli assess \
 |--------|---------|-------------|
 | `--cv` | *required* | Path to CV file (JSON or TXT) |
 | `--confirmed-only` | `true` | Only assess jobs with status="confirmed" |
+| `--model` | `sonnet` | Claude model: haiku, sonnet, opus (or full ID like claude-sonnet-5) |
+| `--mode` | `new-only` | 'new-only' (unassessed) or 'all' (all confirmed) |
+| `--score-threshold` | None | Re-assess jobs below threshold |
+| `--since` | None | Re-assess jobs after ISO date (2026-07-01) |
+
+### Model Comparison
+
+| Model | Alias | Cost (input/output per 1M) | Speed | Accuracy | Use Case |
+|-------|-------|---------------------------|-------|----------|----------|
+| Haiku | `haiku` | $0.80 / $4.0 | Fast | 🟡 Good | Budget, prototyping, volume testing |
+| Sonnet | `sonnet` | $3.0 / $15.0 | Medium | 🟢 Great | **Default choice** |
+| Opus | `opus` | $15.0 / $75.0 | Slower | 🟢 Excellent | High accuracy needed |
+
+**Using aliases:**
+```bash
+# Haiku with alias
+uv run python -m src.cli assess --cv data/cv.json --model haiku
+
+# Opus with alias (case-insensitive)
+uv run python -m src.cli assess --cv data/cv.json --model OPUS
+
+# Full model ID (also works)
+uv run python -m src.cli assess --cv data/cv.json --model claude-haiku-4-5-20251001
+```
 
 ### CV File Format
 

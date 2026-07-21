@@ -49,6 +49,8 @@ class PreprocessedJob(BaseModel):
                 "clean_text": "Senior Python Developer...",
                 "token_count": 687,
                 "estimated_cost": 0.00206,
+                "model_name": "claude-sonnet-5",
+                "pricing_date": "2026-07-18",
             }
         }
     )
@@ -59,7 +61,17 @@ class PreprocessedJob(BaseModel):
     sentences: List[str] = Field(..., description="Sentence-segmented text")
     chunks: List[str] = Field(..., description="Semantic chunks")
     token_count: int = Field(..., description="Total tokens")
-    estimated_cost: float = Field(..., description="Estimated LLM cost in USD")
+    estimated_cost: float = Field(
+        ..., description="Estimated LLM cost in USD (model-specific)"
+    )
+    model_name: str = Field(
+        default="claude-sonnet-5",
+        description="LLM model used for cost estimation (e.g., claude-sonnet-5, claude-haiku-4-5-20251001)",
+    )
+    pricing_date: str = Field(
+        default="2026-07-18",
+        description="Date when pricing rates were valid (YYYY-MM-DD)",
+    )
     processed_date: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

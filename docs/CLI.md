@@ -630,51 +630,87 @@ ats-showcase preprocess --show-estimates
 ---
 
 ### review
-**Purpose**: User verification before LLM processing
+**Purpose**: User verification + cost transparency before LLM assessment
 
 ```bash
-# Single company (legacy, backward compatible)
-ats-showcase review --extracted data/extracted_jobs/companya_jobs.json
+# Basic: confirm/reject jobs interactively
+uv run python -m src.cli review --merge-all
 
-# Multi-company (RECOMMENDED)
-ats-showcase review --merge-all
+# With cost recalculation (NEW): Show costs for specific model
+uv run python -m src.cli review --merge-all --model haiku   # Haiku costs
+uv run python -m src.cli review --merge-all --model sonnet  # Sonnet costs (default)
+
+# With cost warning (NEW): Alert if total > threshold
+uv run python -m src.cli review --merge-all --cost-limit 0.05  # Warn if > $0.05
 ```
 
 **Options**:
 - `--extracted PATH` - Path to single extracted jobs JSON (optional if using `--merge-all`)
 - `--preprocessed PATH` - Path to preprocessed jobs JSON (default: data/extracted_jobs/preprocessed_jobs.json)
-- `--merge-all` - **[RECOMMENDED]** Auto-discover and process all extracted company files together
+- `--merge-all` - **[RECOMMENDED]** Auto-discover and process all extracted company files
+- `--model TEXT` - **[NEW]** Recalculate costs for model: haiku, sonnet, opus (default: uses preprocess estimates)
+- `--cost-limit FLOAT` - **[NEW]** Warn if estimated cost exceeds threshold USD (default: $0.10)
+- `--mode TEXT` - Review mode: 'new-only' (unreviewed, default) or 'all' (all jobs)
+- `--skip-before-date DATE` - Skip jobs crawled before ISO date (e.g., 2026-07-01)
+- `--skip-rejected` - Skip previously rejected jobs (default: true)
+- `--skip-assessed` - Skip previously assessed jobs (default: true)
+- `--allow-re-review` - Show prior decisions and allow re-review
 
-**Multi-Company Workflow**:
-When using `--merge-all`:
-- ✅ Auto-discovers all `*_jobs.json` files in `data/extracted_jobs/`
-- ✅ Processes ALL jobs from all companies in one interactive session
-- ✅ Pairs with multi-company `preprocessed_jobs.json` created by preprocess
-- Works seamlessly with `crawl --config-dir` pipelines
+**Cost Recalculation** (when `--model` specified):
+- Loads preprocessed token counts
+- Recalculates estimated cost using selected model's pricing
+- Shows: original estimate → model-specific estimate
+- Helps decide which model to use for assessment phase
 
-**Output**: Updated job statuses ("confirmed"/"rejected") in database
+**Cost Warnings** (when `--cost-limit` specified):
+- After review complete, warns if total_cost > limit
+- Suggests adjusting limit or proceeding with assessment
+- Useful for budget-conscious workflows
+
+**Output**: Job statuses ("confirmed"/"rejected") saved to database, cost summary displayed
 
 ---
 
 ### assess
-**Purpose**: Claude LLM job-CV matching
+**Purpose**: Claude LLM job-CV matching with configurable model selection
 
 ```bash
-ats-showcase assess \
+# Default: Sonnet (balanced cost/quality, $3/$15 per 1M tokens)
+uv run python -m src.cli assess --cv data/cv.json --confirmed-only
+
+# Budget mode: Haiku (95% cost savings, $0.80/$4 per 1M tokens)
+uv run python -m src.cli assess --cv data/cv.json --model haiku
+
+# Premium: Opus (best accuracy, $15/$75 per 1M tokens)
+uv run python -m src.cli assess --cv data/cv.json --model opus
+
+# Advanced: Custom filters with full model ID
+uv run python -m src.cli assess \
   --cv data/cv.json \
-  --confirmed-only \
-  --model claude-3-5-sonnet-20241022 \
-  --batch-size 10
+  --mode new-only \
+  --score-threshold 65 \
+  --since 2026-07-01 \
+  --model claude-sonnet-5
 ```
+
+**Model options** (use aliases or full IDs):
+- `haiku` or `claude-haiku-4-5-20251001` – Fast, cheapest ($0.80/$4/1M)
+- `sonnet` or `claude-sonnet-5` – Balanced, default ($3/$15/1M)
+- `opus` or `claude-opus-4-8` – Most capable ($15/$75/1M)
 
 **Options**:
 - `--cv PATH` - Candidate CV file (required)
 - `--confirmed-only/--all` - Filter verified jobs (default: confirmed only)
-- `--model TEXT` - Claude model selection (default: claude-3-5-sonnet-20241022)
-- `--min-score FLOAT` - Filter results >= threshold (default: 0.0)
-- `--batch-size INT` - Concurrent assessments (default: 10)
+- `--model TEXT` - Claude model: haiku, sonnet, opus, or full ID (default: sonnet)
+- `--model TEXT` - Claude model selection
+  - `claude-haiku-4-5-20251001` - Budget ($0.80/$4 per 1M, 95% savings)
+  - `claude-sonnet-5` - Default ($3/$15 per 1M, 80% savings)
+  - `claude-opus-4-8` - Premium ($15/$75 per 1M, best accuracy)
+- `--mode TEXT` - 'new-only' (unassessed) or 'all' (default: new-only)
+- `--score-threshold FLOAT` - Re-assess jobs < threshold
+- `--since DATE` - Re-assess jobs after ISO date (2026-07-01)
 
-**Output**: Assessment results in CSV, cost summary printed
+**Output**: Assessment results, per-model cost summary, token usage
 
 ---
 
@@ -1019,21 +1055,43 @@ uv run python -m src.cli assess \
 ---
 
 ### Full Workflow
-**Purpose**: Execute all phases sequentially
+**Purpose**: Execute all phases sequentially (crawl→preprocess→verify→assess→export)
 
 ```bash
-ats-showcase --all \
-  --config config/companies.json \
+# Default: Sonnet model
+uv run python -m src.cli all \
   --cv data/cv.json \
-  --output data/assessments/
+  --config config/companies.json
+
+# Budget mode: Haiku (95% cost savings)
+uv run python -m src.cli all \
+  --cv data/cv.json \
+  --config config/companies.json \
+  --model claude-haiku-4-5-20251001
+
+# Premium: Opus (best accuracy)
+uv run python -m src.cli all \
+  --cv data/cv.json \
+  --config-dir ./config \
+  --model claude-opus-4-8 \
+  --interactive
 ```
 
-**Equivalent to**:
+**Options**:
+- `--cv PATH` - CV file (required)
+- `--config PATH` - Single config file or
+- `--config-dir PATH` - Directory of config files (NEW)
+- `--model TEXT` - Claude model (Haiku/Sonnet/Opus, default: Sonnet)
+- `--interactive` - Prompt before assessing each job
+- `--tui / --no-tui` - Use/disable dashboard (auto-detected)
+
+**Equivalent to** (step-by-step):
 ```bash
-ats-showcase crawl --config config/companies.json
-ats-showcase review --file data/extracted_jobs/...
-ats-showcase assess --cv data/cv.json --confirmed-only
-ats-showcase export --format markdown --output data/assessments/
+uv run python -m src.cli crawl --config config/companies.json
+uv run python -m src.cli preprocess
+uv run python -m src.cli review --interactive
+uv run python -m src.cli assess --cv data/cv.json --model claude-sonnet-5
+uv run python -m src.cli export --output data/assessments/report.md
 ```
 
 ## Error Handling Patterns

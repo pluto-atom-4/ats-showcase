@@ -137,6 +137,11 @@ def all(
         "--merge-all",
         help="Auto-discover and process all extracted company files",
     ),
+    model: Optional[str] = typer.Option(
+        None,
+        "--model",
+        help="Claude model (haiku/sonnet/opus or full ID, default sonnet). See docs/CLI.md for pricing.",
+    ),
 ) -> None:
     """
     Run full workflow: crawl → preprocess → review → assess → export.
@@ -427,6 +432,7 @@ def all(
 
         phase_start = time.time()
 
+        from src.config.models import get_model_display_name
         from src.llm.provider import LLMProvider
 
         # Load CV
@@ -446,7 +452,9 @@ def all(
 
         # Initialize LLM provider
         try:
-            llm_provider = LLMProvider()
+            llm_provider = LLMProvider(model_id=model)
+            model_display = get_model_display_name(llm_provider.model)
+            typer.echo(f"🤖 Using {model_display} model\n")
         except ValueError as e:
             typer.echo(f"❌ LLM setup failed: {e}", err=True)
             typer.echo("   Set ANTHROPIC_API_KEY environment variable", err=True)
@@ -749,6 +757,11 @@ def preprocess(
     chunker = SemanticChunker(target_chunk_size=400)
     counter = TokenCounter()
 
+    from datetime import date as date_class
+
+    # Get current date for pricing_date field
+    pricing_date = date_class.today().isoformat()
+
     all_preprocessed: list[PreprocessedJob] = []
     total_tokens = 0
     total_cost = 0.0
@@ -791,6 +804,8 @@ def preprocess(
                         chunks=chunks,
                         token_count=token_count,
                         estimated_cost=estimated_cost,
+                        model_name=counter.model,
+                        pricing_date=pricing_date,
                     )
 
                     all_preprocessed.append(preprocessed)
@@ -849,6 +864,10 @@ def preprocess(
 # ============================================================================
 
 
+# Default cost limit: $0.10 (roughly 30k tokens on Sonnet)
+COST_THRESHOLD = 0.10
+
+
 @app.command()
 def review(
     extracted: Optional[str] = typer.Option(
@@ -884,8 +903,17 @@ def review(
     allow_re_review: bool = typer.Option(
         False, "--allow-re-review", help="Show prior decisions and allow re-review"
     ),
+    cost_limit: Optional[float] = typer.Option(
+        None, "--cost-limit", help="Warn if estimated LLM cost exceeds this USD amount"
+    ),
+    model: Optional[str] = typer.Option(
+        None,
+        "--model",
+        help="Claude model (haiku/sonnet/opus or full ID). Recalculates costs based on model pricing.",
+    ),
 ) -> None:
     """Interactively review extracted jobs before LLM assessment."""
+    from src.config.models import get_model_display_name, resolve_model_alias
     from src.verification import JobReviewer
 
     logger.info("Starting job review")
@@ -938,6 +966,53 @@ def review(
         )
         logger.info(f"Review complete: {stats.confirmed} confirmed, {stats.rejected} rejected")
 
+        # Recalculate costs if model specified
+        if model:
+            from src.tokenization.counter import TokenCounter
+
+            resolved_model = resolve_model_alias(model)
+            model_display = get_model_display_name(resolved_model)
+            typer.echo(f"\n💰 Recalculating costs for {model_display} model...")
+
+            # Create counter with specified model to recalculate costs
+            counter = TokenCounter(model=resolved_model)
+            recalc_cost = 0.0
+
+            # Load preprocessed jobs and recalculate their costs
+            try:
+                import json
+
+                with open(preprocessed) as f:
+                    preprocessed_jobs = json.load(f)
+
+                for job in preprocessed_jobs:
+                    # Only recalculate for confirmed jobs
+                    if job.get("status") == "confirmed":
+                        tokens = job.get("token_count", 0)
+                        # Use default output_tokens (300) for recalculation
+                        job_cost = counter.estimate_cost(tokens, output_tokens=300)
+                        recalc_cost += job_cost
+
+                typer.echo(
+                    f"✅ Recalculated costs using {model_display}:\n"
+                    f"   Original estimate: ${stats.total_cost:.6f}\n"
+                    f"   {model_display} estimate: ${recalc_cost:.6f}"
+                )
+                stats.total_cost = recalc_cost
+            except Exception as e:
+                logger.warning(f"Failed to recalculate costs: {e}")
+                typer.echo(f"⚠️  Could not recalculate costs: {e}")
+
+        # Check cost limit warning
+        threshold = cost_limit if cost_limit is not None else COST_THRESHOLD
+        if stats.total_cost > threshold:
+            typer.echo(
+                f"\n⚠️  WARNING: Estimated LLM cost (${stats.total_cost:.6f}) exceeds "
+                f"threshold (${threshold:.6f})\n"
+                f"   To proceed with assessment, use: assess --model <model> --cv <cv_file>\n"
+                f"   To adjust threshold: review --cost-limit {stats.total_cost + 0.01}"
+            )
+
     except Exception as e:
         logger.error(f"Review failed: {e}", exc_info=True)
         typer.echo(f"\n❌ Review failed: {e}", err=True)
@@ -964,11 +1039,17 @@ def assess(
     since: Optional[str] = typer.Option(
         None, "--since", help="Re-assess jobs crawled on/after this date (ISO format, e.g. 2026-07-01)"
     ),
+    model: Optional[str] = typer.Option(
+        None,
+        "--model",
+        help="Claude model (haiku/sonnet/opus or full ID, default sonnet). See docs/CLI.md for pricing.",
+    ),
 ) -> None:
-    """Assess CV fit for confirmed jobs using Claude 3.5 Sonnet."""
+    """Assess CV fit for confirmed jobs."""
     import json
     from pathlib import Path
 
+    from src.config.models import get_model_display_name
     from src.llm.provider import LLMProvider
     from src.storage.assessment_store import AssessmentStore
     from src.verification import JobReviewer
@@ -993,7 +1074,9 @@ def assess(
 
         # Initialize LLM provider
         try:
-            llm_provider = LLMProvider()
+            llm_provider = LLMProvider(model_id=model)
+            model_display = get_model_display_name(llm_provider.model)
+            typer.echo(f"🤖 Using {model_display} model\n")
         except ValueError as e:
             typer.echo(f"❌ LLM setup failed: {e}", err=True)
             typer.echo("   Set ANTHROPIC_API_KEY environment variable", err=True)
@@ -1140,6 +1223,18 @@ def assess(
                     tokens_used=assessment.tokens_used,
                     actual_cost=assessment.actual_cost,
                 )
+
+                # Validate cost estimate vs actual
+                estimated_tokens = preprocessed.get("token_count", 0)
+                estimated_cost = preprocessed.get("estimated_cost", 0.0)
+                if estimated_tokens > 0:
+                    accuracy = (estimated_tokens / assessment.tokens_used) * 100
+                    logger.info(
+                        f"Cost validation for {job_id}: "
+                        f"estimated {estimated_tokens} tokens (${estimated_cost:.6f}), "
+                        f"actual {assessment.tokens_used} tokens (${assessment.actual_cost:.6f}), "
+                        f"accuracy {accuracy:.1f}%"
+                    )
 
                 # Display progress
                 typer.echo(

@@ -110,7 +110,7 @@ class TestLLMProvider:
         provider = LLMProvider(api_key="test-key")
 
         assert provider.api_key == "test-key"
-        assert provider.MODEL == "claude-opus-4-1-20250805"
+        assert provider.model == "claude-sonnet-5"  # Default model
 
     def test_init_without_api_key_raises(self):
         """Test initialization without API key raises error."""
@@ -181,8 +181,8 @@ class TestLLMProvider:
             cv_text="CV text",
         )
 
-        # Cost: (input_tokens / 1M * $0.003) + (output_tokens / 1M * $0.015)
-        expected_cost = (600 / 1_000_000) * 0.003 + (50 / 1_000_000) * 0.015
+        # Cost: (input_tokens / 1M * $3.0) + (output_tokens / 1M * $15.0) for Sonnet
+        expected_cost = (600 / 1_000_000) * 3.0 + (50 / 1_000_000) * 15.0
         assert abs(result.actual_cost - expected_cost) < 0.000001
 
     def test_build_assessment_prompt(self):

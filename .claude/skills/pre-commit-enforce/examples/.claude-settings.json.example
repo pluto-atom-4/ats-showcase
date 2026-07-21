@@ -1,0 +1,9 @@
+{
+  "skillConfigs": {
+    "pre-commit-enforce": {
+      "protectedBranches": ["main"],
+      "showInstructions": true,
+      "message": "Direct commits to main are not allowed."
+    }
+  }
+}

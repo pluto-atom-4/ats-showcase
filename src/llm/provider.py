@@ -1,4 +1,4 @@
-"""Claude 3.5 Sonnet LLM provider for job assessments."""
+"""Claude LLM provider for job assessments."""
 
 import json
 import logging
@@ -6,7 +6,14 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
-from models.job import Assessment
+from src.config.models import (
+    DEFAULT_MODEL,
+    get_model_display_name,
+    get_model_pricing,
+    resolve_model_alias,
+    validate_model,
+)
+from src.models.job import Assessment
 
 logger = logging.getLogger(__name__)
 
@@ -67,20 +74,29 @@ class AssessmentResult:
 
 
 class LLMProvider:
-    """Claude 3.5 Sonnet LLM provider for CV-to-job assessment."""
+    """Claude LLM provider for CV-to-job assessment."""
 
-    # Pricing constants (Claude 3.5 Sonnet)
-    INPUT_PRICE_PER_1M = 0.003
-    OUTPUT_PRICE_PER_1M = 0.015
-    MODEL = "claude-opus-4-1-20250805"
-
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(
+        self, api_key: Optional[str] = None, model_id: Optional[str] = None
+    ):
         """
         Initialize LLM provider.
 
         Args:
             api_key: Anthropic API key (defaults to ANTHROPIC_API_KEY env var)
+            model_id: Claude model ID (defaults to DEFAULT_MODEL from config)
         """
+        # Set model and pricing
+        if model_id:
+            validate_model(model_id)
+            self.model = resolve_model_alias(model_id)
+        else:
+            self.model = DEFAULT_MODEL
+
+        self.input_price_per_1m, self.output_price_per_1m = get_model_pricing(
+            self.model
+        )
+
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not self.api_key:
             error_msg = (
@@ -101,7 +117,11 @@ class LLMProvider:
                 "anthropic package not installed. Run: pip install anthropic"
             ) from err
 
-        logger.info(f"Initialized LLMProvider with model: {self.MODEL}")
+        model_display = get_model_display_name(self.model)
+        logger.info(
+            f"Initialized LLMProvider with {model_display} ({self.model}) - "
+            f"${self.input_price_per_1m:.2f}/${self.output_price_per_1m:.2f} per 1M tokens"
+        )
 
     def assess_job(
         self,
@@ -138,7 +158,7 @@ class LLMProvider:
                 logger.debug(f"Assessing job {job_id} (attempt {attempt + 1}/3)")
 
                 response = self.client.messages.create(
-                    model=self.MODEL,
+                    model=self.model,
                     max_tokens=1024,
                     system="You are an expert recruiter evaluating job fit. "
                     "Respond with ONLY valid JSON, no extra text.",
@@ -151,9 +171,9 @@ class LLMProvider:
                 total_tokens = input_tokens + output_tokens
 
                 # Calculate actual cost
-                actual_cost = (input_tokens / 1_000_000) * self.INPUT_PRICE_PER_1M + (
+                actual_cost = (input_tokens / 1_000_000) * self.input_price_per_1m + (
                     output_tokens / 1_000_000
-                ) * self.OUTPUT_PRICE_PER_1M
+                ) * self.output_price_per_1m
 
                 # Parse response - ensure we get a TextBlock
                 response_text = ""
