@@ -9,7 +9,7 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import Footer, Static
+from textual.widgets import Static
 
 from src.browser.crawler import Crawler
 from src.tui.dialogs.job_review import JobReviewDialog
