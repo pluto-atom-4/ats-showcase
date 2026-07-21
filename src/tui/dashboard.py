@@ -85,7 +85,6 @@ class ATPDashboard(Screen):
         background: $boost;
         color: $text;
         border-top: solid $primary;
-        dock: bottom;
     }
     """
 
