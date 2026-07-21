@@ -59,6 +59,15 @@ class JobReviewDialog(ModalScreen):
     Button {
         margin: 0 1;
     }
+
+    #footer-help {
+        width: 1fr;
+        height: auto;
+        border-top: solid $accent;
+        padding: 1 0;
+        text-align: center;
+        color: $text-muted;
+    }
     """
 
     def __init__(self, job_id: str, job_data: Dict[str, Any]):
@@ -102,6 +111,8 @@ class JobReviewDialog(ModalScreen):
                 yield Button("Confirm", id="confirm", variant="primary")
                 yield Button("Reject", id="reject", variant="error")
                 yield Button("Skip", id="skip", variant="warning")
+
+            yield Static("esc=Cancel", id="footer-help")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button clicks."""
