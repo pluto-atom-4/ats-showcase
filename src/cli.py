@@ -184,7 +184,21 @@ def all(
             app = ATPDashboardApp(
                 state, companies=companies, cv_file=cv, headless=headless, up_to=up_to
             )
-            app.run()
+            try:
+                app.run()
+            except Exception as e:
+                logger.exception(f"TUI error: {e}")
+                typer.echo(f"❌ TUI crashed: {e}", err=True)
+            finally:
+                # Restore terminal state after TUI (even if crashed)
+                import subprocess
+                import sys
+
+                try:
+                    if sys.stdin.isatty():
+                        subprocess.run(["stty", "sane"], check=False)
+                except Exception:
+                    pass
             return
         except ImportError as e:
             typer.echo(
