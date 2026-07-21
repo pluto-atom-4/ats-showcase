@@ -79,6 +79,11 @@ class ATPDashboard(Screen):
         height: 1fr;
         border: solid $primary;
     }
+
+    Footer {
+        height: 1;
+        background: $boost;
+    }
     """
 
     BINDINGS = [
