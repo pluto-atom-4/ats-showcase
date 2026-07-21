@@ -82,6 +82,7 @@ class StateManager:
         self.phase_status: Dict[str, PhaseStatus] = {
             "crawl": PhaseStatus.IDLE,
             "preprocess": PhaseStatus.IDLE,
+            "review": PhaseStatus.IDLE,
             "assess": PhaseStatus.IDLE,
             "export": PhaseStatus.IDLE,
         }
