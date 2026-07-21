@@ -342,68 +342,51 @@ class ATPDashboard(Screen):
 
     async def _phase_review(self) -> None:
         """Execute review phase - validate jobs before assessment."""
-        import json
-        from pathlib import Path
-
         self._show_panel("review-panel")
 
-        # Load preprocessed jobs
-        preprocessed_path = Path("data/extracted_jobs/preprocessed_jobs.json")
-        if not preprocessed_path.exists():
-            logger.info("No preprocessed jobs to review")
+        if not self.state.jobs:
+            logger.info("No jobs to review")
             self.state.complete_phase("review")
             return
 
         try:
-            with open(preprocessed_path) as f:
-                preprocessed_jobs = json.load(f)
-
-            if not preprocessed_jobs:
-                logger.info("No preprocessed jobs to review")
-                self.state.complete_phase("review")
-                return
-
-            self.state.start_phase("review", total_items=len(preprocessed_jobs))
+            self.state.start_phase("review", total_items=len(self.state.jobs))
 
             confirmed_count = 0
             rejected_count = 0
 
-            for job in preprocessed_jobs:
-                job_id = job.get("job_id", "unknown")
-
+            for job_id, job_data in self.state.jobs.items():
                 if self.interactive:
                     # Show review dialog for interactive mode
                     decision = await self.app.push_screen_wait(
                         JobReviewDialog(
                             job_id,
                             {
-                                "title": job.get("title", "N/A"),
-                                "company": job.get("company", "N/A"),
-                                "token_count": job.get("token_count", 0),
-                                "status": job.get("status", "pending_review"),
+                                "title": job_data.get("title", "N/A"),
+                                "company": job_data.get("company", "N/A"),
+                                "location": job_data.get("location", "N/A"),
+                                "url": job_data.get("url", ""),
+                                "clean_text": job_data.get("clean_text", ""),
+                                "description": job_data.get("description", ""),
                             },
                         )
                     )
 
                     if decision == "confirm":
-                        job["status"] = "confirmed"
+                        self.state.update_job(job_id, status="confirmed")
                         confirmed_count += 1
                     elif decision == "reject":
-                        job["status"] = "rejected"
+                        self.state.update_job(job_id, status="rejected")
                         rejected_count += 1
                     else:  # skip or escape
-                        job["status"] = "pending_review"
+                        self.state.update_job(job_id, status="pending_review")
                 else:
                     # Non-interactive: auto-confirm all
-                    job["status"] = "confirmed"
+                    self.state.update_job(job_id, status="confirmed")
                     confirmed_count += 1
 
                 self.state.increment_phase_progress("review")
                 await asyncio.sleep(0.01)
-
-            # Save updated job statuses
-            with open(preprocessed_path, "w") as f:
-                json.dump(preprocessed_jobs, f, indent=2)
 
             logger.info(
                 f"Review complete: {confirmed_count} confirmed, "
