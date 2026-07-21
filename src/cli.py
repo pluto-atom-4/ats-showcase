@@ -142,9 +142,16 @@ def all(
         "--model",
         help="Claude model (haiku/sonnet/opus or full ID, default sonnet). See docs/CLI.md for pricing.",
     ),
+    up_to: Optional[str] = typer.Option(
+        None,
+        "--up-to",
+        help="Stop workflow at phase [crawl|preprocess|review|assess]. Default: run all phases",
+    ),
 ) -> None:
     """
     Run full workflow: crawl → preprocess → review → assess → export.
+
+    Use --up-to {phase} to halt at specified phase for cost verification.
 
     Use either --config <file> for a single config file,
     or --config-dir <directory> for multiple config files.
@@ -152,6 +159,7 @@ def all(
     Example:
         python -m src.cli all --cv data/cv.json --config config/companies.json
         python -m src.cli all --cv data/cv.json --config-dir ./config --tui
+        python -m src.cli all --cv data/cv.json --config config/companies.json --up-to review
     """
     import sys
 
@@ -188,6 +196,13 @@ def all(
 
     logger.info("Running full workflow")
     typer.echo("✨ Full workflow started...\n")
+
+    # Validate up_to phase parameter
+    valid_phases = {"crawl", "preprocess", "review", "assess", "export"}
+    if up_to and up_to not in valid_phases:
+        typer.echo(f"❌ Invalid phase: {up_to}", err=True)
+        typer.echo(f"   Valid phases: {', '.join(sorted(valid_phases))}", err=True)
+        raise typer.Exit(1)
 
     start_time = time.time()
 
@@ -267,6 +282,11 @@ def all(
         crawl_results = asyncio.run(run_crawl())
         phase_time = time.time() - phase_start
         typer.echo(f"⏱️  Phase 1 took {phase_time:.2f}s\n")
+
+        if up_to == "crawl":
+            typer.echo("✅ Stopping at crawl phase (as requested)\n")
+            typer.echo(f"⏱️  Full workflow took {time.time() - start_time:.2f}s\n")
+            raise typer.Exit(0)
 
         # ====================================================================
         # PHASE 2: PREPROCESS
@@ -370,6 +390,11 @@ def all(
         phase_time = time.time() - phase_start
         typer.echo(f"⏱️  Phase 2 took {phase_time:.2f}s\n")
 
+        if up_to == "preprocess":
+            typer.echo("✅ Stopping at preprocess phase (as requested)\n")
+            typer.echo(f"⏱️  Full workflow took {time.time() - start_time:.2f}s\n")
+            raise typer.Exit(0)
+
         # ====================================================================
         # PHASE 3: REVIEW
         # ====================================================================
@@ -422,6 +447,11 @@ def all(
 
         phase_time = time.time() - phase_start
         typer.echo(f"⏱️  Phase 3 took {phase_time:.2f}s\n")
+
+        if up_to == "review":
+            typer.echo("✅ Stopping at review phase (as requested)\n")
+            typer.echo(f"⏱️  Full workflow took {time.time() - start_time:.2f}s\n")
+            raise typer.Exit(0)
 
         # ====================================================================
         # PHASE 4: ASSESS
@@ -558,6 +588,11 @@ def all(
 
         phase_time = time.time() - phase_start
         typer.echo(f"⏱️  Phase 4 took {phase_time:.2f}s\n")
+
+        if up_to == "assess":
+            typer.echo("✅ Stopping at assess phase (as requested)\n")
+            typer.echo(f"⏱️  Full workflow took {time.time() - start_time:.2f}s\n")
+            raise typer.Exit(0)
 
         # ====================================================================
         # PHASE 5: EXPORT

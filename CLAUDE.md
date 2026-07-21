@@ -86,6 +86,9 @@ uv run python -m src.cli all --cv data/cv.json --config config/companies.json --
 # Full pipeline with Opus (most capable, $15/$75 per 1M)
 uv run python -m src.cli all --cv data/cv.json --config config/companies.json --model opus
 
+# Stop before assess (cost verification)
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --up-to review
+
 # Step-by-step
 uv run python -m src.cli crawl --config config/companies.json
 uv run python -m src.cli preprocess --show-estimates

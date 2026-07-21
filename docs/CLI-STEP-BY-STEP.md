@@ -57,6 +57,32 @@ uv run python -m src.cli all --no-tui --cv data/cv.json --config config/companie
 
 ---
 
+## Cost-Controlled Workflow (Stop Before Assess)
+
+Use `--up-to` to halt before expensive assessment phase:
+
+```bash
+# Extract jobs, verify quality — STOP before paying for assessment
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --up-to review
+
+# Crawl + preprocess only
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --up-to preprocess
+
+# Crawl only
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --up-to crawl
+
+# Continue with assessment (after verification)
+uv run python -m src.cli assess --cv data/cv.json
+```
+
+**Typical workflow:**
+1. Extract jobs: `--up-to crawl`
+2. Clean + verify: `--up-to review`
+3. Review extraction quality interactively
+4. If satisfied: continue with `assess` or full `--all` on next run
+
+---
+
 ## Full Workflow (8 Commands)
 
 > **Note:** The interactive TUI dashboard is available when running the complete workflow with the `all` command (see Quick Start above). Individual phase commands (crawl, preprocess, assess, export) use text-based output only. For step-by-step phases with TUI visualization, use `uv run python -m src.cli all --tui`.
