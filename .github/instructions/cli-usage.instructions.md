@@ -20,6 +20,23 @@ uv run python -m src.cli --all \
   --config-dir ./config
 ```
 
+### Halt at Phase (Cost Control)
+
+Stop workflow before expensive phases:
+
+```bash
+# Common: Stop before assess phase
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --up-to review
+
+# Other phases
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --up-to crawl
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --up-to preprocess
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --up-to assess
+```
+
+**Valid phases:** `crawl`, `preprocess`, `review`, `assess`, `export`
+**Default:** No `--up-to` runs all phases
+
 ### Phase Commands (Individual Steps)
 
 **1. Crawl** – Extract jobs from company career pages:

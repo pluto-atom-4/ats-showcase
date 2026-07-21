@@ -49,6 +49,7 @@ ats-showcase/
 │   └── --days               # Time period (default: 7)
 │
 └── --all                    # Full workflow (crawl→preprocess→verify→assess→export)
+    └── --up-to              # Stop at phase [crawl|preprocess|review|assess]
 ```
 
 ## Typer Implementation

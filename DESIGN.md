@@ -8,7 +8,7 @@
 
 ## 1. PRODUCT NARRATIVE
 
-ATS Playground orchestrates 4 phases:
+ATS Playground orchestrates 5 phases:
 - **Crawl:** Extract jobs from career pages (Playwright, CSS selectors, rate-limited)
 - **Preprocess:** Clean HTML → semantic chunks, estimate tokens
 - **Verify:** Interactive confirmation before costly API calls
@@ -16,6 +16,8 @@ ATS Playground orchestrates 4 phases:
 - **Export:** Markdown reports with rankings
 
 Raw HTML ~6,000 tokens/job → clean text ~400 tokens (15× cost reduction).
+
+**Cost Control:** Use `--up-to review` to halt before assess phase (cost verification).
 
 **Design Philosophy:** Replace verbose text output with interactive dashboard: real-time progress, live cost tracking, top matches visible, async-aware.
 

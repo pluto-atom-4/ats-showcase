@@ -40,6 +40,15 @@ python -m src.cli assess --cv data/cv.json
 python -m src.cli export --output data/assessments/report.md
 ```
 
+**Stop before billing (cost verification):**
+```bash
+# Crawl + preprocess + review — STOP before assess
+python -m src.cli all --cv data/cv.json --config config/companies.json --up-to review
+
+# Crawl + preprocess only
+python -m src.cli all --cv data/cv.json --config config/companies.json --up-to preprocess
+```
+
 **Config Options**:
 - `--config <file>` - Single JSON config file (backward compatible)
 - `--config-dir <dir>` - Directory of JSON config files (NEW - enables `enabled` flag for selective processing)

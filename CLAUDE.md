@@ -18,47 +18,15 @@ ATS Playground: CV-to-jobs assessment system. Crawls career pages, preprocesses 
 
 ## Git Workflow (Enforced)
 
-**Feature Branch Workflow**: All commits must go through feature branches. Direct commits to `main` are blocked by a pre-commit hook.
+Feature branches only. Pre-commit hook blocks direct `main` commits.
 
-**Proper workflow:**
 ```bash
-# 1. Create feature branch
 git checkout -b feat/issue-XXX-description
-
-# 2. Commit changes
 git commit -m "message"
-
-# 3. Push branch
 git push -u origin feat/issue-XXX-description
-
-# 4. Create PR on GitHub
-# 5. Merge via PR (never direct push to main)
 ```
 
-**Why**: Enforces code review, CI checks, and team visibility before merging.
-
-**If you see "Direct commits to main are not allowed"**: Create a feature branch and cherry-pick your commit:
-```bash
-git branch feat/recover-commit
-git checkout feat/recover-commit
-git reset HEAD~1  # Undo commit on main
-git checkout main
-git reset --hard origin/main  # Restore main to remote
-```
-
-### Install Pre-Commit Hook
-
-One-liner to set up enforcement:
-```bash
-curl -sSL https://github.com/pluto-atom-4/pre-commit-enforce-skill/releases/download/v1.0.0/install.sh | bash
-```
-
-Or download + run locally:
-```bash
-bash .claude/skills/pre-commit-enforce/setup.sh
-```
-
-See [pre-commit-enforce skill docs](https://github.com/pluto-atom-4/pre-commit-enforce-skill) for customization (protect multiple branches, custom messages).
+Setup: `bash .claude/skills/pre-commit-enforce/setup.sh`. See [docs](https://github.com/pluto-atom-4/pre-commit-enforce-skill).
 
 ---
 
@@ -77,31 +45,17 @@ uv run python src/storage/db.py --init
 ## Quick Workflow
 
 ```bash
-# Full pipeline (default: Sonnet model, $3/$15 per 1M tokens)
+# Full pipeline (Sonnet, $3/$15 per 1M)
 uv run python -m src.cli all --cv data/cv.json --config config/companies.json
 
-# Full pipeline with Haiku (95% cheaper, $0.80/$4 per 1M)
+# Cheaper version (Haiku, $0.80/$4 per 1M)
 uv run python -m src.cli all --cv data/cv.json --config config/companies.json --model haiku
 
-# Full pipeline with Opus (most capable, $15/$75 per 1M)
-uv run python -m src.cli all --cv data/cv.json --config config/companies.json --model opus
-
-# Step-by-step
-uv run python -m src.cli crawl --config config/companies.json
-uv run python -m src.cli preprocess --show-estimates
-uv run python -m src.cli review --interactive                           # Basic review
-uv run python -m src.cli review --interactive --model haiku             # Show Haiku costs
-uv run python -m src.cli review --interactive --cost-limit 0.05         # Warn if > $0.05
-uv run python -m src.cli assess --cv data/cv.json --model sonnet
-uv run python -m src.cli export --output data/assessments/report.md
+# Stop before assess (cost verify)
+uv run python -m src.cli all --cv data/cv.json --config config/companies.json --up-to review
 ```
 
-**Model options** (aliases or full IDs):
-- `haiku` or `claude-haiku-4-5-20251001` – Fast, cheap ($0.80/$4 per 1M)
-- `sonnet` or `claude-sonnet-5` – Balanced ($3/$15 per 1M, default)
-- `opus` or `claude-opus-4-8` – Most capable ($15/$75 per 1M)
-
-**Command reference**: See [.github/instructions/cli-usage.instructions.md](.github/instructions/cli-usage.instructions.md)
+See [CLI reference](.github/instructions/cli-usage.instructions.md) for all commands.
 
 ---
 
@@ -139,58 +93,17 @@ Read phase-specific guidance in `.claude/rules/`:
 
 ---
 
-## Tech Stack
+## Context File Maintenance
 
-- **Browser**: Playwright (async, JS rendering)
-- **HTML cleaning**: MarkItDown (primary), BeautifulSoup (fallback)
-- **NLP**: spaCy (sentence segmentation)
-- **Tokens**: tiktoken (estimates), Claude API (actual)
-- **DB**: SQLite with FTS5 full-text search
-- **LLM**: Claude (configurable via --model flag):
-  - Haiku (default for cost): $0.80/$4.0 per 1M (95% savings)
-  - Sonnet (default): $3.0/$15.0 per 1M (80% savings)
-  - Opus: $15.0/$75.0 per 1M (best accuracy)
-- **CLI**: Typer (async-ready)
+Automated token budget validation in `.github/workflows/context-lint.yml`. See [maintenance guide](docs/dev-note/ai-config-maintenance.md).
 
----
-
-## Keeping Context Files Updated
-
-Context files (CLAUDE.md, DESIGN.md, .claude/rules/) must remain aligned with implementation to keep AI guidance accurate.
-
-**Automated Validation:** `.github/workflows/context-lint.yml` runs on every push/PR. Blocks merge if files exceed token budgets.
-
-**Quarterly Audit:** Every ~13 weeks, review files for:
-- Staleness (deprecated tools, outdated commands)
-- Accuracy (does documentation match code?)
-- Redundancy (conflicting patterns across files?)
-
-**Process:** See [docs/dev-note/ai-config-maintenance.md](docs/dev-note/ai-config-maintenance.md)
-
-**Issue Template:** `.github/ISSUE_TEMPLATE/quarterly-context-audit.md`
-
----
-
-## Docs Map
+## Docs & Help
 
 - **Architecture**: [DESIGN.md](DESIGN.md)
-- **Agent Roles**: [AGENTS.md](AGENTS.md)
-- **Code Patterns**: [.github/instructions/code-patterns.instructions.md](.github/instructions/code-patterns.instructions.md)
-- **Copilot**: [.github/copilot-instructions.md](.github/copilot-instructions.md)
-- **Config Maintenance**: [docs/dev-note/ai-config-maintenance.md](docs/dev-note/ai-config-maintenance.md)
-- **Compliance Log**: [docs/dev-note/ai-compliance-log.md](docs/dev-note/ai-compliance-log.md)
-
----
-
-## Getting Help
-
-- **Command syntax?** → [.github/instructions/cli-usage.instructions.md](.github/instructions/cli-usage.instructions.md)
-- **Code patterns?** → [.github/instructions/code-patterns.instructions.md](.github/instructions/code-patterns.instructions.md)
-- **Agent roles?** → [AGENTS.md](AGENTS.md)
-- **Phase details?** → [.claude/rules/](#phase-specific-rules) (links above)
-- **Troubleshooting?** → [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
+- **Phase rules**: [.claude/rules/](#phase-specific-rules)
+- **CLI reference**: [.github/instructions/cli-usage.instructions.md](.github/instructions/cli-usage.instructions.md)
 
 ---
 
 **Status**: Progressive Disclosure (minimal bloat, maximum clarity)
-**Last Updated**: 2026-07-18 (model selection feature added)
+**Last Updated**: 2026-07-21 (trimmed for token budget)

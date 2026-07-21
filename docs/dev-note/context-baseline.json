@@ -1,45 +1,45 @@
 {
-  "timestamp": "2026-07-19T12:34:44.959494",
+  "timestamp": "2026-07-21T15:06:36.663009",
   "files": [
     {
       "path": "CLAUDE.md",
-      "lines": 166,
-      "chars": 5986,
-      "tokens_estimated": 1496,
+      "lines": 110,
+      "chars": 3892,
+      "tokens_estimated": 1001,
       "budget": 1500,
       "status": "compliant",
-      "percent_of_budget": 99.73333333333333,
-      "last_modified": "2026-07-19T11:54:07.533912"
+      "percent_of_budget": 66.73333333333333,
+      "last_modified": "2026-07-21T15:06:36.662973"
     },
     {
       "path": "DESIGN.md",
-      "lines": 144,
-      "chars": 5573,
-      "tokens_estimated": 1393,
+      "lines": 146,
+      "chars": 5658,
+      "tokens_estimated": 1414,
       "budget": 3000,
       "status": "compliant",
-      "percent_of_budget": 46.43333333333333,
-      "last_modified": "2026-07-19T11:48:24.840213"
+      "percent_of_budget": 47.13333333333333,
+      "last_modified": "2026-07-21T14:58:32.439274"
     },
     {
       "path": "AGENTS.md",
       "lines": 100,
-      "chars": 2462,
+      "chars": 2460,
       "tokens_estimated": 615,
       "budget": 1000,
       "status": "compliant",
       "percent_of_budget": 61.5,
-      "last_modified": "2026-07-19T11:48:43.352304"
+      "last_modified": "2026-07-19T12:46:20.949450"
     },
     {
       "path": ".github/copilot-instructions.md",
       "lines": 91,
-      "chars": 2479,
-      "tokens_estimated": 619,
+      "chars": 2471,
+      "tokens_estimated": 617,
       "budget": 1000,
       "status": "compliant",
-      "percent_of_budget": 61.9,
-      "last_modified": "2026-07-19T11:48:58.468379"
+      "percent_of_budget": 61.7,
+      "last_modified": "2026-07-19T12:46:20.949450"
     },
     {
       "path": ".claude/rules/assess.md",
@@ -74,12 +74,12 @@
     {
       "path": ".claude/rules/multi-agent.md",
       "lines": 100,
-      "chars": 2793,
-      "tokens_estimated": 698,
+      "chars": 2761,
+      "tokens_estimated": 690,
       "budget": 2000,
       "status": "compliant",
-      "percent_of_budget": 34.9,
-      "last_modified": "2026-07-19T11:52:05.961309"
+      "percent_of_budget": 34.5,
+      "last_modified": "2026-07-19T12:46:20.949450"
     },
     {
       "path": ".claude/rules/preprocess.md",
@@ -104,12 +104,12 @@
     {
       "path": ".claude/rules/tui.md",
       "lines": 50,
-      "chars": 1406,
+      "chars": 1404,
       "tokens_estimated": 351,
       "budget": 3000,
       "status": "compliant",
       "percent_of_budget": 11.700000000000001,
-      "last_modified": "2026-07-19T11:47:18.255883"
+      "last_modified": "2026-07-19T12:46:20.949450"
     },
     {
       "path": ".claude/rules/verify.md",
@@ -124,13 +124,15 @@
   ],
   "summary": {
     "total_files": 12,
-    "compliant": 12,
+    "compliant": 11,
     "warnings": 0,
-    "over_budget": 0,
-    "total_tokens": 8393,
+    "over_budget": 1,
+    "total_tokens": 8799,
     "total_budget": 21000,
-    "utilization_percent": 40.0
+    "utilization_percent": 41.9
   },
   "warnings": [],
-  "errors": []
+  "errors": [
+    "CLAUDE.md: EXCEEDS budget (126%)"
+  ]
 }
