@@ -83,6 +83,9 @@ class ATPDashboard(Screen):
     Footer {
         height: 1;
         background: $boost;
+        color: $text;
+        border-top: solid $primary;
+        dock: bottom;
     }
     """
 
