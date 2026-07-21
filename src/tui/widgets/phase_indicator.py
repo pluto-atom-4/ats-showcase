@@ -6,7 +6,7 @@ from src.tui.models.state import PhaseStatus, StateManager
 
 
 class PhaseIndicator(Static):
-    """Displays status of all 4 workflow phases."""
+    """Displays status of all 5 workflow phases."""
 
     def __init__(self, state: StateManager, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -40,6 +40,7 @@ class PhaseIndicator(Static):
         indicators = [
             self.get_phase_indicator("crawl"),
             self.get_phase_indicator("preprocess"),
+            self.get_phase_indicator("review"),
             self.get_phase_indicator("assess"),
             self.get_phase_indicator("export"),
         ]

@@ -47,17 +47,17 @@ class ATPDashboard(Screen):
     Main TUI Dashboard for ATS Showcase workflow.
 
     Layout:
-    ┌─────────────────────────────────────┐
-    │  Header: Workflow Status, Total Cost │
-    ├─────────────────────────────────────┤
-    │  Phase Indicator (✓ ⏳ ⚪ ⚪)        │
-    ├─────────────────────────────────────┤
-    │                                       │
-    │  Active Panel (Crawl/Prep/Assess/Exp)│
-    │                                       │
-    ├─────────────────────────────────────┤
-    │ [p]ause [r]esume [q]uit               │
-    └─────────────────────────────────────┘
+    ┌──────────────────────────────────────┐
+    │  Header: Workflow Status, Total Cost  │
+    ├──────────────────────────────────────┤
+    │  Phase Indicator (✓ ⏳ ⚪ ⚪ ⚪)     │
+    ├──────────────────────────────────────┤
+    │                                        │
+    │  Active Panel (Crawl/Prep/Review/Assess/Exp)
+    │                                        │
+    ├──────────────────────────────────────┤
+    │ [p]ause [r]esume [q]uit                │
+    └──────────────────────────────────────┘
     """
 
     CSS = """
@@ -141,6 +141,7 @@ class ATPDashboard(Screen):
         for panel_name in [
             "crawl-panel",
             "preprocess-panel",
+            "review-panel",
             "assess-panel",
             "export-panel",
         ]:
