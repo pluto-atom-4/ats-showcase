@@ -138,7 +138,7 @@ class TestReviewPhaseInteractive:
         assert state.phase_metrics["review"].processed_items == 0
 
         # Simulate processing
-        for i in range(3):
+        for _i in range(3):
             state.increment_phase_progress("review")
 
         assert state.phase_metrics["review"].processed_items == 3
