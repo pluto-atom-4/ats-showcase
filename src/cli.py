@@ -182,7 +182,7 @@ def all(
             companies = load_companies_config(config, config_dir)
 
             app = ATPDashboardApp(
-                state, companies=companies, cv_file=cv, headless=headless, up_to=up_to
+                state, companies=companies, cv_file=cv, headless=headless, up_to=up_to, interactive=interactive
             )
             try:
                 app.run()
