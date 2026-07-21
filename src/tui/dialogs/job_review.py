@@ -68,9 +68,17 @@ class JobReviewDialog(ModalScreen):
         self.decision: Optional[str] = None  # "confirm" | "reject" | "skip"
 
     def on_mount(self) -> None:
-        """Set focus to first button when dialog mounts."""
-        confirm_btn = self.query_one("#confirm", Button)
-        confirm_btn.focus()
+        """Set focus to first button after compose completes."""
+        self.call_later(self._set_focus)
+
+    def _set_focus(self) -> None:
+        """Set focus to confirm button (called after compose)."""
+        try:
+            confirm_btn = self.query_one("#confirm", Button)
+            confirm_btn.focus()
+        except Exception:
+            # If focus fails, let Textual handle default focus
+            pass
 
     def compose(self) -> ComposeResult:
         """Render job review dialog."""
