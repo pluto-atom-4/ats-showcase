@@ -250,21 +250,7 @@ class ATPDashboard(Screen):
                         description=job.description or "",
                     )
 
-                    # Interactive approval if enabled
-                    if self.interactive:
-                        decision = await self.app.push_screen_wait(
-                            JobReviewDialog(job_id, self.state.jobs[job_id])
-                        )
-                        if decision == "confirm":
-                            self.state.update_job(job_id, status="confirmed")
-                        elif decision == "reject":
-                            self.state.update_job(job_id, status="rejected")
-                        elif decision == "skip":
-                            self.state.update_job(job_id, status="pending_review")
-                        # None means escape key, treat as skip
-                        else:
-                            self.state.update_job(job_id, status="pending_review")
-
+                    # In TUI mode, all interactive review happens in review phase, not crawl
                     self.state.increment_phase_progress("crawl")
                     await asyncio.sleep(0.01)
 
@@ -358,6 +344,7 @@ class ATPDashboard(Screen):
             for job_id, job_data in self.state.jobs.items():
                 if self.interactive:
                     # Show review dialog for interactive mode
+                    logger.info(f"Showing review dialog for job {job_id}")
                     decision = await self.app.push_screen_wait(
                         JobReviewDialog(
                             job_id,
@@ -372,6 +359,7 @@ class ATPDashboard(Screen):
                         )
                     )
 
+                    logger.info(f"Job {job_id} decision: {decision}")
                     if decision == "confirm":
                         self.state.update_job(job_id, status="confirmed")
                         confirmed_count += 1

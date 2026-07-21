@@ -67,6 +67,11 @@ class JobReviewDialog(ModalScreen):
         self.job_data = job_data
         self.decision: Optional[str] = None  # "confirm" | "reject" | "skip"
 
+    def on_mount(self) -> None:
+        """Set focus to first button when dialog mounts."""
+        confirm_btn = self.query_one("#confirm", Button)
+        confirm_btn.focus()
+
     def compose(self) -> ComposeResult:
         """Render job review dialog."""
         with Container(id="job-review-box"):
