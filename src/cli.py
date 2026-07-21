@@ -182,7 +182,7 @@ def all(
             companies = load_companies_config(config, config_dir)
 
             app = ATPDashboardApp(
-                state, companies=companies, cv_file=cv, headless=headless
+                state, companies=companies, cv_file=cv, headless=headless, up_to=up_to
             )
             app.run()
             return
@@ -669,6 +669,9 @@ def all(
         typer.echo("   - Report: data/assessments/report.md")
         typer.echo("")
 
+    except typer.Exit:
+        # Normal exit (e.g., from --up-to flag)
+        raise
     except Exception as e:
         logger.error(f"Workflow failed: {e}", exc_info=True)
         typer.echo(f"\n❌ Workflow failed: {e}", err=True)

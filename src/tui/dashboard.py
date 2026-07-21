@@ -94,6 +94,7 @@ class ATPDashboard(Screen):
         cv_file: Optional[str] = None,
         headless: bool = True,
         interactive: bool = False,
+        up_to: Optional[str] = None,
     ):
         super().__init__()
         self.state = state
@@ -104,6 +105,7 @@ class ATPDashboard(Screen):
         self.cv_text = ""
         self.headless = headless
         self.interactive = interactive
+        self.up_to = up_to
 
         # Load CV if provided
         if cv_file:
@@ -193,9 +195,25 @@ class ATPDashboard(Screen):
         """Run complete workflow asynchronously."""
         try:
             await self._phase_crawl()
+            if self.up_to == "crawl":
+                self.notify("✅ Stopping at crawl phase (as requested)")
+                return
+
             await self._phase_preprocess()
+            if self.up_to == "preprocess":
+                self.notify("✅ Stopping at preprocess phase (as requested)")
+                return
+
             await self._phase_review()
+            if self.up_to == "review":
+                self.notify("✅ Stopping at review phase (as requested)")
+                return
+
             await self._phase_assess()
+            if self.up_to == "assess":
+                self.notify("✅ Stopping at assess phase (as requested)")
+                return
+
             await self._phase_export()
             self.notify("Workflow complete!")
         except Exception as e:
@@ -598,12 +616,14 @@ class ATPDashboardApp(App):
         companies: Optional[Dict[str, Any]] = None,
         cv_file: Optional[str] = None,
         headless: bool = True,
+        up_to: Optional[str] = None,
     ):
         super().__init__()
         self.state = state
         self.companies = companies or {}
         self.cv_file = cv_file
         self.headless = headless
+        self.up_to = up_to
 
     def on_mount(self) -> None:
         """Mount dashboard screen when app starts."""
@@ -612,5 +632,6 @@ class ATPDashboardApp(App):
             companies=self.companies,
             cv_file=self.cv_file,
             headless=self.headless,
+            up_to=self.up_to,
         )
         self.push_screen(dashboard)
