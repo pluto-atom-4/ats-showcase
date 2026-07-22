@@ -6,133 +6,120 @@ import pytest
 import spacy
 
 
+def _create_mock_token(text, pos, dep, lemma, is_stop=False, ent_type="", head=None):
+    """Helper to create mock token with realistic attributes."""
+    token = Mock()
+    token.text = text
+    token.pos_ = pos
+    token.dep_ = dep
+    token.lemma_ = lemma
+    token.is_stop = is_stop
+    token.ent_type_ = ent_type
+    token.is_punct = text in ".,!?;"
+    if head is None:
+        token.head = Mock(pos_="NOUN")
+    else:
+        token.head = head
+    return token
+
+
+def _create_mock_entity(text, label):
+    """Helper to create mock entity."""
+    ent = Mock()
+    ent.text = text
+    ent.label_ = label
+    return ent
+
+
+def _get_pos_tag(word):
+    """Assign realistic POS tag based on word."""
+    tech_words = ("python", "javascript", "react", "django", "flask", "fastapi")
+    noun_words = ("developer", "engineer", "skill", "experience")
+    adj_words = ("experienced", "senior", "junior", "motivated")
+
+    if word.lower() in tech_words:
+        return "PROPN"
+    elif word.lower() in noun_words:
+        return "NOUN"
+    elif word.lower() in adj_words:
+        return "ADJ"
+    return "NOUN"
+
+
+def _get_dep_tag(word):
+    """Assign realistic DEP tag based on word."""
+    compound_words = ("machine", "learning", "web", "mobile", "cloud")
+    if word.lower() in compound_words:
+        return "compound"
+    return "nmod"
+
+
+def _extract_entities_from_text(text):
+    """Extract entities from text for mocking."""
+    entities = []
+    entity_map = {
+        "python": ("Python", "PRODUCT"),
+        "javascript": ("JavaScript", "PRODUCT"),
+        "react": ("React", "PRODUCT"),
+        "postgresql": ("PostgreSQL", "PRODUCT"),
+        "mongodb": ("MongoDB", "PRODUCT"),
+        "redis": ("Redis", "PRODUCT"),
+        "aws": ("AWS", "PRODUCT"),
+        "gcp": ("GCP", "ORG"),
+        "google": ("Google", "ORG"),
+        "amazon": ("Amazon", "ORG"),
+    }
+    for keyword, (name, label) in entity_map.items():
+        if keyword in text.lower():
+            entities.append(_create_mock_entity(name, label))
+    return entities
+
+
+def _create_tokens_from_text(text, words):
+    """Create mock tokens with POS/DEP tags."""
+    tokens = []
+    for i, word in enumerate(words):
+        pos = _get_pos_tag(word)
+        dep = _get_dep_tag(word)
+
+        parent = None
+        if dep == "compound" and i + 1 < len(words):
+            parent = _create_mock_token(
+                words[i + 1].lower(), "NOUN", "nmod", words[i + 1].lower()
+            )
+
+        token = _create_mock_token(word.lower(), pos, dep, word.lower(), head=parent)
+        tokens.append(token)
+    return tokens
+
+
+def _process_text_to_doc(text):
+    """Convert text to mock spaCy doc with sentences, tokens, entities."""
+    doc = MagicMock()
+
+    # Sentence segmentation
+    sentences = text.split(". ")
+    doc.sents = [
+        Mock(text=sent.strip() + ("." if not sent.endswith(".") else ""))
+        for sent in sentences
+    ]
+
+    # Tokens
+    words = text.split()
+    tokens = _create_tokens_from_text(text, words)
+    doc.__iter__ = Mock(return_value=iter(tokens))
+
+    # Entities
+    doc.ents = _extract_entities_from_text(text)
+
+    return doc
+
+
 @pytest.fixture
 def mock_spacy_model():
     """Mock spaCy model for testing without actual model download."""
     model = MagicMock()
-
-    # Mock doc with sentences
-    mock_sent1 = Mock()
-    mock_sent1.text = "This is a sentence."
-
-    mock_sent2 = Mock()
-    mock_sent2.text = "This is another one."
-
-    # Mock tokens for extract_entities
-    def create_mock_token(text, pos, dep, lemma, is_stop=False, ent_type="", head=None):
-        token = Mock()
-        token.text = text
-        token.pos_ = pos
-        token.dep_ = dep
-        token.lemma_ = lemma
-        token.is_stop = is_stop
-        token.ent_type_ = ent_type
-        token.is_punct = text in ".,!?;"
-        if head is None:
-            token.head = Mock(pos_="NOUN")
-        else:
-            token.head = head
-        return token
-
-    # Mock entities
-    def create_mock_entity(text, label):
-        ent = Mock()
-        ent.text = text
-        ent.label_ = label
-        return ent
-
-    # Create a callable that returns a doc with configurable sentences/tokens/entities
-    def nlp_processor(text):
-        doc = MagicMock()
-
-        # Sentence segmentation
-        sentences = text.split(". ")
-        doc.sents = [
-            Mock(text=sent.strip() + ("." if not sent.endswith(".") else ""))
-            for sent in sentences
-        ]
-
-        # Tokens - split by space with more realistic POS/DEP tagging
-        tokens = []
-        words = text.split()
-
-        for i, word in enumerate(words):
-            # Assign realistic POS tags
-            if word.lower() in (
-                "python",
-                "javascript",
-                "react",
-                "django",
-                "flask",
-                "fastapi",
-            ):
-                pos = "PROPN"
-            elif word.lower() in (
-                "developer",
-                "engineer",
-                "skill",
-                "experience",
-            ):
-                pos = "NOUN"
-            elif word.lower() in ("experienced", "senior", "junior", "motivated"):
-                pos = "ADJ"
-            else:
-                pos = "NOUN"
-
-            # Assign realistic DEP tags
-            if word.lower() in (
-                "machine",
-                "learning",
-                "web",
-                "mobile",
-                "cloud",
-            ):
-                dep = "compound"
-            elif word == "needed" or word.lower() == "required":
-                dep = "nmod"
-            else:
-                dep = "nmod"
-
-            # Create parent token for compound dependencies
-            parent = None
-            if dep == "compound" and i + 1 < len(words):
-                parent = create_mock_token(
-                    words[i + 1].lower(), "NOUN", "nmod", words[i + 1].lower()
-                )
-
-            token = create_mock_token(
-                word.lower(), pos, dep, word.lower(), head=parent
-            )
-            tokens.append(token)
-
-        doc.__iter__ = Mock(return_value=iter(tokens))
-
-        # Entities
-        doc.ents = []
-        if "python" in text.lower():
-            doc.ents.append(create_mock_entity("Python", "PRODUCT"))
-        if "javascript" in text.lower():
-            doc.ents.append(create_mock_entity("JavaScript", "PRODUCT"))
-        if "react" in text.lower():
-            doc.ents.append(create_mock_entity("React", "PRODUCT"))
-        if "postgresql" in text.lower():
-            doc.ents.append(create_mock_entity("PostgreSQL", "PRODUCT"))
-        if "mongodb" in text.lower():
-            doc.ents.append(create_mock_entity("MongoDB", "PRODUCT"))
-        if "redis" in text.lower():
-            doc.ents.append(create_mock_entity("Redis", "PRODUCT"))
-        if "aws" in text.lower():
-            doc.ents.append(create_mock_entity("AWS", "PRODUCT"))
-        if "gcp" in text.lower():
-            doc.ents.append(create_mock_entity("GCP", "ORG"))
-        if "google" in text.lower():
-            doc.ents.append(create_mock_entity("Google", "ORG"))
-        if "amazon" in text.lower():
-            doc.ents.append(create_mock_entity("Amazon", "ORG"))
-
-        return doc
-
-    model.side_effect = nlp_processor
+    model.side_effect = _process_text_to_doc
     return model
 
 
