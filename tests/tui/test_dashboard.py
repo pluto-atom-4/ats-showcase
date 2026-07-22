@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.tui.dashboard import ATPDashboard, HeaderPanel
+from src.tui.dashboard import ATPDashboard, ATPDashboardApp, HeaderPanel
 from src.tui.models.state import PhaseStatus, StateManager
 from src.tui.panels.assess_panel import AssessPanel
 from src.tui.panels.base import BasePanelWidget
@@ -25,10 +25,11 @@ class TestDashboard:
         assert dashboard.title == "ATS Showcase - TUI Dashboard"
 
     def test_dashboard_has_bindings(self, state_manager):
-        """Dashboard has required keyboard bindings."""
-        dashboard = ATPDashboard(state_manager)
-        bindings = [binding[0] for binding in dashboard.BINDINGS]
+        """App has required keyboard bindings for command palette."""
+        app = ATPDashboardApp(state_manager)
+        bindings = [binding[0] for binding in app.BINDINGS]
         assert "p" in bindings
+        assert "r" in bindings
         assert "q" in bindings
 
 

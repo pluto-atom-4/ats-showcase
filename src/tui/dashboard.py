@@ -42,6 +42,24 @@ class HeaderPanel(Static):
         return f"{title}\nTokens: {tokens} | Total Cost: {cost}"
 
 
+class HelpPanel(Static):
+    """Help panel showing available keyboard commands."""
+
+    CSS = """
+    HelpPanel {
+        height: 1;
+        background: $boost;
+        text-align: left;
+        color: $text-muted;
+        dock: bottom;
+    }
+    """
+
+    def render(self) -> str:
+        """Render available commands."""
+        return "p=Pause  r=Resume  q=Quit"
+
+
 class ATPDashboard(Screen):
     """
     Main TUI Dashboard for ATS Showcase workflow.
@@ -87,9 +105,9 @@ class ATPDashboard(Screen):
     """
 
     BINDINGS = [
-        ("p", "pause_resume", "Pause/Resume"),
-        ("r", "resume_workflow", "Resume"),
-        ("q", "quit_app", "Quit"),
+        ("p", "pause_resume"),
+        ("r", "resume_workflow"),
+        ("q", "quit_app"),
     ]
 
     def __init__(
@@ -139,6 +157,7 @@ class ATPDashboard(Screen):
             export_panel.styles.display = "none"
             yield export_panel
 
+        yield HelpPanel(id="help-panel")
         yield Footer()
 
     def _show_panel(self, panel_id: str) -> None:
@@ -156,22 +175,31 @@ class ATPDashboard(Screen):
     def action_pause_resume(self) -> None:
         """Toggle pause on workflow."""
         self.state.paused = not self.state.paused
-        verb = "Paused" if self.state.paused else "Resumed"
-        self.notify(f"{verb} workflow")
+        if self.state.paused:
+            self.notify("⏸️  Workflow paused", severity="warning", timeout=2)
+        else:
+            self.notify("▶️  Workflow resumed", severity="information", timeout=2)
 
     def action_resume_workflow(self) -> None:
         """Resume from pause."""
         if self.state.paused:
             self.state.paused = False
-            self.notify("Resumed workflow")
+            self.notify("▶️  Workflow resumed", severity="information", timeout=2)
+        else:
+            self.notify("Workflow not paused", severity="information", timeout=1)
 
     def action_quit_app(self) -> None:
         """Exit dashboard."""
         if any(
             s == PhaseStatus.RUNNING for s in self.state.phase_status.values()
         ):
-            self.notify("Workflow still running. Press [p] to pause first.")
+            self.notify(
+                "Workflow still running. Press [p] to pause first.",
+                severity="error",
+                timeout=2,
+            )
         else:
+            self.notify("👋 Exiting...", severity="information", timeout=1)
             self.app.exit()
 
     def _load_cv(self, cv_file: str) -> None:
@@ -587,6 +615,12 @@ class ATPDashboardApp(App):
     }
     """
 
+    BINDINGS = [
+        ("p", "pause_resume", "Pause/Resume"),
+        ("r", "resume_workflow", "Resume"),
+        ("q", "quit_app", "Quit"),
+    ]
+
     def __init__(
         self,
         state: StateManager,
@@ -615,3 +649,38 @@ class ATPDashboardApp(App):
             up_to=self.up_to,
         )
         self.push_screen(dashboard)
+
+    def action_pause_resume(self) -> None:
+        """Toggle pause on workflow."""
+        self.state.paused = not self.state.paused
+        if self.screen:
+            if self.state.paused:
+                self.screen.notify("⏸️  Workflow paused", severity="warning", timeout=2)
+            else:
+                self.screen.notify("▶️  Workflow resumed", severity="information", timeout=2)
+
+    def action_resume_workflow(self) -> None:
+        """Resume from pause."""
+        if self.state.paused:
+            self.state.paused = False
+            if self.screen:
+                self.screen.notify("▶️  Workflow resumed", severity="information", timeout=2)
+        else:
+            if self.screen:
+                self.screen.notify("Workflow not paused", severity="information", timeout=1)
+
+    def action_quit_app(self) -> None:
+        """Exit dashboard."""
+        if any(
+            s == PhaseStatus.RUNNING for s in self.state.phase_status.values()
+        ):
+            if self.screen:
+                self.screen.notify(
+                    "Workflow still running. Press [p] to pause first.",
+                    severity="error",
+                    timeout=2,
+                )
+        else:
+            if self.screen:
+                self.screen.notify("👋 Exiting...", severity="information", timeout=1)
+            self.exit()

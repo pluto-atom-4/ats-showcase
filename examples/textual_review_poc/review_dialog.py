@@ -1,33 +1,27 @@
-"""Interactive job review dialog for approval/rejection during crawl phase."""
+"""Minimal ModalScreen for job review (deferred focus management)."""
 
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static
 
-from src.tui.utils.formatters import truncate
 
+class ReviewDialog(ModalScreen):
+    """Modal dialog for job review decision.
 
-class JobReviewDialog(ModalScreen):
-    """Modal dialog for user to approve/reject/skip extracted job.
-
-    Shows:
-    - Job title, company, location
-    - Clean text preview (first 500 chars)
-    - Buttons: Confirm, Reject, Skip
-
-    User decision saved to StateManager.jobs[job_id]["status"].
+    Key pattern: Deferred focus via call_later in on_mount().
+    Ensures buttons are mounted before focus() is called.
     """
 
     CSS = """
-    JobReviewDialog {
+    ReviewDialog {
         align: center middle;
     }
 
-    #job-review-box {
-        width: 80;
+    #dialog-box {
+        width: 70;
         height: auto;
         border: solid $primary;
         background: $surface;
@@ -40,7 +34,7 @@ class JobReviewDialog(ModalScreen):
         padding: 0 0 1 0;
     }
 
-    #preview {
+    #description {
         width: 1fr;
         height: auto;
         border-top: solid $accent;
@@ -59,63 +53,50 @@ class JobReviewDialog(ModalScreen):
     Button {
         margin: 0 1;
     }
-
-    #footer-help {
-        width: 1fr;
-        height: auto;
-        border-top: solid $accent;
-        padding: 1 0;
-        text-align: center;
-        color: $text-muted;
-    }
     """
 
-    def __init__(self, job_id: str, job_data: Dict[str, Any]):
+    def __init__(self, job_id: str, title: str, company: str, description: str):
         super().__init__()
         self.job_id = job_id
-        self.job_data = job_data
-        self.decision: Optional[str] = None  # "confirm" | "reject" | "skip"
+        self.title = title
+        self.company = company
+        self.description = description
+        self.decision: Optional[str] = None
 
     def on_mount(self) -> None:
-        """Set focus to first button after compose completes."""
+        """Deferred focus: call_later ensures widgets are fully mounted."""
         self.call_later(self._set_focus)
 
     def _set_focus(self) -> None:
-        """Set focus to confirm button (called after compose)."""
+        """Set focus to confirm button (deferred until after compose)."""
         try:
             confirm_btn = self.query_one("#confirm", Button)
             confirm_btn.focus()
         except Exception:
-            # If focus fails, let Textual handle default focus
             pass
 
     def compose(self) -> ComposeResult:
-        """Render job review dialog."""
-        with Container(id="job-review-box"):
+        """Build dialog UI."""
+        with Vertical(id="dialog-box"):
             with Static(id="job-info"):
                 yield Static(
                     f"[b]Job Review[/b]\n"
-                    f"Title: {self.job_data.get('title', 'Unknown')}\n"
-                    f"Company: {self.job_data.get('company', 'Unknown')}\n"
-                    f"Location: {self.job_data.get('location', 'Unknown')}"
+                    f"Title: {self.title}\n"
+                    f"Company: {self.company}"
                 )
 
-            preview_text = self.job_data.get("clean_text", "")
-            if not preview_text:
-                preview_text = self.job_data.get("description", "")
-            preview = truncate(preview_text, max_len=500)
-
-            yield Static(preview, id="preview")
+            yield Static(
+                self.description[:300] + ("..." if len(self.description) > 300 else ""),
+                id="description",
+            )
 
             with Horizontal(id="buttons"):
                 yield Button("Confirm", id="confirm", variant="primary")
                 yield Button("Reject", id="reject", variant="error")
                 yield Button("Skip", id="skip", variant="warning")
 
-            yield Static("esc=Cancel", id="footer-help")
-
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button clicks."""
+        """Handle button presses (Tab + Enter workflow)."""
         if event.button.id == "confirm":
             self.decision = "confirm"
         elif event.button.id == "reject":
@@ -126,7 +107,7 @@ class JobReviewDialog(ModalScreen):
         self.dismiss(self.decision)
 
     def action_quit_dialog(self) -> None:
-        """Close dialog without decision (escape key)."""
+        """Escape key: dismiss without decision."""
         self.dismiss(None)
 
     BINDINGS = [
