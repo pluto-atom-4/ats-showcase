@@ -65,17 +65,17 @@ def chunk_by_tokens(text: str, target_tokens: int = 500) -> List[str]:
     tokens = text.split()
     chunks = []
     current = []
-    
+
     for token in tokens:
         if count_tokens(" ".join(current + [token])) > target_tokens:
             chunks.append(" ".join(current))
             current = [token]
         else:
             current.append(token)
-    
+
     if current:
         chunks.append(" ".join(current))
-    
+
     return chunks
 ```
 
@@ -101,7 +101,7 @@ def build_assessment_prompt(
 ) -> str:
     """Build prompt using preprocessed data."""
     skills, tech, requirements = extracted_entities
-    
+
     prompt = f"""
 You are an expert recruiter assessing CV fit for a job opening.
 
@@ -162,23 +162,23 @@ from src.tokenization.counter import count_tokens
 def assess_job_non_streaming(cv_text: str, job_text: str, model: str = "claude-3-5-sonnet-20241022") -> dict:
     """Assess job fit (non-streaming)."""
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    
+
     # Preprocess
     preprocessor = Preprocessor()
     clean_text = parse_html(job_text)
     chunks = chunk_semantic(clean_text)
     skills, tech, reqs = preprocessor.extract_entities(clean_text)
-    
+
     # Build prompt
     prompt = build_assessment_prompt(cv_text, job_text, (skills, tech, reqs), chunks)
-    
+
     # Count tokens upfront
     input_tokens = count_tokens(prompt)
     estimated_output = 200  # JSON response ~200 tokens
     estimated_cost = (input_tokens + estimated_output) * 0.000003  # Sonnet input rate
-    
+
     print(f"Estimated: {input_tokens} input + {estimated_output} output = ${estimated_cost:.6f}")
-    
+
     # Call API
     message = client.messages.create(
         model=model,
@@ -187,16 +187,16 @@ def assess_job_non_streaming(cv_text: str, job_text: str, model: str = "claude-3
             {"role": "user", "content": prompt}
         ],
     )
-    
+
     # Parse response
     response_text = message.content[0].text
     assessment = json.loads(response_text)
-    
+
     # Log actual usage
     actual_input = message.usage.input_tokens
     actual_output = message.usage.output_tokens
     actual_cost = (actual_input + actual_output) * 0.000003
-    
+
     return {
         "assessment": assessment,
         "cost_tracking": {
@@ -223,14 +223,14 @@ Use for review phase UX (show reasoning as it streams):
 def assess_job_streaming(cv_text: str, job_text: str, callback=None):
     """Assess with streaming output."""
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    
+
     preprocessor = Preprocessor()
     clean_text = parse_html(job_text)
     chunks = chunk_semantic(clean_text)
     skills, tech, reqs = preprocessor.extract_entities(clean_text)
-    
+
     prompt = build_assessment_prompt(cv_text, job_text, (skills, tech, reqs), chunks)
-    
+
     with client.messages.stream(
         model="claude-3-5-sonnet-20241022",
         max_tokens=500,
@@ -241,7 +241,7 @@ def assess_job_streaming(cv_text: str, job_text: str, callback=None):
             full_response += text
             if callback:
                 callback(text)  # Update UI in real-time
-    
+
     return full_response
 ```
 
@@ -269,7 +269,7 @@ import anthropic
 def call_with_backoff(prompt: str, max_retries: int = 3) -> str:
     """Call Claude API with exponential backoff."""
     client = anthropic.Anthropic()
-    
+
     for attempt in range(max_retries):
         try:
             response = client.messages.create(
@@ -278,26 +278,26 @@ def call_with_backoff(prompt: str, max_retries: int = 3) -> str:
                 messages=[{"role": "user", "content": prompt}],
             )
             return response.content[0].text
-        
+
         except anthropic.RateLimitError as e:
             if attempt == max_retries - 1:
                 raise
-            
+
             backoff_seconds = 2 ** attempt  # 2, 4, 8 seconds
             logger.warning(f"Rate limited. Retry in {backoff_seconds}s (attempt {attempt + 1}/{max_retries})")
             time.sleep(backoff_seconds)
-        
+
         except anthropic.APIStatusError as e:
             if e.status_code in (500, 502, 503):  # Transient server errors
                 if attempt == max_retries - 1:
                     raise
-                
+
                 backoff_seconds = 2 ** attempt
                 logger.warning(f"Server error {e.status_code}. Retry in {backoff_seconds}s")
                 time.sleep(backoff_seconds)
             else:
                 raise  # Don't retry on client errors (4xx)
-        
+
         except anthropic.AuthenticationError:
             logger.error("Invalid API key. Check ANTHROPIC_API_KEY.")
             raise
@@ -314,11 +314,11 @@ from asyncio import Semaphore
 async def assess_jobs_batch(jobs: list, cv_text: str, max_concurrent: int = 3):
     """Assess multiple jobs with rate limiting."""
     semaphore = Semaphore(max_concurrent)  # Max 3 concurrent requests
-    
+
     async def assess_with_semaphore(job):
         async with semaphore:
             return await assess_job_async(cv_text, job)
-    
+
     results = await asyncio.gather(*[assess_with_semaphore(job) for job in jobs])
     return results
 ```
@@ -395,25 +395,25 @@ logger = logging.getLogger(__name__)
 def assess_with_logging(cv_text: str, job_text: str, job_id: str):
     """Assess with comprehensive logging."""
     logger.info(f"Starting assessment for job {job_id}")
-    
+
     try:
         preprocessor = Preprocessor()
         clean_text = parse_html(job_text)
         skills, tech, reqs = preprocessor.extract_entities(clean_text)
-        
+
         logger.debug(f"Extracted: {len(skills)} skills, {len(tech)} tech, {len(reqs)} reqs")
-        
+
         prompt = build_assessment_prompt(cv_text, job_text, (skills, tech, reqs), [])
         input_tokens = count_tokens(prompt)
-        
+
         logger.debug(f"Input tokens: {input_tokens}")
-        
+
         response = call_with_backoff(prompt)
         assessment = json.loads(response)
-        
+
         logger.info(f"Assessment complete: score={assessment['overall_score']}")
         return assessment
-    
+
     except anthropic.RateLimitError as e:
         logger.warning(f"Rate limited on job {job_id}: {e}")
         raise
@@ -469,7 +469,7 @@ def build_prompt_with_examples(cv_text: str, job_text: str, chunks: list) -> str
             "assessment": {"overall_score": 75, "tech_match": 85, "reasoning": "..."}
         }
     ]
-    
+
     prompt = f"""
 {SYSTEM_PROMPT}
 
@@ -511,15 +511,15 @@ def estimate_cost(cv_text: str, job_text: str) -> dict:
     cv_tokens = count_tokens(cv_text)
     job_tokens = count_tokens(job_text)
     prompt_overhead = 50  # System prompt, examples
-    
+
     estimated_input = cv_tokens + job_tokens + prompt_overhead
     estimated_output = 200  # JSON response
-    
+
     # Claude 3.5 Sonnet: $3/1M input, $15/1M output
     input_cost = estimated_input * (3 / 1_000_000)
     output_cost = estimated_output * (15 / 1_000_000)
     total_cost = input_cost + output_cost
-    
+
     return {
         "estimated_input_tokens": estimated_input,
         "estimated_output_tokens": estimated_output,
@@ -536,11 +536,11 @@ def track_assessment_cost(job_id: str, message_response):
     actual_input = message_response.usage.input_tokens
     actual_output = message_response.usage.output_tokens
     actual_cost = (actual_input + actual_output) * 0.000003  # Average rate
-    
+
     logger.info(
         f"Job {job_id}: {actual_input} input + {actual_output} output = ${actual_cost:.6f}"
     )
-    
+
     # Store in cost_tracking table
     db.insert_cost_tracking({
         "job_id": job_id,
@@ -601,16 +601,16 @@ def quick_assess(cv_path: str, job_html: str) -> dict:
     """Quick assessment with minimal setup."""
     with open(cv_path) as f:
         cv_text = f.read()
-    
+
     clean_job = parse_html(job_html)
     prompt = f"CV:\n{cv_text}\n\nJob:\n{clean_job}\n\nScore this match 0-100."
-    
+
     response = anthropic.Anthropic().messages.create(
         model="claude-3-5-sonnet-20241022",
         max_tokens=100,
         messages=[{"role": "user", "content": prompt}]
     )
-    
+
     return {"score": int(response.content[0].text)}
 ```
 
@@ -633,6 +633,6 @@ def assess_batch(jobs: list, cv_text: str) -> list:
 
 ---
 
-**Last Updated:** 2026-07-22  
-**Status:** Ready for implementation (Phase 1–4 tasks)  
+**Last Updated:** 2026-07-22
+**Status:** Ready for implementation (Phase 1–4 tasks)
 **Next:** Task 4 (Review Panel Enhancement)
