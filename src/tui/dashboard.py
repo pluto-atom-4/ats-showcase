@@ -13,7 +13,7 @@ from textual.widgets import Footer, Static
 
 from src.browser.crawler import Crawler
 from src.tui.dialogs.job_review import JobReviewDialog
-from src.tui.models.state import StateManager
+from src.tui.models.state import PhaseStatus, StateManager
 from src.tui.panels.assess_panel import AssessPanel
 from src.tui.panels.crawl_panel import CrawlPanel
 from src.tui.panels.export_panel import ExportPanel

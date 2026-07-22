@@ -4,13 +4,13 @@
 
 This minimal side project **proves that Textual modal dialogs correctly handle user input** without the complexity of the full ATS dashboard.
 
-✓ ModalScreen focus management via `call_later()`  
-✓ Keyboard navigation (Tab between buttons)  
-✓ Button activation (Enter to press focused button)  
-✓ User decisions captured (confirm/reject/skip)  
-✓ Escape key cancellation  
-✓ Terminal state restoration (`stty sane`)  
-✓ Async workflow coordination (`@work(exclusive=True)`)  
+✓ ModalScreen focus management via `call_later()`
+✓ Keyboard navigation (Tab between buttons)
+✓ Button activation (Enter to press focused button)
+✓ User decisions captured (confirm/reject/skip)
+✓ Escape key cancellation
+✓ Terminal state restoration (`stty sane`)
+✓ Async workflow coordination (`@work(exclusive=True)`)
 
 ## Run the PoC
 
@@ -75,8 +75,8 @@ def action_quit_dialog(self) -> None:
     self.dismiss(None)  # Close dialog with no decision
 ```
 
-**Tab** navigates widgets (built-in Textual behavior)  
-**Enter** activates focused widget  
+**Tab** navigates widgets (built-in Textual behavior)
+**Enter** activates focused widget
 **Escape** bound to custom action
 
 ### 4. Async Workflow Coordination
@@ -88,12 +88,12 @@ async def run_review(self) -> None:
     for job in jobs:
         # Wait for dialog (blocks until user decides)
         decision = await self.app.push_screen_wait(ReviewDialog(...))
-        
+
         # Mutation safe: no concurrent tasks
         self.state.record_decision(job_id, decision)
 ```
 
-**`@work(exclusive=True)`** prevents race conditions  
+**`@work(exclusive=True)`** prevents race conditions
 **`push_screen_wait()`** blocks until dialog dismissed, returns user's decision
 
 ### 5. Terminal I/O Safety
@@ -107,7 +107,7 @@ finally:
     subprocess.run(["stty", "sane"], check=False)
 ```
 
-**Why?** Textual enters "alternate screen mode" (raw, no echo). If app crashes, terminal left broken.  
+**Why?** Textual enters "alternate screen mode" (raw, no echo). If app crashes, terminal left broken.
 **`stty sane`** restores normal input/output behavior.
 
 ## File Structure

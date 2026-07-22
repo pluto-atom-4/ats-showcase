@@ -48,7 +48,7 @@ class ReviewPoCApp(App):
         self.state = PoCStateManager()
 
         # Add jobs to state
-        for job_id, title, company, desc in jobs:
+        for job_id, title, company, _desc in jobs:
             self.state.add_job(job_id, title, company)
 
     def compose(self) -> ComposeResult:
