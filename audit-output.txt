@@ -1,0 +1,65 @@
+🔍 Auditing context files...
+
+✗ CLAUDE.md
+   Lines: 199 | Tokens: 1891 | Budget: 1500
+   126% of budget
+
+✓ DESIGN.md
+   Lines: 146 | Tokens: 1414 | Budget: 3000
+   47% of budget
+
+✓ AGENTS.md
+   Lines: 100 | Tokens: 615 | Budget: 1000
+   62% of budget
+
+✓ .github/copilot-instructions.md
+   Lines: 91 | Tokens: 617 | Budget: 1000
+   62% of budget
+
+✓ .claude/rules/assess.md
+   Lines: 86 | Tokens: 558 | Budget: 1500
+   37% of budget
+
+✓ .claude/rules/cli.md
+   Lines: 93 | Tokens: 589 | Budget: 1000
+   59% of budget
+
+✓ .claude/rules/crawl.md
+   Lines: 72 | Tokens: 495 | Budget: 2000
+   25% of budget
+
+✓ .claude/rules/multi-agent.md
+   Lines: 100 | Tokens: 690 | Budget: 2000
+   34% of budget
+
+✓ .claude/rules/preprocess.md
+   Lines: 60 | Tokens: 490 | Budget: 2000
+   24% of budget
+
+✓ .claude/rules/storage.md
+   Lines: 118 | Tokens: 658 | Budget: 1500
+   44% of budget
+
+✓ .claude/rules/tui.md
+   Lines: 50 | Tokens: 351 | Budget: 3000
+   12% of budget
+
+✓ .claude/rules/verify.md
+   Lines: 66 | Tokens: 431 | Budget: 1500
+   29% of budget
+
+======================================================================
+SUMMARY
+======================================================================
+Total files audited: 12
+Compliant: 11/12
+Total tokens (estimated): 8,799
+Total budget: 21,000
+Overall utilization: 42%
+
+✗ Over Budget (1):
+   - CLAUDE.md: EXCEEDS budget (126%)
+
+📊 Report exported to: /home/pluto-atom-4/Documents/full-stack/ats-playground/docs/dev-note/context-baseline.json
+
+Next step: Review findings in docs/dev-note/ai-config-audit-findings.md
