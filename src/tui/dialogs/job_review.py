@@ -9,6 +9,12 @@ from textual.widgets import Button, Static
 
 from src.tui.utils.formatters import truncate
 
+try:
+    from src.tokenization.preprocessor import Preprocessor
+    PREPROCESSOR_AVAILABLE = True
+except ImportError:
+    PREPROCESSOR_AVAILABLE = False
+
 
 class JobReviewDialog(ModalScreen):
     """Modal dialog for user to approve/reject/skip extracted job.
@@ -60,6 +66,35 @@ class JobReviewDialog(ModalScreen):
         margin: 0 1;
     }
 
+    #entity-section {
+        width: 1fr;
+        height: auto;
+        border-top: solid $accent;
+        padding: 1 0;
+        margin: 1 0 0 0;
+    }
+
+    #entity-skills,
+    #entity-tech,
+    #entity-reqs {
+        width: 1fr;
+        height: auto;
+        padding: 0 1;
+        margin: 0 0 0.5 0;
+    }
+
+    .entity-label {
+        width: 1fr;
+        color: $accent;
+        text-style: bold;
+    }
+
+    .entity-content {
+        width: 1fr;
+        color: $text;
+        padding: 0 1;
+    }
+
     #footer-help {
         width: 1fr;
         height: auto;
@@ -89,6 +124,27 @@ class JobReviewDialog(ModalScreen):
             # If focus fails, let Textual handle default focus
             pass
 
+    def _extract_entities(self) -> tuple[list[str], list[str], list[str]]:
+        """Extract entities from job data using preprocessor.
+
+        Returns tuple of (skills, technologies, requirements).
+        Returns empty lists if preprocessor unavailable.
+        """
+        if not PREPROCESSOR_AVAILABLE:
+            return [], [], []
+
+        try:
+            text = self.job_data.get("clean_text", "")
+            if not text:
+                text = self.job_data.get("description", "")
+            if not text:
+                return [], [], []
+
+            preprocessor = Preprocessor()
+            return preprocessor.extract_entities(text)
+        except Exception:
+            return [], [], []
+
     def compose(self) -> ComposeResult:
         """Render job review dialog."""
         with Container(id="job-review-box"):
@@ -99,6 +155,32 @@ class JobReviewDialog(ModalScreen):
                     f"Company: {self.job_data.get('company', 'Unknown')}\n"
                     f"Location: {self.job_data.get('location', 'Unknown')}"
                 )
+
+            skills, technologies, requirements = self._extract_entities()
+
+            if skills or technologies or requirements:
+                with Vertical(id="entity-section"):
+                    if skills:
+                        yield Static("Skills:", classes="entity-label")
+                        yield Static(
+                            ", ".join(skills[:10]),
+                            classes="entity-content",
+                            id="entity-skills",
+                        )
+                    if technologies:
+                        yield Static("Technologies:", classes="entity-label")
+                        yield Static(
+                            ", ".join(technologies[:10]),
+                            classes="entity-content",
+                            id="entity-tech",
+                        )
+                    if requirements:
+                        yield Static("Requirements:", classes="entity-label")
+                        yield Static(
+                            ", ".join(requirements[:10]),
+                            classes="entity-content",
+                            id="entity-reqs",
+                        )
 
             preview_text = self.job_data.get("clean_text", "")
             if not preview_text:
