@@ -14,14 +14,14 @@ class TestLLMProviderInit:
 
     def test_init_with_api_key(self) -> None:
         """Initialize with explicit API key."""
-        provider = LLMProvider(api_key="sk-test-key-12345")
-        assert provider.api_key == "sk-test-key-12345"
+        provider = LLMProvider(api_key="sk-test-key-12345")  # pragma: allowlist secret
+        assert provider.api_key == "sk-test-key-12345"  # pragma: allowlist secret
         assert provider.model == "claude-3-5-sonnet-20241022"
 
     def test_init_custom_model(self) -> None:
         """Initialize with custom model."""
         provider = LLMProvider(
-            api_key="sk-test-key",
+            api_key="sk-test-key",  # pragma: allowlist secret
             model="claude-3-5-haiku-20241022"
         )
         assert provider.model == "claude-3-5-haiku-20241022"
@@ -34,9 +34,9 @@ class TestLLMProviderInit:
 
     def test_init_from_env(self) -> None:
         """Reads API key from ANTHROPIC_API_KEY env var."""
-        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-env-key"}):
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-env-key"}):  # pragma: allowlist secret
             provider = LLMProvider(api_key=None)
-            assert provider.api_key == "sk-env-key"
+            assert provider.api_key == "sk-env-key"  # pragma: allowlist secret
 
 
 class TestEstimateCost:
