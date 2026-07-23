@@ -1,7 +1,7 @@
 """Reshape preprocessed job data for optimal Claude API consumption."""
 
 import logging
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.tokenization.counter import TokenCounter
 
@@ -36,8 +36,8 @@ class DataReshaper:
         sentences = [s.strip() for s in text.replace("!", ".").replace("?", ".").split(".")
                      if s.strip()]
 
-        chunks = []
-        current_chunk = []
+        chunks: List[str] = []
+        current_chunk: List[str] = []
         current_tokens = 0
 
         for sent in sentences:
@@ -104,7 +104,7 @@ class DataReshaper:
         job_description: str,
         extracted_entities: Optional[Tuple[List[str], List[str], List[str]]] = None,
         chunks: Optional[List[str]] = None,
-    ) -> dict:
+    ) -> Dict[str, Any]:
         """Prepare assessment context for LLM prompt.
 
         Combines CV, job description, extracted entities, and chunks
@@ -122,22 +122,21 @@ class DataReshaper:
         if extracted_entities is None:
             extracted_entities = ([], [], [])
 
-        if chunks is None:
-            chunks = []
+        chunks_list: List[str] = chunks if chunks is not None else []
 
         # Format entities
         entities_text = DataReshaper.format_extracted_entities(*extracted_entities)
 
         # Build context
-        context = {
+        context: Dict[str, Any] = {
             "cv": cv_text,
             "job_description": job_description,
             "entities": entities_text,
-            "chunks": chunks,
+            "chunks": chunks_list,
         }
 
         # Count tokens for cost estimation
-        full_text = f"{cv_text}\n{job_description}\n{entities_text}\n{chr(10).join(chunks)}"
+        full_text = f"{cv_text}\n{job_description}\n{entities_text}\n{chr(10).join(chunks_list)}"
         token_count = _token_counter.count_tokens(full_text)
 
         context["token_count"] = token_count

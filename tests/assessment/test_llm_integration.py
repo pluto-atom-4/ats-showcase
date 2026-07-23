@@ -118,7 +118,12 @@ class TestAssessJobMocking:
         mock_anthropic_class.return_value = mock_client
 
         mock_message = MagicMock()
-        mock_message.content = [MagicMock(text='{"overall_score": 75, "tech_match": 80, "seniority_match": 70, "location_match": "yes", "top_strengths": ["Python"], "gaps": ["Redis"], "reasoning": "Good fit"}')]
+        response_json = (
+            '{"overall_score": 75, "tech_match": 80, "seniority_match": 70, '
+            '"location_match": "yes", "top_strengths": ["Python"], '
+            '"gaps": ["Redis"], "reasoning": "Good fit"}'
+        )
+        mock_message.content = [MagicMock(text=response_json)]
         mock_message.usage.input_tokens = 600
         mock_message.usage.output_tokens = 150
 

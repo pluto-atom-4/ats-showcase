@@ -283,23 +283,24 @@ class TestPromptComparison:
         cv = "Senior Python Developer"
         job = "We seek a Python expert"
 
-        simple = PromptBuilder.build_simple_prompt(cv, job)
-        with_examples = PromptBuilder.build_prompt_with_examples(cv, job)
+        simple_prompt = PromptBuilder.build_simple_prompt(cv, job)
+        examples_prompt = PromptBuilder.build_prompt_with_examples(cv, job)
 
-        assert job in simple
-        assert job in with_examples
+        assert job in simple_prompt
+        assert job in examples_prompt
 
     def test_examples_has_example_simple_doesnt(self) -> None:
         """Only examples prompt includes example assessment."""
         cv = "Senior Python Developer"
         job = "We seek a Python expert"
 
-        simple = PromptBuilder.build_simple_prompt(cv, job)
+        simple_prompt = PromptBuilder.build_simple_prompt(cv, job)
         with_examples = PromptBuilder.build_prompt_with_examples(cv, job)
 
         # Examples should have "Example" or similar
         assert "Example" in with_examples
-        # Simple may or may not have it (but less likely)
+        # Simple may or may not have it
+        assert isinstance(simple_prompt, str)
 
     def test_both_prompt_json_output(self) -> None:
         """Both prompts request JSON output."""

@@ -7,6 +7,7 @@ import time
 from typing import Any, Dict, Optional
 
 import anthropic
+from anthropic.types import Message
 
 from src.assessment.prompt_builder import PromptBuilder
 from src.tokenization.counter import TokenCounter
@@ -69,6 +70,68 @@ class LLMProvider:
             "total_cost_usd": input_cost + output_cost,
         }
 
+    def _call_api_with_retries(
+        self, prompt: str, max_retries: int
+    ) -> tuple[Message, int]:
+        """Call Claude API with retry logic.
+
+        Args:
+            prompt: Full prompt to send
+            max_retries: Max retry attempts
+
+        Returns:
+            Tuple of (message response, elapsed_ms)
+
+        Raises:
+            anthropic.AuthenticationError: Invalid API key
+            anthropic.RateLimitError: Rate limited after retries
+            anthropic.APIStatusError: Other API errors after retries
+        """
+        for attempt in range(max_retries):
+            try:
+                start_time = time.time()
+                message = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=500,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                elapsed_ms = int((time.time() - start_time) * 1000)
+                return message, elapsed_ms
+
+            except anthropic.AuthenticationError as e:
+                logger.error(f"Authentication failed: {e}")
+                raise
+
+            except anthropic.RateLimitError as e:
+                if attempt == max_retries - 1:
+                    logger.error(f"Rate limited after {max_retries} attempts: {e}")
+                    raise
+                backoff_seconds = 2 ** attempt
+                logger.warning(
+                    f"Rate limited (attempt {attempt + 1}/{max_retries}). "
+                    f"Retrying in {backoff_seconds}s"
+                )
+                time.sleep(backoff_seconds)
+
+            except anthropic.APIStatusError as e:
+                if e.status_code in (500, 502, 503):
+                    if attempt == max_retries - 1:
+                        logger.error(
+                            f"Server error {e.status_code} after {max_retries} attempts: {e}"
+                        )
+                        raise
+                    backoff_seconds = 2 ** attempt
+                    logger.warning(
+                        f"Server error {e.status_code} (attempt {attempt + 1}/{max_retries}). "
+                        f"Retrying in {backoff_seconds}s"
+                    )
+                    time.sleep(backoff_seconds)
+                else:
+                    logger.error(f"Client error {e.status_code}: {e}")
+                    raise
+
+        raise RuntimeError("Unexpected: max_retries loop exhausted")
+
     def assess_job(
         self,
         cv_text: str,
@@ -106,97 +169,46 @@ class LLMProvider:
         )
 
         # Call API with retries
-        for attempt in range(max_retries):
-            try:
-                start_time = time.time()
+        message, elapsed_ms = self._call_api_with_retries(prompt, max_retries)
 
-                message = self.client.messages.create(
-                    model=self.model,
-                    max_tokens=500,
-                    messages=[
-                        {"role": "user", "content": prompt}
-                    ],
-                )
+        try:
+            # Parse response (assuming first content block is text)
+            if not message.content or not hasattr(message.content[0], "text"):
+                raise ValueError("Unexpected response format: no text content")
 
-                elapsed_ms = int((time.time() - start_time) * 1000)
+            response_text: str = message.content[0].text
+            assessment = json.loads(response_text)
 
-                # Parse response
-                response_text = message.content[0].text
-                assessment = json.loads(response_text)
+            # Track actual usage
+            actual_input = message.usage.input_tokens
+            actual_output = message.usage.output_tokens
+            pricing = MODEL_PRICING.get(self.model, MODEL_PRICING["claude-3-5-sonnet-20241022"])
+            actual_cost = (
+                (actual_input * pricing["input"] + actual_output * pricing["output"]) / 1_000_000
+            )
 
-                # Track actual usage
-                actual_input = message.usage.input_tokens
-                actual_output = message.usage.output_tokens
-                pricing = MODEL_PRICING.get(self.model, MODEL_PRICING["claude-3-5-sonnet-20241022"])
-                actual_cost = (
-                    (actual_input * pricing["input"] + actual_output * pricing["output"]) / 1_000_000
-                )
+            logger.info(
+                f"Assessment complete: score={assessment.get('overall_score', '?')}, "
+                f"actual tokens={actual_input + actual_output}, cost=${actual_cost:.6f}"
+            )
 
-                logger.info(
-                    f"Assessment complete: score={assessment.get('overall_score', '?')}, "
-                    f"actual tokens={actual_input + actual_output}, cost=${actual_cost:.6f}"
-                )
+            return {
+                "assessment": assessment,
+                "cost_tracking": {
+                    "estimated_input": estimate["input_tokens"],
+                    "estimated_output": estimate["output_tokens"],
+                    "estimated_cost_usd": estimate["total_cost_usd"],
+                    "actual_input": actual_input,
+                    "actual_output": actual_output,
+                    "actual_cost_usd": actual_cost,
+                },
+                "metadata": {
+                    "model": self.model,
+                    "api_call_time_ms": elapsed_ms,
+                    "attempt": 1,
+                },
+            }
 
-                return {
-                    "assessment": assessment,
-                    "cost_tracking": {
-                        "estimated_input": estimate["input_tokens"],
-                        "estimated_output": estimate["output_tokens"],
-                        "estimated_cost_usd": estimate["total_cost_usd"],
-                        "actual_input": actual_input,
-                        "actual_output": actual_output,
-                        "actual_cost_usd": actual_cost,
-                    },
-                    "metadata": {
-                        "model": self.model,
-                        "api_call_time_ms": elapsed_ms,
-                        "attempt": attempt + 1,
-                    },
-                }
-
-            except anthropic.AuthenticationError as e:
-                logger.error(f"Authentication failed: {e}")
-                raise
-
-            except anthropic.RateLimitError as e:
-                if attempt == max_retries - 1:
-                    logger.error(f"Rate limited after {max_retries} attempts: {e}")
-                    raise
-
-                backoff_seconds = 2 ** attempt
-                logger.warning(
-                    f"Rate limited (attempt {attempt + 1}/{max_retries}). "
-                    f"Retrying in {backoff_seconds}s"
-                )
-                time.sleep(backoff_seconds)
-
-            except anthropic.APIStatusError as e:
-                # Retry on 5xx errors
-                if e.status_code in (500, 502, 503):
-                    if attempt == max_retries - 1:
-                        logger.error(
-                            f"Server error {e.status_code} after {max_retries} attempts: {e}"
-                        )
-                        raise
-
-                    backoff_seconds = 2 ** attempt
-                    logger.warning(
-                        f"Server error {e.status_code} (attempt {attempt + 1}/{max_retries}). "
-                        f"Retrying in {backoff_seconds}s"
-                    )
-                    time.sleep(backoff_seconds)
-                else:
-                    # Don't retry on 4xx errors
-                    logger.error(f"Client error {e.status_code}: {e}")
-                    raise
-
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse assessment JSON: {e}\nResponse: {response_text}")
-                raise
-
-            except Exception as e:
-                logger.exception(f"Unexpected error during assessment: {e}")
-                raise
-
-        # Should not reach here
-        raise RuntimeError("Unexpected: max_retries loop exhausted")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse assessment JSON: {e}\nResponse: {response_text}")
+            raise
