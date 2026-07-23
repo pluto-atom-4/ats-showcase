@@ -75,6 +75,9 @@ class PromptBuilder:
         if chunks:
             chunks_section = "\n### Job Description (Semantic Chunks)\n\n"
             chunks_section += "\n".join(f"- {chunk}" for chunk in chunks)
+        else:
+            # If no chunks, include full job description
+            chunks_section = f"\n### Job Description\n\n{job_description}"
 
         prompt = f"""{SYSTEM_PROMPT}
 
@@ -156,8 +159,11 @@ JSON:"""
 
         chunks_section = ""
         if chunks:
-            chunks_section = "\n### Job Description\n\n"
+            chunks_section = "\n### Job Description (Semantic Chunks)\n\n"
             chunks_section += "\n".join(f"- {chunk}" for chunk in chunks[:3])
+        else:
+            # If no chunks, include full job description
+            chunks_section = f"\n### Job Description\n\n{job_description}"
 
         prompt = f"""{SYSTEM_PROMPT}
 
