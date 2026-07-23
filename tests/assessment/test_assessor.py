@@ -1,5 +1,6 @@
 """Tests for Assessor end-to-end assessment workflow."""
 
+from typing import List, Tuple
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -23,7 +24,7 @@ class TestAssessorInit:
 
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
-    def test_init_with_defaults(self, mock_llm_class, mock_prep_class) -> None:
+    def test_init_with_defaults(self, mock_llm_class: MagicMock, mock_prep_class: MagicMock) -> None:
         """Initialize with default model."""
         assessor = Assessor()
         assert assessor.model == "claude-3-5-sonnet-20241022"
@@ -34,14 +35,14 @@ class TestAssessorInit:
 
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
-    def test_init_with_custom_model(self, mock_llm_class, mock_prep_class) -> None:
+    def test_init_with_custom_model(self, mock_llm_class: MagicMock, mock_prep_class: MagicMock) -> None:
         """Initialize with custom model."""
         assessor = Assessor(model="claude-3-5-haiku-20241022")
         assert assessor.model == "claude-3-5-haiku-20241022"
 
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
-    def test_init_with_examples(self, mock_llm_class, mock_prep_class) -> None:
+    def test_init_with_examples(self, mock_llm_class: MagicMock, mock_prep_class: MagicMock) -> None:
         """Initialize with use_examples enabled."""
         assessor = Assessor(use_examples=True)
         assert assessor.use_examples is True
@@ -50,10 +51,18 @@ class TestAssessorInit:
 class TestEntityScoring:
     """Test entity-based scoring logic."""
 
-    def test_entity_score_perfect_match(self, mock_assessor) -> None:
+    def test_entity_score_perfect_match(self, mock_assessor: Assessor) -> None:
         """Perfect overlap: all CV skills match job requirements."""
-        cv_entities = (["Python", "Django"], ["AWS"], ["5 years"])
-        job_entities = (["Python", "Django"], ["AWS"], ["5 years"])
+        cv_entities: Tuple[List[str], List[str], List[str]] = (
+            ["Python", "Django"],
+            ["AWS"],
+            ["5 years"],
+        )
+        job_entities: Tuple[List[str], List[str], List[str]] = (
+            ["Python", "Django"],
+            ["AWS"],
+            ["5 years"],
+        )
 
         score = mock_assessor._compute_entity_score(cv_entities, job_entities)
 
@@ -62,10 +71,18 @@ class TestEntityScoring:
         assert score["requirements_match"] == 100.0
         assert score["overall_entity_score"] == 100.0
 
-    def test_entity_score_partial_match(self, mock_assessor) -> None:
+    def test_entity_score_partial_match(self, mock_assessor: Assessor) -> None:
         """Partial overlap: some skills match, some don't."""
-        cv_entities = (["Python", "Java"], ["AWS"], [])
-        job_entities = (["Python", "Go"], ["AWS", "GCP"], [])
+        cv_entities: Tuple[List[str], List[str], List[str]] = (
+            ["Python", "Java"],
+            ["AWS"],
+            [],
+        )
+        job_entities: Tuple[List[str], List[str], List[str]] = (
+            ["Python", "Go"],
+            ["AWS", "GCP"],
+            [],
+        )
 
         score = mock_assessor._compute_entity_score(cv_entities, job_entities)
 
@@ -74,10 +91,18 @@ class TestEntityScoring:
         assert 40 < score["tech_match"] < 60
         assert 30 < score["overall_entity_score"] < 70
 
-    def test_entity_score_no_match(self, mock_assessor) -> None:
+    def test_entity_score_no_match(self, mock_assessor: Assessor) -> None:
         """No overlap: different skills and tech."""
-        cv_entities = (["Java", "Spring"], ["MySQL"], [])
-        job_entities = (["Python", "Django"], ["PostgreSQL"], [])
+        cv_entities: Tuple[List[str], List[str], List[str]] = (
+            ["Java", "Spring"],
+            ["MySQL"],
+            [],
+        )
+        job_entities: Tuple[List[str], List[str], List[str]] = (
+            ["Python", "Django"],
+            ["PostgreSQL"],
+            [],
+        )
 
         score = mock_assessor._compute_entity_score(cv_entities, job_entities)
 
@@ -85,10 +110,14 @@ class TestEntityScoring:
         assert score["tech_match"] == 0.0
         assert score["requirements_match"] == 0.0
 
-    def test_entity_score_empty_cv(self, mock_assessor) -> None:
+    def test_entity_score_empty_cv(self, mock_assessor: Assessor) -> None:
         """Empty CV entities."""
-        cv_entities = ([], [], [])
-        job_entities = (["Python"], ["AWS"], [])
+        cv_entities: Tuple[List[str], List[str], List[str]] = ([], [], [])
+        job_entities: Tuple[List[str], List[str], List[str]] = (
+            ["Python"],
+            ["AWS"],
+            [],
+        )
 
         score = mock_assessor._compute_entity_score(cv_entities, job_entities)
 
@@ -96,10 +125,14 @@ class TestEntityScoring:
         assert score["skill_match"] == 0.0
         assert score["tech_match"] == 0.0
 
-    def test_entity_score_empty_job(self, mock_assessor) -> None:
+    def test_entity_score_empty_job(self, mock_assessor: Assessor) -> None:
         """Empty job entities (shouldn't happen but edge case)."""
-        cv_entities = (["Python"], ["AWS"], [])
-        job_entities = ([], [], [])
+        cv_entities: Tuple[List[str], List[str], List[str]] = (
+            ["Python"],
+            ["AWS"],
+            [],
+        )
+        job_entities: Tuple[List[str], List[str], List[str]] = ([], [], [])
 
         score = mock_assessor._compute_entity_score(cv_entities, job_entities)
 
@@ -107,30 +140,54 @@ class TestEntityScoring:
         assert score["skill_match"] == 100.0
         assert score["tech_match"] == 100.0
 
-    def test_entity_score_case_insensitive(self, mock_assessor) -> None:
+    def test_entity_score_case_insensitive(self, mock_assessor: Assessor) -> None:
         """Entity matching is case-insensitive."""
-        cv_entities = (["python", "Django"], ["aws"], [])
-        job_entities = (["Python", "Django"], ["AWS"], [])
+        cv_entities: Tuple[List[str], List[str], List[str]] = (
+            ["python", "Django"],
+            ["aws"],
+            [],
+        )
+        job_entities: Tuple[List[str], List[str], List[str]] = (
+            ["Python", "Django"],
+            ["AWS"],
+            [],
+        )
 
         score = mock_assessor._compute_entity_score(cv_entities, job_entities)
 
         assert score["skill_match"] == 100.0
         assert score["tech_match"] == 100.0
 
-    def test_entity_score_special_characters(self, mock_assessor) -> None:
+    def test_entity_score_special_characters(self, mock_assessor: Assessor) -> None:
         """Entity matching handles special characters."""
-        cv_entities = (["C++", "C#"], ["Node.js"], [])
-        job_entities = (["C++", "C#"], ["Node.js"], [])
+        cv_entities: Tuple[List[str], List[str], List[str]] = (
+            ["C++", "C#"],
+            ["Node.js"],
+            [],
+        )
+        job_entities: Tuple[List[str], List[str], List[str]] = (
+            ["C++", "C#"],
+            ["Node.js"],
+            [],
+        )
 
         score = mock_assessor._compute_entity_score(cv_entities, job_entities)
 
         assert score["skill_match"] == 100.0
         assert score["tech_match"] == 100.0
 
-    def test_entity_score_structure(self, mock_assessor) -> None:
+    def test_entity_score_structure(self, mock_assessor: Assessor) -> None:
         """Entity score has required fields."""
-        cv_entities = (["Python"], ["AWS"], [])
-        job_entities = (["Python", "Go"], ["AWS", "GCP"], [])
+        cv_entities: Tuple[List[str], List[str], List[str]] = (
+            ["Python"],
+            ["AWS"],
+            [],
+        )
+        job_entities: Tuple[List[str], List[str], List[str]] = (
+            ["Python", "Go"],
+            ["AWS", "GCP"],
+            [],
+        )
 
         score = mock_assessor._compute_entity_score(cv_entities, job_entities)
 
@@ -145,7 +202,7 @@ class TestEntityScoring:
 class TestTokenSavings:
     """Test token savings measurement."""
 
-    def test_baseline_token_count(self, mock_assessor) -> None:
+    def test_baseline_token_count(self, mock_assessor: Assessor) -> None:
         """Baseline tokens counted correctly."""
         cv = "Senior Python Developer with 5 years experience"
         job = "We seek a Python expert with Django knowledge"
@@ -155,7 +212,7 @@ class TestTokenSavings:
         assert baseline > 0
         assert isinstance(baseline, int)
 
-    def test_baseline_grows_with_text_length(self, mock_assessor) -> None:
+    def test_baseline_grows_with_text_length(self, mock_assessor: Assessor) -> None:
         """Longer text → more baseline tokens."""
         cv = "Python Developer"
         job = "Python expert"
@@ -167,7 +224,7 @@ class TestTokenSavings:
 
         assert baseline2 > baseline1
 
-    def test_baseline_long_job_description(self, mock_assessor) -> None:
+    def test_baseline_long_job_description(self, mock_assessor: Assessor) -> None:
         """Baseline for very long job description."""
         cv = "CV text"
         job = "Job description " * 100  # ~1600 chars
@@ -183,7 +240,7 @@ class TestAssessmentIntegration:
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
     def test_assess_job_success(
-        self, mock_llm_class, mock_preprocessor_class
+        self, mock_llm_class: MagicMock, mock_preprocessor_class: MagicMock
     ) -> None:
         """Successful assessment returns AssessmentResult."""
         # Mock preprocessor
@@ -230,7 +287,7 @@ class TestAssessmentIntegration:
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
     def test_assess_job_assessment_included(
-        self, mock_llm_class, mock_preprocessor_class
+        self, mock_llm_class: MagicMock, mock_preprocessor_class: MagicMock
     ) -> None:
         """Assessment from LLM included in result."""
         mock_preprocessor = MagicMock()
@@ -269,7 +326,7 @@ class TestAssessmentIntegration:
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
     def test_assess_job_entity_score_included(
-        self, mock_llm_class, mock_preprocessor_class
+        self, mock_llm_class: MagicMock, mock_preprocessor_class: MagicMock
     ) -> None:
         """Entity score computed and included in result."""
         mock_preprocessor = MagicMock()
@@ -309,7 +366,7 @@ class TestAssessmentIntegration:
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
     def test_assess_job_cost_tracking_propagated(
-        self, mock_llm_class, mock_preprocessor_class
+        self, mock_llm_class: MagicMock, mock_preprocessor_class: MagicMock
     ) -> None:
         """Cost tracking from LLM included in result."""
         mock_preprocessor = MagicMock()
@@ -347,7 +404,7 @@ class TestAssessmentIntegration:
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
     def test_assess_job_metadata_included(
-        self, mock_llm_class, mock_preprocessor_class
+        self, mock_llm_class: MagicMock, mock_preprocessor_class: MagicMock
     ) -> None:
         """Metadata from LLM included in result."""
         mock_preprocessor = MagicMock()
@@ -385,7 +442,7 @@ class TestAssessmentIntegration:
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
     def test_assess_job_token_savings_computed(
-        self, mock_llm_class, mock_preprocessor_class
+        self, mock_llm_class: MagicMock, mock_preprocessor_class: MagicMock
     ) -> None:
         """Token savings percentage computed."""
         mock_preprocessor = MagicMock()
@@ -415,13 +472,11 @@ class TestAssessmentIntegration:
         assessor.preprocessor = mock_preprocessor
         assessor.llm_provider = mock_llm
         # Mock baseline to be 600 so savings = (1 - 400/600) * 100 ≈ 33.3%
-        assessor._estimate_baseline_tokens = MagicMock(return_value=600)
-
-        result = assessor.assess_job("CV", "Job")
-
-        # Savings = (1 - actual/baseline) * 100 = (1 - 400/600) * 100 ≈ 33.3%
-        assert result["token_savings_percent"] > 30
-        assert result["token_savings_percent"] < 40
+        with patch.object(assessor, "_estimate_baseline_tokens", return_value=600):
+            result = assessor.assess_job("CV", "Job")
+            # Savings = (1 - actual/baseline) * 100 = (1 - 400/600) * 100 ≈ 33.3%
+            assert result["token_savings_percent"] > 30
+            assert result["token_savings_percent"] < 40
 
 
 class TestEdgeCases:
@@ -429,7 +484,7 @@ class TestEdgeCases:
 
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
-    def test_assess_job_empty_cv(self, mock_llm_class, mock_prep_class) -> None:
+    def test_assess_job_empty_cv(self, mock_llm_class: MagicMock, mock_prep_class: MagicMock) -> None:
         """Raises error if CV empty."""
         assessor = Assessor()
 
@@ -438,7 +493,7 @@ class TestEdgeCases:
 
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
-    def test_assess_job_empty_job(self, mock_llm_class, mock_prep_class) -> None:
+    def test_assess_job_empty_job(self, mock_llm_class: MagicMock, mock_prep_class: MagicMock) -> None:
         """Raises error if job description empty."""
         assessor = Assessor()
 
@@ -447,7 +502,7 @@ class TestEdgeCases:
 
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
-    def test_assess_job_whitespace_cv(self, mock_llm_class, mock_prep_class) -> None:
+    def test_assess_job_whitespace_cv(self, mock_llm_class: MagicMock, mock_prep_class: MagicMock) -> None:
         """Raises error if CV is only whitespace."""
         assessor = Assessor()
 
@@ -456,7 +511,7 @@ class TestEdgeCases:
 
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
-    def test_assess_job_whitespace_job(self, mock_llm_class, mock_prep_class) -> None:
+    def test_assess_job_whitespace_job(self, mock_llm_class: MagicMock, mock_prep_class: MagicMock) -> None:
         """Raises error if job is only whitespace."""
         assessor = Assessor()
 
@@ -466,7 +521,7 @@ class TestEdgeCases:
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
     def test_assess_job_with_special_characters(
-        self, mock_llm_class, mock_preprocessor_class
+        self, mock_llm_class: MagicMock, mock_preprocessor_class: MagicMock
     ) -> None:
         """Handles special characters in CV/job."""
         mock_preprocessor = MagicMock()
@@ -505,7 +560,7 @@ class TestEdgeCases:
     @patch("src.assessment.assessor.Preprocessor")
     @patch("src.assessment.assessor.LLMProvider")
     def test_assess_job_very_long_text(
-        self, mock_llm_class, mock_preprocessor_class
+        self, mock_llm_class: MagicMock, mock_preprocessor_class: MagicMock
     ) -> None:
         """Handles very long CV and job descriptions."""
         mock_preprocessor = MagicMock()
@@ -535,12 +590,10 @@ class TestEdgeCases:
         assessor.preprocessor = mock_preprocessor
         assessor.llm_provider = mock_llm
         # Mock baseline to be 2000 so savings = (1 - 1500/2000) * 100 = 25%
-        assessor._estimate_baseline_tokens = MagicMock(return_value=2000)
+        with patch.object(assessor, "_estimate_baseline_tokens", return_value=2000):
+            cv_long = "CV " * 500  # Very long CV
+            job_long = "Job " * 500  # Very long job
 
-        cv_long = "CV " * 500  # Very long CV
-        job_long = "Job " * 500  # Very long job
-
-        result = assessor.assess_job(cv_long, job_long)
-
-        assert "assessment" in result
-        assert result["token_savings_percent"] > 0
+            result = assessor.assess_job(cv_long, job_long)
+            assert "assessment" in result
+            assert result["token_savings_percent"] > 0
