@@ -1361,6 +1361,7 @@ def assess(
                     f"⏱️  [{idx}/{len(confirmed_jobs)}] Rate limited on {title}\n"
                     f"   Continuing with remaining jobs...\n"
                 )
+                failed += 1
                 failed_jobs.append({"job_id": job_id, "title": title, "reason": "rate_limited"})
                 logger.warning(f"[{idx}/{len(confirmed_jobs)}] Rate limited on {job_id}: {e}")
 
@@ -1369,6 +1370,7 @@ def assess(
                     f"⚠️  [{idx}/{len(confirmed_jobs)}] Failed to parse response for {title}\n"
                     f"   Skipping job...\n"
                 )
+                failed += 1
                 failed_jobs.append({"job_id": job_id, "title": title, "reason": "parse_error"})
                 logger.error(f"[{idx}/{len(confirmed_jobs)}] Parse error for {job_id}: {e}")
 
@@ -1377,6 +1379,7 @@ def assess(
                     f"❌ [{idx}/{len(confirmed_jobs)}] {title}\n"
                     f"   Error: {type(e).__name__}: {e}\n"
                 )
+                failed += 1
                 failed_jobs.append({
                     "job_id": job_id,
                     "title": title,
@@ -1389,7 +1392,7 @@ def assess(
         typer.echo("📊 Assessment Summary:")
         typer.echo(f"   ✅ Assessed: {successful}/{len(confirmed_jobs)}")
         if failed_jobs:
-            typer.echo(f"   ❌ Failed: {len(failed_jobs)}")
+            typer.echo(f"   ❌ Failed: {failed}")
             for job in failed_jobs[:5]:  # Show first 5 failures
                 typer.echo(f"      • {job['title']}: {job['reason']}")
             if len(failed_jobs) > 5:
@@ -1420,7 +1423,7 @@ def assess(
 
         logger.info(
             f"Assessment complete: {successful} successful, "
-            f"{len(failed_jobs)} failed, ${total_cost:.6f} total cost, "
+            f"{failed} failed, ${total_cost:.6f} total cost, "
             f"{total_tokens:,} tokens"
         )
 
