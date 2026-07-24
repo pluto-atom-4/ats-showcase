@@ -1,7 +1,5 @@
 """End-to-end integration tests for full assessment pipeline."""
 
-import json
-from pathlib import Path
 from typing import Any, Generator, List
 from unittest.mock import MagicMock, patch
 
@@ -23,21 +21,71 @@ def temp_db() -> Generator[Database, None, None]:
 
 @pytest.fixture
 def sample_cv() -> str:
-    """Load sample CV from fixtures."""
-    fixture_path = Path(__file__).parent.parent / "data" / "fixtures" / "cv_sample.json"
-    with open(fixture_path) as f:
-        cv_data: dict[str, Any] = json.load(f)
-    text = cv_data.get("text", "")
-    return text if isinstance(text, str) else ""
+    """Generate sample CV text for testing."""
+    return (
+        "Test Developer with 5 years of experience in backend development using Python and JavaScript. "
+        "Proficient in AWS cloud services, Docker containerization, and Kubernetes orchestration. "
+        "Strong database design skills with PostgreSQL. "
+        "Looking for senior developer roles in remote environments with focus on scalability and system design."
+    )
 
 
 @pytest.fixture
 def sample_jobs() -> List[dict[str, Any]]:
-    """Load sample jobs from fixtures."""
-    fixture_path = Path(__file__).parent.parent / "data" / "fixtures" / "jobs_sample.json"
-    with open(fixture_path) as f:
-        jobs: Any = json.load(f)
-    return jobs if isinstance(jobs, list) else []
+    """Generate sample job postings for testing."""
+    return [
+        {
+            "job_id": "test-job-1",
+            "company": "TechCorp",
+            "title": "Senior Python Developer",
+            "location": "Remote",
+            "url": "https://techcorp.careers/jobs/1",
+            "html": (
+                "<html><body><h1>Senior Python Developer</h1><p>"
+                "Senior Python Developer with 5+ years. AWS & Docker. "
+                "$150k-$180k Remote.</p></body></html>"
+            ),
+            "description": (
+                "Senior Python Developer at TechCorp. "
+                "Senior Python Developer with 5+ years. AWS & Docker. "
+                "$150k-$180k Remote."
+            ),
+        },
+        {
+            "job_id": "test-job-2",
+            "company": "CloudSys",
+            "title": "DevOps Engineer",
+            "location": "San Francisco, CA",
+            "url": "https://cloudsys.careers/jobs/2",
+            "html": (
+                "<html><body><h1>DevOps Engineer</h1><p>"
+                "DevOps Engineer with Kubernetes & AWS. 3-5 years. "
+                "Python infrastructure code. $130k-$160k.</p></body></html>"
+            ),
+            "description": (
+                "DevOps Engineer at CloudSys. "
+                "DevOps Engineer with Kubernetes & AWS. 3-5 years. "
+                "Python infrastructure code. $130k-$160k."
+            ),
+        },
+        {
+            "job_id": "test-job-3",
+            "company": "WebServices Inc",
+            "title": "Frontend React Developer",
+            "location": "New York, NY",
+            "url": "https://webservices.careers/jobs/3",
+            "html": (
+                "<html><body><h1>Frontend React Developer</h1><p>"
+                "React/TypeScript developer 3+ years. Node.js backend. "
+                "$120k-$150k NYC.</p></body></html>"
+            ),
+            "description": (
+                "Frontend React Developer at WebServices Inc. "
+                "React/TypeScript developer 3+ years. Node.js backend. "
+                "$120k-$150k NYC."
+            ),
+        },
+    ]
 
 
 class TestFullPipeline:
