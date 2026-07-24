@@ -4,6 +4,7 @@ Tests for Task 8: CLI integration for assess phase.
 References: docs/dev-note/preprocessor-llm-api-research.md (Part 2.1, 3.1, 4, 6)
 """
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -36,7 +37,7 @@ def sample_job() -> str:
 
 
 @pytest.fixture
-def mock_assessor_result() -> dict:
+def mock_assessor_result() -> dict[str, Any]:
     """Mock Assessor.assess_job() result."""
     return {
         "assessment": {
@@ -68,14 +69,14 @@ def mock_assessor_result() -> dict:
 
 
 @pytest.fixture
-def temp_cv_file(tmp_path) -> str:
+def temp_cv_file(tmp_path: Any) -> str:
     """Create a temporary CV file."""
     cv_path = tmp_path / "test_cv.json"
     cv_path.write_text('{"text": "Test Developer with 5 years backend experience."}')
     return str(cv_path)
 
 
-def test_assess_single_job(temp_cv_file, mock_assessor_result):
+def test_assess_single_job(temp_cv_file: str, mock_assessor_result: dict[str, Any]) -> None:
     """Test assessing a single job."""
     with patch("src.verification.JobReviewer") as mock_reviewer_cls, \
          patch("src.storage.assessment_store.AssessmentStore") as mock_store_cls, \
@@ -116,7 +117,7 @@ def test_assess_single_job(temp_cv_file, mock_assessor_result):
         assert "Assessment Summary" in result.stdout or "Assessment complete" in result.stdout
 
 
-def test_assess_multiple_jobs(temp_cv_file, mock_assessor_result):
+def test_assess_multiple_jobs(temp_cv_file: str, mock_assessor_result: dict[str, Any]) -> None:
     """Test assessing multiple jobs."""
     with patch("src.verification.JobReviewer") as mock_reviewer_cls, \
          patch("src.storage.assessment_store.AssessmentStore") as mock_store_cls, \
@@ -164,7 +165,7 @@ def test_assess_multiple_jobs(temp_cv_file, mock_assessor_result):
         assert "✅ [2/2]" in result.stdout
 
 
-def test_assess_cost_tracking(temp_cv_file, mock_assessor_result):
+def test_assess_cost_tracking(temp_cv_file: str, mock_assessor_result: dict[str, Any]) -> None:
     """Test cost tracking (estimate vs actual)."""
     with patch("src.verification.JobReviewer") as mock_reviewer_cls, \
          patch("src.storage.assessment_store.AssessmentStore") as mock_store_cls, \
@@ -204,7 +205,7 @@ def test_assess_cost_tracking(temp_cv_file, mock_assessor_result):
         assert "Tokens:" in result.stdout or "tokens" in result.stdout
 
 
-def test_assess_empty_jobs(temp_cv_file):
+def test_assess_empty_jobs(temp_cv_file: str) -> None:
     """Test handling when no confirmed jobs found."""
     with patch("src.verification.JobReviewer") as mock_reviewer_cls, \
          patch("src.assessment.assessor.Assessor"):
@@ -219,7 +220,7 @@ def test_assess_empty_jobs(temp_cv_file):
         assert "No confirmed jobs" in output or "confirmed" in output.lower()
 
 
-def test_assess_cv_not_found():
+def test_assess_cv_not_found() -> None:
     """Test error on missing CV file."""
     result = runner.invoke(app, ["assess", "--cv", "/nonexistent/cv.json"])
 
@@ -228,7 +229,7 @@ def test_assess_cv_not_found():
     assert "not found" in output.lower() or "exit" in result.output.lower()
 
 
-def test_assess_rate_limit_handling(temp_cv_file, mock_assessor_result):
+def test_assess_rate_limit_handling(temp_cv_file: str, mock_assessor_result: dict[str, Any]) -> None:
     """Test rate limit error handling (non-fatal)."""
     import anthropic
 
@@ -269,7 +270,7 @@ def test_assess_rate_limit_handling(temp_cv_file, mock_assessor_result):
         assert "Assessment complete" in result.stdout or "Failed" in result.stdout or result.exit_code in (0, 1)
 
 
-def test_assess_verify_cost_flag(temp_cv_file, mock_assessor_result):
+def test_assess_verify_cost_flag(temp_cv_file: str, mock_assessor_result: dict[str, Any]) -> None:
     """Test --verify-cost flag prompts user."""
     with patch("src.verification.JobReviewer") as mock_reviewer_cls, \
          patch("src.storage.assessment_store.AssessmentStore") as mock_store_cls, \

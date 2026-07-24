@@ -4,8 +4,9 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, TypedDict
 
+import anthropic
 import typer
 from dotenv import load_dotenv
 
@@ -17,6 +18,21 @@ from storage.assessment_store import AssessmentStore
 from storage.export import ExportConfig, MarkdownExporter
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# TYPE DEFINITIONS
+# ============================================================================
+
+
+class ResultItem(TypedDict):
+    """Result item for assessed job."""
+
+    job_id: str
+    title: str
+    llm_score: float
+    entity_score: float
+    cost: float
 
 
 # ============================================================================
@@ -1276,8 +1292,8 @@ def assess(
         failed = 0
         total_cost = 0.0
         total_tokens = 0
-        failed_jobs = []
-        results = []
+        failed_jobs: list[dict[str, Any]] = []
+        results: list[ResultItem] = []
 
         for idx, confirmed_job in enumerate(confirmed_jobs, 1):
             job_id = confirmed_job["job_id"]
@@ -1393,11 +1409,11 @@ def assess(
         if results:
             top_results = sorted(results, key=lambda x: x["llm_score"], reverse=True)[:5]
             typer.echo(f"\n🏆 Top {len(top_results)} Matches (by LLM score):")
-            for i, result in enumerate(top_results, 1):
-                entity_score = result.get("entity_score", 0)
+            for i, result_item in enumerate(top_results, 1):
+                entity_score = result_item.get("entity_score", 0)
                 typer.echo(
-                    f"   {i}. {result['title']} "
-                    f"(LLM: {result['llm_score']:.0f}, Entity: {entity_score:.0f})"
+                    f"   {i}. {result_item['title']} "
+                    f"(LLM: {result_item['llm_score']:.0f}, Entity: {entity_score:.0f})"
                 )
 
         typer.echo("\n✅ Assessment complete!\n")
