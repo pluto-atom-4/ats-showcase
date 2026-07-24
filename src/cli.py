@@ -4,8 +4,9 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, TypedDict
 
+import anthropic
 import typer
 from dotenv import load_dotenv
 
@@ -17,6 +18,21 @@ from storage.assessment_store import AssessmentStore
 from storage.export import ExportConfig, MarkdownExporter
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# TYPE DEFINITIONS
+# ============================================================================
+
+
+class ResultItem(TypedDict):
+    """Result item for assessed job."""
+
+    job_id: str
+    title: str
+    llm_score: float
+    entity_score: float
+    cost: float
 
 
 # ============================================================================
@@ -1096,13 +1112,23 @@ def assess(
         "--model",
         help="Claude model (haiku/sonnet/opus or full ID, default sonnet). See docs/CLI.md for pricing.",
     ),
+    verify_cost: bool = typer.Option(
+        False,
+        "--verify-cost",
+        help="Show cost estimate and prompt before proceeding",
+    ),
+    limit: Optional[int] = typer.Option(
+        None,
+        "--limit",
+        help="Max jobs to assess (useful for testing/budgeting)",
+    ),
 ) -> None:
-    """Assess CV fit for confirmed jobs."""
+    """Assess CV fit for confirmed jobs using entity-based scoring."""
     import json
     from pathlib import Path
 
+    from src.assessment.assessor import Assessor
     from src.config.models import get_model_display_name
-    from src.llm.provider import LLMProvider
     from src.storage.assessment_store import AssessmentStore
     from src.verification import JobReviewer
 
@@ -1124,13 +1150,13 @@ def assess(
 
         typer.echo(f"📄 Loaded CV from: {cv}\n")
 
-        # Initialize LLM provider
+        # Initialize Assessor
         try:
-            llm_provider = LLMProvider(model_id=model)
-            model_display = get_model_display_name(llm_provider.model)
+            assessor = Assessor(model=model or "claude-3-5-sonnet-20241022")
+            model_display = get_model_display_name(assessor.model)
             typer.echo(f"🤖 Using {model_display} model\n")
         except ValueError as e:
-            typer.echo(f"❌ LLM setup failed: {e}", err=True)
+            typer.echo(f"❌ Assessor setup failed: {e}", err=True)
             typer.echo("   Set ANTHROPIC_API_KEY environment variable", err=True)
             raise typer.Exit(1) from e
 
@@ -1232,106 +1258,173 @@ def assess(
                 typer.echo("❌ No jobs match date filter criteria.", err=True)
                 raise typer.Exit(1)
 
-        # Load preprocessed jobs for context
-        preprocessed_path = Path("data/extracted_jobs/preprocessed_jobs.json")
-        preprocessed_map = {}
+        # Apply job limit if specified
+        if limit:
+            confirmed_jobs = confirmed_jobs[:limit]
+            typer.echo(f"📊 Applied job limit: assessing {len(confirmed_jobs)} jobs\n")
 
-        if preprocessed_path.exists():
-            with open(preprocessed_path) as f:
-                preprocessed_jobs = json.load(f)
-                preprocessed_map = {j["job_id"]: j for j in preprocessed_jobs}
+        # Cost pre-flight check
+        if verify_cost:
+            typer.echo("📋 Estimating costs before proceeding...\n")
+            estimated_total = 0.0
+            for job in confirmed_jobs:
+                job_desc = job.get("description") or job.get("title", "")
+                try:
+                    # Simple token estimate: CV + job description
+                    from src.tokenization.counter import TokenCounter
+                    counter = TokenCounter()
+                    est_tokens = counter.count_tokens(cv_text + "\n" + job_desc) + 200
+                    est_cost = est_tokens * 0.000003  # Sonnet input rate
+                    estimated_total += est_cost
+                except Exception:
+                    estimated_total += 0.01  # Fallback: $0.01 per job
+
+            typer.echo(
+                f"💰 Estimated total cost for {len(confirmed_jobs)} jobs: "
+                f"${estimated_total:.6f}\n"
+            )
+            if not typer.confirm("Proceed with assessment?"):
+                typer.echo("Aborted.")
+                raise typer.Exit(0)
 
         # Assess each job
         successful = 0
         failed = 0
         total_cost = 0.0
         total_tokens = 0
+        failed_jobs: list[dict[str, Any]] = []
+        results: list[ResultItem] = []
 
         for idx, confirmed_job in enumerate(confirmed_jobs, 1):
             job_id = confirmed_job["job_id"]
             title = confirmed_job["title"]
+            company = confirmed_job.get("company", "Unknown")
             location = confirmed_job.get("location", "Unknown")
+            job_desc = confirmed_job.get("description") or confirmed_job.get("title", "")
 
             try:
-                # Get preprocessed chunks
-                preprocessed = preprocessed_map.get(job_id, {})
-                job_chunks = preprocessed.get("chunks", [title, location])
-
-                # Assess job
-                assessment = llm_provider.assess_job(job_id, job_chunks, cv_text)
+                # Use Assessor for entity-based scoring
+                result = assessor.assess_job(cv_text, job_desc)
 
                 # Save assessment
                 assessment_store.save_assessment(
                     job_id=job_id,
                     title=title,
-                    company=confirmed_job.get("company", "Unknown"),
+                    company=company,
                     location=location,
-                    overall_score=assessment.overall_score,
-                    tech_score=assessment.tech_score,
-                    seniority_score=assessment.seniority_score,
-                    location_score=assessment.location_score,
-                    recommendations=assessment.recommendations,
-                    summary=assessment.summary,
-                    tokens_used=assessment.tokens_used,
-                    actual_cost=assessment.actual_cost,
+                    overall_score=result["assessment"].get("overall_score", 0),
+                    tech_score=result["entity_score"].get("tech_match", 0),
+                    seniority_score=result["entity_score"].get("skill_match", 0),
+                    location_score=50,  # Not provided by entity scorer
+                    recommendations=result["assessment"].get("reasoning", ""),
+                    summary=result["assessment"].get("reasoning", ""),
+                    tokens_used=result["cost_tracking"].get("actual_input", 0),
+                    actual_cost=result["cost_tracking"].get("actual_cost_usd", 0.0),
                 )
 
-                # Validate cost estimate vs actual
-                estimated_tokens = preprocessed.get("token_count", 0)
-                estimated_cost = preprocessed.get("estimated_cost", 0.0)
-                if estimated_tokens > 0:
-                    accuracy = (estimated_tokens / assessment.tokens_used) * 100
-                    logger.info(
-                        f"Cost validation for {job_id}: "
-                        f"estimated {estimated_tokens} tokens (${estimated_cost:.6f}), "
-                        f"actual {assessment.tokens_used} tokens (${assessment.actual_cost:.6f}), "
-                        f"accuracy {accuracy:.1f}%"
-                    )
-
                 # Display progress
+                overall_score = result["assessment"].get("overall_score", 0)
+                entity_score = result["entity_score"].get("overall_entity_score", 0)
+                actual_cost = result["cost_tracking"].get("actual_cost_usd", 0.0)
+                actual_tokens = result["cost_tracking"].get("actual_input", 0)
+                savings = result.get("token_savings_percent", 0)
+
                 typer.echo(
-                    f"✅ Job {idx}/{len(confirmed_jobs)}: {title}\n"
-                    f"   Tech: {assessment.tech_score:.0f}/100 | "
-                    f"Seniority: {assessment.seniority_score:.0f}/100 | "
-                    f"Location: {assessment.location_score:.0f}/100 | "
-                    f"Overall: {assessment.overall_score:.0f}/100\n"
-                    f"   Cost: ${assessment.actual_cost:.6f} | "
-                    f"Tokens: {assessment.tokens_used}\n"
+                    f"✅ [{idx}/{len(confirmed_jobs)}] {title} @ {company}\n"
+                    f"   LLM Score: {overall_score:.0f}/100 | "
+                    f"Entity Score: {entity_score:.0f}/100\n"
+                    f"   Cost: ${actual_cost:.6f} | "
+                    f"Tokens: {actual_tokens} | "
+                    f"Savings: {savings:.1f}%\n"
                 )
 
                 successful += 1
-                total_cost += assessment.actual_cost
-                total_tokens += assessment.tokens_used
+                total_cost += actual_cost
+                total_tokens += actual_tokens
+                results.append({
+                    "job_id": job_id,
+                    "title": title,
+                    "llm_score": overall_score,
+                    "entity_score": entity_score,
+                    "cost": actual_cost,
+                })
+
+                logger.info(
+                    f"[{idx}/{len(confirmed_jobs)}] Assessed {job_id}: "
+                    f"score={overall_score}, entity={entity_score}, "
+                    f"tokens={actual_tokens}, cost=${actual_cost:.6f}, "
+                    f"savings={savings:.1f}%"
+                )
+
+            except anthropic.RateLimitError as e:
+                typer.echo(
+                    f"⏱️  [{idx}/{len(confirmed_jobs)}] Rate limited on {title}\n"
+                    f"   Continuing with remaining jobs...\n"
+                )
+                failed += 1
+                failed_jobs.append({"job_id": job_id, "title": title, "reason": "rate_limited"})
+                logger.warning(f"[{idx}/{len(confirmed_jobs)}] Rate limited on {job_id}: {e}")
+
+            except json.JSONDecodeError as e:
+                typer.echo(
+                    f"⚠️  [{idx}/{len(confirmed_jobs)}] Failed to parse response for {title}\n"
+                    f"   Skipping job...\n"
+                )
+                failed += 1
+                failed_jobs.append({"job_id": job_id, "title": title, "reason": "parse_error"})
+                logger.error(f"[{idx}/{len(confirmed_jobs)}] Parse error for {job_id}: {e}")
 
             except Exception as e:
-                typer.echo(f"❌ Job {idx}/{len(confirmed_jobs)}: {title}\n" f"   Error: {e}\n")
+                typer.echo(
+                    f"❌ [{idx}/{len(confirmed_jobs)}] {title}\n"
+                    f"   Error: {type(e).__name__}: {e}\n"
+                )
                 failed += 1
-                logger.error(f"Assessment failed for job {job_id}: {e}", exc_info=True)
+                failed_jobs.append({
+                    "job_id": job_id,
+                    "title": title,
+                    "reason": type(e).__name__,
+                })
+                logger.exception(f"[{idx}/{len(confirmed_jobs)}] Assessment failed for {job_id}")
 
         # Display summary
-        stats = assessment_store.get_stats()
         typer.echo("\n" + "=" * 80)
         typer.echo("📊 Assessment Summary:")
-        typer.echo(f"   Total assessed: {successful}/{len(confirmed_jobs)}")
-        if failed > 0:
-            typer.echo(f"   Failed: {failed}")
+        typer.echo(f"   ✅ Assessed: {successful}/{len(confirmed_jobs)}")
+        if failed_jobs:
+            typer.echo(f"   ❌ Failed: {failed}")
+            for job in failed_jobs[:5]:  # Show first 5 failures
+                typer.echo(f"      • {job['title']}: {job['reason']}")
+            if len(failed_jobs) > 5:
+                typer.echo(f"      ... and {len(failed_jobs) - 5} more (see logs)")
 
-        typer.echo(f"   Avg overall score: {stats.get('avg_score', 0):.1f}/100")
+        typer.echo("\n💰 Cost Summary:")
+        if results:
+            avg_score = sum(r["llm_score"] for r in results) / len(results)
+            typer.echo(f"   Avg LLM score: {avg_score:.1f}/100")
         typer.echo(f"   Total cost: ${total_cost:.6f}")
-        typer.echo(f"   Total tokens: {total_tokens}")
+        typer.echo(f"   Total tokens: {total_tokens:,}")
+        if total_tokens > 0:
+            avg_cost_per_job = total_cost / successful if successful > 0 else 0
+            typer.echo(f"   Avg cost per job: ${avg_cost_per_job:.6f}")
 
-        # Show top matches
-        top_matches = assessment_store.get_top_matches(limit=3)
-        if top_matches:
-            typer.echo("\n🏆 Top Matches:")
-            for i, match in enumerate(top_matches, 1):
-                typer.echo(f"   {i}. {match['title']} - Overall: {match['overall_score']:.0f}/100")
+        # Show top matches by LLM score
+        if results:
+            top_results = sorted(results, key=lambda x: x["llm_score"], reverse=True)[:5]
+            typer.echo(f"\n🏆 Top {len(top_results)} Matches (by LLM score):")
+            for i, result_item in enumerate(top_results, 1):
+                entity_score = result_item.get("entity_score", 0)
+                typer.echo(
+                    f"   {i}. {result_item['title']} "
+                    f"(LLM: {result_item['llm_score']:.0f}, Entity: {entity_score:.0f})"
+                )
 
         typer.echo("\n✅ Assessment complete!\n")
 
         logger.info(
             f"Assessment complete: {successful} successful, "
-            f"{failed} failed, ${total_cost:.6f} total cost"
+            f"{failed} failed, ${total_cost:.6f} total cost, "
+            f"{total_tokens:,} tokens"
         )
 
     except Exception as e:
