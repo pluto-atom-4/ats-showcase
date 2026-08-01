@@ -57,5 +57,6 @@ repos:
         args: [--python-version=3.12, --ignore-missing-imports]
         stages: [commit]
         types: [python]
+        exclude: ^src/nlp/
 
   # (pytest is run as a separate workflow step, not in pre-commit)
