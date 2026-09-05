@@ -189,3 +189,117 @@ def create_markdown_polisher(nlp: Language, name: str) -> MarkdownPolisher:
         but are not used to configure the polisher.
     """
     return MarkdownPolisher()
+
+
+@Language.factory("requirement_processor")
+def create_requirement_processor(nlp: Language, name: str):
+    """Factory function to create RequirementProcessor component.
+
+    Registered with spaCy using @Language.factory() decorator. Allows
+    instantiation via nlp.create_pipe("requirement_processor").
+
+    This factory creates RequirementProcessor instances with default configuration:
+    - Filters to "requirements" section type only (B2 decision)
+    - Returns requirements list: [{"text": str, "confidence": float, "source": str}, ...]
+
+    Args:
+        nlp: spaCy Language object (required by factory pattern)
+        name: Component name (required by factory pattern)
+
+    Returns:
+        RequirementProcessor instance with default configuration
+
+    Usage:
+        >>> import spacy
+        >>> from src.poc.tweak.spacy_pipeline import registry  # noqa: F401
+        >>>
+        >>> nlp = spacy.load("en_core_web_md")
+        >>> processor = nlp.create_pipe("requirement_processor")
+        >>> nlp.add_pipe("requirement_processor", last=True)
+
+    Note:
+        The nlp and name parameters are required by the spaCy factory pattern.
+        For custom configurations, create directly:
+        >>> from src.poc.tweak.spacy_pipeline import RequirementProcessor
+        >>> processor = RequirementProcessor(nlp, "requirement_processor")
+    """
+    from .requirement_processor import RequirementProcessor
+
+    return RequirementProcessor(nlp, name)
+
+
+@Language.factory("skill_processor")
+def create_skill_processor(nlp: Language, name: str):
+    """Factory function to create SkillProcessor component.
+
+    Registered with spaCy using @Language.factory() decorator. Allows
+    instantiation via nlp.create_pipe("skill_processor").
+
+    This factory creates SkillProcessor instances with default configuration:
+    - Filters to "skills" section type only (B2 decision)
+    - Uses spaCy Matcher with action verb lemmas (SKILL_VERBS from patterns)
+    - Returns skills list: [{"skill": str, "confidence": 1.0}, ...]
+
+    Args:
+        nlp: spaCy Language object (required by factory pattern)
+        name: Component name (required by factory pattern)
+
+    Returns:
+        SkillProcessor instance with default configuration
+
+    Usage:
+        >>> import spacy
+        >>> from src.poc.tweak.spacy_pipeline import registry  # noqa: F401
+        >>>
+        >>> nlp = spacy.load("en_core_web_md")
+        >>> processor = nlp.create_pipe("skill_processor")
+        >>> nlp.add_pipe("skill_processor", last=True)
+
+    Note:
+        The nlp and name parameters are required by the spaCy factory pattern.
+        For custom configurations, create directly:
+        >>> from src.poc.tweak.spacy_pipeline import SkillProcessor
+        >>> processor = SkillProcessor(nlp, "skill_processor")
+    """
+    from .skill_processor import SkillProcessor
+
+    return SkillProcessor(nlp, name)
+
+
+@Language.factory("technology_processor")
+def create_technology_processor(nlp: Language, name: str):
+    """Factory function to create TechnologyProcessor component.
+
+    Registered with spaCy using @Language.factory() decorator. Allows
+    instantiation via nlp.create_pipe("technology_processor").
+
+    This factory creates TechnologyProcessor instances with default configuration:
+    - Filters to "technologies" OR "tools" section types only (B2 decision)
+    - Uses pre-registered entity_ruler (D5 decision)
+    - Returns technologies list: [{"tech": str, "confidence": 1.0}, ...]
+
+    Args:
+        nlp: spaCy Language object (required by factory pattern)
+        name: Component name (required by factory pattern)
+
+    Returns:
+        TechnologyProcessor instance with default configuration
+
+    Usage:
+        >>> import spacy
+        >>> from src.poc.tweak.spacy_pipeline import registry  # noqa: F401
+        >>>
+        >>> nlp = spacy.load("en_core_web_md")
+        >>> # Ensure entity_ruler is pre-registered (done in batch_processor.py)
+        >>> processor = nlp.create_pipe("technology_processor")
+        >>> nlp.add_pipe("technology_processor", last=True)
+
+    Note:
+        The nlp and name parameters are required by the spaCy factory pattern.
+        For custom configurations, create directly:
+        >>> from src.poc.tweak.spacy_pipeline import TechnologyProcessor
+        >>> processor = TechnologyProcessor(nlp, "technology_processor")
+    """
+    from .technology_processor import TechnologyProcessor
+
+    return TechnologyProcessor(nlp, name)

@@ -5,11 +5,14 @@ Provides composable, chainable components for HTML processing and markdown analy
 2. HTMLMarkdownConverter: Convert HTML to Markdown using MarkItDown
 3. MarkdownPolisher: Apply formatting rules for polished output
 4. SectionClassifierComponent: Classify markdown sections into semantic types (Phase C)
+5. RequirementProcessor: Extract requirements from classified sections (Issue #321)
+6. SkillProcessor: Extract skills from classified sections (Issue #321)
+7. TechnologyProcessor: Extract technologies from classified sections (Issue #321)
 
-All components except SectionClassifierComponent inherit from PipelineComponent abstract
-base and follow the text-in/text-out interface. SectionClassifierComponent operates on
-spaCy Doc extensions (doc._.sections → doc._.classified_sections) and uses the standard
-spaCy pipe interface (__call__(doc) -> doc).
+All components except SectionClassifierComponent, RequirementProcessor, SkillProcessor,
+and TechnologyProcessor inherit from PipelineComponent abstract base and follow the
+text-in/text-out interface. The latter four operate on spaCy Doc extensions and use the
+standard spaCy pipe interface (__call__(doc) -> doc).
 
 Components are composable and can be chained independently or via spaCy factory pattern.
 
@@ -40,6 +43,9 @@ Quick Start - spaCy Factory Pattern:
     >>> converter = nlp.create_pipe("html_markdown_converter")
     >>> polisher = nlp.create_pipe("markdown_polisher")
     >>> classifier = nlp.create_pipe("section_classifier")  # Phase C component
+    >>> req_proc = nlp.create_pipe("requirement_processor")  # Issue #321
+    >>> skill_proc = nlp.create_pipe("skill_processor")  # Issue #321
+    >>> tech_proc = nlp.create_pipe("technology_processor")  # Issue #321
     >>>
     >>> # Process through full pipeline
     >>> markdown = polisher.process(converter.process(preprocessor.process(raw_html)))
@@ -111,6 +117,45 @@ SectionClassifierComponent (Phase C):
         >>> for section, classification in doc._.classified_sections:
         ...     print(f"{section.title}: {classification.section_type}")
 
+RequirementProcessor (Issue #321):
+    Extracts requirements from classified sections.
+    - Filters to "requirements" section type only
+    - Uses pattern-based detection with confidence scoring
+    - Returns list: [{"text": str, "confidence": float, "source": str}, ...]
+
+    Example:
+        >>> req_proc = nlp.create_pipe("requirement_processor")
+        >>> nlp.add_pipe("requirement_processor", last=True)
+        >>> doc = nlp("Must have Python. Nice to have Java.")
+        >>> doc._.requirements
+        # [{"text": "Must have Python.", "confidence": 0.93, "source": "pattern"}]
+
+SkillProcessor (Issue #321):
+    Extracts skills from classified sections.
+    - Filters to "skills" section type only
+    - Uses spaCy Matcher with action verb lemmas
+    - Returns list: [{"skill": str, "confidence": 1.0}, ...]
+
+    Example:
+        >>> skill_proc = nlp.create_pipe("skill_processor")
+        >>> nlp.add_pipe("skill_processor", last=True)
+        >>> doc = nlp("Building scalable architectures")
+        >>> doc._.skills
+        # [{"skill": "building scalable architectures", "confidence": 1.0}]
+
+TechnologyProcessor (Issue #321):
+    Extracts technologies from classified sections.
+    - Filters to "technologies" OR "tools" section types only
+    - Uses pre-registered entity_ruler for entity matching
+    - Returns list: [{"tech": str, "confidence": 1.0}, ...]
+
+    Example:
+        >>> tech_proc = nlp.create_pipe("technology_processor")
+        >>> nlp.add_pipe("technology_processor", last=True)
+        >>> doc = nlp("Experience with Python, Docker, and AWS")
+        >>> doc._.technologies
+        # [{"tech": "python", "confidence": 1.0}, ...]
+
 Usage Patterns:
 
 1. Pipeline class (recommended for repeated use):
@@ -138,7 +183,10 @@ Performance Notes:
 - HTMLMarkdownConverter: ~50ms (MarkItDown I/O)
 - MarkdownPolisher: <1ms (pre-compiled regex)
 - SectionClassifierComponent: <1ms per section (keyword matching)
-- Total: ~50ms per document
+- RequirementProcessor: <5ms per job (pattern matching)
+- SkillProcessor: <10ms per job (spaCy matcher)
+- TechnologyProcessor: <10ms per job (entity extraction)
+- Total: ~50-100ms per document
 
 See docs/spacy_pipeline.md for comprehensive documentation, configuration options,
 troubleshooting, and advanced integration patterns.
@@ -149,18 +197,36 @@ Module Contents:
 - HTMLMarkdownConverter: Stage 2 - HTML to Markdown conversion
 - MarkdownPolisher: Stage 3 - Markdown formatting
 - SectionClassifierComponent: Phase C - Section classification
+- RequirementProcessor: Issue #321 - Requirement extraction
+- SkillProcessor: Issue #321 - Skill extraction
+- TechnologyProcessor: Issue #321 - Technology extraction
 - registry: spaCy factory registrations
 """
 
 # Import components for public API
 # Import registry module to trigger @Language.factory() decorators
 # This must happen on module import so factories are registered
+# Set up Doc extensions for extracted data (Issue #321)
+from spacy.tokens import Doc
+
 from . import registry  # noqa: F401
 from .base import PipelineComponent
 from .html_markdown_converter import HTMLMarkdownConverter
 from .html_preprocessor import HTMLPreprocessor
 from .markdown_polisher import MarkdownPolisher
+from .requirement_processor import RequirementProcessor
 from .section_classifier import SectionClassifierComponent
+from .skill_processor import SkillProcessor
+from .technology_processor import TechnologyProcessor
+
+if not Doc.has_extension("requirements"):
+    Doc.set_extension("requirements", default=[])
+
+if not Doc.has_extension("skills"):
+    Doc.set_extension("skills", default=[])
+
+if not Doc.has_extension("technologies"):
+    Doc.set_extension("technologies", default=[])
 
 __all__ = [
     "PipelineComponent",
@@ -168,5 +234,8 @@ __all__ = [
     "HTMLMarkdownConverter",
     "MarkdownPolisher",
     "SectionClassifierComponent",
+    "RequirementProcessor",
+    "SkillProcessor",
+    "TechnologyProcessor",
     "registry",
 ]
