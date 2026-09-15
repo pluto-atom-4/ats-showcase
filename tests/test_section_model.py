@@ -281,9 +281,7 @@ class TestMarkdownSectionNewFields:
             ],
             labels=["requirements", "qualifications"],
             is_skip=False,
-            keyword_matches=[
-                {"keyword": "years", "section_type": "requirements", "source": "title", "position": 5}
-            ],
+            keyword_matches=[{"keyword": "years", "section_type": "requirements", "source": "title", "position": 5}],
         )
 
         section_dict = section.to_dict()
@@ -461,9 +459,7 @@ class TestJobResultWithSections:
             ],
             labels=["skills", "responsibilities"],
             is_skip=False,
-            keyword_matches=[
-                {"keyword": "skill", "section_type": "skills", "source": "title", "position": 0}
-            ],
+            keyword_matches=[{"keyword": "skill", "section_type": "skills", "source": "title", "position": 0}],
         )
 
         result.markdown_sections = [section]

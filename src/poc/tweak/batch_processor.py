@@ -257,10 +257,11 @@ def process_job(
                             result.keyword_matches += len(type_class.matched_keywords)
 
                         # Build all_types list: convert TypeClassification tuples to dicts
+                        # Note: Store full precision here; rounding only happens in MarkdownSection.to_dict()
                         all_types_list = [
                             {
                                 "section_type": type_class.section_type.value,
-                                "confidence": round(type_class.confidence, 2),
+                                "confidence": type_class.confidence,
                             }
                             for type_class in classification.all_types
                         ]
