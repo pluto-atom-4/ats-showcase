@@ -39,6 +39,7 @@ import spacy
 
 from src.poc.tweak.markdown_section_classifier import SectionClassifier
 from src.poc.tweak.multi_line_paragraph import MarkdownSpanRuler
+from src.poc.tweak.section_model import MarkdownSection
 from src.poc.tweak.spacy_pipeline import (
     HTMLMarkdownConverter,
     HTMLPreprocessor,
@@ -65,6 +66,7 @@ class JobResult:
         requirements: List of extracted requirements (Issue #321)
         skills: List of extracted skills (Issue #321)
         technologies: List of extracted technologies (Issue #321)
+        markdown_sections: List of MarkdownSection objects with full metadata (Issue #338)
         errors: List of (stage_name, error_message) tuples for per-stage errors
     """
 
@@ -79,6 +81,7 @@ class JobResult:
     requirements: List[Dict[str, Any]] = field(default_factory=list)
     skills: List[Dict[str, Any]] = field(default_factory=list)
     technologies: List[Dict[str, Any]] = field(default_factory=list)
+    markdown_sections: List[MarkdownSection] = field(default_factory=list)
     errors: List[tuple] = field(default_factory=list)
 
     def add_error(self, stage: str, error: str) -> None:
@@ -235,7 +238,9 @@ def process_job(
         # Stage 5: Classify each section and aggregate confidence stats
         if sections:
             confidences = []
-            for section in sections:
+            markdown_sections = []
+
+            for section_idx, section in enumerate(sections):
                 try:
                     classification = classifier.classify(section)
 
@@ -247,9 +252,25 @@ def process_job(
                         # Count total keyword matches
                         for type_class in classification.all_types:
                             result.keyword_matches += len(type_class.matched_keywords)
+
+                    # Create MarkdownSection with full metadata for traceability (Issue #338)
+                    md_section = MarkdownSection(
+                        section_id=f"sec_{section_idx}",
+                        heading=section.heading or "",
+                        content=section.content,
+                        section_type=classification.primary_type or "unknown",
+                        confidence=classification.primary_confidence or 0.0,
+                        line_start=section.start_line or 0,
+                        line_end=section.end_line or 0,
+                        matched_keywords=classification.primary_matched_keywords or [],
+                    )
+                    markdown_sections.append(md_section)
+
                 except Exception as sec_err:
                     result.add_error("section_classification", str(sec_err))
                     # Continue processing other sections
+
+            result.markdown_sections = markdown_sections
 
             # Aggregate confidence stats across all sections
             if confidences:
