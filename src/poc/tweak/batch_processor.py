@@ -246,27 +246,42 @@ def process_job(
                 try:
                     classification = classifier.classify(section)
 
-                    # Extract confidence stats from classification
+                    # Aggregate primary confidence per section (Bug B fix: Issue #338)
+                    # SectionClassification has all_types tuple; highest confidence is at [0]
+                    # Extract primary confidence and keywords from all_types[0]
                     if classification.all_types:
-                        for tc in classification.all_types:
-                            confidences.append(tc.confidence)
+                        primary_type = classification.all_types[0]
+                        confidences.append(primary_type.confidence)
 
-                        # Count total keyword matches
+                        # Count total keyword matches from all candidate types
                         for type_class in classification.all_types:
                             result.keyword_matches += len(type_class.matched_keywords)
 
-                    # Create MarkdownSection with full metadata for traceability (Issue #338)
-                    md_section = MarkdownSection(
-                        section_id=f"sec_{section_idx}",
-                        heading=section.heading or "",
-                        content=section.content,
-                        section_type=classification.primary_type or "unknown",
-                        confidence=classification.primary_confidence or 0.0,
-                        line_start=section.start_line or 0,
-                        line_end=section.end_line or 0,
-                        matched_keywords=classification.primary_matched_keywords or [],
-                    )
-                    markdown_sections.append(md_section)
+                        # Create MarkdownSection with full metadata for traceability (Issue #338)
+                        md_section = MarkdownSection(
+                            section_id=f"sec_{section_idx}",
+                            heading=section.title or "",  # Bug A fix: changed from section.heading to section.title
+                            content=section.content,
+                            section_type=primary_type.section_type.value,
+                            confidence=primary_type.confidence,
+                            line_start=section.start_line or 0,
+                            line_end=section.end_line or 0,
+                            matched_keywords=list(primary_type.matched_keywords),
+                        )
+                        markdown_sections.append(md_section)
+                    else:
+                        # No types classified: create default section with zero confidence
+                        md_section = MarkdownSection(
+                            section_id=f"sec_{section_idx}",
+                            heading=section.title or "",
+                            content=section.content,
+                            section_type="unknown",
+                            confidence=0.0,
+                            line_start=section.start_line or 0,
+                            line_end=section.end_line or 0,
+                            matched_keywords=[],
+                        )
+                        markdown_sections.append(md_section)
 
                 except Exception as sec_err:
                     result.add_error("section_classification", str(sec_err))

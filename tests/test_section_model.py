@@ -5,8 +5,9 @@ batch_processor for Issue #338.
 """
 
 import pytest
-from src.poc.tweak.section_model import MarkdownSection
+
 from src.poc.tweak.batch_processor import JobResult
+from src.poc.tweak.section_model import MarkdownSection
 
 
 class TestMarkdownSectionSchema:
