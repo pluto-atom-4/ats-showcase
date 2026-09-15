@@ -148,6 +148,87 @@ class TestRunBatch:
                 assert result.confidence_avg >= result.confidence_min, "Avg confidence should be >= min confidence"
                 assert result.confidence_avg <= result.confidence_max, "Avg confidence should be <= max confidence"
 
+    def test_batch_processor_no_section_classification_errors_on_real_fixtures(self):
+        """Verify no section_classification errors on real fixture jobs (Bug A/B test).
+
+        This test ensures that section objects are correctly accessed (Bug A fix: .title not .heading)
+        and confidence aggregation matches per-section storage (Bug B fix).
+        """
+        # Arrange
+        fixture_path = Path(__file__).parent.parent / "fixtures" / "details_test_fixture.json"
+
+        # Act
+        results = run_batch(str(fixture_path))
+
+        # Assert - no "section_classification" errors (would indicate Bug A or similar)
+        for result in results:
+            section_class_errors = [error for error in result.errors if error[0] == "section_classification"]
+            err_count = len(section_class_errors)
+            assert err_count == 0, (
+                f"Job {result.job_id} has {err_count} section_classification errors: {section_class_errors}"
+            )
+
+    def test_batch_processor_markdown_sections_have_valid_titles(self):
+        """Verify MarkdownSection.heading correctly populated from section.title (Bug A fix).
+
+        Bug A was: section.heading used instead of section.title, causing AttributeError.
+        This test ensures heading field is correctly populated.
+        """
+        # Arrange
+        fixture_path = Path(__file__).parent.parent / "fixtures" / "details_test_fixture.json"
+
+        # Act
+        results = run_batch(str(fixture_path))
+
+        # Assert
+        for result in results:
+            assert isinstance(result.markdown_sections, list), f"Job {result.job_id} should have markdown_sections list"
+            for section in result.markdown_sections:
+                # heading should be a string (possibly empty if no title)
+                assert isinstance(section.heading, str), (
+                    f"Section {section.section_id} heading should be str, got {type(section.heading)}"
+                )
+
+    def test_batch_processor_confidence_aggregates_match_per_section_values(self):
+        """Verify confidence aggregate stats match per-section values (Bug B fix).
+
+        Bug B was: aggregates built from all_types confidences but stored in sections as primary_confidence.
+        This test ensures consistency between aggregate min/max/avg and what's stored per-section.
+        """
+        # Arrange
+        fixture_path = Path(__file__).parent.parent / "fixtures" / "details_test_fixture.json"
+
+        # Act
+        results = run_batch(str(fixture_path))
+
+        # Assert
+        for result in results:
+            if result.sections_detected == 0:
+                # If no sections, aggregates should be default
+                assert result.confidence_min == 0.0, f"Job {result.job_id}: min should be 0.0 with no sections"
+                assert result.confidence_max == 0.0, f"Job {result.job_id}: max should be 0.0 with no sections"
+                assert result.confidence_avg == 0.0, f"Job {result.job_id}: avg should be 0.0 with no sections"
+            else:
+                # Extract confidences from stored markdown_sections
+                section_confidences = [s.confidence for s in result.markdown_sections if s.confidence is not None]
+                if section_confidences:
+                    # Recompute aggregates from per-section values
+                    expected_min = min(section_confidences)
+                    expected_max = max(section_confidences)
+                    expected_avg = sum(section_confidences) / len(section_confidences)
+
+                    # Assert aggregates match recomputed values
+                    jid = result.job_id
+                    cmin = result.confidence_min
+                    cmax = result.confidence_max
+                    cavg = result.confidence_avg
+                    min_err = f"{jid}: confidence_min mismatch (result={cmin}, expected={expected_min})"
+                    max_err = f"{jid}: confidence_max mismatch (result={cmax}, expected={expected_max})"
+                    avg_err = f"{jid}: confidence_avg mismatch (result={cavg}, expected={expected_avg})"
+                    assert abs(cmin - expected_min) < 0.001, min_err
+                    assert abs(cmax - expected_max) < 0.001, max_err
+                    assert abs(cavg - expected_avg) < 0.001, avg_err
+
     def test_batch_processor_extracts_technologies_regression(self):
         """Verify technology extraction works (regression test for entity_ruler patterns).
 
