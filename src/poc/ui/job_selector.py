@@ -252,6 +252,7 @@ class JobSelectorApp(App):
         """Export selected jobs to JSON file.
 
         Reads selection state from the SelectionList widget (source of truth).
+        Ensures 'description' field is present (defaults to null) for batch processing compatibility.
         """
         job_list = self.query_one("#job_list", SelectionList)
 
@@ -265,6 +266,12 @@ class JobSelectorApp(App):
         if not selected_jobs:
             self.notify("No jobs selected to export.", title="Export", timeout=3)
             return
+
+        # Ensure all jobs have 'description' field (required by batch_processor)
+        # Default to null if not present
+        for job in selected_jobs:
+            if "description" not in job:
+                job["description"] = None
 
         # Export
         try:

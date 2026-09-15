@@ -13,7 +13,7 @@ class Job(TypedDict):
     company: str
     location: str
     status: str
-    description: NotRequired[str]
+    description: NotRequired[str | None]
     url: NotRequired[str]
     salary_min: NotRequired[float | None]
     salary_max: NotRequired[float | None]
