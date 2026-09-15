@@ -72,15 +72,13 @@ class MarkdownSection:
         )
 
     @property
-    def content_preview(self, max_len: int = 60) -> str:
+    def content_preview(self) -> str:
         """Short content preview for logging.
 
-        Args:
-            max_len: Maximum length of preview (default 60)
-
         Returns:
-            First max_len characters of content, with ellipsis if truncated
+            First 60 characters of content, with ellipsis if truncated
         """
+        max_len = 60
         if len(self.content) <= max_len:
             return self.content
         return self.content[:max_len] + "..."

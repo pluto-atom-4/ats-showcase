@@ -146,6 +146,7 @@ def load_jobs(path: str) -> List[Dict[str, Any]]:
 def process_job(
     job: Dict[str, Any],
     *,
+    nlp: spacy.language.Language,
     preprocessor: HTMLPreprocessor,
     converter: HTMLMarkdownConverter,
     polisher: MarkdownPolisher,
@@ -172,6 +173,7 @@ def process_job(
 
     Args:
         job: Job record dict (must have 'id', 'title', 'company', 'description')
+        nlp: Configured spaCy Language object with all extensions and components registered
         preprocessor: HTMLPreprocessor instance
         converter: HTMLMarkdownConverter instance
         polisher: MarkdownPolisher instance
@@ -290,15 +292,11 @@ def process_job(
 
     # Stages 6-8: Extract requirements, skills, technologies from doc (per-stage error handling)
     try:
-        # Create a spaCy Doc for extraction
-        # We process polished markdown through the full pipeline again
-        # to populate doc._.classified_sections and other extensions
-        import spacy
+        # Create a spaCy Doc for extraction using the fully-configured nlp pipeline
+        # This ensures all extensions and components are available
+        doc = nlp(polished_markdown)
 
-        nlp = spacy.blank("en")  # Minimal NLP for doc creation
-
-        # Create synthetic doc with sections pre-populated
-        doc = nlp("")  # Create empty doc
+        # Ensure sections are populated on the doc for classification
         doc._.sections = sections  # Pre-populate sections from ruler output
 
         # Apply classifiers and extract data
@@ -388,6 +386,7 @@ def run_batch(input_path: str) -> List[JobResult]:
     for job in jobs:
         result = process_job(
             job,
+            nlp=nlp,
             preprocessor=preprocessor,
             converter=converter,
             polisher=polisher,
