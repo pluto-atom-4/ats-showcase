@@ -70,6 +70,30 @@ class TestLoadJobs:
         assert "missing 'description' field" in str(exc_info.value)
         assert "job1" in str(exc_info.value)
 
+    def test_load_jobs_null_description_is_valid(self, tmp_path):
+        """Test that null description values are accepted (processed gracefully)."""
+        # Arrange - description field present but null
+        test_file = tmp_path / "null_description.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer",
+                        "company": "Acme",
+                        "description": None,  # Explicitly null
+                    }
+                ]
+            )
+        )
+
+        # Act
+        jobs = load_jobs(str(test_file))
+
+        # Assert - should load without error
+        assert len(jobs) == 1
+        assert jobs[0]["description"] is None
+
     def test_load_jobs_empty_array_returns_empty_list(self, tmp_path):
         """Test that empty JSON array returns empty list without error."""
         # Arrange
@@ -148,3 +172,51 @@ class TestRunBatch:
                 assert isinstance(tech["tech"], str), "Tech value should be string"
                 assert isinstance(tech["confidence"], float), "Confidence should be float"
                 assert tech["confidence"] == 1.0, "Technology confidence should always be 1.0"
+
+    def test_batch_processor_handles_null_description_gracefully(self, tmp_path):
+        """Test that jobs with null descriptions are processed without errors.
+
+        Null descriptions should be treated as empty strings and processed
+        without causing the batch processor to fail (Issue #340).
+        """
+        # Arrange - Create test file with null description
+        test_file = tmp_path / "null_description_jobs.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer Position",
+                        "company": "TechCorp",
+                        "description": None,  # Null description
+                        "location": "Remote",
+                    },
+                    {
+                        "id": "job2",
+                        "title": "Engineer Role",
+                        "company": "InnovateLabs",
+                        "description": "<p>Some HTML content here</p>",  # Valid description
+                        "location": "On-site",
+                    },
+                ]
+            )
+        )
+
+        # Act - Should not raise error
+        results = run_batch(str(test_file))
+
+        # Assert
+        assert len(results) == 2, "Should process both jobs"
+
+        # First job with null description should process without error
+        job1_result = results[0]
+        assert job1_result.job_id == "job1"
+        assert job1_result.title == "Developer Position"
+        assert not job1_result.has_errors(), f"Job with null description should not error: {job1_result.errors}"
+
+        # Second job with valid description should also process
+        job2_result = results[1]
+        assert job2_result.job_id == "job2"
+        assert job2_result.title == "Engineer Role"
+        # This job may have content to process
+        assert isinstance(job2_result.sections_detected, int)

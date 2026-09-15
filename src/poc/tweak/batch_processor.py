@@ -101,7 +101,7 @@ def load_jobs(path: str) -> List[Dict[str, Any]]:
     Validates that:
     - Input is a JSON array
     - Each record contains a 'description' field
-    - description field is non-empty
+    - description field can be null (handled gracefully downstream)
 
     Args:
         path: Path to JSON file containing job records
@@ -127,18 +127,14 @@ def load_jobs(path: str) -> List[Dict[str, Any]]:
             f"Expected JSON array at root, got {type(data).__name__}. Input must be an array of job records."
         )
 
-    # Validate each record has description field
+    # Validate each record has description field (but allow null values)
     for i, job in enumerate(data):
         if not isinstance(job, dict):
             raise ValueError(f"Record {i} is not a dict (type: {type(job).__name__}). Each job must be an object.")
         if "description" not in job:
             raise ValueError(
                 f"Record {i} (ID: {job.get('id', 'unknown')}) missing 'description' field. "
-                "Each job must have a description."
-            )
-        if not job["description"]:
-            raise ValueError(
-                f"Record {i} (ID: {job.get('id', 'unknown')}) has empty description. Description cannot be empty."
+                "Each job must have a description field (can be null)."
             )
 
     return data
@@ -205,6 +201,10 @@ def process_job(
     )
 
     raw_html = job.get("description", "")
+
+    # Handle null description gracefully
+    if raw_html is None:
+        raw_html = ""
 
     # Stage 1: Preprocess
     try:
