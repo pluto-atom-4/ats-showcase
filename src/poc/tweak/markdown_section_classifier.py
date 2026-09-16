@@ -329,7 +329,7 @@ def calculate_position(keyword: str, source_text: str) -> int:
 
         Unicode characters:
         >>> calculate_position("cafe", "expertise in cafe management")
-        14
+        13
 
     Note:
         This function performs case-sensitive matching on normalized (lowercase)
