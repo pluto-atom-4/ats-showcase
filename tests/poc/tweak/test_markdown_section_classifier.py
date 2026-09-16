@@ -372,8 +372,8 @@ class TestSectionClassifierMultiType:
         )
         result = classifier.classify(section)
         # Should contain both SKILLS and RESPONSIBILITIES (multi-type)
-        assert len(result.all_types) >= 1
-        assert len(result.labels) >= 1
+        assert SectionType.SKILLS in result.labels
+        assert SectionType.RESPONSIBILITIES in result.labels
 
     def test_classify_highest_confidence_first_in_all_types(self) -> None:
         """Test that all_types is sorted by confidence descending."""
@@ -409,11 +409,11 @@ class TestSectionClassifierMultiType:
         )
         result = classifier.classify(section)
         # Should have keyword matches with position information
-        if result.keyword_matches:
-            km = result.keyword_matches[0]
-            assert km.keyword in ("technical", "skill")
-            assert km.source in ("title", "content")
-            assert isinstance(km.position, int)
+        assert len(result.keyword_matches) >= 2
+        km = result.keyword_matches[0]
+        assert km.keyword in ("technical", "skill")
+        assert km.source in ("title", "content")
+        assert isinstance(km.position, int)
 
     def test_classify_multi_type_labels_frozenset(self) -> None:
         """Test that labels is a frozenset of all matched types."""
@@ -430,8 +430,8 @@ class TestSectionClassifierMultiType:
         )
         result = classifier.classify(section)
         assert isinstance(result.labels, frozenset)
-        for label in result.labels:
-            assert isinstance(label, SectionType)
+        assert SectionType.SKILLS in result.labels
+        assert SectionType.QUALIFICATIONS in result.labels
 
 
 # ============================================================================
@@ -716,9 +716,8 @@ class TestEdgeCases:
         result = classifier.classify(section)
         # Should have SKIP type and is_skip=True
         types = {tc.section_type for tc in result.all_types}
-        assert SectionType.SKIP in types or "benefits" in result.all_types[0].matched_keywords or result.is_skip
-        if SectionType.SKIP in types:
-            assert result.is_skip is True
+        assert SectionType.SKIP in types
+        assert result.is_skip is True
 
     def test_section_with_only_whitespace(self) -> None:
         """Test section with only whitespace in title and content."""
@@ -735,7 +734,8 @@ class TestEdgeCases:
         )
         result = classifier.classify(section)
         # Whitespace is stripped, so behaves like empty
-        assert len(result.all_types) >= 1
+        assert result.all_types[0].section_type == SectionType.UNLABELED
+        assert result.all_types[0].confidence == 0.0
 
     def test_multiple_skip_keywords_in_title(self) -> None:
         """Test title with multiple SKIP keywords increases confidence."""
@@ -752,7 +752,7 @@ class TestEdgeCases:
         )
         result = classifier.classify(section)
         # Should have multiple matches
-        assert len(result.all_types) >= 1
+        assert len(result.keyword_matches) >= 2
 
 
 # ============================================================================
