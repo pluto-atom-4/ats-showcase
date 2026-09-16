@@ -131,12 +131,8 @@ class TechnologyProcessor:
                     ):
                         continue
                 else:
-                    skills_entry = next(
-                        (tc for tc in all_types if tc.section_type == SectionType.SKILLS), None
-                    )
-                    knowledge_entry = next(
-                        (tc for tc in all_types if tc.section_type == SectionType.KNOWLEDGE), None
-                    )
+                    skills_entry = next((tc for tc in all_types if tc.section_type == SectionType.SKILLS), None)
+                    knowledge_entry = next((tc for tc in all_types if tc.section_type == SectionType.KNOWLEDGE), None)
 
                     if skills_entry is None and knowledge_entry is None:
                         continue
