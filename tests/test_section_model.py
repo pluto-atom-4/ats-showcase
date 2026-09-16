@@ -317,6 +317,57 @@ class TestMarkdownSectionNewFields:
         assert section.labels == ["skip"]
         assert section.to_dict()["is_skip"] is True
 
+    def test_to_dict_rounds_all_types_confidence_consistently(self):
+        """Test to_dict() rounds all_types confidence values consistently with primary confidence.
+
+        Addresses Issue #338 review round 2 finding: Ensure that when serializing,
+        confidence values are rounded to 2 decimals consistently across both the primary
+        confidence field and the all_types entries.
+        """
+        # Create section with full-precision confidence values
+        full_precision_confidence = 0.926789
+        secondary_precision = 0.754321
+
+        section = MarkdownSection(
+            section_id="sec_0",
+            heading="Requirements",
+            content="5+ years experience required",
+            section_type="requirements",
+            confidence=full_precision_confidence,  # 0.926789, should round to 0.93
+            line_start=10,
+            line_end=25,
+            matched_keywords=["years"],
+            all_types=[
+                {
+                    "section_type": "requirements",
+                    "confidence": full_precision_confidence,  # Should also round to 0.93
+                },
+                {"section_type": "qualifications", "confidence": secondary_precision},  # Should round to 0.75
+            ],
+            labels=["requirements", "qualifications"],
+            is_skip=False,
+        )
+
+        # Verify internal representation maintains full precision
+        assert section.confidence == full_precision_confidence
+        assert section.all_types[0]["confidence"] == full_precision_confidence
+        assert section.all_types[1]["confidence"] == secondary_precision
+
+        # After to_dict(), serialization should round both
+        section_dict = section.to_dict()
+
+        # Primary confidence should be rounded to 2 decimals
+        assert section_dict["confidence"] == 0.93
+
+        # all_types entries should also be rounded to 2 decimals
+        assert len(section_dict["all_types"]) == 2
+        assert section_dict["all_types"][0]["confidence"] == 0.93  # Same primary type, same rounded value
+        assert section_dict["all_types"][1]["confidence"] == 0.75
+
+        # Verify all_types structure is preserved
+        assert section_dict["all_types"][0]["section_type"] == "requirements"
+        assert section_dict["all_types"][1]["section_type"] == "qualifications"
+
 
 class TestJobResultWithSections:
     """Test JobResult integration with markdown_sections."""

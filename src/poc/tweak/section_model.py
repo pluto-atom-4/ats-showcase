@@ -130,6 +130,9 @@ class MarkdownSection:
         Returns a dict suitable for JSON export, with confidence rounded to 2 decimals.
         Includes all new fields (all_types, labels, is_skip, keyword_matches) for full
         classification data preservation (Issue #338, #295).
+
+        Note: Confidence values are rounded to 2 decimals at serialization boundary only;
+        internal representation (self.all_types) maintains full precision for accuracy.
         """
         return {
             "section_id": self.section_id,
@@ -140,7 +143,10 @@ class MarkdownSection:
             "line_start": self.line_start,
             "line_end": self.line_end,
             "matched_keywords": self.matched_keywords,
-            "all_types": self.all_types,
+            "all_types": [
+                {"section_type": entry["section_type"], "confidence": round(entry["confidence"], 2)}
+                for entry in self.all_types
+            ],
             "labels": self.labels,
             "is_skip": self.is_skip,
             "keyword_matches": self.keyword_matches,
