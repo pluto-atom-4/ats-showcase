@@ -372,7 +372,6 @@ class TestSectionClassifierMultiType:
         )
         result = classifier.classify(section)
         # Should contain both SKILLS and RESPONSIBILITIES (multi-type)
-        section_types = {tc.section_type for tc in result.all_types}
         assert len(result.all_types) >= 1
         assert len(result.labels) >= 1
 
@@ -635,7 +634,7 @@ class TestClassifySectionFunction:
     def test_classify_section_none_raises_error(self) -> None:
         """Test classify_section raises ValueError for None section."""
         with pytest.raises(ValueError, match="section cannot be None"):
-            classify_section(None)
+            classify_section(None)  # type: ignore[arg-type]
 
 
 # ============================================================================
@@ -779,7 +778,7 @@ class TestSectionClassifierInitialization:
         """Test classify raises ValueError for None section."""
         classifier = SectionClassifier()
         with pytest.raises(ValueError, match="section cannot be None"):
-            classifier.classify(None)
+            classifier.classify(None)  # type: ignore[arg-type]
 
     def test_classifier_get_nlp_returns_optional(self) -> None:
         """Test _get_nlp returns Optional[Language]."""
