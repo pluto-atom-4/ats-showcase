@@ -130,7 +130,7 @@ class RequirementProcessor:
         _name: Component identifier for logging
     """
 
-    def __init__(self, nlp: Language, name: str) -> None:
+    def __init__(self, nlp: Language, name: str, min_confidence: float = 0.70) -> None:
         """Initialize RequirementProcessor.
 
         Registers doc._.requirements extension if not already present.
@@ -138,6 +138,11 @@ class RequirementProcessor:
         Args:
             nlp: spaCy Language object (required by factory pattern)
             name: Component name for logging (typically 'requirement_processor')
+            min_confidence: Minimum confidence required for the top-ranked
+                QUALIFICATIONS classification (classification.all_types[0])
+                before extraction runs for that section. Sections where
+                all_types is empty/absent fall back to labels-only behavior
+                regardless of this threshold (Issue #346).
 
         Raises:
             ValueError: If name is None or empty
@@ -147,6 +152,7 @@ class RequirementProcessor:
 
         self.nlp = nlp
         self._name = name
+        self.min_confidence = min_confidence
 
         # Register Doc extension for requirements if not present
         if not Doc.has_extension("requirements"):
@@ -186,6 +192,19 @@ class RequirementProcessor:
                 # "requirements" section type maps to SectionType.QUALIFICATIONS
                 if SectionType.QUALIFICATIONS not in classification.labels:
                     continue
+
+                # Issue #346: when all_types is present, gate extraction on the
+                # top-ranked type's confidence. Falls back to labels-only
+                # behavior above when all_types is empty/absent.
+                all_types = classification.all_types
+                if all_types and all_types[0].section_type == SectionType.QUALIFICATIONS:
+                    top_confidence = all_types[0].confidence
+                    if top_confidence < self.min_confidence:
+                        logger.info(
+                            f"Skipping QUALIFICATIONS extraction: confidence "
+                            f"{top_confidence:.2f} < threshold {self.min_confidence:.2f}"
+                        )
+                        continue
 
                 # Extract from section title
                 if section.title:
