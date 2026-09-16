@@ -52,7 +52,7 @@ class TechnologyProcessor:
         _name: Component identifier for logging
     """
 
-    def __init__(self, nlp: Language, name: str) -> None:
+    def __init__(self, nlp: Language, name: str, min_confidence: float = 0.70) -> None:
         """Initialize TechnologyProcessor.
 
         Ensures entity_ruler is present in pipeline and registers doc._.technologies
@@ -61,6 +61,8 @@ class TechnologyProcessor:
         Args:
             nlp: spaCy Language object (required by factory pattern)
             name: Component name for logging (typically 'technology_processor')
+            min_confidence: Minimum classification confidence required (of the
+                winning SKILLS/KNOWLEDGE type) to trigger extraction (Issue #348)
 
         Raises:
             ValueError: If name is None or empty
@@ -70,6 +72,7 @@ class TechnologyProcessor:
 
         self.nlp = nlp
         self._name = name
+        self.min_confidence = min_confidence
 
         # Ensure entity_ruler exists (D5 decision: explicit pre-registration in batch_processor.py)
         # This check is defensive; actual registration happens in run_batch()
@@ -115,13 +118,46 @@ class TechnologyProcessor:
 
         for section, classification in classified_sections:
             try:
-                # Filter to SKILLS or KNOWLEDGE section types (B2 decision)
+                # Filter to SKILLS or KNOWLEDGE section types (B2 decision), gated by
+                # confidence threshold when multi-type data is available (Issue #348)
                 # Technologies are typically listed in skills or knowledge sections
-                if (
-                    SectionType.SKILLS not in classification.labels
-                    and SectionType.KNOWLEDGE not in classification.labels
-                ):
-                    continue
+                all_types = getattr(classification, "all_types", None)
+
+                if not all_types:
+                    # Backward compatible: no confidence data, fall back to labels-only check
+                    if (
+                        SectionType.SKILLS not in classification.labels
+                        and SectionType.KNOWLEDGE not in classification.labels
+                    ):
+                        continue
+                else:
+                    skills_entry = next(
+                        (tc for tc in all_types if tc.section_type == SectionType.SKILLS), None
+                    )
+                    knowledge_entry = next(
+                        (tc for tc in all_types if tc.section_type == SectionType.KNOWLEDGE), None
+                    )
+
+                    if skills_entry is None and knowledge_entry is None:
+                        continue
+
+                    if skills_entry is not None and knowledge_entry is not None:
+                        winning_type = (
+                            skills_entry if skills_entry.confidence >= knowledge_entry.confidence else knowledge_entry
+                        )
+                        logger.info(
+                            f"Technology extraction triggered by {winning_type.section_type} "
+                            f"at confidence {winning_type.confidence:.2f}"
+                        )
+                    else:
+                        winning_type = skills_entry if skills_entry is not None else knowledge_entry
+
+                    if winning_type.confidence < self.min_confidence:
+                        logger.info(
+                            f"Skipping technology extraction: confidence {winning_type.confidence:.2f} "
+                            f"< threshold {self.min_confidence:.2f}"
+                        )
+                        continue
 
                 # Extract TECH entities from doc (already processed by entity_ruler in pipeline)
                 # We filter by section here by checking the entity text position in section content
