@@ -52,7 +52,7 @@ class SkillProcessor:
         matcher: spaCy Matcher instance for skill pattern matching
     """
 
-    def __init__(self, nlp: Language, name: str) -> None:
+    def __init__(self, nlp: Language, name: str, min_confidence: float = 0.70) -> None:
         """Initialize SkillProcessor.
 
         Creates Matcher pattern for skill detection and registers doc._.skills
@@ -61,6 +61,8 @@ class SkillProcessor:
         Args:
             nlp: spaCy Language object (required by factory pattern)
             name: Component name for logging (typically 'skill_processor')
+            min_confidence: Minimum confidence threshold for SKILLS classification
+                (Issue #347). Default 0.70. See __call__ for threshold logic.
 
         Raises:
             ValueError: If name is None or empty
@@ -70,6 +72,7 @@ class SkillProcessor:
 
         self.nlp = nlp
         self._name = name
+        self.min_confidence = min_confidence
         self.matcher = Matcher(nlp.vocab)
 
         # Define the Matcher Pattern
@@ -127,6 +130,32 @@ class SkillProcessor:
                 # Filter to SKILLS section type only (B2 decision)
                 if SectionType.SKILLS not in classification.labels:
                     continue
+
+                # Confidence gate (Issue #347). If all_types is empty/absent,
+                # fall back to labels-only behavior above (backward compatible).
+                all_types = getattr(classification, "all_types", None)
+                if all_types:
+                    top_type = all_types[0]
+                    if top_type.section_type == SectionType.SKILLS:
+                        skills_confidence = top_type.confidence
+                    else:
+                        # SKILLS+TECHNOLOGIES overlap (e.g. "Technical Stack" section
+                        # classified TECHNOLOGIES (0.85) / SKILLS (0.72)): unlike
+                        # RequirementProcessor's top-ranked-only rule, extraction here
+                        # keys off SKILLS' own confidence, scanned from all_types,
+                        # even when SKILLS isn't the #1-ranked type.
+                        skills_entry = next(
+                            (tc for tc in all_types if tc.section_type == SectionType.SKILLS),
+                            None,
+                        )
+                        skills_confidence = skills_entry.confidence if skills_entry else None
+
+                    if skills_confidence is not None and skills_confidence < self.min_confidence:
+                        logger.info(
+                            f"Skipping SKILLS extraction: confidence {skills_confidence:.2f} "
+                            f"< threshold {self.min_confidence:.2f}"
+                        )
+                        continue
 
                 # Combine title and content for processing
                 text_to_process = ""
