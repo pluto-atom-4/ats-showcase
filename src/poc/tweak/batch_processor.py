@@ -246,9 +246,8 @@ def process_job(
                 try:
                     classification = classifier.classify(section)
 
-                    # Aggregate primary confidence per section (Bug B fix: Issue #338)
-                    # SectionClassification has all_types tuple; highest confidence is at [0]
-                    # Extract primary confidence and keywords from all_types[0]
+                    # Extract primary (highest-confidence) type for backward compatibility
+                    # (Issue #338: preserving full multi-type data without breaking existing fields)
                     if classification.all_types:
                         primary_type = classification.all_types[0]
                         confidences.append(primary_type.confidence)
@@ -257,16 +256,42 @@ def process_job(
                         for type_class in classification.all_types:
                             result.keyword_matches += len(type_class.matched_keywords)
 
-                        # Create MarkdownSection with full metadata for traceability (Issue #338)
+                        # Build all_types list: convert TypeClassification tuples to dicts
+                        # Note: Store full precision here; rounding only happens in MarkdownSection.to_dict()
+                        all_types_list = [
+                            {
+                                "section_type": type_class.section_type.value,
+                                "confidence": type_class.confidence,
+                            }
+                            for type_class in classification.all_types
+                        ]
+
+                        # Build keyword_matches list: convert KeywordMatch tuples to dicts
+                        keyword_matches_list = [
+                            {
+                                "keyword": km.keyword,
+                                "section_type": km.section_type.value,
+                                "source": km.source,
+                                "position": km.position,
+                            }
+                            for km in classification.keyword_matches
+                        ]
+
+                        # Create MarkdownSection with full classification metadata (Issue #338, #295)
                         md_section = MarkdownSection(
                             section_id=f"sec_{section_idx}",
-                            heading=section.title or "",  # Bug A fix: changed from section.heading to section.title
+                            heading=section.title or "",
                             content=section.content,
                             section_type=primary_type.section_type.value,
                             confidence=primary_type.confidence,
                             line_start=section.start_line or 0,
                             line_end=section.end_line or 0,
                             matched_keywords=list(primary_type.matched_keywords),
+                            # Preserve full classification data (Issue #295: closes data-loss gap)
+                            all_types=all_types_list,
+                            labels=[label.value for label in classification.labels],
+                            is_skip=classification.is_skip,
+                            keyword_matches=keyword_matches_list,
                         )
                         markdown_sections.append(md_section)
                     else:
@@ -280,6 +305,10 @@ def process_job(
                             line_start=section.start_line or 0,
                             line_end=section.end_line or 0,
                             matched_keywords=[],
+                            all_types=[],
+                            labels=[],
+                            is_skip=False,
+                            keyword_matches=[],
                         )
                         markdown_sections.append(md_section)
 
