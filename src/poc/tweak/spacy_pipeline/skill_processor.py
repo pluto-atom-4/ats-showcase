@@ -83,10 +83,11 @@ class SkillProcessor:
             # Optional: Connector words like "with", "the", "of"
             # (e.g., "partner WITH", "lead THE")
             {"POS": {"IN": ["ADP", "DET", "PART"]}, "OP": "?"},
-            # The Meat: A sequence of Nouns, Adjectives, or Proper Nouns
-            # (e.g., "novel deep learning architectures")
-            # Note: ADP excluded from this group (prepositions shouldn't appear as descriptors)
-            {"POS": {"IN": ["ADJ", "NOUN", "PROPN"]}, "OP": "+"},
+            # The Meat: A sequence of Nouns, Adjectives, Proper Nouns, or Verbs
+            # (e.g., "novel deep learning architectures", "distributed teams")
+            # Note: VERB included for past participles (e.g., "distributed") tagged by spaCy
+            # as VERB instead of ADJ. ADP excluded (prepositions shouldn't appear as descriptors)
+            {"POS": {"IN": ["ADJ", "NOUN", "PROPN", "VERB"]}, "OP": "+"},
         ]
 
         # Add pattern to matcher
@@ -157,40 +158,49 @@ class SkillProcessor:
                         )
                         continue
 
-                # Combine title and content for processing
-                text_to_process = ""
+                # Segment title and content separately (Issue #354)
+                # This prevents Matcher patterns from spanning across line boundaries
+                # and avoids merging title with first content line
+                text_lines = []
                 if section.title:
-                    text_to_process += section.title + " "
+                    text_lines.append(section.title)
                 if section.content:
-                    text_to_process += section.content
+                    text_lines.extend(section.content.splitlines())
 
-                if not text_to_process.strip():
+                if not text_lines:
                     continue
 
-                # Process text through spaCy
-                try:
-                    skill_doc = self.nlp(text_to_process)
-                except Exception as e:
-                    logger.error(f"Failed to process skills text: {e}")
-                    continue
+                # Process each line separately through spaCy
+                for line in text_lines:
+                    line_stripped = line.strip()
+                    if not line_stripped:
+                        continue
 
-                # Find matches using matcher
-                try:
-                    matches = self.matcher(skill_doc, as_spans=True)
+                    try:
+                        skill_doc = self.nlp(line_stripped)
+                    except Exception as e:
+                        logger.error(f"Failed to process skills line: {e}")
+                        continue
 
-                    # Filter overlapping spans
-                    unique_spans = filter_spans(matches)
+                    # Find matches using matcher
+                    try:
+                        matches = self.matcher(skill_doc, as_spans=True)
 
-                    # Extract skill text, normalize, and deduplicate
-                    for span in unique_spans:
-                        skill_text = span.text.replace("\n", " ").strip().lower()
-                        if skill_text and skill_text not in seen_skills:
-                            skills.append({"skill": skill_text, "confidence": 1.0})
-                            seen_skills.add(skill_text)
+                        # Filter overlapping spans
+                        unique_spans = filter_spans(matches)
 
-                except Exception as e:
-                    logger.error(f"Matcher extraction failed for section '{section.title}': {e}")
-                    continue
+                        # Extract skill text, normalize, and deduplicate
+                        for span in unique_spans:
+                            skill_text = span.text.strip().lower()
+                            if skill_text and skill_text not in seen_skills:
+                                skills.append({"skill": skill_text, "confidence": 1.0})
+                                seen_skills.add(skill_text)
+
+                    except Exception as e:
+                        logger.error(
+                            f"Matcher extraction failed for section '{section.title}', line '{line_stripped}': {e}"
+                        )
+                        continue
 
             except Exception as e:
                 logger.error(f"Error extracting skills from section '{section.title}': {e}")
