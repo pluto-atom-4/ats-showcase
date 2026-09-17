@@ -166,11 +166,7 @@ class TestSkillProcessorLineSegmentation:
         processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
 
         # Three skills on separate lines
-        multiline_content = (
-            "Building scalable systems\n"
-            "Leading distributed teams\n"
-            "Designing scalable architectures"
-        )
+        multiline_content = "Building scalable systems\nLeading distributed teams\nDesigning scalable architectures"
         section = _make_section(content=multiline_content)
         tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
         classification = SectionClassification.from_type_classifications([tc])
@@ -215,9 +211,7 @@ class TestSkillProcessorLineSegmentation:
         """Single-line skills -> no regression from line segmentation."""
         processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
 
-        section = _make_section(
-            content="Building scalable architectures with Python and distributed systems"
-        )
+        section = _make_section(content="Building scalable architectures with Python and distributed systems")
         tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
         classification = SectionClassification.from_type_classifications([tc])
 

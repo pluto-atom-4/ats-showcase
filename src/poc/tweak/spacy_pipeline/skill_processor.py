@@ -198,8 +198,7 @@ class SkillProcessor:
 
                     except Exception as e:
                         logger.error(
-                            f"Matcher extraction failed for section '{section.title}', "
-                            f"line '{line_stripped}': {e}"
+                            f"Matcher extraction failed for section '{section.title}', line '{line_stripped}': {e}"
                         )
                         continue
 
