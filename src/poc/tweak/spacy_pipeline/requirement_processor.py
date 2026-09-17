@@ -208,7 +208,7 @@ class RequirementProcessor:
 
                 # Extract from section title
                 if section.title:
-                    for sentence in section.title.split("."):
+                    for sentence in re.split(r"[.\r\n]+", section.title):
                         sentence = sentence.strip()
                         if not sentence:
                             continue
@@ -219,7 +219,7 @@ class RequirementProcessor:
 
                 # Extract from section content
                 if section.content:
-                    for sentence in section.content.split("."):
+                    for sentence in re.split(r"[.\r\n]+", section.content):
                         sentence = sentence.strip()
                         if not sentence:
                             continue
