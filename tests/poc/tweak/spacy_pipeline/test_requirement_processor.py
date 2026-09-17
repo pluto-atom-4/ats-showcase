@@ -142,5 +142,106 @@ class TestRequirementProcessorConfidenceThreshold:
 
 
 # ============================================================================
+# Multi-Line Sentence Splitting Tests (Issue #353)
+# ============================================================================
+
+
+class TestRequirementProcessorMultiLineSplitting:
+    """Test multi-line sentence splitting on newlines and periods."""
+
+    def test_multiline_no_periods_splits_on_newlines(self, nlp) -> None:
+        """Multi-line content without periods splits correctly on newlines."""
+        processor = RequirementProcessor(nlp, "requirement_processor")
+
+        doc = nlp("Test")
+        section = MarkdownSection(
+            title="Requirements",
+            content="Must have Python experience\nMust know Django\nMust have REST API skills",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=12,
+            line_count=3,
+            has_list=False,
+        )
+        classification = _make_classification(confidence=0.85)
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract 3 separate requirements, one per line
+        assert len(doc._.requirements) >= 3
+
+    def test_mixed_line_endings_carriage_return_linefeed(self, nlp) -> None:
+        """Mixed line endings (\\r\\n and \\n) split correctly."""
+        processor = RequirementProcessor(nlp, "requirement_processor")
+
+        doc = nlp("Test")
+        section = MarkdownSection(
+            title="Requirements",
+            content="Must have Python\r\nMust know SQL\nMust understand testing",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=10,
+            line_count=3,
+            has_list=False,
+        )
+        classification = _make_classification(confidence=0.85)
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract at least 3 requirements despite mixed line endings
+        assert len(doc._.requirements) >= 3
+
+    def test_periods_and_newlines_both_split(self, nlp) -> None:
+        """Text with both periods and newlines splits on both."""
+        processor = RequirementProcessor(nlp, "requirement_processor")
+
+        doc = nlp("Test")
+        section = MarkdownSection(
+            title="Requirements",
+            content="Must have Python. Must know Django\nMust have REST API skills. Must understand testing",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=16,
+            line_count=2,
+            has_list=False,
+        )
+        classification = _make_classification(confidence=0.85)
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract at least 4 requirements: split on both . and \n
+        assert len(doc._.requirements) >= 4
+
+    def test_multiline_title_also_splits(self, nlp) -> None:
+        """Multi-line section titles are also split correctly."""
+        processor = RequirementProcessor(nlp, "requirement_processor")
+
+        doc = nlp("Test")
+        section = MarkdownSection(
+            title="Must have experience\nMust know frameworks",
+            content="Experience with Django",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=8,
+            line_count=2,
+            has_list=False,
+        )
+        classification = _make_classification(confidence=0.85)
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract requirements from both title (2 lines) and content (1)
+        assert len(doc._.requirements) >= 2
+
+
+# ============================================================================
 # Run with: uv run pytest tests/poc/tweak/spacy_pipeline/test_requirement_processor.py -v
 # ============================================================================
