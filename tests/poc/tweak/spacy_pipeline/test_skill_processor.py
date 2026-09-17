@@ -156,3 +156,100 @@ class TestSkillProcessorConfidenceThreshold:
 
         # No confidence data available: extraction proceeds purely on labels membership.
         assert len(doc._.skills) > 0
+
+
+class TestSkillProcessorLineSegmentation:
+    """Test line-by-line segmentation before spaCy Matcher (Issue #354)."""
+
+    def test_multiline_skill_list_extracts_separate_skills(self, nlp) -> None:
+        """Multi-line skill list (3 lines) -> 3 separate skills, not merged."""
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        # Three skills on separate lines
+        multiline_content = (
+            "Building scalable systems\n"
+            "Leading distributed teams\n"
+            "Designing scalable architectures"
+        )
+        section = _make_section(content=multiline_content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract at least 3 distinct skills (one per line)
+        assert len(doc._.skills) >= 3
+        # Verify skills are distinct (not merged into one)
+        skill_texts = [s["skill"] for s in doc._.skills]
+        assert "building scalable systems" in skill_texts or "building scalable" in skill_texts
+        assert any("leading" in s for s in skill_texts)
+        assert any("designing" in s for s in skill_texts)
+
+    def test_mixed_line_endings_correct_segmentation(self, nlp) -> None:
+        """Mixed line endings (\\r\\n + \\n) -> correct per-line segmentation."""
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        # Mix Windows (\\r\\n) and Unix (\\n) line endings
+        multiline_content = "Building scalable systems\r\nLeading distributed teams\nDesigning architectures"
+        section = _make_section(content=multiline_content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract multiple skills despite mixed line endings
+        assert len(doc._.skills) >= 2
+        skill_texts = [s["skill"] for s in doc._.skills]
+        # Verify no skills contain raw line ending markers
+        for skill in skill_texts:
+            assert "\r" not in skill
+            assert "\n" not in skill
+
+    def test_single_line_skill_no_regression(self, nlp) -> None:
+        """Single-line skills -> no regression from line segmentation."""
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        section = _make_section(
+            content="Building scalable architectures with Python and distributed systems"
+        )
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract skills normally
+        assert len(doc._.skills) > 0
+
+    def test_seen_skills_deduplication_across_lines(self, nlp) -> None:
+        """Deduplication (seen_skills) still works across multiple lines."""
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        # Repeated skill on different lines
+        multiline_content = (
+            "Building scalable systems\n"
+            "Building scalable systems\n"  # Duplicate
+            "Leading distributed teams"
+        )
+        section = _make_section(content=multiline_content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Duplicates should be deduplicated
+        skill_texts = [s["skill"] for s in doc._.skills]
+        # "building scalable systems" or similar should appear exactly once
+        building_count = sum(1 for s in skill_texts if "building" in s and "scalable" in s)
+        assert building_count == 1
