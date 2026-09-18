@@ -18,8 +18,7 @@ CREATE TABLE IF NOT EXISTS job_reviews (
     crawled_at TIMESTAMP,
     preprocessed_at TIMESTAMP,
     reviewed_at TIMESTAMP,
-    preprocessing_version TEXT DEFAULT 'v2.0',
-    FOREIGN KEY (job_id) REFERENCES jobs(id)
+    preprocessing_version TEXT DEFAULT 'v2.0'
 )
 """
 
@@ -69,7 +68,7 @@ CREATE TABLE IF NOT EXISTS cost_tracking (
     estimated_cost_before REAL,
     estimated_cost_after REAL,
     is_re_preprocessing BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY(job_id) REFERENCES jobs(id)
+    FOREIGN KEY(job_id) REFERENCES job_reviews(job_id)
 )
 """
 

@@ -76,8 +76,7 @@ class JobReviewer:
         crawled_at TIMESTAMP,
         preprocessed_at TIMESTAMP,
         reviewed_at TIMESTAMP,
-        preprocessing_version TEXT DEFAULT 'v2.0',
-        FOREIGN KEY (job_id) REFERENCES jobs(id)
+        preprocessing_version TEXT DEFAULT 'v2.0'
     )
     """
 
