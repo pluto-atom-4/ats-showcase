@@ -7,6 +7,8 @@ with legacy imports, but all query classes have been removed.
 See: src/storage/job_store.py and src/storage/assessment_store.py for current API.
 """
 
+import warnings
+
 
 class JobQueries:
     """Deprecated: Use JobStore instead.
@@ -16,8 +18,10 @@ class JobQueries:
     """
 
     def __init__(self):
-        raise DeprecationWarning(
-            "JobQueries is deprecated. Use src.storage.job_store.JobStore instead."
+        warnings.warn(
+            "JobQueries is deprecated. Use src.storage.job_store.JobStore instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
 
 
@@ -29,8 +33,10 @@ class CostQueries:
     """
 
     def __init__(self):
-        raise DeprecationWarning(
-            "CostQueries is deprecated. Use src.storage.job_store.JobStore instead."
+        warnings.warn(
+            "CostQueries is deprecated. Use src.storage.job_store.JobStore instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
 
 
@@ -42,6 +48,8 @@ class AssessmentQueries:
     """
 
     def __init__(self):
-        raise DeprecationWarning(
-            "AssessmentQueries is deprecated. Use src.storage.assessment_store.AssessmentStore instead."
+        warnings.warn(
+            "AssessmentQueries is deprecated. Use src.storage.assessment_store.AssessmentStore instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
