@@ -39,7 +39,9 @@ class AssessmentStore:
 
         cursor = self.conn.cursor()
         try:
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_job_assessments_score ON job_assessments(overall_score DESC)")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_job_assessments_score ON job_assessments(overall_score DESC)"
+            )
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_job_assessments_job_id ON job_assessments(job_id)")
             self.conn.commit()
         except sqlite3.OperationalError as e:
