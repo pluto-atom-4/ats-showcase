@@ -87,13 +87,3 @@ CREATE TABLE IF NOT EXISTS quality_tracking (
     FOREIGN KEY(job_id) REFERENCES job_reviews(job_id)
 )
 """
-
-# Dictionary mapping table names to their SQL definitions
-# Used by _init_helpers.initialize_db_common() for batch table creation
-SCHEMAS = {
-    "job_reviews": JOBS_TABLE_SQL,
-    "job_assessments": ASSESSMENT_TABLE_SQL,
-    "job_assessments_fts": ASSESSMENT_FTS_SQL,
-    "cost_tracking": COST_TRACKING_TABLE_SQL,
-    "quality_tracking": QUALITY_TRACKING_TABLE_SQL,
-}

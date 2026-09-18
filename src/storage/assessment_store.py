@@ -45,7 +45,11 @@ class AssessmentStore:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_job_assessments_job_id ON job_assessments(job_id)")
             self.conn.commit()
         except sqlite3.OperationalError as e:
-            logger.debug(f"Index creation: {e}")
+            # Only log unexpected errors; IF NOT EXISTS should prevent duplicates
+            if "already exists" in str(e).lower():
+                logger.debug(f"Index already exists: {e}")
+            else:
+                logger.warning(f"Unexpected error creating index: {e}")
 
     def _run_migrations(self) -> None:
         """Run schema migrations to add missing columns for quality tracking (Phase 3B)."""
@@ -67,8 +71,12 @@ class AssessmentStore:
                 cursor.execute(f"ALTER TABLE job_assessments ADD COLUMN {col_name} {col_type}")
                 self.conn.commit()
                 logger.info(f"Added column {col_name} to job_assessments (Phase 3B migration)")
-            except sqlite3.OperationalError:
-                pass  # Column already exists
+            except sqlite3.OperationalError as e:
+                # Only ignore "column already exists" errors; other errors are unexpected
+                if "already exists" in str(e).lower() or "duplicate column name" in str(e).lower():
+                    logger.debug(f"Column {col_name} already exists")
+                else:
+                    logger.warning(f"Unexpected error adding column {col_name}: {e}")
 
     def _close_db(self) -> None:
         """Close database connection."""
