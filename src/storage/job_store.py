@@ -2,39 +2,22 @@
 
 import logging
 import sqlite3
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from src.storage._init_helpers import initialize_db_common
 from src.storage.cost_models import (
     CostComparisonReport,
     QualityComparisonReport,
     QualityImpactMetrics,
     ReprocessingMetrics,
 )
+from src.storage.schema import COST_TRACKING_TABLE_SQL, JOBS_TABLE_SQL, QUALITY_TRACKING_TABLE_SQL
 
 logger = logging.getLogger(__name__)
 
 
 class JobStore:
     """SQLite storage for job reviews with preprocessing version tracking."""
-
-    JOBS_TABLE_SQL = """
-    CREATE TABLE IF NOT EXISTS job_reviews (
-        job_id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        location TEXT,
-        company TEXT,
-        status TEXT NOT NULL DEFAULT 'pending',
-        reason TEXT,
-        tokens INTEGER,
-        estimated_cost REAL,
-        crawled_at TIMESTAMP,
-        preprocessed_at TIMESTAMP,
-        reviewed_at TIMESTAMP,
-        preprocessing_version TEXT DEFAULT 'v2.0',
-        FOREIGN KEY (job_id) REFERENCES jobs(id)
-    )
-    """
 
     def __init__(self, db_path: str = "data/ats_playground.db"):
         """Initialize job store."""
@@ -44,13 +27,9 @@ class JobStore:
 
     def _initialize_db(self) -> None:
         """Initialize database and schema."""
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(self.db_path)
-        self.conn.row_factory = sqlite3.Row
-
-        cursor = self.conn.cursor()
-        cursor.execute(self.JOBS_TABLE_SQL)
-        self.conn.commit()
+        # Use common initialization helper with job-related schemas
+        tables = {"job_reviews": JOBS_TABLE_SQL}
+        self.conn = initialize_db_common(self.db_path, tables)
         logger.info("Initialized job store database")
         self._run_migrations()
 
@@ -256,25 +235,7 @@ class JobStore:
         cursor = self.conn.cursor()
 
         # Create cost_tracking table if it doesn't exist
-        cursor.execute(
-            """CREATE TABLE IF NOT EXISTS cost_tracking (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                job_id TEXT,
-                phase TEXT,
-                input_tokens INTEGER,
-                output_tokens INTEGER,
-                cost REAL,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                preprocessing_version_before TEXT,
-                preprocessing_version_after TEXT,
-                tokens_before INTEGER,
-                tokens_after INTEGER,
-                estimated_cost_before REAL,
-                estimated_cost_after REAL,
-                is_re_preprocessing BOOLEAN DEFAULT FALSE,
-                FOREIGN KEY(job_id) REFERENCES jobs(id)
-            )"""
-        )
+        cursor.execute(COST_TRACKING_TABLE_SQL)
 
         # Check and add missing columns
         cursor.execute("PRAGMA table_info(cost_tracking)")
@@ -526,19 +487,7 @@ class JobStore:
         cursor = self.conn.cursor()
 
         # Create quality_tracking table if it doesn't exist
-        cursor.execute(
-            """CREATE TABLE IF NOT EXISTS quality_tracking (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                job_id TEXT,
-                preprocessing_version_before TEXT,
-                preprocessing_version_after TEXT,
-                previous_assessment_score INTEGER,
-                new_assessment_score INTEGER,
-                score_delta INTEGER,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(job_id) REFERENCES job_reviews(job_id)
-            )"""
-        )
+        cursor.execute(QUALITY_TRACKING_TABLE_SQL)
 
         self.conn.commit()
 
