@@ -3,41 +3,16 @@
 import json
 import logging
 import sqlite3
-from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from src.storage._init_helpers import initialize_db_common
+from src.storage.schema import ASSESSMENT_FTS_SQL, ASSESSMENT_TABLE_SQL
 
 logger = logging.getLogger(__name__)
 
 
 class AssessmentStore:
     """SQLite storage for job assessments."""
-
-    ASSESSMENT_TABLE_SQL = """
-    CREATE TABLE IF NOT EXISTS job_assessments (
-        job_id TEXT PRIMARY KEY,
-        title TEXT,
-        company TEXT,
-        location TEXT,
-        overall_score REAL,
-        tech_score REAL,
-        seniority_score REAL,
-        location_score REAL,
-        recommendations TEXT,
-        summary TEXT,
-        tokens_used INTEGER,
-        input_tokens INTEGER DEFAULT 0,
-        output_tokens INTEGER DEFAULT 0,
-        actual_cost REAL,
-        assessed_date TIMESTAMP,
-        FOREIGN KEY (job_id) REFERENCES job_reviews(job_id)
-    )
-    """
-
-    ASSESSMENT_FTS_SQL = """
-    CREATE VIRTUAL TABLE IF NOT EXISTS job_assessments_fts USING fts5(
-        job_id, title, company, summary, recommendations
-    )
-    """
 
     def __init__(self, db_path: str = "data/ats_playground.db"):
         """Initialize assessment store."""
@@ -47,25 +22,28 @@ class AssessmentStore:
 
     def _initialize_db(self) -> None:
         """Initialize database and schema."""
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(self.db_path)
-        self.conn.row_factory = sqlite3.Row
+        # Use common initialization helper with assessment-related schemas
+        tables = {
+            "job_assessments": ASSESSMENT_TABLE_SQL,
+            "job_assessments_fts": ASSESSMENT_FTS_SQL,
+        }
+        self.conn = initialize_db_common(self.db_path, tables)
+        logger.info("Initialized assessment database")
+        self._create_indices()
+        self._run_migrations()
+
+    def _create_indices(self) -> None:
+        """Create indices for better query performance."""
+        if not self.conn:
+            return
 
         cursor = self.conn.cursor()
-
-        # Create main table
-        cursor.execute(self.ASSESSMENT_TABLE_SQL)
-
-        # Create FTS table
-        cursor.execute(self.ASSESSMENT_FTS_SQL)
-
-        # Create indices
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_job_assessments_score ON job_assessments(overall_score DESC)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_job_assessments_job_id ON job_assessments(job_id)")
-
-        self.conn.commit()
-        logger.info("Initialized assessment database")
-        self._run_migrations()
+        try:
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_job_assessments_score ON job_assessments(overall_score DESC)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_job_assessments_job_id ON job_assessments(job_id)")
+            self.conn.commit()
+        except sqlite3.OperationalError as e:
+            logger.debug(f"Index creation: {e}")
 
     def _run_migrations(self) -> None:
         """Run schema migrations to add missing columns for quality tracking (Phase 3B)."""
