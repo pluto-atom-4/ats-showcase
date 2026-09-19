@@ -152,7 +152,7 @@ async def retry_goto(
     for attempt in range(1, max_attempts + 1):
         try:
             logger.debug(f"Navigation attempt {attempt}/{max_attempts} to {url}")
-            await page.goto(url, wait_until="networkidle")
+            await page.goto(url, wait_until="load")
             logger.debug(f"Successfully navigated to {url}")
             return True
         except Exception as e:

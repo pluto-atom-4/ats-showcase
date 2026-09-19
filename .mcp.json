@@ -1,20 +1,5 @@
 {
   "mcpServers": {
-    "playwright": {
-      "type": "local",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@playwright/mcp@latest",
-        "--browser=chromium",
-        "--headless"
-      ],
-      "env": {
-        "NODE_ENV": "production",
-        "PLAYWRIGHT_MCP_EXECUTABLE_PATH": "$HOME/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome",
-        "PLAYWRIGHT_MCP_SCRIPTS_DIR": "/home/pluto-atom-4/.config/mcp-scripts"
-      }
-    },
     "github": {
       "type": "http",
       "url": "https://api.githubcopilot.com/mcp/",
