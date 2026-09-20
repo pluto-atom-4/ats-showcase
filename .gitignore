@@ -216,3 +216,4 @@ graphify-out/
 GRAPH_REPORT.md
 # graphify claude install leaves a pre-edit settings.json backup, local-only
 .claude/settings.json.graphify-bak
+config_test/workdays-3.json
