@@ -374,7 +374,10 @@ async def extract_job_from_container(
     """
     try:
         # Debug logging at start of function
-        logger.debug(f"Container {container_index}: Extracting job from container (type: {container.tag_name if hasattr(container, 'tag_name') else 'unknown'})")
+        container_type = container.tag_name if hasattr(container, "tag_name") else "unknown"
+        logger.debug(
+            f"Container {container_index}: Extracting job from container (type: {container_type})"
+        )
 
         # Extract title with detailed logging
         try:
@@ -411,7 +414,10 @@ async def extract_job_from_container(
         # Extract description with detailed logging
         try:
             description = await extract_text(container, selectors.get("description"))
-            logger.debug(f"Container {container_index} description extraction: {description[:50] if description else None}...")
+            desc_preview = description[:50] if description else None
+            logger.debug(
+                f"Container {container_index} description extraction: {desc_preview}..."
+            )
         except Exception as e:
             logger.warning(f"Container {container_index} description extraction failed: {e}")
             description = None
@@ -436,7 +442,10 @@ async def extract_job_from_container(
         # For WorkSource: click link → navigate → extract jobId from detail page URL → navigate back
         url = ""
         if link and company_key == "WorkSource":
-            logger.debug(f"Container {container_index}: [jobId_extract] Processing WorkSource link with click: {link[:80] if link else 'None'}...")
+            link_preview = link[:80] if link else "None"
+            logger.debug(
+                f"Container {container_index}: [jobId_extract] Processing WorkSource link with click: {link_preview}..."
+            )
             try:
                 # Step 1: Click the link selector on the container
                 link_selector = selectors.get("link")
@@ -454,18 +463,29 @@ async def extract_job_from_container(
                         # Step 3: Extract jobId from current page URL
                         current_url = page.url
                         job_id_param = extract_url_param(current_url, "jobId")
-                        logger.debug(f"Container {container_index}: [jobId_extract] Current page URL: {current_url}, jobId extracted: {job_id_param}")
+                        logger.debug(
+                            f"Container {container_index}: [jobId_extract] Current page URL: {current_url}"
+                        )
+                        logger.debug(
+                            f"Container {container_index}: [jobId_extract] jobId extracted: {job_id_param}"
+                        )
 
                         if job_id_param:
                             # Construct URL with jobId parameter
                             separator = "&" if "?" in base_url else "?"
                             url = base_url + separator + f"jobId={job_id_param}"
-                            logger.debug(f"Container {container_index}: [jobId_extract] Constructed URL with jobId: {url}")
+                            logger.debug(
+                                f"Container {container_index}: [jobId_extract] Constructed URL with jobId: {url}"
+                            )
 
                         # Note: Don't navigate back. Page state remains valid for subsequent extractions.
-                        logger.debug(f"Container {container_index}: [jobId_extract] jobId extracted, ready for next container")
+                        logger.debug(
+                            f"Container {container_index}: [jobId_extract] jobId extracted, ready for next container"
+                        )
                     else:
-                        logger.warning(f"Container {container_index}: [jobId_extract] Could not find link element to click")
+                        logger.warning(
+                            f"Container {container_index}: [jobId_extract] Could not find link element to click"
+                        )
                 else:
                     logger.warning(f"Container {container_index}: [jobId_extract] No link selector configured")
             except Exception as e:
@@ -490,7 +510,9 @@ async def extract_job_from_container(
                 logger.debug(f"Container {container_index}: [jobId_extract] Absolute link, using as-is: {url}")
             else:
                 url = urljoin(base_url, link)
-                logger.debug(f"Container {container_index}: [jobId_extract] Relative link, joining with base_url: {url}")
+                logger.debug(
+                    f"Container {container_index}: [jobId_extract] Relative link, joining with base_url: {url}"
+                )
 
         # Generate deterministic job ID
         job_id = generate_job_id(
@@ -526,6 +548,7 @@ async def extract_job_from_container(
     except Exception as e:
         logger.warning(f"Container {container_index}: Error extracting job from container: {e}")
         import traceback
+
         logger.debug(f"Container {container_index}: Exception traceback: {traceback.format_exc()}")
         return None
 

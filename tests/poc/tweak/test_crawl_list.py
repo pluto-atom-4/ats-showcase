@@ -994,9 +994,7 @@ class TestExtractJobFromContainer:
 
         link_elem = AsyncMock()
         # Link without jobId parameter
-        link_elem.get_attribute = AsyncMock(
-            return_value="/en-US/jobs/job/abc123xyz789/"
-        )
+        link_elem.get_attribute = AsyncMock(return_value="/en-US/jobs/job/abc123xyz789/")
         # Mock click to simulate navigation
         link_elem.click = AsyncMock()
 
@@ -1077,7 +1075,7 @@ class TestCrawlCompanyJobs:
     async def test_crawl_company_jobs_uses_display_name(self):
         """Test that company display name from config is used in extracted jobs (fallback path)."""
         browser = AsyncMock()
-        page = AsyncMock()
+        page = MagicMock()  # Use MagicMock for sync methods like set_default_timeout
         browser.new_page = AsyncMock(return_value=page)
 
         # Mock container
