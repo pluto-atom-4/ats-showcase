@@ -375,9 +375,7 @@ async def extract_job_from_container(
     try:
         # Debug logging at start of function
         container_type = container.tag_name if hasattr(container, "tag_name") else "unknown"
-        logger.debug(
-            f"Container {container_index}: Extracting job from container (type: {container_type})"
-        )
+        logger.debug(f"Container {container_index}: Extracting job from container (type: {container_type})")
 
         # Extract title with detailed logging
         try:
@@ -415,9 +413,7 @@ async def extract_job_from_container(
         try:
             description = await extract_text(container, selectors.get("description"))
             desc_preview = description[:50] if description else None
-            logger.debug(
-                f"Container {container_index} description extraction: {desc_preview}..."
-            )
+            logger.debug(f"Container {container_index} description extraction: {desc_preview}...")
         except Exception as e:
             logger.warning(f"Container {container_index} description extraction failed: {e}")
             description = None
@@ -463,12 +459,8 @@ async def extract_job_from_container(
                         # Step 3: Extract jobId from current page URL
                         current_url = page.url
                         job_id_param = extract_url_param(current_url, "jobId")
-                        logger.debug(
-                            f"Container {container_index}: [jobId_extract] Current page URL: {current_url}"
-                        )
-                        logger.debug(
-                            f"Container {container_index}: [jobId_extract] jobId extracted: {job_id_param}"
-                        )
+                        logger.debug(f"Container {container_index}: [jobId_extract] Current page URL: {current_url}")
+                        logger.debug(f"Container {container_index}: [jobId_extract] jobId extracted: {job_id_param}")
 
                         if job_id_param:
                             # Construct URL with jobId parameter
