@@ -33,7 +33,7 @@ import json
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import spacy
 
@@ -84,7 +84,7 @@ class JobResult:
     technologies: List[Dict[str, Any]] = field(default_factory=list)
     markdown_sections: List[MarkdownSection] = field(default_factory=list)
     errors: List[tuple] = field(default_factory=list)
-    warnings: List[tuple] = field(default_factory=list)
+    warnings: List[Tuple[str, str]] = field(default_factory=list)
 
     def add_error(self, stage: str, error: str) -> None:
         """Add a per-stage error to the result.
