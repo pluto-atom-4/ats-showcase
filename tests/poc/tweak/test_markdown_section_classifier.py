@@ -1024,7 +1024,10 @@ class TestSkipPrecedenceContentPath:
         classifier = SectionClassifier()
         section = MarkdownSection(
             title="",  # Untitled (level -2)
-            content="Description: Manage projects. Overview of role and responsibilities. Location: Remote. Compensation package.",
+            content=(
+                "Description: Manage projects. Overview of role and responsibilities. "
+                "Location: Remote. Compensation package."
+            ),
             level=-2,
             start_line=0,
             end_line=2,
@@ -1053,7 +1056,10 @@ class TestSkipPrecedenceContentPath:
         classifier = SectionClassifier()
         section = MarkdownSection(
             title="",  # Untitled
-            content="Description: Develop Python applications. Summary: Lead technical projects. Location: Remote. Compensation details.",
+            content=(
+                "Description: Develop Python applications. Summary: Lead technical projects. "
+                "Location: Remote. Compensation details."
+            ),
             level=-2,
             start_line=0,
             end_line=2,
