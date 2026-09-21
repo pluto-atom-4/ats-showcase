@@ -232,7 +232,7 @@ def process_job(
             from src.poc.tweak.html_scope import scope_to_selector
 
             scope_result = scope_to_selector(raw_html, description_selector)
-            
+
             # Handle different match scenarios
             if scope_result.match_count == 0:
                 # No matches: warn and use full HTML
@@ -246,7 +246,8 @@ def process_job(
                     # Multiple matches: warn and use first
                     result.add_warning(
                         "html_scoping",
-                        f"Selector '{description_selector}' matched {scope_result.match_count} elements; using first match",
+                        f"Selector '{description_selector}' matched {scope_result.match_count} "
+                        "elements; using first match",
                     )
                 # Use the scoped fragment (single or first of multiple)
                 raw_html = scope_result.fragment
@@ -588,7 +589,6 @@ def print_summary(results: List[JobResult]) -> str:
     return summary
 
 
-
 def _resolve_description_selector(company: str, config_dir: str) -> str:
     """Resolve description_selector from company config (lazy import).
 
@@ -619,9 +619,7 @@ def _resolve_description_selector(company: str, config_dir: str) -> str:
 
     description_selector = selectors.get("description_selector")
     if not description_selector:
-        raise ValueError(
-            f"Company '{company}' config found but has no 'selectors.description_selector' defined"
-        )
+        raise ValueError(f"Company '{company}' config found but has no 'selectors.description_selector' defined")
 
     return description_selector
 

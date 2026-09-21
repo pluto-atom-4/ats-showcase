@@ -317,7 +317,10 @@ class TestHTMLScoping:
                         "id": "job1",
                         "title": "Developer",
                         "company": "TechCorp",
-                        "description": '<div class="sidebar">Sidebar content</div><div class="job-description">Job requirements here</div>',
+                        "description": (
+                            '<div class="sidebar">Sidebar content</div>'
+                            '<div class="job-description">Job requirements here</div>'
+                        ),
                     }
                 ]
             )
@@ -378,7 +381,9 @@ class TestHTMLScoping:
                         "id": "job1",
                         "title": "Developer",
                         "company": "TechCorp",
-                        "description": '<div class="desc">First</div><div class="desc">Second</div><div class="desc">Third</div>',
+                        "description": (
+                            '<div class="desc">First</div><div class="desc">Second</div><div class="desc">Third</div>'
+                        ),
                     }
                 ]
             )
@@ -668,8 +673,9 @@ class TestCLIFlags:
         )
 
         # Act - Call main with --company flag
-        from src.poc.tweak.batch_processor import main
         import sys
+
+        from src.poc.tweak.batch_processor import main
 
         old_argv = sys.argv
         try:
@@ -698,11 +704,14 @@ class TestCLIFlags:
         config_file.write_text(json.dumps({"companies": {}}))
 
         input_file = tmp_path / "jobs.json"
-        input_file.write_text(json.dumps([{"id": "job1", "title": "Developer", "company": "TechCorp", "description": "text"}]))
+        input_file.write_text(
+            json.dumps([{"id": "job1", "title": "Developer", "company": "TechCorp", "description": "text"}])
+        )
 
         # Act
-        from src.poc.tweak.batch_processor import main
         import sys
+
+        from src.poc.tweak.batch_processor import main
 
         old_argv = sys.argv
         try:
@@ -732,6 +741,6 @@ class TestCLIFlags:
         from src.poc.tweak.batch_processor import _resolve_description_selector
 
         # If we call _resolve_description_selector with config_test, common.py is imported
-        # (which is the lazy import behavior) 
+        # (which is the lazy import behavior)
         # This test just documents that config_test is the default
         assert True  # Placeholder; actual behavior verified by CLI tests above
