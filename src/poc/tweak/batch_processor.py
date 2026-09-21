@@ -48,6 +48,7 @@ from src.poc.tweak.spacy_pipeline import (
     SkillProcessor,
     TechnologyProcessor,
 )
+from src.poc.tweak.spacy_pipeline.heading_promoter import HeadingPromoter
 
 
 @dataclass
@@ -169,6 +170,7 @@ def process_job(
     skill_processor: SkillProcessor,
     tech_processor: TechnologyProcessor,
     description_selector: Optional[str] = None,
+    heading_promoter: Optional[HeadingPromoter] = None,
 ) -> JobResult:
     """Process a single job through the markdown pipeline.
 
@@ -179,6 +181,7 @@ def process_job(
     1. HTMLPreprocessor: Clean raw HTML
     2. HTMLMarkdownConverter: Convert HTML to Markdown
     3. MarkdownPolisher: Polish Markdown formatting
+    3b. HeadingPromoter: Promote plain-text headings to markdown (optional, Issue #365)
     4. MarkdownSpanRuler: Parse sections from markdown
     5. SectionClassifier: Classify sections via keyword-based matching
     6. RequirementProcessor: Extract requirements (Issue #321)
@@ -197,6 +200,8 @@ def process_job(
         skill_processor: SkillProcessor instance
         tech_processor: TechnologyProcessor instance
         description_selector: Optional CSS selector to scope HTML fragment before processing
+        heading_promoter: Optional HeadingPromoter instance for promoting plain-text headings
+                          (default None skips heading promotion)
 
     Returns:
         JobResult with processing stats and any errors encountered
@@ -279,9 +284,18 @@ def process_job(
         result.add_error("polisher", str(e))
         return result
 
+    # Stage 3b: Promote plain-text headings (optional, Issue #365)
+    promoted_markdown = polished_markdown
+    if heading_promoter is not None:
+        try:
+            promoted_markdown = heading_promoter.process(polished_markdown)
+        except Exception as e:
+            result.add_error("heading_promoter", str(e))
+            # Non-fatal: continue with unpromoted markdown
+
     # Stage 4: Parse sections using MarkdownSpanRuler
     try:
-        sections = ruler.parse(polished_markdown)
+        sections = ruler.parse(promoted_markdown)
         result.sections_detected = len(sections)
 
         # Stage 5: Classify each section and aggregate confidence stats
@@ -423,7 +437,9 @@ def process_job(
     return result
 
 
-def run_batch(input_path: str, description_selector: Optional[str] = None) -> List[JobResult]:
+def run_batch(
+    input_path: str, description_selector: Optional[str] = None, promote_headings: bool = True
+) -> List[JobResult]:
     """Run batch processing on all jobs in input file.
 
     Loads spaCy model, instantiates pipeline components once, then processes
@@ -432,6 +448,7 @@ def run_batch(input_path: str, description_selector: Optional[str] = None) -> Li
     Args:
         input_path: Path to JSON file with job records
         description_selector: Optional CSS selector to scope HTML fragments
+        promote_headings: Whether to promote plain-text headings (default True, Issue #365)
 
     Returns:
         List of JobResult objects (one per job)
@@ -465,6 +482,7 @@ def run_batch(input_path: str, description_selector: Optional[str] = None) -> Li
     preprocessor = HTMLPreprocessor()
     converter = HTMLMarkdownConverter()
     polisher = MarkdownPolisher()
+    heading_promoter = HeadingPromoter() if promote_headings else None
     markdown_ruler = MarkdownSpanRuler(nlp)
     classifier = SectionClassifier()
 
@@ -488,6 +506,7 @@ def run_batch(input_path: str, description_selector: Optional[str] = None) -> Li
             skill_processor=skill_processor,
             tech_processor=tech_processor,
             description_selector=description_selector,
+            heading_promoter=heading_promoter,
         )
         results.append(result)
 
@@ -658,6 +677,11 @@ def main() -> int:
         default="config_test",
         help="Directory containing company config JSON files (default: config_test)",
     )
+    parser.add_argument(
+        "--no-promote-headings",
+        action="store_true",
+        help="Disable plain-text heading promotion (default: headings promoted, Issue #365)",
+    )
 
     args = parser.parse_args()
 
@@ -671,7 +695,9 @@ def main() -> int:
             return 1
 
     try:
-        results = run_batch(args.input_path, description_selector=description_selector)
+        results = run_batch(
+            args.input_path, description_selector=description_selector, promote_headings=not args.no_promote_headings
+        )
         print_summary(results)
 
         # Export to JSON if requested
