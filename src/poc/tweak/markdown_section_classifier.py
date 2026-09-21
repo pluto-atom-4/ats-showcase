@@ -660,7 +660,8 @@ class SectionClassifier:
             SectionClassification with:
             - all_types: Tuple of TypeClassification sorted by confidence descending
             - labels: FrozenSet of all matched SectionTypes
-            - is_skip: True if any matched type is SKIP
+            - is_skip: Title path = any matched type is SKIP;
+              untitled/content path = top-ranked type is SKIP
             - keyword_matches: Tuple of KeywordMatch with position information
 
         Raises:

@@ -311,7 +311,6 @@ SKIP_SECTIONS: FrozenSet[str] = frozenset(
         "union",
         "contingent upon award",
         "relocation",
-        "hourly",
     }
 )
 
