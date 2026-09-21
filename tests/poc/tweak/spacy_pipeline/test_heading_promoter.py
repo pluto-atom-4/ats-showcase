@@ -389,7 +389,7 @@ class TestHeadingPromoterErrorHandling:
             raise ValueError("Intentional test error")
 
         original_should_promote = promoter._should_promote
-        promoter._should_promote = bad_should_promote
+        promoter._should_promote = bad_should_promote  # type: ignore[method-assign]
 
         text = "Job Description\nContent."
         result = promoter.process(text)
@@ -398,4 +398,4 @@ class TestHeadingPromoterErrorHandling:
         assert result == text
 
         # Restore original method
-        promoter._should_promote = original_should_promote
+        promoter._should_promote = original_should_promote  # type: ignore[method-assign]
