@@ -588,6 +588,44 @@ def print_summary(results: List[JobResult]) -> str:
     return summary
 
 
+
+def _resolve_description_selector(company: str, config_dir: str) -> str:
+    """Resolve description_selector from company config (lazy import).
+
+    Loads company configs only when called (lazy import to avoid playwright/spaCy imports
+    when --company flag is not used).
+
+    Args:
+        company: Company config key or name to search for
+        config_dir: Directory containing config JSON files
+
+    Returns:
+        The description_selector value from matched company config
+
+    Raises:
+        ValueError: If company not found, or found but has no selectors.description_selector
+    """
+    # Lazy import: only import common.py when --company is used
+    from src.poc.tweak.common import load_all_company_configs, resolve_company_selectors
+
+    merged_config = load_all_company_configs(config_dir)
+
+    # Try to resolve selectors for the given company
+    selectors = resolve_company_selectors(company, merged_config)
+
+    if not selectors:
+        # No selectors found for this company
+        raise ValueError(f"No configuration found for company '{company}' in {config_dir}")
+
+    description_selector = selectors.get("description_selector")
+    if not description_selector:
+        raise ValueError(
+            f"Company '{company}' config found but has no 'selectors.description_selector' defined"
+        )
+
+    return description_selector
+
+
 def main() -> int:
     """CLI entry point for batch processor.
 
@@ -610,11 +648,32 @@ def main() -> int:
         default=None,
         help="Output path for JSON results (optional)",
     )
+    parser.add_argument(
+        "--company",
+        type=str,
+        default=None,
+        help="Company config key or name to resolve description_selector from (optional, requires --config-dir)",
+    )
+    parser.add_argument(
+        "--config-dir",
+        type=str,
+        default="config_test",
+        help="Directory containing company config JSON files (default: config_test)",
+    )
 
     args = parser.parse_args()
 
+    # Resolve description_selector from --company if provided
+    description_selector = None
+    if args.company:
+        try:
+            description_selector = _resolve_description_selector(args.company, args.config_dir)
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
     try:
-        results = run_batch(args.input_path)
+        results = run_batch(args.input_path, description_selector=description_selector)
         print_summary(results)
 
         # Export to JSON if requested
