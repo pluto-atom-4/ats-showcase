@@ -1024,8 +1024,9 @@ class SectionClassifier:
             result_classifications.append(TypeClassification(fallback_type, fallback_conf, ()))
             # No keyword matches for fallback case
 
-        # Step 5: Compute is_skip: True if SKIP is in matched types
-        is_skip = bool(result_classifications) and result_classifications[0].section_type is SectionType.SKIP
+        # Step 5: Compute is_skip: True only if top-ranked type is SKIP (content path)
+        sorted_result = sorted(result_classifications, key=lambda tc: tc.confidence, reverse=True)
+        is_skip = bool(sorted_result) and sorted_result[0].section_type is SectionType.SKIP
 
         # Step 6: Build and return via factory
         return SectionClassification.from_type_classifications(

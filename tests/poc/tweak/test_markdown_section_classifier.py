@@ -903,10 +903,7 @@ class TestWordBoundaryKeywordMatching:
         classifier = SectionClassifier()
         section = MarkdownSection(
             title="",  # Untitled
-            content=(
-                "COMPENSATION: $70-$80 HOURLY. Location: Remote. "
-                "Job Desc: Manage projects."
-            ),
+            content=("COMPENSATION: $70-$80 HOURLY. Location: Remote. Job Desc: Manage projects."),
             level=-2,
             start_line=0,
             end_line=3,
@@ -1021,13 +1018,13 @@ class TestSkipPrecedenceContentPath:
     def test_description_outranks_skip_keywords(self) -> None:
         """Content where DESCRIPTION is top-ranked but skip keywords also match -> is_skip=False.
 
-        Untitled content with description-ish text (no conditional assert).
+        Untitled content with strong description keywords + skip keywords.
         Expected: type=DESCRIPTION (top-ranked), is_skip=False (only top-ranked type determines is_skip).
         """
         classifier = SectionClassifier()
         section = MarkdownSection(
             title="",  # Untitled (level -2)
-            content="Manage Python projects and lead initiatives. Some location and compensation details included.",
+            content="Description: Manage projects. Overview of role and responsibilities. Location: Remote. Compensation package.",
             level=-2,
             start_line=0,
             end_line=2,
@@ -1036,17 +1033,16 @@ class TestSkipPrecedenceContentPath:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Content-path logic: is_skip = True only if top-ranked type is SKIP
+        # Unconditional assertion: description text should outrank skip keywords
         assert len(result.all_types) > 0, "Result should have at least one type"
-        top_ranked = result.all_types[0]
-        # If top-ranked is not SKIP, is_skip must be False
-        if top_ranked.section_type != SectionType.SKIP:
-            assert not result.is_skip, (
-                f"Expected is_skip=False when top-ranked is {top_ranked.section_type}, but got {result.is_skip}"
-            )
-        # If top-ranked is SKIP, is_skip must be True
-        else:
-            assert result.is_skip, f"Expected is_skip=True when top-ranked is SKIP, but got {result.is_skip}"
+        assert result.all_types[0].section_type is SectionType.DESCRIPTION, (
+            f"Expected top-ranked type=DESCRIPTION, got {result.all_types[0].section_type}"
+        )
+        assert not result.is_skip, "Expected is_skip=False when DESCRIPTION is top-ranked"
+        # Verify skip keywords NOT in matched keywords (hourly removed in review fix)
+        matched_kw_set = {km.keyword for km in result.keyword_matches}
+        assert "our" not in matched_kw_set, "'our' should not be matched (word boundary)"
+        assert "hourly" not in matched_kw_set, "'hourly' was removed from SKIP_SECTIONS"
 
     def test_worksource_shaped_description_outranks_compensation_location(self) -> None:
         """WorkSource-shaped case: description text + skip keywords (compensation, location) -> is_skip=False.
@@ -1057,7 +1053,7 @@ class TestSkipPrecedenceContentPath:
         classifier = SectionClassifier()
         section = MarkdownSection(
             title="",  # Untitled
-            content=("Job Description: Manage Python projects in our offices. Location: Remote. Compensation package."),
+            content="Description: Develop Python applications. Summary: Lead technical projects. Location: Remote. Compensation details.",
             level=-2,
             start_line=0,
             end_line=2,
@@ -1066,16 +1062,12 @@ class TestSkipPrecedenceContentPath:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Verify top-ranked type and is_skip logic
+        # Unconditional assertion: explicit "Job Description" + description text should outrank skip keywords
         assert len(result.all_types) > 0
-        top_ranked = result.all_types[0]
-        # With description text prevalent, top-ranked should be DESCRIPTION
-        # and is_skip should be False (only top-ranked determines is_skip)
-        if top_ranked.section_type == SectionType.DESCRIPTION:
-            assert not result.is_skip, "Expected is_skip=False when DESCRIPTION is top-ranked"
-        elif top_ranked.section_type == SectionType.SKIP:
-            # If compensation + location outrank description, is_skip must be True
-            assert result.is_skip, "Expected is_skip=True when SKIP is top-ranked"
+        assert result.all_types[0].section_type is SectionType.DESCRIPTION, (
+            f"Expected top-ranked type=DESCRIPTION, got {result.all_types[0].section_type}"
+        )
+        assert not result.is_skip, "Expected is_skip=False when DESCRIPTION is top-ranked"
 
     def test_skip_is_top_ranked_eoe_union_content(self) -> None:
         """Untitled content where SKIP IS top-ranked (e.g., EEO/union/e-verify text) -> is_skip=True.
@@ -1086,7 +1078,7 @@ class TestSkipPrecedenceContentPath:
         classifier = SectionClassifier()
         section = MarkdownSection(
             title="",  # Untitled
-            content=("Equal opportunity employer. E-verify and right to work requirements. Union position."),
+            content="Equal opportunity employer. E-verify and right to work requirements. Union position.",
             level=-2,
             start_line=0,
             end_line=2,
@@ -1095,16 +1087,12 @@ class TestSkipPrecedenceContentPath:
             has_list=False,
         )
         result = classifier.classify(section)
+        # Unconditional assertion: only skip keywords, no description text -> SKIP should rank highest
         assert len(result.all_types) > 0
-        top_ranked = result.all_types[0]
-        # With multiple skip keywords and no strong description text, SKIP should rank high
-        # is_skip should match top-ranked type
-        if top_ranked.section_type == SectionType.SKIP:
-            assert result.is_skip, "Expected is_skip=True when SKIP is top-ranked"
-        else:
-            assert not result.is_skip, (
-                f"Expected is_skip=False when top-ranked is {top_ranked.section_type}, but is_skip={result.is_skip}"
-            )
+        assert result.all_types[0].section_type is SectionType.SKIP, (
+            f"Expected top-ranked type=SKIP, got {result.all_types[0].section_type}"
+        )
+        assert result.is_skip, "Expected is_skip=True when SKIP is top-ranked"
 
     def test_titled_is_skip_unchanged_any_hit(self) -> None:
         """Titled sections still use 'any skip hit' rule for is_skip (title path unchanged).
