@@ -310,6 +310,7 @@ SKIP_SECTIONS: FrozenSet[str] = frozenset(
         "total rewards",
         "union",
         "contingent upon award",
+        "relocation",
     }
 )
 

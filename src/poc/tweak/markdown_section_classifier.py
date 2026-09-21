@@ -15,6 +15,7 @@ Supports multi-type classification: a single section can match multiple semantic
 (e.g., 'Skills and Responsibilities' → both SKILLS and RESPONSIBILITIES in results).
 
 Issue #301: Enhance classify() with Section Ruler Pattern matching
+Issue #365: Fix word-boundary keyword matching and content-path is_skip precedence
 
 Classes:
     TypeClassification: Single section type with confidence and optional pattern label
@@ -37,7 +38,9 @@ Example (multi-type classification with ruler):
     labels = {SectionType.SKILLS, SectionType.RESPONSIBILITIES}
 """
 
+import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import TYPE_CHECKING, FrozenSet, List, Literal, Optional, Tuple
 
 from src.poc.tweak.multi_line_paragraph import MarkdownSection
@@ -53,6 +56,71 @@ from src.poc.tweak.patterns import (
 
 if TYPE_CHECKING:
     from spacy.language import Language
+
+# ============================================================================
+# Issue #365: Word-boundary keyword matching helper
+# ============================================================================
+
+
+@lru_cache(maxsize=512)
+def _compile_keyword_pattern(keyword: str) -> "re.Pattern[str]":
+    r"""Compile and cache regex pattern for word-boundary keyword matching.
+
+    Creates a leading-only word boundary pattern: `(?<!\w)keyword`.
+    This prevents mid-word hits (e.g., 'our' in 'HOURLY' does not match)
+    while allowing stems (e.g., 'qualif' matches 'Qualifications').
+
+    Args:
+        keyword: Keyword string to compile (assumed lowercase)
+
+    Returns:
+        Compiled regex pattern with leading-only boundary
+
+    Note:
+        Pattern is cached per keyword to avoid recompiling on every match.
+        Max cache size is 512 to balance memory and performance.
+    """
+    # Escape special regex characters in keyword
+    escaped = re.escape(keyword)
+    # Leading-only boundary: (?<!\w) prevents mid-word matches
+    pattern_str = r"(?<!\w)" + escaped
+    return re.compile(pattern_str)
+
+
+def _kw_in(keyword: str, text: str) -> bool:
+    """Check if keyword matches in text using word-boundary aware matching.
+
+    Uses leading-only word boundary `(?<!\\w)keyword` to match keywords
+    while avoiding mid-word substring hits. This handles the case where
+    keywords are stems (e.g., 'qualif', 'respons', 'requirement') that
+    need to match as prefixes in inflected forms like 'Qualifications'.
+
+    Why leading-only (not full word boundary \b)?
+    - Full \b on stems breaks trailing matches: 'qualif\b' misses
+      'qualifications' (ends with 's', not 'f')
+    - Leading (?<!\\w) prevents accidental substring hits: 'our' in
+      'HOURLY' (mid-word) is blocked, but 'our' in 'Our Benefits' works
+    - Existing tests: 0 failures with leading boundary, 9 failures with full \b
+
+    Args:
+        keyword: Keyword to search for (assumed lowercase)
+        text: Text to search in (assumed lowercase, normalized)
+
+    Returns:
+        True if keyword matches with leading-only boundary, False otherwise
+
+    Example:
+        >>> _kw_in('qualif', 'qualifications')
+        True
+        >>> _kw_in('qualif', 'required')
+        False
+        >>> _kw_in('our', 'hourly')  # Mid-word 'our' in HOURLY
+        False
+        >>> _kw_in('our', 'our benefits')  # Leading 'our'
+        True
+    """
+    pattern = _compile_keyword_pattern(keyword)
+    return pattern.search(text) is not None
 
 
 @dataclass(frozen=True)
@@ -580,10 +648,10 @@ class SectionClassifier:
         7. Fall back to OTHER or UNLABELED based on content presence
         8. Calculate keyword positions using calculate_position for each match
 
-        SKIP Behavior:
-        SKIP is classified same as other types (no precedence override yet).
-        If any matched type is SKIP, is_skip flag is set to True.
-        See follow-up issues for enhanced SKIP logic tuning.
+        SKIP Behavior (Issue #365):
+        - Title path: is_skip = True if any matched type is SKIP (unchanged)
+        - Content path: is_skip = True only if top-ranked type is SKIP (new behavior)
+        This reduces false positives when multiple keyword types are matched.
 
         Args:
             section: MarkdownSection to classify
@@ -592,7 +660,8 @@ class SectionClassifier:
             SectionClassification with:
             - all_types: Tuple of TypeClassification sorted by confidence descending
             - labels: FrozenSet of all matched SectionTypes
-            - is_skip: True if any matched type is SKIP
+            - is_skip: Title path = any matched type is SKIP;
+              untitled/content path = top-ranked type is SKIP
             - keyword_matches: Tuple of KeywordMatch with position information
 
         Raises:
@@ -710,7 +779,7 @@ class SectionClassifier:
 
         # Step 2: Check keyword categories (NO EARLY RETURN)
         # SKIP sections
-        skip_matches = tuple(kw for kw in self.skip_keywords if kw in title_text)
+        skip_matches = tuple(kw for kw in self.skip_keywords if _kw_in(kw, title_text))
         if skip_matches:
             if SectionType.SKIP not in all_matches:
                 all_matches[SectionType.SKIP] = skip_matches
@@ -719,7 +788,7 @@ class SectionClassifier:
                 all_matches[SectionType.SKIP] = tuple(set(all_matches[SectionType.SKIP]) | set(skip_matches))
 
         # SKILLS sections
-        skills_matches = tuple(kw for kw in SKILLS_KEYWORDS if kw in title_text)
+        skills_matches = tuple(kw for kw in SKILLS_KEYWORDS if _kw_in(kw, title_text))
         if skills_matches:
             if SectionType.SKILLS not in all_matches:
                 all_matches[SectionType.SKILLS] = skills_matches
@@ -727,7 +796,7 @@ class SectionClassifier:
                 all_matches[SectionType.SKILLS] = tuple(set(all_matches[SectionType.SKILLS]) | set(skills_matches))
 
         # QUALIFICATIONS sections
-        qual_matches = tuple(kw for kw in QUALIFICATIONS_KEYWORDS if kw in title_text)
+        qual_matches = tuple(kw for kw in QUALIFICATIONS_KEYWORDS if _kw_in(kw, title_text))
         if qual_matches:
             if SectionType.QUALIFICATIONS not in all_matches:
                 all_matches[SectionType.QUALIFICATIONS] = qual_matches
@@ -737,7 +806,7 @@ class SectionClassifier:
                 )
 
         # RESPONSIBILITIES sections
-        resp_matches = tuple(kw for kw in RESPONSIBILITIES_KEYWORDS if kw in title_text)
+        resp_matches = tuple(kw for kw in RESPONSIBILITIES_KEYWORDS if _kw_in(kw, title_text))
         if resp_matches:
             if SectionType.RESPONSIBILITIES not in all_matches:
                 all_matches[SectionType.RESPONSIBILITIES] = resp_matches
@@ -747,7 +816,7 @@ class SectionClassifier:
                 )
 
         # KNOWLEDGE sections
-        know_matches = tuple(kw for kw in KNOWLEDGE_KEYWORDS if kw in title_text)
+        know_matches = tuple(kw for kw in KNOWLEDGE_KEYWORDS if _kw_in(kw, title_text))
         if know_matches:
             if SectionType.KNOWLEDGE not in all_matches:
                 all_matches[SectionType.KNOWLEDGE] = know_matches
@@ -755,7 +824,7 @@ class SectionClassifier:
                 all_matches[SectionType.KNOWLEDGE] = tuple(set(all_matches[SectionType.KNOWLEDGE]) | set(know_matches))
 
         # DESCRIPTION sections
-        desc_matches = tuple(kw for kw in DESCRIPTION_KEYWORDS if kw in title_text)
+        desc_matches = tuple(kw for kw in DESCRIPTION_KEYWORDS if _kw_in(kw, title_text))
         if desc_matches:
             if SectionType.DESCRIPTION not in all_matches:
                 all_matches[SectionType.DESCRIPTION] = desc_matches
@@ -813,6 +882,8 @@ class SectionClassifier:
         UNLABELED based on content presence. Tracks keyword positions using
         calculate_position().
 
+        Issue #365: is_skip logic uses top-ranked type only (not any matched type).
+
         Q3: Apply ruler matching to content-based classification too (approved)
 
         If content is empty, returns UNLABELED classification with 0.0 confidence.
@@ -867,7 +938,7 @@ class SectionClassifier:
 
         # Step 2: Check keyword categories (NO EARLY RETURN)
         # SKIP keywords in content prefix
-        skip_matches = tuple(kw for kw in self.skip_keywords if kw in first_words)
+        skip_matches = tuple(kw for kw in self.skip_keywords if _kw_in(kw, first_words))
         if skip_matches:
             if SectionType.SKIP not in all_matches:
                 all_matches[SectionType.SKIP] = skip_matches
@@ -875,7 +946,7 @@ class SectionClassifier:
                 all_matches[SectionType.SKIP] = tuple(set(all_matches[SectionType.SKIP]) | set(skip_matches))
 
         # SKILLS keywords in content prefix
-        skills_matches = tuple(kw for kw in SKILLS_KEYWORDS if kw in first_words)
+        skills_matches = tuple(kw for kw in SKILLS_KEYWORDS if _kw_in(kw, first_words))
         if skills_matches:
             if SectionType.SKILLS not in all_matches:
                 all_matches[SectionType.SKILLS] = skills_matches
@@ -883,7 +954,7 @@ class SectionClassifier:
                 all_matches[SectionType.SKILLS] = tuple(set(all_matches[SectionType.SKILLS]) | set(skills_matches))
 
         # QUALIFICATIONS keywords in content prefix
-        qual_matches = tuple(kw for kw in QUALIFICATIONS_KEYWORDS if kw in first_words)
+        qual_matches = tuple(kw for kw in QUALIFICATIONS_KEYWORDS if _kw_in(kw, first_words))
         if qual_matches:
             if SectionType.QUALIFICATIONS not in all_matches:
                 all_matches[SectionType.QUALIFICATIONS] = qual_matches
@@ -893,7 +964,7 @@ class SectionClassifier:
                 )
 
         # RESPONSIBILITIES keywords in content prefix
-        resp_matches = tuple(kw for kw in RESPONSIBILITIES_KEYWORDS if kw in first_words)
+        resp_matches = tuple(kw for kw in RESPONSIBILITIES_KEYWORDS if _kw_in(kw, first_words))
         if resp_matches:
             if SectionType.RESPONSIBILITIES not in all_matches:
                 all_matches[SectionType.RESPONSIBILITIES] = resp_matches
@@ -903,7 +974,7 @@ class SectionClassifier:
                 )
 
         # KNOWLEDGE keywords in content prefix
-        know_matches = tuple(kw for kw in KNOWLEDGE_KEYWORDS if kw in first_words)
+        know_matches = tuple(kw for kw in KNOWLEDGE_KEYWORDS if _kw_in(kw, first_words))
         if know_matches:
             if SectionType.KNOWLEDGE not in all_matches:
                 all_matches[SectionType.KNOWLEDGE] = know_matches
@@ -911,7 +982,7 @@ class SectionClassifier:
                 all_matches[SectionType.KNOWLEDGE] = tuple(set(all_matches[SectionType.KNOWLEDGE]) | set(know_matches))
 
         # DESCRIPTION keywords in content prefix
-        desc_matches = tuple(kw for kw in DESCRIPTION_KEYWORDS if kw in first_words)
+        desc_matches = tuple(kw for kw in DESCRIPTION_KEYWORDS if _kw_in(kw, first_words))
         if desc_matches:
             if SectionType.DESCRIPTION not in all_matches:
                 all_matches[SectionType.DESCRIPTION] = desc_matches
@@ -953,8 +1024,9 @@ class SectionClassifier:
             result_classifications.append(TypeClassification(fallback_type, fallback_conf, ()))
             # No keyword matches for fallback case
 
-        # Step 5: Compute is_skip: True if SKIP is in matched types
-        is_skip = SectionType.SKIP in {tc.section_type for tc in result_classifications}
+        # Step 5: Compute is_skip: True only if top-ranked type is SKIP (content path)
+        sorted_result = sorted(result_classifications, key=lambda tc: tc.confidence, reverse=True)
+        is_skip = bool(sorted_result) and sorted_result[0].section_type is SectionType.SKIP
 
         # Step 6: Build and return via factory
         return SectionClassification.from_type_classifications(

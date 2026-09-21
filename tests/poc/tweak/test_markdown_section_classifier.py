@@ -26,6 +26,7 @@ from src.poc.tweak.markdown_section_classifier import (
     SectionType,
     TypeClassification,
     _clamp_confidence,
+    _kw_in,
     calculate_confidence,
     calculate_position,
     classify_section,
@@ -866,3 +867,259 @@ class TestConsistencyAndRegression:
         result = classifier.classify(section)
         all_types_set = {tc.section_type for tc in result.all_types}
         assert result.labels == all_types_set
+
+
+# ============================================================================
+# Test: Word-Boundary Keyword Matching (Issue #365)
+# ============================================================================
+
+
+class TestWordBoundaryKeywordMatching:
+    """Test leading-only word boundary keyword matching prevents mid-word hits."""
+
+    def test_our_in_your_title_not_skip(self) -> None:
+        """Verify 'our' in 'Your' does not match as mid-word substring."""
+        classifier = SectionClassifier()
+        section = MarkdownSection(
+            title="Your Impact",
+            content="",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=2,
+            line_count=1,
+            has_list=False,
+        )
+        result = classifier.classify(section)
+        # 'our' is a skip keyword, but should NOT match in 'your' (mid-word)
+        assert not result.is_skip
+
+    def test_our_in_worksource_metadata_not_matched(self) -> None:
+        """Verify 'our' not matched in WorkSource-shaped content.
+
+        Content with compensation/location/description. Asserts 'our'/'hourly'
+        are NOT in matched keywords (hourly removed in review fix).
+        """
+        classifier = SectionClassifier()
+        section = MarkdownSection(
+            title="",  # Untitled
+            content=("COMPENSATION: $70-$80 HOURLY. Location: Remote. Job Desc: Manage projects."),
+            level=-2,
+            start_line=0,
+            end_line=3,
+            word_count=12,
+            line_count=3,
+            has_list=False,
+        )
+        result = classifier.classify(section)
+        # Assert 'our' is NOT in matched keywords
+        matched_kw_set = {km.keyword for km in result.keyword_matches}
+        assert "our" not in matched_kw_set, f"'our' should not match in content, but found in: {matched_kw_set}"
+        # Assert 'hourly' is not matched as skip (hourly removed from SKIP_SECTIONS)
+        assert "hourly" not in matched_kw_set, (
+            f"'hourly' should not be a skip keyword after removal, but found in: {matched_kw_set}"
+        )
+
+    def test_leading_our_still_skip(self) -> None:
+        """Verify leading 'Our' matches and is_skip=True."""
+        classifier = SectionClassifier()
+        section = MarkdownSection(
+            title="Our Company Benefits",
+            content="",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=3,
+            line_count=1,
+            has_list=False,
+        )
+        result = classifier.classify(section)
+        # 'our' is a skip keyword at word start, should match
+        assert result.is_skip
+
+    def test_stem_qualif_still_matches(self) -> None:
+        """Verify 'qualif' matches 'Qualifications'."""
+        classifier = SectionClassifier()
+        section = MarkdownSection(
+            title="Qualifications",
+            content="",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=1,
+            line_count=1,
+            has_list=False,
+        )
+        result = classifier.classify(section)
+        # 'qualif' is a QUALIFICATIONS keyword and should match
+        assert SectionType.QUALIFICATIONS in result.labels
+
+    def test_stem_requirements_still_matches(self) -> None:
+        """Verify 'requirement' matches 'Requirements'."""
+        classifier = SectionClassifier()
+        section = MarkdownSection(
+            title="Requirements",
+            content="",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=1,
+            line_count=1,
+            has_list=False,
+        )
+        result = classifier.classify(section)
+        # 'requirement' is a QUALIFICATIONS keyword and should match
+        assert SectionType.QUALIFICATIONS in result.labels
+
+    def test_relocation_still_skip(self) -> None:
+        """Verify 'relocation' keyword is matched as SKIP (remains after review fix)."""
+        classifier = SectionClassifier()
+        section = MarkdownSection(
+            title="Relocation Required",
+            content="",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=2,
+            line_count=1,
+            has_list=False,
+        )
+        result = classifier.classify(section)
+        # 'relocation' remains as skip keyword after hourly removal
+        assert result.is_skip
+
+    def test_hourly_not_skip_after_removal(self) -> None:
+        """Verify 'hourly' is NOT matched as SKIP (removed in review fix).
+
+        After dropping 'hourly' from SKIP_SECTIONS, content with 'Hourly Rate'
+        should not produce a skip keyword match for 'hourly'.
+        """
+        classifier = SectionClassifier()
+        section = MarkdownSection(
+            title="Hourly Rate: $50/hr",
+            content="",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=3,
+            line_count=1,
+            has_list=False,
+        )
+        result = classifier.classify(section)
+        # After review fix, 'hourly' is no longer in SKIP_SECTIONS
+        # So this should NOT classify as SKIP based on hourly keyword
+        matched_kw_set = {km.keyword for km in result.keyword_matches}
+        assert "hourly" not in matched_kw_set, "'hourly' should not be a skip keyword after removal"
+
+
+class TestSkipPrecedenceContentPath:
+    """Test that content-path is_skip only when top-ranked type is SKIP."""
+
+    def test_description_outranks_skip_keywords(self) -> None:
+        """Content where DESCRIPTION is top-ranked but skip keywords also match -> is_skip=False.
+
+        Untitled content with strong description keywords + skip keywords.
+        Expected: type=DESCRIPTION (top-ranked), is_skip=False (only top-ranked type determines is_skip).
+        """
+        classifier = SectionClassifier()
+        section = MarkdownSection(
+            title="",  # Untitled (level -2)
+            content=(
+                "Description: Manage projects. Overview of role and responsibilities. "
+                "Location: Remote. Compensation package."
+            ),
+            level=-2,
+            start_line=0,
+            end_line=2,
+            word_count=15,
+            line_count=2,
+            has_list=False,
+        )
+        result = classifier.classify(section)
+        # Unconditional assertion: description text should outrank skip keywords
+        assert len(result.all_types) > 0, "Result should have at least one type"
+        assert result.all_types[0].section_type is SectionType.DESCRIPTION, (
+            f"Expected top-ranked type=DESCRIPTION, got {result.all_types[0].section_type}"
+        )
+        assert not result.is_skip, "Expected is_skip=False when DESCRIPTION is top-ranked"
+        # Verify skip keywords NOT in matched keywords (hourly removed in review fix)
+        matched_kw_set = {km.keyword for km in result.keyword_matches}
+        assert "our" not in matched_kw_set, "'our' should not be matched (word boundary)"
+        assert "hourly" not in matched_kw_set, "'hourly' was removed from SKIP_SECTIONS"
+
+    def test_worksource_shaped_description_outranks_compensation_location(self) -> None:
+        """WorkSource-shaped case: description text + skip keywords (compensation, location) -> is_skip=False.
+
+        Reproduces the real-world scenario: content with 'compensation', 'location' skip keywords
+        but description text ranks higher. Expected: type=DESCRIPTION, is_skip=False.
+        """
+        classifier = SectionClassifier()
+        section = MarkdownSection(
+            title="",  # Untitled
+            content=(
+                "Description: Develop Python applications. Summary: Lead technical projects. "
+                "Location: Remote. Compensation details."
+            ),
+            level=-2,
+            start_line=0,
+            end_line=2,
+            word_count=16,
+            line_count=2,
+            has_list=False,
+        )
+        result = classifier.classify(section)
+        # Unconditional assertion: explicit "Job Description" + description text should outrank skip keywords
+        assert len(result.all_types) > 0
+        assert result.all_types[0].section_type is SectionType.DESCRIPTION, (
+            f"Expected top-ranked type=DESCRIPTION, got {result.all_types[0].section_type}"
+        )
+        assert not result.is_skip, "Expected is_skip=False when DESCRIPTION is top-ranked"
+
+    def test_skip_is_top_ranked_eoe_union_content(self) -> None:
+        """Untitled content where SKIP IS top-ranked (e.g., EEO/union/e-verify text) -> is_skip=True.
+
+        Content with E-Verify, Equal Opportunity, union keywords without description text.
+        Expected: type=SKIP (top-ranked), is_skip=True.
+        """
+        classifier = SectionClassifier()
+        section = MarkdownSection(
+            title="",  # Untitled
+            content="Equal opportunity employer. E-verify and right to work requirements. Union position.",
+            level=-2,
+            start_line=0,
+            end_line=2,
+            word_count=16,
+            line_count=2,
+            has_list=False,
+        )
+        result = classifier.classify(section)
+        # Unconditional assertion: only skip keywords, no description text -> SKIP should rank highest
+        assert len(result.all_types) > 0
+        assert result.all_types[0].section_type is SectionType.SKIP, (
+            f"Expected top-ranked type=SKIP, got {result.all_types[0].section_type}"
+        )
+        assert result.is_skip, "Expected is_skip=True when SKIP is top-ranked"
+
+    def test_titled_is_skip_unchanged_any_hit(self) -> None:
+        """Titled sections still use 'any skip hit' rule for is_skip (title path unchanged).
+
+        Title path: is_skip=True if ANY matched type is SKIP, regardless of confidence ranking.
+        """
+        classifier = SectionClassifier()
+        # Title with 'our' (SKIP) and 'skills' (SKILLS)
+        section = MarkdownSection(
+            title="Our Technical Skills",
+            content="Python, Java, SQL",
+            level=2,
+            start_line=0,
+            end_line=1,
+            word_count=5,
+            line_count=1,
+            has_list=False,
+        )
+        result = classifier.classify(section)
+        # Title path: "any skip hit" rule, so is_skip=True if SKIP in any matched type
+        if SectionType.SKIP in result.labels:
+            assert result.is_skip, "Title path: is_skip should be True if any matched type is SKIP"
+        else:
+            assert not result.is_skip, "Title path: is_skip should be False if no SKIP type matched"
