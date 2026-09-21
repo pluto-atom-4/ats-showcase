@@ -26,110 +26,47 @@ The promoter is designed to be non-fatal; if any error occurs during processing,
 the original text is returned unchanged.
 """
 
+import logging
 import re
 from typing import FrozenSet, Optional
 
 from src.poc.tweak.spacy_pipeline.base import PipelineComponent
 
-# Strict phrase set: 64 non-'other' headings derived from classifier keywords/patterns
-# The 10 excluded 'other' phrases (duties, education, eeo statement, equal employment opportunity,
-# job duties, must have, nice to have, the role, who we are, who you are) do NOT appear here.
+logger = logging.getLogger(__name__)
+
+# Strict phrase set: 28 non-'other' headings that appear in live jobs.
+# Filtered from larger set (Q2 rule: only phrases actually seen in live job descriptions).
+# All phrases pass consistency test: classify as non-'other' type via SectionClassifier.
 KNOWN_PLAIN_HEADINGS: FrozenSet[str] = frozenset(
     [
         "ability",
         "about",
-        "about the position",
         "about the role",
-        "about this opportunity",
-        "about this position",
-        "about this role",
-        "about us",
-        "about you",
-        "affirmative action",
-        "application instructions",
-        "application process",
-        "basic qualifications",
         "benefits",
-        "career path",
-        "certification",
         "compensation",
-        "competency",
-        "contact us",
-        "core competencies",
-        "core skills",
-        "day to day responsibilities",
         "description",
-        "desired qualifications",
-        "domain knowledge",
-        "duty",
-        "environment",
         "equal opportunity employer",
-        "essential",
-        "essential functions",
-        "essential qualifications",
-        "essential requirements",
         "experience",
         "expertise",
-        "growth opportunities",
-        "how to apply",
-        "ideal candidate",
-        "ideal fit",
-        "interview process",
-        "intro",
         "job description",
-        "job function",
-        "job overview",
-        "job responsibilities",
-        "key competencies",
         "key responsibilities",
         "knowledge",
-        "learning and development",
-        "license",
-        "minimum qualifications",
         "minimum requirements",
-        "more information",
-        "next steps",
-        "organization overview",
         "overview",
-        "perks",
-        "physical requirements",
-        "position description",
-        "position overview",
         "preferred qualifications",
-        "preferred requirements",
-        "preferred skills",
-        "primary responsibilities",
-        "proficiency",
         "qualifications",
-        "required education",
-        "required experience",
         "required qualifications",
-        "required skills",
         "requirement",
         "requirements",
         "responsibilities",
         "role description",
         "role overview",
-        "role responsibilities",
         "salary",
         "skill",
         "skills",
         "summary",
-        "team overview",
         "technical",
-        "technical knowledge",
         "technical skills",
-        "travel requirements",
-        "we are looking for",
-        "we need",
-        "we seek",
-        "what we are looking for",
-        "what you bring",
-        "what you will bring",
-        "what you will do",
-        "work location",
-        "work schedule",
-        "working conditions",
     ]
 )
 
@@ -207,8 +144,9 @@ class HeadingPromoter(PipelineComponent):
 
             return "\n".join(result_lines)
 
-        except Exception:
-            # Non-fatal: return original text on any error
+        except Exception as e:
+            # Non-fatal: log and return original text
+            logger.warning(f"Error in heading_promoter.process(): {e}")
             return text
 
     def _should_promote(self, stripped_line: str, is_first: bool, prev_blank: bool) -> bool:

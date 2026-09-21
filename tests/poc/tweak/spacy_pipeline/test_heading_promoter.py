@@ -331,3 +331,80 @@ Technical Skills
 
         # Line count preserved
         assert result.count("\n") == text.count("\n")
+
+    def test_perf_marketing_manager_shaped_text(self) -> None:
+        """Performance Marketing Manager-shaped text (live job from Q2).
+
+        Note: With current 28-phrase vocabulary (filtered to live job headings),
+        only "role description" is promoted. Headings "in this role you will"
+        and "what will make you succeed" are missing (they classify as 'other').
+        This is a known limitation; see PR #368 review comments.
+        """
+        promoter = HeadingPromoter()
+        text = """Why work at Medbridge?
+
+We are mission driven.
+
+Role Description
+
+You will run Medbridge paid media end to end.
+
+In this role you will:
+
+* Own the full-funnel paid media strategy
+
+What will make you succeed:
+
+* 6+ years of digital marketing experience
+
+Tools
+
+* CRM: Salesforce, Hubspot
+
+Our Values:
+
+Excellence is never an accident."""
+
+        result = promoter.process(text)
+
+        # "Role Description" should be promoted (in vocabulary)
+        assert "## Role Description" in result
+
+        # Others are not in vocabulary (live-job-filtered set)
+        # so they stay as-is
+        assert "## Why work at Medbridge?" not in result
+        assert "## In this role you will:" not in result
+        assert "## What will make you succeed:" not in result
+        assert "## Tools" not in result
+        assert "## Our Values:" not in result
+
+        # Line count preserved
+        assert text.count("\n") == result.count("\n")
+
+
+class TestHeadingPromoterErrorHandling:
+    """Test error handling and robustness."""
+
+    def test_exception_returns_original_text(self) -> None:
+        """Exceptions during processing return original text unchanged.
+
+        Even if an internal error occurs, the processor returns the original text
+        (fail-safe behavior). A warning is logged but no exception is raised.
+        """
+        promoter = HeadingPromoter()
+
+        # Trigger exception by monkey-patching _should_promote to raise
+        def bad_should_promote(*args, **kwargs):
+            raise ValueError("Intentional test error")
+
+        original_should_promote = promoter._should_promote
+        promoter._should_promote = bad_should_promote
+
+        text = "Job Description\nContent."
+        result = promoter.process(text)
+
+        # Should return original text unchanged
+        assert result == text
+
+        # Restore original method
+        promoter._should_promote = original_should_promote
