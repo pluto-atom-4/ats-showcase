@@ -1,0 +1,32 @@
+[
+  {
+    "id": "job_A_full_shell",
+    "title": "Senior Python Developer",
+    "company": "TechCorp",
+    "description": "<div class='job-details'><p>Full job description with requirements</p></div>"
+  },
+  {
+    "id": "job_B_already_scoped",
+    "title": "Frontend Engineer",
+    "company": "WebInc",
+    "description": "<p>Already clean description text without wrapper divs</p>"
+  },
+  {
+    "id": "job_C_no_match",
+    "title": "DevOps Specialist",
+    "company": "CloudSys",
+    "description": "<div class='other-content'><p>This has no job-details selector to match</p></div>"
+  },
+  {
+    "id": "job_D_multi_match",
+    "title": "QA Engineer",
+    "company": "TestLab",
+    "description": "<div class='job-details'><p>First match</p></div><div class='job-details'><p>Second match</p></div><div class='job-details'><p>Third match</p></div>"
+  },
+  {
+    "id": "job_E_null_description",
+    "title": "Data Analyst",
+    "company": "DataCorp",
+    "description": null
+  }
+]

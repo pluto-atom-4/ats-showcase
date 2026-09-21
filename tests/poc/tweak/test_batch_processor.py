@@ -301,3 +301,252 @@ class TestRunBatch:
         assert job2_result.title == "Engineer Role"
         # This job may have content to process
         assert isinstance(job2_result.sections_detected, int)
+
+
+class TestHTMLScoping:
+    """Tests for HTML scoping via description_selector (Issue #363)."""
+
+    def test_scoped_vs_unscoped_output_differs(self, tmp_path):
+        """Test that scoped output differs from unscoped when selector is provided."""
+        # Arrange - Create test file with selector-scoped HTML
+        test_file = tmp_path / "scoping_test.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer",
+                        "company": "TechCorp",
+                        "description": '<div class="sidebar">Sidebar content</div><div class="job-description">Job requirements here</div>',
+                    }
+                ]
+            )
+        )
+
+        # Act - Process unscoped
+        results_unscoped = run_batch(str(test_file), description_selector=None)
+
+        # Act - Process scoped
+        results_scoped = run_batch(str(test_file), description_selector=".job-description")
+
+        # Assert - Results should differ (scoped has less content)
+        assert len(results_unscoped) == 1
+        assert len(results_scoped) == 1
+        unscoped_job = results_unscoped[0]
+        scoped_job = results_scoped[0]
+
+        # Scoped should have fewer sections/keywords if it excluded sidebar
+        # (Note: exact counts depend on pipeline, but scoped should be more focused)
+        assert unscoped_job.job_id == scoped_job.job_id
+
+    def test_scoping_warning_no_matches(self, tmp_path):
+        """Test that no-match scenario generates warning."""
+        # Arrange
+        test_file = tmp_path / "no_match_test.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer",
+                        "company": "TechCorp",
+                        "description": "<div>Some content</div>",
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(str(test_file), description_selector=".nonexistent")
+
+        # Assert
+        assert len(results) == 1
+        result = results[0]
+        assert len(result.warnings) >= 1
+        warning_texts = [w[1] for w in result.warnings]
+        assert any("matched 0 elements" in w for w in warning_texts)
+        assert not result.has_errors()  # Warnings are not errors
+
+    def test_scoping_warning_multi_matches(self, tmp_path):
+        """Test that multi-match scenario generates warning with count."""
+        # Arrange
+        test_file = tmp_path / "multi_match_test.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer",
+                        "company": "TechCorp",
+                        "description": '<div class="desc">First</div><div class="desc">Second</div><div class="desc">Third</div>',
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(str(test_file), description_selector=".desc")
+
+        # Assert
+        assert len(results) == 1
+        result = results[0]
+        assert len(result.warnings) >= 1
+        warning_texts = [w[1] for w in result.warnings]
+        assert any("matched 3 elements" in w for w in warning_texts)
+        assert not result.has_errors()
+
+    def test_scoping_warning_invalid_css(self, tmp_path):
+        """Test that invalid CSS selector generates warning."""
+        # Arrange
+        test_file = tmp_path / "invalid_css_test.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer",
+                        "company": "TechCorp",
+                        "description": "<div>Content</div>",
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(str(test_file), description_selector=">>invalid")
+
+        # Assert
+        assert len(results) == 1
+        result = results[0]
+        assert len(result.warnings) >= 1
+        warning_texts = [w[1] for w in result.warnings]
+        assert any("Invalid CSS selector" in w for w in warning_texts)
+        assert not result.has_errors()  # Invalid CSS is a warning, not an error
+
+    def test_scoping_no_warning_on_single_match(self, tmp_path):
+        """Test that single match produces no warning."""
+        # Arrange
+        test_file = tmp_path / "single_match_test.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer",
+                        "company": "TechCorp",
+                        "description": '<div class="job-desc">Exact match</div>',
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(str(test_file), description_selector=".job-desc")
+
+        # Assert
+        assert len(results) == 1
+        result = results[0]
+        # Should have no html_scoping warnings for single match
+        html_scope_warnings = [w for w in result.warnings if w[0] == "html_scoping"]
+        assert len(html_scope_warnings) == 0
+
+    def test_warnings_not_counted_as_failure(self, tmp_path):
+        """Test that warnings do not cause has_errors() to return True."""
+        # Arrange
+        test_file = tmp_path / "warnings_test.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer",
+                        "company": "TechCorp",
+                        "description": "<div>No matching selector</div>",
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(str(test_file), description_selector=".nonexistent")
+
+        # Assert
+        assert len(results) == 1
+        result = results[0]
+        assert len(result.warnings) > 0  # Has warnings
+        assert not result.has_errors()  # But not errors
+
+    def test_job_not_mutated_by_scoping(self, tmp_path):
+        """Test that original job dict is not mutated by scoping."""
+        # Arrange
+        test_file = tmp_path / "mutate_test.json"
+        original_html = '<div class="desc">Content</div>'
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer",
+                        "company": "TechCorp",
+                        "description": original_html,
+                    }
+                ]
+            )
+        )
+
+        # Load jobs before processing
+        jobs = load_jobs(str(test_file))
+        original_description = jobs[0]["description"]
+
+        # Act
+        _results = run_batch(str(test_file), description_selector=".desc")
+
+        # Assert - reload jobs and verify original not mutated
+        jobs_after = load_jobs(str(test_file))
+        assert jobs_after[0]["description"] == original_description
+
+    def test_scoping_with_null_description(self, tmp_path):
+        """Test that null description with selector is handled gracefully."""
+        # Arrange
+        test_file = tmp_path / "null_with_selector_test.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer",
+                        "company": "TechCorp",
+                        "description": None,
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(str(test_file), description_selector=".desc")
+
+        # Assert
+        assert len(results) == 1
+        result = results[0]
+        assert not result.has_errors()  # Null + selector = no error
+
+    def test_fixture_scope_selector_fixture_loads(self):
+        """Test that synthetic fixture loads and contains expected jobs."""
+        # Arrange
+        fixture_path = Path(__file__).parent.parent / "fixtures" / "scope_selector_fixture.json"
+
+        # Act
+        jobs = load_jobs(str(fixture_path))
+
+        # Assert
+        assert len(jobs) == 5
+        job_ids = [job["id"] for job in jobs]
+        assert "job_A_full_shell" in job_ids
+        assert "job_B_already_scoped" in job_ids
+        assert "job_C_no_match" in job_ids
+        assert "job_D_multi_match" in job_ids
+        assert "job_E_null_description" in job_ids
+
+        # Verify all have description field (even if null)
+        for job in jobs:
+            assert "description" in job

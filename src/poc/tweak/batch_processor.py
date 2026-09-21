@@ -33,7 +33,7 @@ import json
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import spacy
 
@@ -68,6 +68,7 @@ class JobResult:
         technologies: List of extracted technologies (Issue #321)
         markdown_sections: List of MarkdownSection objects with full metadata (Issue #338)
         errors: List of (stage_name, error_message) tuples for per-stage errors
+        warnings: List of (stage_name, warning_message) tuples for per-job warnings (not failures)
     """
 
     job_id: str
@@ -83,6 +84,7 @@ class JobResult:
     technologies: List[Dict[str, Any]] = field(default_factory=list)
     markdown_sections: List[MarkdownSection] = field(default_factory=list)
     errors: List[tuple] = field(default_factory=list)
+    warnings: List[tuple] = field(default_factory=list)
 
     def add_error(self, stage: str, error: str) -> None:
         """Add a per-stage error to the result.
@@ -92,6 +94,17 @@ class JobResult:
             error: Error message
         """
         self.errors.append((stage, error))
+
+    def add_warning(self, stage: str, warning: str) -> None:
+        """Add a per-stage warning to the result.
+
+        Warnings do not count as errors (job processing continues normally).
+
+        Args:
+            stage: Pipeline stage name (e.g., 'html_scoping')
+            warning: Warning message
+        """
+        self.warnings.append((stage, warning))
 
     def has_errors(self) -> bool:
         """Check if this job had any processing errors."""
@@ -155,6 +168,7 @@ def process_job(
     req_processor: RequirementProcessor,
     skill_processor: SkillProcessor,
     tech_processor: TechnologyProcessor,
+    description_selector: Optional[str] = None,
 ) -> JobResult:
     """Process a single job through the markdown pipeline.
 
@@ -182,6 +196,7 @@ def process_job(
         req_processor: RequirementProcessor instance
         skill_processor: SkillProcessor instance
         tech_processor: TechnologyProcessor instance
+        description_selector: Optional CSS selector to scope HTML fragment before processing
 
     Returns:
         JobResult with processing stats and any errors encountered
@@ -210,6 +225,37 @@ def process_job(
     # Handle null description gracefully
     if raw_html is None:
         raw_html = ""
+
+    # Stage 0: Scope to selector if provided (Issue #363)
+    if description_selector:
+        try:
+            from src.poc.tweak.html_scope import scope_to_selector
+
+            scope_result = scope_to_selector(raw_html, description_selector)
+            
+            # Handle different match scenarios
+            if scope_result.match_count == 0:
+                # No matches: warn and use full HTML
+                result.add_warning(
+                    "html_scoping",
+                    f"Selector '{description_selector}' matched 0 elements; processing full HTML",
+                )
+            elif scope_result.fragment:
+                # Have a fragment (matched 1+ elements)
+                if scope_result.match_count > 1:
+                    # Multiple matches: warn and use first
+                    result.add_warning(
+                        "html_scoping",
+                        f"Selector '{description_selector}' matched {scope_result.match_count} elements; using first match",
+                    )
+                # Use the scoped fragment (single or first of multiple)
+                raw_html = scope_result.fragment
+        except ValueError as e:
+            # Invalid CSS selector: warn and use full HTML
+            result.add_warning(
+                "html_scoping",
+                f"Invalid CSS selector '{description_selector}': {e}; processing full HTML",
+            )
 
     # Stage 1: Preprocess
     try:
@@ -376,7 +422,7 @@ def process_job(
     return result
 
 
-def run_batch(input_path: str) -> List[JobResult]:
+def run_batch(input_path: str, description_selector: Optional[str] = None) -> List[JobResult]:
     """Run batch processing on all jobs in input file.
 
     Loads spaCy model, instantiates pipeline components once, then processes
@@ -384,6 +430,7 @@ def run_batch(input_path: str) -> List[JobResult]:
 
     Args:
         input_path: Path to JSON file with job records
+        description_selector: Optional CSS selector to scope HTML fragments
 
     Returns:
         List of JobResult objects (one per job)
@@ -439,6 +486,7 @@ def run_batch(input_path: str) -> List[JobResult]:
             req_processor=req_processor,
             skill_processor=skill_processor,
             tech_processor=tech_processor,
+            description_selector=description_selector,
         )
         results.append(result)
 
@@ -494,6 +542,12 @@ def print_summary(results: List[JobResult]) -> str:
                 lines.append(f"    - {stage}: {error}")
         else:
             lines.append("  Status: SUCCESS")
+
+        # Show warnings (if any) - warnings do not count as failures
+        if result.warnings:
+            lines.append(f"  Warnings ({len(result.warnings)}):")
+            for stage, warning in result.warnings:
+                lines.append(f"    - {stage}: {warning}")
 
     # Aggregate statistics
     lines.append("")
