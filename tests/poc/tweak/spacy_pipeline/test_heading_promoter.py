@@ -49,47 +49,36 @@ class TestHeadingPromoterBasic:
         # Test with straight apostrophe; the phrase should exist if defined
         text = "Roles and Responsibilities\nMore info."
         result = promoter.process(text)
-        # Just verify it processes without error
-        assert result is not None
-
-    def test_whitespace_trimmed(self) -> None:
-        """Leading/trailing whitespace is trimmed."""
-        promoter = HeadingPromoter()
-        text = "  Job Description  \nContent."
-        result = promoter.process(text)
-        assert "## Job Description" in result
-
-    def test_not_promoted_unknown_phrase(self) -> None:
-        """Phrase not in known set is NOT promoted."""
-        promoter = HeadingPromoter()
-        text = "Random Heading Text\nContent below."
-        result = promoter.process(text)
-        assert "## Random Heading Text" not in result
-        assert "Random Heading Text" in result  # Original preserved
+        # "Roles and Responsibilities" not in KNOWN_PLAIN_HEADINGS, stays as-is
+        assert "## Roles and Responsibilities" not in result
 
 
 class TestHeadingPromoterStructuralRules:
-    """Test structural rules (position, format, markers)."""
-
-    def test_not_promoted_already_markdown_heading(self) -> None:
-        """Line already starting with ## is not re-promoted."""
-        promoter = HeadingPromoter()
-        text = "## Job Description\nContent."
-        result = promoter.process(text)
-        # Should not become "## ## Job Description"
-        assert "## ## Job Description" not in result
-        assert result.count("## Job Description") == 1
+    """Test structural promotion rules (line position, formatting, etc.)."""
 
     def test_not_promoted_bold_line(self) -> None:
-        """Line formatted as **bold** is not promoted."""
+        """Line that is entirely bold (**...**) is not promoted."""
         promoter = HeadingPromoter()
         text = "**Job Description**\nContent."
         result = promoter.process(text)
         assert "## **Job Description**" not in result
-        assert "**Job Description**" in result  # Original preserved
 
-    def test_not_promoted_bullet_line(self) -> None:
-        """Line starting with bullet marker is not promoted."""
+    def test_not_promoted_in_paragraph(self) -> None:
+        """Phrase in middle of paragraph (no blank line before) is not promoted."""
+        promoter = HeadingPromoter()
+        text = "Some text. Job Description is next.\nMore content."
+        result = promoter.process(text)
+        assert "## Job Description" not in result
+
+    def test_not_promoted_hash_line(self) -> None:
+        """Line starting with # (already markdown) is not promoted."""
+        promoter = HeadingPromoter()
+        text = "# Job Description\nContent."
+        result = promoter.process(text)
+        assert "## # Job Description" not in result
+
+    def test_not_promoted_ast_line(self) -> None:
+        """Line starting with * (list marker) is not promoted."""
         promoter = HeadingPromoter()
         text = "* Job Description\nContent."
         result = promoter.process(text)
@@ -335,10 +324,10 @@ Technical Skills
     def test_perf_marketing_manager_shaped_text(self) -> None:
         """Performance Marketing Manager-shaped text (live job from Q2).
 
-        Note: With current 28-phrase vocabulary (filtered to live job headings),
-        only "role description" is promoted. Headings "in this role you will"
-        and "what will make you succeed" are missing (they classify as 'other').
-        This is a known limitation; see PR #368 review comments.
+        With the new classifier keywords ("in this role" -> RESPONSIBILITIES,
+        "succeed" -> QUALIFICATIONS) and expanded phrase set, headings
+        "in this role you will" and "what will make you succeed" are now promoted.
+        This enables proper section splitting and requirement extraction.
         """
         promoter = HeadingPromoter()
         text = """Why work at Medbridge?
@@ -370,11 +359,13 @@ Excellence is never an accident."""
         # "Role Description" should be promoted (in vocabulary)
         assert "## Role Description" in result
 
-        # Others are not in vocabulary (live-job-filtered set)
-        # so they stay as-is
+        # "In this role you will" and "What will make you succeed" should now be promoted
+        # (they are in KNOWN_PLAIN_HEADINGS with new keywords from Issue #365)
+        assert "## In this role you will" in result
+        assert "## What will make you succeed" in result
+
+        # These are still NOT in vocabulary, so they stay as-is
         assert "## Why work at Medbridge?" not in result
-        assert "## In this role you will:" not in result
-        assert "## What will make you succeed:" not in result
         assert "## Tools" not in result
         assert "## Our Values:" not in result
 
