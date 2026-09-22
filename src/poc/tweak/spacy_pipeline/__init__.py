@@ -211,6 +211,7 @@ from spacy.tokens import Doc
 
 from . import registry  # noqa: F401
 from .base import PipelineComponent
+from .heading_promoter import HeadingPromoter
 from .html_markdown_converter import HTMLMarkdownConverter
 from .html_preprocessor import HTMLPreprocessor
 from .markdown_polisher import MarkdownPolisher
@@ -230,6 +231,7 @@ if not Doc.has_extension("technologies"):
 
 __all__ = [
     "PipelineComponent",
+    "HeadingPromoter",
     "HTMLPreprocessor",
     "HTMLMarkdownConverter",
     "MarkdownPolisher",

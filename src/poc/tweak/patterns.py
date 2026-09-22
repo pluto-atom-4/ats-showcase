@@ -320,11 +320,13 @@ SKILLS_KEYWORDS: Tuple[str, ...] = ("skill", "technical", "core", "competency", 
 
 # Keywords indicating qualifications/requirements sections
 # Source: _classify_section_from_header (L1154)
-QUALIFICATIONS_KEYWORDS: Tuple[str, ...] = ("requirement", "qualif", "essential")
+# Added: "succeed" to match "what will make you succeed" (Issue #365 Performance Marketing Manager)
+QUALIFICATIONS_KEYWORDS: Tuple[str, ...] = ("requirement", "qualif", "essential", "succeed")
 
 # Keywords indicating responsibilities sections
 # Source: _classify_section_from_header (L1160)
-RESPONSIBILITIES_KEYWORDS: Tuple[str, ...] = ("respons", "duty", "what you")
+# Added: "in this role" to match "in this role you will" (Issue #365 Performance Marketing Manager)
+RESPONSIBILITIES_KEYWORDS: Tuple[str, ...] = ("respons", "duty", "what you", "in this role")
 
 # Keywords indicating knowledge/experience sections
 # Source: _classify_section_from_header (L1158)
