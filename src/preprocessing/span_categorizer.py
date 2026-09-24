@@ -9,6 +9,8 @@ from typing import Any
 from spacy.language import Language
 from spacy.tokens import Doc, Span
 
+from src.preprocessing.span_types import DEFAULT_RULES, BoundaryRules
+
 # Register custom attribute if not already registered
 if not Doc.has_extension("requirement_spans"):
     Doc.set_extension("requirement_spans", default=None)
@@ -34,22 +36,25 @@ def _get_span_type_and_conjunct_count(tokens: list[int], doc: Doc) -> tuple[str,
     return span_type, conjunct_count
 
 
-def _is_hard_boundary(token_text: str, token_pos: str, token_dep: str) -> bool:
+def _is_hard_boundary(
+    token_text: str,
+    token_pos: str,
+    token_dep: str,
+    rules: BoundaryRules = DEFAULT_RULES,
+) -> bool:
     """Check if token marks hard span boundary.
 
     Args:
         token_text: Text of token
         token_pos: POS tag
         token_dep: Dependency tag
+        rules: Boundary rules for span extraction
 
     Returns:
         True if hard boundary
     """
-    if token_pos == "PUNCT":
-        if token_text in [".", ";", "!", "?"]:
-            return True
-        if token_text == ")":
-            return True
+    if token_pos == "PUNCT" and token_text in rules.hard_stops:
+        return True
     return False
 
 
@@ -57,6 +62,7 @@ def _is_soft_boundary(
     token_text: str,
     token_pos: str,
     next_token_text: str | None = None,
+    rules: BoundaryRules = DEFAULT_RULES,
 ) -> bool:
     """Check if token marks soft boundary.
 
@@ -64,11 +70,12 @@ def _is_soft_boundary(
         token_text: Text of token
         token_pos: POS tag
         next_token_text: Text of next token (if available)
+        rules: Boundary rules for span extraction
 
     Returns:
         True if soft boundary
     """
-    if token_pos == "PUNCT" and token_text == ",":
+    if token_pos == "PUNCT" and token_text in rules.soft_stops:
         # Soft stop unless followed by 'and' or 'or'
         if next_token_text and next_token_text.lower() in ["and", "or"]:
             return False
@@ -143,6 +150,7 @@ def _should_stop_at_token(
     token: str,
     token_pos: str,
     next_token_text: str | None,
+    rules: BoundaryRules = DEFAULT_RULES,
 ) -> bool:
     """Check if we should stop expanding span at this token.
 
@@ -150,19 +158,18 @@ def _should_stop_at_token(
         token: Token text
         token_pos: POS tag
         next_token_text: Next token text (if available)
+        rules: Boundary rules for span extraction
 
     Returns:
         True if should stop
     """
     if token_pos == "PUNCT":
-        if token in [".", ";", "!", "?"]:
+        if token in rules.hard_stops:
             return True
-        if token == ")":
-            return True
-        if token == "," and not (next_token_text and next_token_text.lower() in ["and", "or"]):
+        if token in rules.soft_stops and not (next_token_text and next_token_text.lower() in ["and", "or"]):
             return True
 
-    if token_pos == "SCONJ" and token.lower() in ["if", "unless", "because"]:
+    if token_pos == "SCONJ" and token.lower() in rules.stop_words:
         return True
 
     return False
@@ -172,6 +179,7 @@ def _expand_span(
     doc: Doc,
     start_idx: int,
     end_idx: int,
+    rules: BoundaryRules = DEFAULT_RULES,
 ) -> tuple[int, int]:
     """Expand span boundaries using POS/DEP tag logic.
 
@@ -179,6 +187,7 @@ def _expand_span(
         doc: spaCy Doc object
         start_idx: Initial start token index
         end_idx: Initial end token index
+        rules: Boundary rules for span extraction
 
     Returns:
         Tuple of (expanded_start, expanded_end)
@@ -194,7 +203,7 @@ def _expand_span(
         next_token_text = next_token.text if next_token else None
 
         # Check stop conditions
-        if _should_stop_at_token(token.text, token.pos_, next_token_text):
+        if _should_stop_at_token(token.text, token.pos_, next_token_text, rules):
             break
 
         # Conjunction expansion (and/or)
@@ -267,15 +276,18 @@ def _create_requirement_span_dict(
     }
 
 
-@Language.component("span_categorizer")
-def span_categorizer(doc: Doc) -> Doc:
+def categorize_spans(
+    doc: Doc,
+    rules: BoundaryRules = DEFAULT_RULES,
+) -> Doc:
     """Extract multi-token requirement spans using POS/DEP tag boundaries.
 
-    Phase 8b component that processes Doc._.requirements (from Phase 8a)
+    Phase 8b implementation that processes Doc._.requirements (from Phase 8a)
     and creates spaCy Span objects with accurate boundaries.
 
     Args:
         doc: spaCy Doc object with Doc._.requirements populated
+        rules: Boundary rules for span extraction
 
     Returns:
         Doc with Doc._.requirement_spans attribute set
@@ -306,6 +318,7 @@ def span_categorizer(doc: Doc) -> Doc:
             doc,
             start_token_idx,
             end_token_idx,
+            rules,
         )
 
         # Create spaCy Span object
@@ -333,3 +346,19 @@ def span_categorizer(doc: Doc) -> Doc:
 
     doc._.requirement_spans = requirement_spans
     return doc
+
+
+@Language.component("span_categorizer")
+def span_categorizer(doc: Doc) -> Doc:
+    """Extract multi-token requirement spans using POS/DEP tag boundaries.
+
+    Phase 8b component that processes Doc._.requirements (from Phase 8a)
+    and creates spaCy Span objects with accurate boundaries.
+
+    Args:
+        doc: spaCy Doc object with Doc._.requirements populated
+
+    Returns:
+        Doc with Doc._.requirement_spans attribute set
+    """
+    return categorize_spans(doc)
