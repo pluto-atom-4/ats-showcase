@@ -182,6 +182,21 @@ Expected benefit: v2.0 produces ~30% fewer tokens vs v1.0 (boilerplate removed).
 
 **Database:** `requirement_spans` JSONB column (array of span dicts with text, token boundaries, type, conjunct_count).
 
+**Strategies (Issue #278):** rules and strategy are injectable; `requirement_spans` dict shape stays frozen.
+
+```python
+from src.preprocessing.span_categorizer import create_span_categorizer
+from src.preprocessing.custom_span_categorizer import load_patterns
+from src.preprocessing.span_types import BoundaryRules
+
+nlp_cat = create_span_categorizer("nlp", rules=BoundaryRules())        # POS/DEP, callable on Doc
+custom = create_span_categorizer("custom", patterns=load_patterns("patterns.json"))  # regex, writes doc._.custom_spans
+```
+
+- `custom` requires `patterns`; patterns are validated (500-char cap, nested-quantifier ReDoS heuristic) and input text is capped at 200k chars.
+- `CustomSpanCategorizer(patterns).categorize(text)` is spaCy-free. The spaCy wrapper is not registered as a pipeline factory yet (#381); no CLI flag yet (#380).
+- Tests for the strategies are model-free; 11 older spaCy-model tests need `en_core_web_md` (#383).
+
 See `docs/dev-note/phase8/span_algorithm.md` for algorithm pseudocode, boundary rules, edge cases.
 
 ## Verification Commands
