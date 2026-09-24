@@ -119,8 +119,8 @@ class TestSectionDetectorBasicDetection:
         req_section = next(s for s in sections if s.label == SectionLabel.REQUIREMENTS)
         ben_section = next(s for s in sections if s.label == SectionLabel.BENEFITS)
         # content_end of req should be at or near the start of "## Benefits"
-        assert req_section.content_end <= len(text)
-        assert ben_section.header_start <= len(text)
+        assert req_section.content_end == ben_section.header_start
+        assert ben_section.content_end == len(text)
         # Sections ordered by start
         assert req_section.header_start < ben_section.header_start
 
@@ -260,7 +260,9 @@ class TestSectionDetectorInputTruncation:
         detector = SectionDetector()
         sections = detector.detect(large_text)
         # Should not raise; sections may or may not be detected depending on truncation point
-        assert isinstance(sections, list)
+        assert len(sections) == 1
+        assert sections[0].label == SectionLabel.REQUIREMENTS
+        assert sections[0].content_end == MAX_INPUT_CHARS
 
     def test_offsets_within_max_chars_after_truncation(self) -> None:
         """detect returns offsets ≤ MAX_INPUT_CHARS after truncation."""
@@ -280,7 +282,8 @@ class TestSectionDetectorInputTruncation:
         detector = SectionDetector()
         sections = detector.detect(text)
         # Should work without truncation warning
-        assert isinstance(sections, list)
+        assert len(sections) == 1
+        assert sections[0].content_end == MAX_INPUT_CHARS
 
 
 class TestSectionDetectorDisplayNames:
@@ -353,7 +356,7 @@ class TestSectionDetectorContentText:
         # content_text should not have leading/trailing whitespace
         assert req.content_text == req.content_text.strip()
         # Should include the actual requirements
-        assert "Python" in req.content_text or "python" in req.content_text.lower()
+        assert req.content_text == "- Must know Python  \n  - Team player"
 
     def test_content_text_multiline(self) -> None:
         """content_text correctly spans multiple lines until next section."""
