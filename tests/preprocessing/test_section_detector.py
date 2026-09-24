@@ -157,31 +157,17 @@ class TestSectionDetectorHeadingLikeFiltering:
         text = "We have multiple requirements such as Requirements and qualifications"
         detector = SectionDetector(promote_headings=True)
         sections = detector.detect(text)
-        # Requirements pattern should match, but _is_heading_like should filter it out
-        # because it's not at the start of a line with header-like prefix
-        req_sections = [s for s in sections if s.label == SectionLabel.REQUIREMENTS]
-        # If there are matches, they should all look like headers (early in text, not mid-sentence)
-        for s in req_sections:
-            # The match should be at position 51 (the second "Requirements" in that sentence)
-            # which is NOT heading-like. So we expect no matches, or only matches that are.
-            prefix_start = text.rfind("\n", 0, s.header_start) + 1
-            prefix = text[prefix_start : s.header_start]
-            # If prefix is not just whitespace/markers, it's not heading-like
-            if prefix.strip(" \t#*_->•·0123456789.)") == "":
-                # This one passed the heading-like test
-                pass
+        # Both 'requirements' and 'qualifications' match the ruler but sit mid-line
+        assert sections == []
+        assert SectionDetector(promote_headings=False).detect(text) != []
 
     def test_heading_mid_sentence_detected_with_promote_headings_false(self) -> None:
         """detect finds 'Requirements' mid-sentence with promote_headings=False."""
         text = "We have multiple requirements and also qualifications and benefits here"
         detector = SectionDetector(promote_headings=False)
         sections = detector.detect(text)
-        # With promote_headings=False, should detect any pattern match
-        # Check that at least one section is found if the text has "requirements"
-        # (the actual detection depends on the regex pattern)
-        req_count = len([s for s in sections if s.label == SectionLabel.REQUIREMENTS])
-        # We can only verify behavior: if patterns match "requirements", it should appear
-        assert isinstance(req_count, int)
+        labels = [s.label for s in sections]
+        assert labels == [SectionLabel.REQUIREMENTS, SectionLabel.QUALIFICATIONS, SectionLabel.BENEFITS]
 
 
 class TestSectionDetectorCustomPatterns:
@@ -318,8 +304,8 @@ class TestSectionDetectorDisplayNames:
         detector = SectionDetector(display_names=custom_names)
         sections = detector.detect(text)
         req = [s for s in sections if s.label == SectionLabel.REQUIREMENTS]
-        if req:
-            assert req[0].display_name == "Custom Requirements Header"
+        assert len(req) == 1
+        assert req[0].display_name == "Custom Requirements Header"
 
 
 class TestSectionDetectorModuleIsolation:
@@ -411,6 +397,20 @@ class TestSectionDetectorEdgeCases:
         assert len(sections) == 1
         assert sections[0].header_start == 0
 
+    def test_next_header_marker_not_in_content(self) -> None:
+        """content_text excludes the markdown marker of the following header."""
+        detector = SectionDetector()
+        sections = detector.detect("## Requirements\nPython\n\n**Benefits**\nHealth")
+        assert [s.content_text for s in sections] == ["Python", "Health"]
+
+    def test_closing_colon_and_bullet_marker(self) -> None:
+        """content_text drops a closing ':' but keeps a leading '* ' bullet."""
+        detector = SectionDetector()
+        colon = detector.detect("Requirements:\nPython")
+        bullet = detector.detect("Requirements\n* Python")
+        assert colon[0].content_text == "Python"
+        assert bullet[0].content_text == "* Python"
+
     def test_very_long_content_section(self) -> None:
         """detect handles section with very long content."""
         long_content = "a" * 50000
@@ -418,8 +418,8 @@ class TestSectionDetectorEdgeCases:
         detector = SectionDetector()
         sections = detector.detect(text)
         req = [s for s in sections if s.label == SectionLabel.REQUIREMENTS]
-        if req:
-            assert len(req[0].content_text) > 1000
+        assert len(req) == 1
+        assert req[0].content_text == long_content
 
 
 __all__ = [

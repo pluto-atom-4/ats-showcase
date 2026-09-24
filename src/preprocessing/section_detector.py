@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any, Collection, Mapping, Sequence
 
@@ -71,6 +72,7 @@ def _is_heading_like(text: str, start: int, end: int) -> bool:
     return True
 
 
+_CLOSING_MARKERS = re.compile(r"^(?:\*\*|__|:)+")
 _RawSpan = tuple[SectionLabel, int, int, str]
 
 
@@ -225,7 +227,10 @@ class SectionDetector:
             else:
                 content_end = len(text)
 
-            content_text = text[content_start:content_end].strip()
+            # Drop the next header's markdown marker ("##", "**") that precedes its matched word
+            raw_content = text[content_start:content_end].rstrip("#*_> \t\n")
+            # ...and the closing "**" / ":" that follows the matched header word (a "* " bullet is kept)
+            content_text = _CLOSING_MARKERS.sub("", raw_content.lstrip(" \t")).strip()
 
             detected_sections.append(
                 DetectedSection(
