@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 MAX_INPUT_CHARS: int = 200_000
 SPANS_KEY: str = "sections"
+_HEADER_PREFIX_CHARS = " \t#*_->•·0123456789.)"
 
 
 def _is_heading_like(text: str, start: int, end: int) -> bool:
@@ -59,7 +60,7 @@ def _is_heading_like(text: str, start: int, end: int) -> bool:
     # Check prefix: only whitespace and header markers allowed
     prefix = text[line_start:start]
     # Strip whitespace, markdown markers, bullets, numbers, and other header artifacts
-    prefix_stripped = prefix.strip(" \t#*_->•·0123456789.)")
+    prefix_stripped = prefix.strip(_HEADER_PREFIX_CHARS)
     if prefix_stripped != "":
         return False
 
@@ -103,6 +104,19 @@ def _resolve_overlaps(raw_spans: list[_RawSpan]) -> list[_RawSpan]:
     return kept
 
 
+def _clean_content(raw_content: str, has_next: bool) -> str:
+    """Trim header artifacts from a section's raw content slice.
+
+    Drops the next header's line prefix ("##", "**", "1.") when a next header exists, and this
+    header's closing "**" / ":" marker (a "* " bullet is kept). Real trailing content is never trimmed.
+    """
+    if has_next:
+        head, sep, tail = raw_content.rpartition("\n")
+        if tail.strip(_HEADER_PREFIX_CHARS) == "":
+            raw_content = head + sep
+    return _CLOSING_MARKERS.sub("", raw_content.lstrip(" \t")).strip()
+
+
 @dataclass(frozen=True)
 class DetectedSection:
     """A detected section in a job description.
@@ -116,7 +130,8 @@ class DetectedSection:
         content_start: Character offset where section content starts (== header_end).
         content_end: Character offset where section content ends (start of next section or
                      end of text).
-        content_text: Extracted section content (text[content_start:content_end].strip()).
+        content_text: Section content, stripped, minus the next header's line prefix
+                      (e.g. "##") and this header's closing "**" / ":" marker.
     """
 
     label: SectionLabel
@@ -227,10 +242,7 @@ class SectionDetector:
             else:
                 content_end = len(text)
 
-            # Drop the next header's markdown marker ("##", "**") that precedes its matched word
-            raw_content = text[content_start:content_end].rstrip("#*_> \t\n")
-            # ...and the closing "**" / ":" that follows the matched header word (a "* " bullet is kept)
-            content_text = _CLOSING_MARKERS.sub("", raw_content.lstrip(" \t")).strip()
+            content_text = _clean_content(text[content_start:content_end], has_next=idx + 1 < len(kept_spans))
 
             detected_sections.append(
                 DetectedSection(

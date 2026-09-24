@@ -411,6 +411,18 @@ class TestSectionDetectorEdgeCases:
         assert colon[0].content_text == "Python"
         assert bullet[0].content_text == "* Python"
 
+    @pytest.mark.parametrize("last_line", ["Must know C#", "Use snake_case_", "Point ->", "Experience *"])
+    def test_trailing_marker_chars_in_content_preserved(self, last_line: str) -> None:
+        """Real trailing '#', '_', '>', '*' in content survive; only the next header prefix is dropped."""
+        sections = SectionDetector().detect(f"## Requirements\n{last_line}\n\n## Benefits\nHealth")
+        assert sections[0].content_text == last_line
+        assert sections[1].content_text == "Health"
+
+    def test_last_section_trailing_marker_preserved(self) -> None:
+        """No next header: nothing is trimmed from the end of the last section."""
+        sections = SectionDetector().detect("## Requirements\nMust know C#")
+        assert sections[0].content_text == "Must know C#"
+
     def test_very_long_content_section(self) -> None:
         """detect handles section with very long content."""
         long_content = "a" * 50000
