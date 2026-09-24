@@ -4,7 +4,7 @@ Implements Phase 8b span extraction using token adjacency and POS tags.
 Converts Phase 8a requirements to spaCy Span objects with boundary detection.
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from spacy.language import Language
 from spacy.tokens import Doc, Span
@@ -362,3 +362,30 @@ def span_categorizer(doc: Doc) -> Doc:
         Doc with Doc._.requirement_spans attribute set
     """
     return categorize_spans(doc)
+
+
+class NLPSpanCategorizer:
+    """POS/DEP-based span categorizer with configurable boundary rules."""
+
+    def __init__(self, rules: BoundaryRules = DEFAULT_RULES) -> None:
+        self.rules = rules
+
+    def __call__(self, doc: Doc) -> Doc:
+        return categorize_spans(doc, self.rules)
+
+
+def create_span_categorizer(
+    strategy: Literal["nlp", "custom"] = "nlp",
+    rules: BoundaryRules = DEFAULT_RULES,
+) -> NLPSpanCategorizer:
+    """Create a span categorizer for the given strategy.
+
+    Raises:
+        ValueError: unknown strategy, or "custom" (not available until the
+                    regex strategy lands).
+    """
+    if strategy == "nlp":
+        return NLPSpanCategorizer(rules)
+    if strategy == "custom":
+        raise ValueError("custom strategy not implemented yet")
+    raise ValueError(f"Unknown strategy: {strategy}")
