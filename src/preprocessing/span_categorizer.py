@@ -4,12 +4,20 @@ Implements Phase 8b span extraction using token adjacency and POS tags.
 Converts Phase 8a requirements to spaCy Span objects with boundary detection.
 """
 
-from typing import Any, Literal
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Literal
 
 from spacy.language import Language
 from spacy.tokens import Doc, Span
 
 from src.preprocessing.span_types import DEFAULT_RULES, BoundaryRules
+
+if TYPE_CHECKING:
+    from src.preprocessing.custom_span_categorizer import (
+        SpanCategorizerComponent,
+    )
+    from src.preprocessing.span_types import SpanPattern
 
 # Register custom attribute if not already registered
 if not Doc.has_extension("requirement_spans"):
@@ -377,15 +385,31 @@ class NLPSpanCategorizer:
 def create_span_categorizer(
     strategy: Literal["nlp", "custom"] = "nlp",
     rules: BoundaryRules = DEFAULT_RULES,
-) -> NLPSpanCategorizer:
+    patterns: list[SpanPattern] | None = None,
+) -> NLPSpanCategorizer | SpanCategorizerComponent:
     """Create a span categorizer for the given strategy.
 
+    Args:
+        strategy: "nlp" for POS/DEP-based, "custom" for regex-based categorizer.
+        rules: Boundary rules for span extraction (NLP strategy only).
+        patterns: List of SpanPattern objects (required for custom strategy).
+
+    Returns:
+        NLPSpanCategorizer for "nlp" strategy, SpanCategorizerComponent for
+        "custom" strategy.
+
     Raises:
-        ValueError: unknown strategy, or "custom" (not available until the
-                    regex strategy lands).
+        ValueError: Unknown strategy, or "custom" without patterns.
     """
     if strategy == "nlp":
         return NLPSpanCategorizer(rules)
     if strategy == "custom":
-        raise ValueError("custom strategy not implemented yet")
+        if patterns is None:
+            raise ValueError("custom strategy requires patterns")
+        from src.preprocessing.custom_span_categorizer import (
+            CustomSpanCategorizer,
+            SpanCategorizerComponent,
+        )
+
+        return SpanCategorizerComponent(CustomSpanCategorizer(patterns))
     raise ValueError(f"Unknown strategy: {strategy}")
