@@ -7,6 +7,7 @@ and create_span_categorizer factory.
 import pytest
 import spacy
 
+from src.preprocessing import custom_span_categorizer
 from src.preprocessing.span_categorizer import (
     DEFAULT_RULES,
     NLPSpanCategorizer,
@@ -15,7 +16,7 @@ from src.preprocessing.span_categorizer import (
     _should_stop_at_token,
     create_span_categorizer,
 )
-from src.preprocessing.span_types import BoundaryRules
+from src.preprocessing.span_types import BoundaryRules, SpanPattern
 
 
 class TestNLPSpanCategorizer:
@@ -201,10 +202,20 @@ class TestCreateSpanCategorizer:
         categorizer = create_span_categorizer("nlp", custom_rules)
         assert categorizer.rules == custom_rules
 
-    def test_create_span_categorizer_custom_raises(self) -> None:
-        """create_span_categorizer('custom') raises ValueError."""
-        with pytest.raises(ValueError, match="custom strategy not implemented yet"):
+    def test_create_span_categorizer_custom_requires_patterns(self) -> None:
+        """create_span_categorizer('custom') without patterns raises ValueError."""
+        with pytest.raises(ValueError, match="requires patterns"):
             create_span_categorizer("custom")
+
+    def test_create_span_categorizer_custom_with_patterns(self) -> None:
+        """create_span_categorizer('custom') with patterns returns categorizer."""
+        patterns = [SpanPattern(category="years", pattern=r"\d+ years")]
+        categorizer = create_span_categorizer("custom", patterns=patterns)
+        doc = spacy.blank("en")("needs 5 years")
+        result = categorizer(doc)
+        assert hasattr(result._, "custom_spans")
+        assert len(result._.custom_spans) == 1
+        assert result._.custom_spans[0]["text"] == "5 years"
 
     def test_create_span_categorizer_bogus_raises(self) -> None:
         """create_span_categorizer with unknown strategy raises ValueError."""
