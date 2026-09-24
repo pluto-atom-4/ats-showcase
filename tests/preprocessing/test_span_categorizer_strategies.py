@@ -200,6 +200,7 @@ class TestCreateSpanCategorizer:
             stop_words=frozenset(),
         )
         categorizer = create_span_categorizer("nlp", custom_rules)
+        assert isinstance(categorizer, NLPSpanCategorizer)
         assert categorizer.rules == custom_rules
 
     def test_create_span_categorizer_custom_requires_patterns(self) -> None:
