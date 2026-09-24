@@ -95,7 +95,7 @@ class TestSectionDetectorBasicDetection:
         text = "## Requirements\n- 5 years Python experience\n- Team player"
         detector = SectionDetector()
         sections = detector.detect(text)
-        assert len(sections) >= 1
+        assert len(sections) == 1
         first = sections[0]
         assert first.label == SectionLabel.REQUIREMENTS
         assert first.display_name == "Requirements"
@@ -199,9 +199,9 @@ class TestSectionDetectorCustomPatterns:
         detector = SectionDetector(patterns=custom_pattern)
         sections = detector.detect(text)
         # Should find the custom pattern
-        assert len(sections) >= 1
+        assert len(sections) == 1
         schooling_matches = [s for s in sections if s.label == SectionLabel.EDUCATION]
-        assert len(schooling_matches) >= 1
+        assert len(schooling_matches) == 1
         assert any("schooling" in s.header_text.lower() for s in schooling_matches)
 
     def test_default_patterns_not_mutated(self) -> None:
@@ -222,7 +222,7 @@ class TestSectionDetectorTargetSections:
         sections = detector.detect(text)
         targeted = detector.target_sections(sections)
         req = [s for s in targeted if s.label == SectionLabel.REQUIREMENTS]
-        assert len(req) >= 1
+        assert len(req) == 1
 
     def test_target_sections_excludes_benefits(self) -> None:
         """target_sections excludes BENEFITS (in FILTER_SECTIONS)."""
@@ -389,7 +389,7 @@ class TestSectionDetectorEdgeCases:
         text = "## Requirements\nMust know Python"
         detector = SectionDetector()
         sections = detector.detect(text)
-        assert len(sections) >= 1
+        assert len(sections) == 1
         req = sections[0]
         assert req.content_end == len(text)
 
@@ -399,8 +399,7 @@ class TestSectionDetectorEdgeCases:
         detector = SectionDetector()
         sections = detector.detect(text)
         req_sections = [s for s in sections if s.label == SectionLabel.REQUIREMENTS]
-        # Depends on pattern behavior, but should preserve ordering
-        assert len(req_sections) >= 1
+        assert len(req_sections) == 2
         for i in range(len(req_sections) - 1):
             assert req_sections[i].header_start < req_sections[i + 1].header_start
 
@@ -409,9 +408,8 @@ class TestSectionDetectorEdgeCases:
         text = "Requirements\nMust know Python"
         detector = SectionDetector()
         sections = detector.detect(text)
-        if sections:
-            # If detected, first section should start at or near 0
-            assert sections[0].header_start >= 0
+        assert len(sections) == 1
+        assert sections[0].header_start == 0
 
     def test_very_long_content_section(self) -> None:
         """detect handles section with very long content."""
