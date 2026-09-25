@@ -549,3 +549,67 @@ class TestSkillProcessorNounLedJunkFiltering:
 
         # Should NOT extract anything
         assert doc._.skills == []
+
+    def test_going_forward_go_language_rejected(self, nlp) -> None:
+        """Phrase 'going forward Go language' should be rejected.
+
+        Even though 'Go' is a tech term, the phrase contains 'going' and 'forward'
+        which are non-tech VERB tokens. The per-token rule should reject this.
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = "going forward Go language"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract nothing (contains non-tech VERB tokens)
+        assert doc._.skills == []
+
+    def test_we_use_go_for_services_rejected(self, nlp) -> None:
+        """Phrase 'we use Go for services' should be rejected.
+
+        Contains PRON 'we' which is not a tech term, so should be rejected
+        by the per-token rule.
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = "we use Go for services"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract nothing (contains non-tech PRON token 'we')
+        assert doc._.skills == []
+
+    def test_go_language_extracted(self, nlp) -> None:
+        """Phrase 'Go language' should be extracted.
+
+        'Go' is a tech term tagged as VERB, and 'language' is a NOUN.
+        This should pass the per-token rule and be extracted.
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = "Go language"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract "go language"
+        skill_texts = {s["skill"] for s in doc._.skills}
+        assert "go language" in skill_texts

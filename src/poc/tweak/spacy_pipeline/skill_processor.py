@@ -240,6 +240,28 @@ class SkillProcessor:
 
         return False
 
+    def _is_tech_token(self, token: Any) -> bool:
+        """Check if a token is a recognized tech term.
+
+        Args:
+            token: spaCy token
+
+        Returns:
+            True if token is a tech term
+        """
+        special_tokens = {"c++", "c#", "sql"}
+        token_lower = token.text.lower()
+
+        # Check special tokens
+        if token_lower in special_tokens:
+            return True
+
+        # Check TECH_TERMS
+        if token_lower in TECH_TERMS:
+            return True
+
+        return False
+
     def _is_valid_skill_chunk(self, chunk_text: str) -> bool:
         """Validate a skill chunk against noise filters.
 
@@ -273,15 +295,15 @@ class SkillProcessor:
         # Check for NOUN/PROPN/X tokens
         has_noun_propn_x = any(token.pos_ in ("NOUN", "PROPN", "X") for token in chunk_doc)
 
-        # Check for VERB/AUX/PRON tokens (sentence-leak filter)
-        has_verb_aux_pron = any(token.pos_ in ("VERB", "AUX", "PRON") for token in chunk_doc)
+        # Per-token rule: reject chunk if any VERB/AUX/PRON token
+        # is not a tech term (e.g., reject "going forward", allow "Go")
+        for token in chunk_doc:
+            if token.pos_ in ("VERB", "AUX", "PRON"):
+                if not self._is_tech_token(token):
+                    return False
 
         # Check for whole-token tech terms
         has_tech_term = self._has_whole_token_tech_term(chunk_doc)
-
-        # Sentence-leak filter: reject if has VERB/AUX/PRON and no tech term
-        if has_verb_aux_pron and not has_tech_term:
-            return False
 
         # Must have either NOUN/PROPN/X or a tech term
         if not has_noun_propn_x and not has_tech_term:
