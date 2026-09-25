@@ -8,6 +8,8 @@ from typing import Any, List, Optional, Set, Tuple, Union
 import spacy
 from spacy.language import Language
 
+from src.preprocessing.section_detector import SectionDetector
+from src.preprocessing.section_extractor import SectionedResult, extract_sectioned
 from src.tokenization.company_names import get_company_keywords, is_company_keyword
 from src.tokenization.keywords import get_all_keywords
 from src.tokenization.soft_skills import get_all_soft_skills
@@ -84,7 +86,7 @@ class Preprocessor:
         model: str = "en_core_web_md",
         extract_requirements: bool = True,
         preserve_requirement_spans: bool = True,
-        section_engine: Optional[Any] = None,
+        section_engine: Optional[SectionDetector] = None,
     ):
         """Initialize preprocessor with spaCy model.
 
@@ -320,7 +322,7 @@ class Preprocessor:
             logger.error(f"Error extracting trigger requirements: {e}")
             return None
 
-    def extract_sectioned_requirements(self, text: str) -> Optional[Any]:
+    def extract_sectioned_requirements(self, text: str) -> Optional[SectionedResult]:
         """Extract sectioned requirements from text using section_engine.
 
         Returns None when section_engine is None (legacy behavior unchanged).
@@ -337,17 +339,7 @@ class Preprocessor:
         if self.section_engine is None:
             return None
 
-        if not text or not text.strip():
-            return None
-
-        try:
-            # Lazy import to avoid circular imports
-            from src.preprocessing.section_extractor import extract_sectioned
-
-            return extract_sectioned(text, detector=self.section_engine)
-        except Exception as e:
-            logger.error(f"Error extracting sectioned requirements: {e}")
-            return None
+        return extract_sectioned(text, detector=self.section_engine)
 
     @staticmethod
     def _get_tech_keywords() -> set[str]:
