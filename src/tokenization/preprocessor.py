@@ -84,6 +84,7 @@ class Preprocessor:
         model: str = "en_core_web_md",
         extract_requirements: bool = True,
         preserve_requirement_spans: bool = True,
+        section_engine: Optional[Any] = None,
     ):
         """Initialize preprocessor with spaCy model.
 
@@ -91,10 +92,13 @@ class Preprocessor:
             model: spaCy model name (e.g., en_core_web_md)
             extract_requirements: Whether to extract trigger-based requirements (default: True)
             preserve_requirement_spans: Whether to respect requirement spans during chunking
+            section_engine: Optional SectionDetector instance for opt-in section-aware requirement
+                          extraction (default: None = legacy behavior unchanged)
         """
         self.model_name = model
         self.extract_requirements = extract_requirements
         self.preserve_requirement_spans = preserve_requirement_spans
+        self.section_engine = section_engine
         self.nlp: Optional[Language] = None
         self._load_model()
 
@@ -314,6 +318,35 @@ class Preprocessor:
 
         except Exception as e:
             logger.error(f"Error extracting trigger requirements: {e}")
+            return None
+
+    def extract_sectioned_requirements(self, text: str) -> Optional[Any]:
+        """Extract sectioned requirements from text using section_engine.
+
+        Returns None when section_engine is None (legacy behavior unchanged).
+        Otherwise returns SectionedResult with requirements extracted from detected sections.
+        Skills/technologies still come from legacy extract_entities(); this method
+        extracts only requirement-specific entities. Output is transient, not persisted.
+
+        Args:
+            text: Input text to extract from
+
+        Returns:
+            SectionedResult if section_engine is set, None otherwise
+        """
+        if self.section_engine is None:
+            return None
+
+        if not text or not text.strip():
+            return None
+
+        try:
+            # Lazy import to avoid circular imports
+            from src.preprocessing.section_extractor import extract_sectioned
+
+            return extract_sectioned(text, detector=self.section_engine)
+        except Exception as e:
+            logger.error(f"Error extracting sectioned requirements: {e}")
             return None
 
     @staticmethod
