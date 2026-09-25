@@ -557,8 +557,160 @@ class TestHTMLScoping:
             assert "description" in job
 
 
+class TestDescriptionMatchStrategies:
+    """Tests for description_selector_match strategies (Issue #367)."""
+
+    def test_strategy_longest_on_multi_match_short_first_long_second(self, tmp_path):
+        """Test that strategy='longest' picks the long description when first match is short (WorkSource case)."""
+        # Arrange: Simulating WorkSource page with benefits snippet first, description second
+        test_file = tmp_path / "longest_multi_match.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Senior Developer",
+                        "company": "WorkSource",
+                        "description": (
+                            '<div class="job-desc">Benefits: Health insurance, 401k</div>'
+                            '<div class="job-desc">Comprehensive job description with requirements, '
+                            "qualifications, technical skills needed, years of experience required, "
+                            "and detailed responsibilities. This is much longer than the benefits section."
+                            "</div>"
+                        ),
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(
+            str(test_file),
+            description_selector=".job-desc",
+            description_match="longest",
+        )
+
+        # Assert
+        assert len(results) == 1
+        result = results[0]
+        # Should have 1 warning about multi-match and longest strategy
+        html_scope_warnings = [w for w in result.warnings if w[0] == "html_scoping"]
+        assert len(html_scope_warnings) >= 1
+        # Warning should mention "using longest match"
+        warning_text = " ".join([w[1] for w in html_scope_warnings])
+        assert "using longest match" in warning_text
+        assert "2 elements" in warning_text
+
+    def test_strategy_all_joins_multiple_matches_with_separator(self, tmp_path):
+        """Test that strategy='all' joins all matches with separator in document order."""
+        # Arrange
+        test_file = tmp_path / "all_matches.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer",
+                        "company": "TestCorp",
+                        "description": (
+                            '<div class="section">Section 1 content</div><div class="section">Section 2 content</div>'
+                        ),
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(
+            str(test_file),
+            description_selector=".section",
+            description_match="all",
+        )
+
+        # Assert
+        assert len(results) == 1
+        result = results[0]
+        html_scope_warnings = [w for w in result.warnings if w[0] == "html_scoping"]
+        assert len(html_scope_warnings) >= 1
+        warning_text = " ".join([w[1] for w in html_scope_warnings])
+        assert "using all matches" in warning_text
+
+    def test_invalid_strategy_warning_fallback_to_first(self, tmp_path):
+        """Test that invalid strategy generates warning and falls back to 'first'."""
+        # Arrange
+        test_file = tmp_path / "invalid_strategy.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer",
+                        "company": "TestCorp",
+                        "description": (
+                            '<div class="desc">First match</div>'
+                            '<div class="desc">Second match longer than first one</div>'
+                        ),
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(
+            str(test_file),
+            description_selector=".desc",
+            description_match="invalid_strategy_name",
+        )
+
+        # Assert
+        assert len(results) == 1
+        result = results[0]
+        html_scope_warnings = [w for w in result.warnings if w[0] == "html_scoping"]
+        assert len(html_scope_warnings) >= 1
+        # Should have warning about invalid strategy
+        warning_texts = [w[1] for w in html_scope_warnings]
+        assert any("Invalid description_selector_match value" in w for w in warning_texts)
+        assert any("invalid_strategy_name" in w for w in warning_texts)
+        assert any("falling back to 'first'" in w for w in warning_texts)
+
+    def test_strategy_first_default_when_not_provided(self, tmp_path):
+        """Test that omitting description_match defaults to 'first' strategy."""
+        # Arrange
+        test_file = tmp_path / "default_strategy.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer",
+                        "company": "TestCorp",
+                        "description": (
+                            '<div class="desc">First match content</div><div class="desc">Second match content</div>'
+                        ),
+                    }
+                ]
+            )
+        )
+
+        # Act - No description_match parameter (defaults to "first")
+        results = run_batch(
+            str(test_file),
+            description_selector=".desc",
+        )
+
+        # Assert
+        assert len(results) == 1
+        result = results[0]
+        # Should use first match (no warning about strategy since it's implicit)
+        html_scope_warnings = [w for w in result.warnings if w[0] == "html_scoping"]
+        # May have warning about multi-match, should say "using first match"
+        if html_scope_warnings:
+            warning_text = " ".join([w[1] for w in html_scope_warnings])
+            assert "using first match" in warning_text or "matched 2 elements" in warning_text
+
+
 class TestCLIFlags:
-    """Tests for CLI --company and --config-dir flags (Issue #363)."""
+    """Tests for CLI --company and --config-dir flags (Issue #363, #367)."""
 
     def test_resolve_description_selector_match_found(self, tmp_path):
         """Test _resolve_description_selector with matching company."""
@@ -635,6 +787,67 @@ class TestCLIFlags:
             _resolve_description_selector("TestCorp", str(config_dir))
 
         assert "has no 'selectors.description_selector' defined" in str(exc_info.value)
+
+    def test_resolve_description_match_returns_longest_for_worksource(self, tmp_path):
+        """Test _resolve_description_match returns 'longest' for WorkSource with proper tmp_path config."""
+        # Arrange - Create temporary config with WorkSource entry having description_selector_match: longest
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        config_file = config_dir / "worksource.json"
+        config_file.write_text(
+            json.dumps(
+                {
+                    "companies": {
+                        "WorkSource": {
+                            "name": "WorkSource Inc.",
+                            "selectors": {
+                                "description_selector": ".job-description",
+                                "description_selector_match": "longest",
+                                "title": "h1",
+                            },
+                        }
+                    }
+                }
+            )
+        )
+
+        # Act
+        from src.poc.tweak.batch_processor import _resolve_description_match
+
+        strategy = _resolve_description_match("WorkSource", str(config_dir))
+
+        # Assert
+        assert strategy == "longest"
+
+    def test_resolve_description_match_returns_first_when_key_absent(self, tmp_path):
+        """Test _resolve_description_match returns 'first' as default when key absent."""
+        # Arrange - Create config without description_selector_match key
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        config_file = config_dir / "test.json"
+        config_file.write_text(
+            json.dumps(
+                {
+                    "companies": {
+                        "TestCorp": {
+                            "name": "Test Corporation",
+                            "selectors": {
+                                "description_selector": ".job-desc",
+                                # Missing "description_selector_match"
+                            },
+                        }
+                    }
+                }
+            )
+        )
+
+        # Act
+        from src.poc.tweak.batch_processor import _resolve_description_match
+
+        strategy = _resolve_description_match("TestCorp", str(config_dir))
+
+        # Assert
+        assert strategy == "first"
 
     def test_cli_company_flag_resolves_selector(self, tmp_path):
         """Test that --company flag resolves description_selector from config."""

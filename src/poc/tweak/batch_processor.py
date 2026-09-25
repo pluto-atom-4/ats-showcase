@@ -4,9 +4,11 @@ This module runs multiple job descriptions through the 4-stage spaCy markdown
 pipeline to validate and test the processing workflow.
 
 Stages:
+0. Scope to selector (optional)
 1. HTMLPreprocessor: Clean HTML, normalize structure
 2. HTMLMarkdownConverter: Convert HTML to Markdown using MarkItDown
 3. MarkdownPolisher: Apply formatting rules for polished output
+3b. HeadingPromoter: Promote plain-text headings to markdown (optional, Issue #365)
 4. MarkdownSpanRuler: Parse sections from markdown content
 5. SectionClassifier: Classify parsed sections into semantic types
 6. RequirementProcessor: Extract requirements from sections (Issue #321)
@@ -49,6 +51,9 @@ from src.poc.tweak.spacy_pipeline import (
     TechnologyProcessor,
 )
 from src.poc.tweak.spacy_pipeline.heading_promoter import HeadingPromoter
+
+# Allowed description_selector_match strategies
+DESCRIPTION_MATCH_STRATEGIES = {"first", "all", "longest"}
 
 
 @dataclass
@@ -170,6 +175,7 @@ def process_job(
     skill_processor: SkillProcessor,
     tech_processor: TechnologyProcessor,
     description_selector: Optional[str] = None,
+    description_match: str = "first",
     heading_promoter: Optional[HeadingPromoter] = None,
 ) -> JobResult:
     """Process a single job through the markdown pipeline.
@@ -178,6 +184,7 @@ def process_job(
     in JobResult.errors and do not abort processing.
 
     Stages:
+    0. Scope to selector (optional, Issue #363, #367)
     1. HTMLPreprocessor: Clean raw HTML
     2. HTMLMarkdownConverter: Convert HTML to Markdown
     3. MarkdownPolisher: Polish Markdown formatting
@@ -200,6 +207,8 @@ def process_job(
         skill_processor: SkillProcessor instance
         tech_processor: TechnologyProcessor instance
         description_selector: Optional CSS selector to scope HTML fragment before processing
+        description_match: Strategy for multi-match selection: "first", "all", or "longest"
+                          (default "first"). Invalid values treated as "first" with warning.
         heading_promoter: Optional HeadingPromoter instance for promoting plain-text headings
                           (default None skips heading promotion)
 
@@ -231,12 +240,23 @@ def process_job(
     if raw_html is None:
         raw_html = ""
 
-    # Stage 0: Scope to selector if provided (Issue #363)
+    # Stage 0: Scope to selector if provided (Issue #363, #367)
     if description_selector:
+        # Validate description_match strategy (only when selector is provided)
+        effective_strategy = description_match
+        if description_match not in DESCRIPTION_MATCH_STRATEGIES:
+            # Invalid strategy: log warning and use "first"
+            result.add_warning(
+                "html_scoping",
+                f"Invalid description_selector_match value '{description_match}'; "
+                f"allowed values are {sorted(DESCRIPTION_MATCH_STRATEGIES)}; falling back to 'first'",
+            )
+            effective_strategy = "first"
+
         try:
             from src.poc.tweak.html_scope import scope_to_selector
 
-            scope_result = scope_to_selector(raw_html, description_selector)
+            scope_result = scope_to_selector(raw_html, description_selector, strategy=effective_strategy)
 
             # Handle different match scenarios
             if scope_result.match_count == 0:
@@ -248,13 +268,18 @@ def process_job(
             elif scope_result.fragment:
                 # Have a fragment (matched 1+ elements)
                 if scope_result.match_count > 1:
-                    # Multiple matches: warn and use first
+                    # Multiple matches: warn with strategy name
+                    strategy_msg = {
+                        "first": "using first match",
+                        "all": "using all matches",
+                        "longest": "using longest match",
+                    }.get(effective_strategy, "using first match")
                     result.add_warning(
                         "html_scoping",
                         f"Selector '{description_selector}' matched {scope_result.match_count} "
-                        "elements; using first match",
+                        f"elements; {strategy_msg}",
                     )
-                # Use the scoped fragment (single or first of multiple)
+                # Use the scoped fragment (single or strategy-selected of multiple)
                 raw_html = scope_result.fragment
         except ValueError as e:
             # Invalid CSS selector: warn and use full HTML
@@ -438,7 +463,10 @@ def process_job(
 
 
 def run_batch(
-    input_path: str, description_selector: Optional[str] = None, promote_headings: bool = True
+    input_path: str,
+    description_selector: Optional[str] = None,
+    description_match: str = "first",
+    promote_headings: bool = True,
 ) -> List[JobResult]:
     """Run batch processing on all jobs in input file.
 
@@ -448,6 +476,8 @@ def run_batch(
     Args:
         input_path: Path to JSON file with job records
         description_selector: Optional CSS selector to scope HTML fragments
+        description_match: Strategy for multi-match selection ("first", "all", "longest").
+                          Default "first".
         promote_headings: Whether to promote plain-text headings (default True, Issue #365)
 
     Returns:
@@ -506,6 +536,7 @@ def run_batch(
             skill_processor=skill_processor,
             tech_processor=tech_processor,
             description_selector=description_selector,
+            description_match=description_match,
             heading_promoter=heading_promoter,
         )
         results.append(result)
@@ -643,6 +674,41 @@ def _resolve_description_selector(company: str, config_dir: str) -> str:
     return description_selector
 
 
+def _resolve_description_match(company: str, config_dir: str) -> str:
+    """Resolve description_selector_match from company config (lazy import, Issue #367).
+
+    Loads company configs only when called (lazy import to avoid playwright/spaCy imports
+    when --company flag is not used).
+
+    Returns "first" (default) if the key is not present in config.
+
+    Args:
+        company: Company config key or name to search for
+        config_dir: Directory containing config JSON files
+
+    Returns:
+        The description_selector_match value from matched company config,
+        or "first" if key is absent
+
+    Raises:
+        ValueError: If company not found
+    """
+    # Lazy import: only import common.py when --company is used
+    from src.poc.tweak.common import load_all_company_configs, resolve_company_selectors
+
+    merged_config = load_all_company_configs(config_dir)
+
+    # Try to resolve selectors for the given company
+    selectors = resolve_company_selectors(company, merged_config)
+
+    if not selectors:
+        # No selectors found for this company
+        raise ValueError(f"No configuration found for company '{company}' in {config_dir}")
+
+    # Return the strategy value, or "first" if key is absent
+    return selectors.get("description_selector_match", "first")
+
+
 def main() -> int:
     """CLI entry point for batch processor.
 
@@ -685,18 +751,23 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    # Resolve description_selector from --company if provided
+    # Resolve description_selector and description_selector_match from --company if provided
     description_selector = None
+    description_match = "first"
     if args.company:
         try:
             description_selector = _resolve_description_selector(args.company, args.config_dir)
+            description_match = _resolve_description_match(args.company, args.config_dir)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
 
     try:
         results = run_batch(
-            args.input_path, description_selector=description_selector, promote_headings=not args.no_promote_headings
+            args.input_path,
+            description_selector=description_selector,
+            description_match=description_match,
+            promote_headings=not args.no_promote_headings,
         )
         print_summary(results)
 
