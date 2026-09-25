@@ -198,35 +198,45 @@ class SkillProcessor:
 
         return " ".join(words)
 
-    def _has_noun_or_special_token(self, chunk_text: str) -> bool:
-        """Check if chunk has a NOUN/PROPN/X token, TECH_TERMS hit, or special tokens.
+    def _has_whole_token_tech_term(self, doc: Any) -> bool:
+        """Check if doc contains any whole-token TECH_TERMS or special tokens.
+
+        Uses whole-token matching: tokenizes chunk and compares actual tokens
+        against TECH_TERMS (with word boundaries for multi-word terms).
 
         Args:
-            chunk_text: The chunk to check
+            doc: spaCy Doc to check (must be pre-parsed)
 
         Returns:
-            True if chunk passes noise filter
+            True if chunk contains a tech term or special token
         """
-        # Check for special tokens like C++, C#, SQL (case-insensitive)
+        # Special tokens (exact matches after lowercasing)
         special_tokens = {"c++", "c#", "sql"}
-        chunk_lower = chunk_text.lower()
-        if any(token in chunk_lower for token in special_tokens):
+
+        # Build a set of lowercased tokens from the doc
+        doc_tokens_lower = {token.text.lower() for token in doc}
+
+        # Check special tokens (exact match)
+        if doc_tokens_lower & special_tokens:
             return True
 
-        # Check if any TECH_TERMS match (case-insensitive)
+        # Check TECH_TERMS with word-boundary logic
+        # For single-word TECH_TERMS, check exact token match
+        # For multi-word TECH_TERMS, check if consecutive tokens match the phrase
         for tech_term in TECH_TERMS:
-            if tech_term.lower() in chunk_lower:
-                return True
-
-        # Parse with spaCy to check POS tags
-        try:
-            chunk_doc = self.nlp(chunk_text)
-            for token in chunk_doc:
-                if token.pos_ in ("NOUN", "PROPN", "X"):
+            tech_lower = tech_term.lower()
+            # Single-word term: check if any token matches
+            if " " not in tech_term:
+                if tech_lower in doc_tokens_lower:
                     return True
-        except Exception:
-            # If spaCy fails, be conservative and allow the chunk
-            return True
+            else:
+                # Multi-word term: check if phrase appears in doc
+                # Reconstruct the text and check if phrase is present as words
+                doc_text = " ".join(token.text.lower() for token in doc)
+                # Use word boundaries to avoid substring matches
+                pattern = r"\b" + re.escape(tech_lower) + r"\b"
+                if re.search(pattern, doc_text):
+                    return True
 
         return False
 
@@ -244,22 +254,37 @@ class SkillProcessor:
         if not chunk_text:
             return False
 
-        # Check token count (max 6)
+        # Parse with spaCy once
         try:
             chunk_doc = self.nlp(chunk_text)
-            if len(chunk_doc) > 6:
-                return False
         except Exception:
-            # If spaCy parsing fails, be conservative
+            # If spaCy parsing fails, reject
             return False
 
-        # Check for NOUN/PROPN/X token or TECH_TERMS or special tokens
-        if not self._has_noun_or_special_token(chunk_text):
+        # Check token count (max 6)
+        if len(chunk_doc) > 6:
             return False
 
         # Drop stopword-only and qualifier-only chunks
         chunk_lower = chunk_text.lower()
         if chunk_lower in QUALIFIER_STOPLIST:
+            return False
+
+        # Check for NOUN/PROPN/X tokens
+        has_noun_propn_x = any(token.pos_ in ("NOUN", "PROPN", "X") for token in chunk_doc)
+
+        # Check for VERB/AUX/PRON tokens (sentence-leak filter)
+        has_verb_aux_pron = any(token.pos_ in ("VERB", "AUX", "PRON") for token in chunk_doc)
+
+        # Check for whole-token tech terms
+        has_tech_term = self._has_whole_token_tech_term(chunk_doc)
+
+        # Sentence-leak filter: reject if has VERB/AUX/PRON and no tech term
+        if has_verb_aux_pron and not has_tech_term:
+            return False
+
+        # Must have either NOUN/PROPN/X or a tech term
+        if not has_noun_propn_x and not has_tech_term:
             return False
 
         return True

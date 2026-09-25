@@ -418,3 +418,134 @@ class TestSkillProcessorNounLedBullets:
         # Should contain python and c++ (order-insensitive)
         assert "python" in skill_texts
         assert "c++" in skill_texts
+
+
+class TestSkillProcessorNounLedJunkFiltering:
+    """Test noun-led junk filtering (Issue #372 Review Fixes)."""
+
+    def test_going_forward_rejected(self, nlp) -> None:
+        """Junk phrase 'going forward' with VERB should be rejected.
+
+        'going forward' is a common phrase that is not a skill.
+        Should be filtered by sentence-leak check.
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = "going forward"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract nothing (not a skill)
+        assert doc._.skills == []
+
+    def test_results_analysis_rejected(self, nlp) -> None:
+        """Junk phrase 'results analysis' should be rejected.
+
+        'results analysis' is a common phrase, not a skill.
+        Should be filtered by sentence-leak check if 'results' is tagged as VERB.
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = "results analysis"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract nothing (not a skill)
+        assert doc._.skills == []
+
+    def test_we_are_a_team_of_experts_rejected(self, nlp) -> None:
+        """Junk sentence 'We are a team of experts' should be rejected.
+
+        Contains PRON ('We') and should be filtered by sentence-leak check.
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = "We are a team of experts"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract nothing (not a skill)
+        assert doc._.skills == []
+
+    def test_good_alone_rejected(self, nlp) -> None:
+        """Single adjective 'good' without NOUN should be rejected.
+
+        'good' is just an adjective with no NOUN/PROPN/X tokens and no tech term.
+        Should be filtered by NOUN check.
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = "good"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract nothing (not a skill)
+        assert doc._.skills == []
+
+    def test_algorithm_design_still_passes(self, nlp) -> None:
+        """Algorithm design is a valid skill and should still be extracted.
+
+        Even though 'design' can be tagged as VERB, it's a legitimate skill phrase.
+        The whole phrase 'algorithm design' should pass.
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = "algorithm design"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should extract "algorithm design" because it has NOUN tokens
+        skill_texts = {s["skill"] for s in doc._.skills}
+        assert "algorithm design" in skill_texts
+
+    def test_whole_token_tech_matching_go_not_golang(self, nlp) -> None:
+        """Whole-token matching: 'go' should not match 'going forward'.
+
+        With whole-token matching, 'go' in TECH_TERMS should not match
+        the substring 'go' in 'going forward'.
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        # This should NOT extract 'go' because 'go' is a whole token, not a substring
+        content = "going forward"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        # Should NOT extract anything
+        assert doc._.skills == []
