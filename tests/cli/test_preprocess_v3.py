@@ -143,31 +143,12 @@ class TestBuildSectionedRequirements:
         # Call the helper
         result = _build_sectioned_requirements(preprocessor, clean_text)
 
-        # Print real output first for verification
-        print("\n=== Real Sectioned Requirements Output ===")
-        print(f"Result type: {type(result)}")
-        print(f"Result: {result}")
-
-        # Assert exact values
-        assert result is not None, "Should return dict for v3.0 with section_engine"
-        assert isinstance(result, dict), "Should return dict, not SectionedResult object"
-        assert "requirements" in result, "Must have 'requirements' key"
-        assert "sections_detected" in result, "Must have 'sections_detected' key"
-        assert "schema_version" in result, "Must have 'schema_version' key"
-        assert result["schema_version"] == "3.0", "Schema version must be 3.0"
-
-        # Check that requirements were extracted from Requirements section
-        requirements = result["requirements"]
-        assert len(requirements) > 0, "Should have extracted requirements"
-        # Verify first requirement is from Requirements section
-        req_texts = [req["text"] for req in requirements]
-        assert any("Python" in t for t in req_texts), "Should extract Python requirement"
-        assert any("SQL" in t for t in req_texts), "Should extract SQL requirement"
-
-        # Check sections detected includes Requirements
-        sections = result["sections_detected"]
-        assert "SECTION_REQUIREMENTS" in sections, "Should detect SECTION_REQUIREMENTS"
-        # Benefits may or may not be detected depending on matching requirements
+        # Assert exact values based on real output
+        assert result is not None
+        assert result["schema_version"] == "3.0"
+        assert [r["text"] for r in result["requirements"]] == ["5+ years Python experience required", "Must know SQL"]
+        assert result["sections_detected"] == ["SECTION_REQUIREMENTS"]
+        assert result["requirements_by_section"] == {"SECTION_REQUIREMENTS": 2}
 
     def test_build_sectioned_requirements_without_engine_returns_none(self, monkeypatch: Any) -> None:
         """Preprocessor without section_engine returns None (v2.0 path)."""
@@ -183,7 +164,7 @@ class TestBuildSectionedRequirements:
         result = _build_sectioned_requirements(preprocessor, clean_text)
 
         # Must return None when engine is not configured
-        assert result is None, "Should return None when section_engine is None"
+        assert result is None
 
 
 class TestPreprocessSingleJobV3:
