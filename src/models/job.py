@@ -1,7 +1,7 @@
 """Pydantic models for job postings and related data."""
 
 from datetime import UTC, datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
@@ -71,6 +71,14 @@ class PreprocessedJob(BaseModel):
     pricing_date: str = Field(
         default="2026-07-18",
         description="Date when pricing rates were valid (YYYY-MM-DD)",
+    )
+    preprocessing_version: str = Field(
+        default="v2.0",
+        description="Version of preprocessing pipeline used (v1.0, v2.0, v3.0)",
+    )
+    sectioned_requirements: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Sectioned requirements with confidence scores (from extract_sectioned, v3.0 only)",
     )
     processed_date: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

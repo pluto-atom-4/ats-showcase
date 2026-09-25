@@ -1299,6 +1299,8 @@ def _preprocess_single_job(
     job_index: int,
     extract_requirements: bool = True,
     show_requirements: bool = False,
+    preprocessing_version: str = "v2.0",
+    section_engine: Any = None,
 ) -> Optional[tuple[Any, int, float, Optional[list[dict[str, Any]]]]]:
     """Process a single job and return preprocessed job or None on failure.
 
@@ -1312,6 +1314,8 @@ def _preprocess_single_job(
         job_index: 1-based job index for logging
         extract_requirements: Whether to extract trigger-based requirements
         show_requirements: Whether to display requirements in CLI output
+        preprocessing_version: Version tag for preprocessing pipeline (v1.0, v2.0, or v3.0)
+        section_engine: SectionDetector instance for v3.0 (optional, only when version is 3.0)
 
     Returns:
         Tuple of (PreprocessedJob, token_count, cost, requirements) or None if processing fails
@@ -1347,6 +1351,20 @@ def _preprocess_single_job(
                 trigger_requirements_list = requirements_data
                 trigger_requirements_json = json.dumps(requirements_data, ensure_ascii=False)
 
+        # Extract sectioned requirements (Issue #281 S5) for v3.0
+        sectioned_requirements_dict = None
+        if section_engine is not None:
+            from src.preprocessing.section_extractor import extract_sectioned
+
+            result = extract_sectioned(clean_text, detector=section_engine)
+            if result.requirements:
+                sectioned_requirements_dict = result.to_json()
+
+        # Normalize preprocessing_version to v-prefixed format
+        normalized_version = (
+            preprocessing_version if preprocessing_version.startswith("v") else f"v{preprocessing_version}"
+        )
+
         # Generate or use existing job ID
         job_id = job.id or generate_job_id(
             company=job.company,
@@ -1371,6 +1389,8 @@ def _preprocess_single_job(
             estimated_cost=estimated_cost,
             model_name=counter.model,
             pricing_date=pricing_date,
+            preprocessing_version=normalized_version,
+            sectioned_requirements=sectioned_requirements_dict,
         )
 
         # Display estimates if requested
@@ -1403,6 +1423,8 @@ def _preprocess_job_file(
     show_estimates: bool,
     extract_requirements: bool = True,
     show_requirements: bool = False,
+    preprocessing_version: str = "v2.0",
+    section_engine: Any = None,
 ) -> Tuple[List[Any], int, List[dict[str, Any]]]:
     """Process all jobs in a single file.
 
@@ -1440,6 +1462,8 @@ def _preprocess_job_file(
                 i,
                 extract_requirements=extract_requirements,
                 show_requirements=show_requirements,
+                preprocessing_version=preprocessing_version,
+                section_engine=section_engine,
             )
             if result:
                 prep_job, tokens, cost, requirements = result
@@ -1500,7 +1524,7 @@ def preprocess(
     preprocessing_version: str = typer.Option(
         "2.0",
         "--preprocessing-version",
-        help="Version: 1.0 (legacy, no boilerplate) or 2.0 (with boilerplate, default)",
+        help="Version: 1.0 (legacy), 2.0 (boilerplate removal, default), or 3.0 (sectioned requirements)",
     ),
     re_preprocess_only_v1: bool = typer.Option(
         False,
@@ -1567,6 +1591,9 @@ def preprocess(
         # Re-preprocess only v1.0 jobs to v2.0
         uv run python -m src.cli preprocess --re-preprocess-only-v1 --preprocessing-version 2.0
 
+        # Preprocess with v3.0 (sectioned requirements extraction)
+        uv run python -m src.cli preprocess --preprocessing-version 3.0
+
         # Selective re-preprocessing with filters
         uv run python -m src.cli preprocess --re-preprocess-only-v1 \\
           --filter-by-age 30 --filter-by-tokens-above 1000 --limit 50 --dry-run
@@ -1580,6 +1607,16 @@ def preprocess(
 
     logger.info("Starting preprocessing")
     typer.echo("🔄 Preprocessing jobs...\n")
+
+    # Validate preprocessing version (Issue #281 S5)
+    clean_version = preprocessing_version.replace("v", "")
+    if clean_version not in ("1.0", "2.0", "3.0"):
+        typer.echo(
+            f"❌ Invalid preprocessing version: {preprocessing_version}",
+            err=True,
+        )
+        typer.echo("   Valid versions: 1.0, 2.0, 3.0", err=True)
+        raise typer.Exit(1)
 
     # Check if doing selective re-preprocessing
     is_selective_reprocess = (
@@ -1595,6 +1632,13 @@ def preprocess(
     counter = TokenCounter()
     preprocessor = Preprocessor(extract_requirements=extract_requirements, preserve_requirement_spans=True)
     pricing_date = date_class.today().isoformat()
+
+    # Initialize SectionDetector for v3.0 (built once, reused for all jobs)
+    section_engine = None
+    if clean_version == "3.0":
+        from src.preprocessing.section_detector import SectionDetector
+
+        section_engine = SectionDetector()
 
     all_preprocessed = []
     total_tokens = 0
@@ -1746,6 +1790,8 @@ def preprocess(
                 show_estimates,
                 extract_requirements=extract_requirements,
                 show_requirements=show_estimates,  # Show requirements if showing estimates
+                preprocessing_version=preprocessing_version,
+                section_engine=section_engine,
             )
             all_preprocessed.extend(preprocessed_jobs)
             failed_count += file_failed

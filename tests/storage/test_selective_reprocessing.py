@@ -78,7 +78,22 @@ class TestJobStoreSelectiveFiltering:
         store = JobStore(temp_db)
 
         with pytest.raises(ValueError, match="Invalid preprocessing version"):
-            store.get_jobs_for_reprocessing(version="v3.0")
+            store.get_jobs_for_reprocessing(version="v4.0")
+
+        store.close()
+
+    def test_get_jobs_for_reprocessing_v3_version(self, temp_db: str) -> None:
+        """Test that v3.0 version is now valid (Issue #281 S5)."""
+        store = JobStore(temp_db)
+
+        # Add some test jobs
+        store.add_job("job1", "Job 1", "Co1", "Remote", preprocessing_version="v3.0", tokens=500)
+        store.add_job("job2", "Job 2", "Co2", "Remote", preprocessing_version="v2.0", tokens=400)
+
+        # Query for v3.0 jobs should work without raising an error
+        jobs = store.get_jobs_for_reprocessing(version="v3.0")
+        assert len(jobs) == 1
+        assert jobs[0]["job_id"] == "job1"
 
         store.close()
 

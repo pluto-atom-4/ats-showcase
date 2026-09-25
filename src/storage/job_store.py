@@ -15,6 +15,8 @@ from src.storage.schema import COST_TRACKING_TABLE_SQL, JOBS_TABLE_SQL, QUALITY_
 
 logger = logging.getLogger(__name__)
 
+_VALID_VERSIONS = ("1.0", "2.0", "3.0")
+
 
 class JobStore:
     """SQLite storage for job reviews with preprocessing version tracking."""
@@ -118,8 +120,8 @@ class JobStore:
         """
         # Normalize version
         clean_version = version.replace("v", "")
-        if clean_version not in ("1.0", "2.0"):
-            raise ValueError(f"Invalid preprocessing version: {version}. Must be '1.0' or '2.0'")
+        if clean_version not in _VALID_VERSIONS:
+            raise ValueError(f"Invalid preprocessing version: {version}. Must be one of {_VALID_VERSIONS}")
 
         if not self.conn:
             raise RuntimeError("Database connection not available")
@@ -154,8 +156,8 @@ class JobStore:
         """
         # Normalize and validate version
         clean_version = version.replace("v", "")
-        if clean_version not in ("1.0", "2.0"):
-            raise ValueError(f"Invalid preprocessing version: {version}. Must be '1.0' or '2.0'")
+        if clean_version not in _VALID_VERSIONS:
+            raise ValueError(f"Invalid preprocessing version: {version}. Must be one of {_VALID_VERSIONS}")
 
         if not self.conn:
             return []
@@ -429,8 +431,8 @@ class JobStore:
         """
         # Normalize and validate version
         clean_version = version.replace("v", "")
-        if clean_version not in ("1.0", "2.0"):
-            raise ValueError(f"Invalid preprocessing version: {version}. Must be '1.0' or '2.0'")
+        if clean_version not in _VALID_VERSIONS:
+            raise ValueError(f"Invalid preprocessing version: {version}. Must be one of {_VALID_VERSIONS}")
 
         if not self.conn:
             return []
