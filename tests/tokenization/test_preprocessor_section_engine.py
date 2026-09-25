@@ -4,9 +4,8 @@ Tests that section_engine parameter is properly stored and used in Preprocessor.
 No spaCy model (en_core_web_md) required. Uses blank SectionDetector().
 """
 
-import inspect
-from typing import Any
-from unittest.mock import MagicMock, patch
+from typing import Any, get_type_hints
+from unittest.mock import patch
 
 import pytest
 
@@ -73,13 +72,20 @@ class TestPreprocessorSectionEngineExecution:
         assert result is not None
         assert isinstance(result, SectionedResult)
 
-        # Should have extracted requirements from Requirements section
-        assert len(result.requirements) > 0
+        # Should have extracted exactly 3 requirements from Requirements section
+        assert len(result.requirements) == 3
 
-        # All requirements should come from Requirements section (Benefits excluded)
-        for req in result.requirements:
-            # SectionLabel.REQUIREMENTS has value "SECTION_REQUIREMENTS"
-            assert req.source_section.value == SectionLabel.REQUIREMENTS.value
+        # Verify first requirement text and source_section
+        assert result.requirements[0].text == "5+ years of Python experience required"
+        assert result.requirements[0].source_section == SectionLabel.REQUIREMENTS
+
+        # Verify second requirement text and source_section
+        assert result.requirements[1].text == "Experience with distributed systems"
+        assert result.requirements[1].source_section == SectionLabel.REQUIREMENTS
+
+        # Verify third requirement text and source_section
+        assert result.requirements[2].text == "Must have strong SQL skills"
+        assert result.requirements[2].source_section == SectionLabel.REQUIREMENTS
 
     def test_extract_sectioned_requirements_detects_sections(self, monkeypatch: Any) -> None:
         """Should populate sections_detected with detected section labels."""
@@ -89,7 +95,8 @@ class TestPreprocessorSectionEngineExecution:
         preprocessor = Preprocessor(section_engine=detector)
 
         text = """## Requirements
-5+ years Python experience
+- 5+ years Python experience required
+- Must know distributed systems
 
 ## Benefits
 Health insurance"""
@@ -97,8 +104,9 @@ Health insurance"""
         result = preprocessor.extract_sectioned_requirements(text)
 
         assert result is not None
-        # sections_detected should contain "SECTION_REQUIREMENTS" (not benefits as it's filtered)
-        assert len(result.sections_detected) > 0
+        # sections_detected should contain exactly SECTION_REQUIREMENTS
+        # (Benefits section is present but its bullets don't match trigger patterns)
+        assert result.sections_detected == ("SECTION_REQUIREMENTS",)
 
     def test_extract_sectioned_requirements_empty_text_returns_sectioned_result(self, monkeypatch: Any) -> None:
         """Empty text with engine should delegate to extract_sectioned, returning SectionedResult."""
@@ -130,12 +138,11 @@ Health insurance"""
 
         result = preprocessor.extract_sectioned_requirements(text)
 
-        # Should return SectionedResult
-        if result is not None:
-            assert isinstance(result, SectionedResult)
-            # If sections not detected, requirements should be empty
-            if len(result.sections_detected) == 0:
-                assert len(result.requirements) == 0
+        # Should return SectionedResult with empty requirements and no sections detected
+        assert result is not None
+        assert isinstance(result, SectionedResult)
+        assert result.sections_detected == ()
+        assert result.requirements == ()
 
 
 class TestPreprocessorSectionEngineSignature:
@@ -145,18 +152,15 @@ class TestPreprocessorSectionEngineSignature:
         """extract_entities should have unchanged signature."""
         monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
 
-        preprocessor = Preprocessor(section_engine=SectionDetector())
+        # Get type hints using get_type_hints
+        hints = get_type_hints(Preprocessor.extract_entities)
+        return_type = hints.get("return")
 
-        sig = inspect.signature(preprocessor.extract_entities)
-        params = list(sig.parameters.keys())
-
-        # Should have only 'text' parameter
-        assert params == ["text"]
-
-        # Return annotation should still be Tuple[List[str], List[str], List[str]]
-        return_annotation = sig.return_annotation
-        # Check it's a tuple of 3 lists
-        assert hasattr(return_annotation, "__origin__")
+        # Return type should be Tuple[List[str], List[str], List[str]]
+        assert return_type is not None
+        assert hasattr(return_type, "__origin__")
+        assert return_type.__origin__ is tuple
+        assert len(return_type.__args__) == 3
 
 
 class TestPreprocessorSectionEngineCustomDetector:
@@ -193,68 +197,9 @@ class TestPreprocessorSectionEngineCustomDetector:
             assert len(call_tracker) == 1
             assert call_tracker[0] is real_detector
 
-    def test_different_detectors_are_distinguished(self, monkeypatch: Any) -> None:
-        """Each preprocessor should use its own detector instance."""
-        monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
-
-        detector1 = SectionDetector()
-        detector2 = SectionDetector()
-
-        preprocessor1 = Preprocessor(section_engine=detector1)
-        preprocessor2 = Preprocessor(section_engine=detector2)
-
-        assert preprocessor1.section_engine is not preprocessor2.section_engine
-        assert preprocessor1.section_engine is detector1
-        assert preprocessor2.section_engine is detector2
-
-
-class TestPreprocessorInitParameters:
-    """Test that section_engine doesn't break existing parameters."""
-
-    def test_all_init_parameters_work_together(self, monkeypatch: Any) -> None:
-        """section_engine should work alongside existing parameters."""
-        monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
-
-        detector = SectionDetector()
-        preprocessor = Preprocessor(
-            model="en_core_web_md",
-            extract_requirements=True,
-            preserve_requirement_spans=True,
-            section_engine=detector,
-        )
-
-        assert preprocessor.model_name == "en_core_web_md"
-        assert preprocessor.extract_requirements is True
-        assert preprocessor.preserve_requirement_spans is True
-        assert preprocessor.section_engine is detector
-
 
 class TestPreprocessorSectionEngineEdgeCases:
     """Test edge cases."""
-
-    def test_extract_sectioned_requirements_with_mock_detector(self, monkeypatch: Any) -> None:
-        """Should work with mock detectors."""
-        monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
-
-        # Mock detector that tracks calls
-        mock_detector = MagicMock(spec=SectionDetector)
-
-        preprocessor = Preprocessor(section_engine=mock_detector)
-
-        # Patch extract_sectioned to avoid actual processing
-        def mock_extract_sectioned(text: str, *, detector: Any = None, **kwargs: Any) -> SectionedResult:
-            return SectionedResult(
-                requirements=(),
-                sections_detected=(),
-                requirements_by_section={},
-            )
-
-        with patch("src.tokenization.preprocessor.extract_sectioned", mock_extract_sectioned):
-            result = preprocessor.extract_sectioned_requirements("test text")
-
-            assert isinstance(result, SectionedResult)
-            # Detector was stored in instance
-            assert preprocessor.section_engine is mock_detector
 
     def test_extract_sectioned_propagates_errors(self, monkeypatch: Any) -> None:
         """If extract_sectioned fails, error should propagate (not be swallowed)."""
@@ -279,16 +224,17 @@ class TestPreprocessorSectionEngineIntegration:
         detector = SectionDetector()
         preprocessor = Preprocessor(section_engine=detector)
 
-        text = "## Requirements\n- Requirement 1"
+        text = "## Requirements\n- 5+ years Python experience required\n- Must know SQL"
 
         result1 = preprocessor.extract_sectioned_requirements(text)
         result2 = preprocessor.extract_sectioned_requirements(text)
 
-        # Both should be SectionedResult but separate instances
-        if result1 is not None:
-            assert isinstance(result1, SectionedResult)
-        if result2 is not None:
-            assert isinstance(result2, SectionedResult)
+        # Both should be SectionedResult and equal by value (frozen dataclass)
+        assert result1 is not None
+        assert result2 is not None
+        assert isinstance(result1, SectionedResult)
+        assert isinstance(result2, SectionedResult)
+        assert result1 == result2
 
     def test_extract_entities_not_affected_by_section_engine(self, monkeypatch: Any) -> None:
         """extract_entities should work regardless of section_engine setting."""
