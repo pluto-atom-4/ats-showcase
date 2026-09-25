@@ -96,7 +96,7 @@ class TestExtractV3Metrics:
         prep_module.Preprocessor._load_model = mock_load_model  # type: ignore[method-assign]
 
         try:
-            count, sections, req_by_section, avg_conf = parity_check._extract_v3_metrics(text)
+            count, sections, req_by_section, avg_conf, result = parity_check._extract_v3_metrics(text)
 
             # Exact assertions for parity_benefits_heavy.md
             assert count == 5
@@ -108,6 +108,10 @@ class TestExtractV3Metrics:
             # (filtered by SKIP_SECTIONS in v3 extraction)
             assert "benefits" not in req_by_section
             assert "compensation" not in req_by_section
+
+            # Result should be valid SectionedResult
+            assert result is not None
+            assert result.schema_version == "3.0"
 
         finally:
             prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
@@ -127,7 +131,7 @@ class TestExtractV3Metrics:
         prep_module.Preprocessor._load_model = mock_load_model  # type: ignore[method-assign]
 
         try:
-            count, sections, req_by_section, avg_conf = parity_check._extract_v3_metrics(text)
+            count, sections, req_by_section, avg_conf, result = parity_check._extract_v3_metrics(text)
 
             # Exact assertions for parity_no_headers.md
             assert count == 0
@@ -149,7 +153,7 @@ class TestExtractV3Metrics:
         prep_module.Preprocessor._load_model = mock_load_model  # type: ignore[method-assign]
 
         try:
-            count, sections, req_by_section, avg_conf = parity_check._extract_v3_metrics("")
+            count, sections, req_by_section, avg_conf, result = parity_check._extract_v3_metrics("")
             assert count == 0
             assert sections == []
             assert req_by_section == {}
@@ -165,7 +169,7 @@ class TestExtractV3Metrics:
         # Run REAL extraction path without monkeypatch
         # extract_sectioned() is model-free, so this should work
         try:
-            count, sections, req_by_section, avg_conf = parity_check._extract_v3_metrics(text)
+            count, sections, req_by_section, avg_conf, result = parity_check._extract_v3_metrics(text)
 
             # Exact assertions (same as monkeypatched test)
             assert count == 5
@@ -204,79 +208,145 @@ class TestExtractLegacyMetrics:
             prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
 
 
-class TestValidateSchema:
-    """Test schema validation."""
+class TestValidateSchemaResult:
+    """Test schema validation against real SectionedResult."""
 
-    def test_valid_schema(self) -> None:
-        """Valid schema passes validation."""
-        result = {
-            "schema_version": "3.0",
-            "requirements": [
-                {
-                    "text": "5+ years Python",
-                    "final_confidence": 0.85,
-                }
-            ],
-            "requirements_by_section": {
-                "SECTION_REQUIREMENTS": 1,
-            },
-        }
-        assert parity_check._validate_schema(result) is True
+    def test_valid_schema_none_result(self) -> None:
+        """None result is valid (empty extraction)."""
+        assert parity_check._validate_schema_result(None) is True
+
+    def test_valid_schema_with_requirements(self, parity_benefits_heavy_fixture: Path) -> None:
+        """Real SectionedResult from valid extraction passes validation."""
+        from src.tokenization import preprocessor as prep_module
+
+        original_load_model = prep_module.Preprocessor._load_model
+
+        def mock_load_model(self: Any) -> None:
+            self.nlp = None
+
+        prep_module.Preprocessor._load_model = mock_load_model  # type: ignore[method-assign]
+
+        try:
+            text = parity_check._load_fixture(parity_benefits_heavy_fixture)
+            assert text is not None
+
+            _, _, _, _, result = parity_check._extract_v3_metrics(text)
+            assert result is not None
+            # Real result should pass validation
+            assert parity_check._validate_schema_result(result) is True
+        finally:
+            prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
 
     def test_invalid_schema_version(self) -> None:
-        """Invalid schema_version fails."""
-        result = {
-            "schema_version": "2.0",  # Wrong version
-            "requirements": [],
-            "requirements_by_section": {},
-        }
-        assert parity_check._validate_schema(result) is False
+        """Invalid schema_version fails validation."""
+        # Create mock result with wrong version
+        mock_result = MagicMock()
+        mock_result.schema_version = "2.0"  # Wrong version
+        mock_result.requirements = []
+        mock_result.requirements_by_section = {}
+
+        assert parity_check._validate_schema_result(mock_result) is False
 
     def test_invalid_confidence_too_high(self) -> None:
-        """Confidence > 1.0 fails."""
-        result = {
-            "schema_version": "3.0",
-            "requirements": [
-                {
-                    "text": "5+ years Python",
-                    "final_confidence": 1.5,  # Out of range
-                }
-            ],
-            "requirements_by_section": {
-                "requirements": 1,
-            },
-        }
-        assert parity_check._validate_schema(result) is False
+        """Confidence > 1.0 fails validation."""
+        mock_req = MagicMock()
+        mock_req.text = "5+ years Python"
+        mock_req.final_confidence = 1.5  # Out of range
+
+        mock_result = MagicMock()
+        mock_result.schema_version = "3.0"
+        mock_result.requirements = [mock_req]
+        mock_result.requirements_by_section = {"SECTION_REQUIREMENTS": 1}
+
+        assert parity_check._validate_schema_result(mock_result) is False
 
     def test_invalid_confidence_negative(self) -> None:
-        """Confidence < 0.0 fails."""
-        result = {
-            "schema_version": "3.0",
-            "requirements": [
-                {
-                    "text": "5+ years Python",
-                    "final_confidence": -0.1,  # Out of range
-                }
-            ],
-            "requirements_by_section": {
-                "requirements": 1,
-            },
-        }
-        assert parity_check._validate_schema(result) is False
+        """Confidence < 0.0 fails validation."""
+        mock_req = MagicMock()
+        mock_req.text = "5+ years Python"
+        mock_req.final_confidence = -0.1  # Out of range
+
+        mock_result = MagicMock()
+        mock_result.schema_version = "3.0"
+        mock_result.requirements = [mock_req]
+        mock_result.requirements_by_section = {"SECTION_REQUIREMENTS": 1}
+
+        assert parity_check._validate_schema_result(mock_result) is False
 
     def test_count_mismatch(self) -> None:
-        """Requirement count != section sum fails."""
-        result = {
-            "schema_version": "3.0",
-            "requirements": [
-                {"text": "req1", "final_confidence": 0.8},
-                {"text": "req2", "final_confidence": 0.7},
-            ],
-            "requirements_by_section": {
-                "requirements": 1,  # Should be 2
-            },
-        }
-        assert parity_check._validate_schema(result) is False
+        """Requirement count != section sum fails validation."""
+        mock_req1 = MagicMock()
+        mock_req1.text = "req1"
+        mock_req1.final_confidence = 0.8
+        mock_req2 = MagicMock()
+        mock_req2.text = "req2"
+        mock_req2.final_confidence = 0.7
+
+        mock_result = MagicMock()
+        mock_result.schema_version = "3.0"
+        mock_result.requirements = [mock_req1, mock_req2]
+        mock_result.requirements_by_section = {"SECTION_REQUIREMENTS": 1}  # Should be 2
+
+        assert parity_check._validate_schema_result(mock_result) is False
+
+
+class TestNormalizeText:
+    """Test text normalization for comparison."""
+
+    def test_normalize_whitespace(self) -> None:
+        """Normalize collapses multiple whitespaces."""
+        text = "5+   years   Python"
+        normalized = parity_check._normalize_text(text)
+        assert normalized == "5+ years python"
+
+    def test_normalize_lowercase(self) -> None:
+        """Normalize converts to lowercase."""
+        text = "5+ Years PYTHON"
+        normalized = parity_check._normalize_text(text)
+        assert normalized == "5+ years python"
+
+    def test_normalize_tabs_newlines(self) -> None:
+        """Normalize handles tabs and newlines."""
+        text = "5+\tyears\nPython"
+        normalized = parity_check._normalize_text(text)
+        assert normalized == "5+ years python"
+
+
+class TestComputeTextDiff:
+    """Test text difference computation."""
+
+    def test_identical_texts(self) -> None:
+        """Identical texts have no diff."""
+        v3_texts = ["5+ years Python", "Experience with Django"]
+        legacy_texts = ["5+ years Python", "Experience with Django"]
+        v3_only, legacy_only = parity_check._compute_text_diff(v3_texts, legacy_texts)
+        assert v3_only == 0
+        assert legacy_only == 0
+
+    def test_v3_only_texts(self) -> None:
+        """v3 with extra texts."""
+        v3_texts = ["5+ years Python", "Experience with Django", "FastAPI knowledge"]
+        legacy_texts = ["5+ years Python", "Experience with Django"]
+        v3_only, legacy_only = parity_check._compute_text_diff(v3_texts, legacy_texts)
+        assert v3_only == 1
+        assert legacy_only == 0
+
+    def test_legacy_only_texts(self) -> None:
+        """Legacy with extra texts."""
+        v3_texts = ["5+ years Python", "Experience with Django"]
+        legacy_texts = ["5+ years Python", "Experience with Django", "FastAPI knowledge"]
+        v3_only, legacy_only = parity_check._compute_text_diff(v3_texts, legacy_texts)
+        assert v3_only == 0
+        assert legacy_only == 1
+
+    def test_normalization_in_diff(self) -> None:
+        """Text diff uses normalized comparison."""
+        v3_texts = ["5+ Years PYTHON", "Experience with Django"]
+        legacy_texts = ["5+ years python", "EXPERIENCE WITH DJANGO"]
+        v3_only, legacy_only = parity_check._compute_text_diff(v3_texts, legacy_texts)
+        # After normalization, they're identical
+        assert v3_only == 0
+        assert legacy_only == 0
 
 
 class TestGenerateParityReport:
@@ -366,6 +436,90 @@ class TestGenerateParityReport:
             assert output_file.read_text(encoding="utf-8") == report
         finally:
             prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
+
+    def test_report_schema_violation_exit_code(self, parity_benefits_heavy_fixture: Path) -> None:
+        """Schema violation sets exit code to 1 (not 0)."""
+        from src.tokenization import preprocessor as prep_module
+
+        original_load_model = prep_module.Preprocessor._load_model
+
+        def mock_load_model(self: Any) -> None:
+            self.nlp = None
+
+        prep_module.Preprocessor._load_model = mock_load_model  # type: ignore[method-assign]
+
+        try:
+            text = parity_check._load_fixture(parity_benefits_heavy_fixture)
+            assert text is not None
+
+            # Monkeypatch _validate_schema_result to return False (schema violation)
+            with patch.object(parity_check, "_validate_schema_result", return_value=False):
+                with patch.object(parity_check, "_check_model_available", return_value=False):
+                    report, exit_code = parity_check._generate_parity_report([parity_benefits_heavy_fixture])
+
+            # Schema violation should set exit code to 1
+            assert exit_code == 1
+        finally:
+            prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
+
+    def test_report_v3_extraction_exception_exit_code_0(self, tmp_path: Path) -> None:
+        """v3 extraction exception sets status=error but exit code stays 0."""
+        # Create temporary fixture that will cause extraction to fail
+        temp_fixture = tmp_path / "bad_fixture.md"
+        temp_fixture.write_text("Some text", encoding="utf-8")
+
+        from src.tokenization import preprocessor as prep_module
+
+        original_load_model = prep_module.Preprocessor._load_model
+
+        def mock_load_model(self: Any) -> None:
+            self.nlp = None
+
+        prep_module.Preprocessor._load_model = mock_load_model  # type: ignore[method-assign]
+
+        try:
+            # Monkeypatch _extract_v3_metrics to raise exception
+            def mock_extract_v3(*args: Any, **kwargs: Any) -> Any:
+                raise RuntimeError("Extraction failed")
+
+            with patch.object(parity_check, "_extract_v3_metrics", side_effect=mock_extract_v3):
+                with patch.object(parity_check, "_check_model_available", return_value=False):
+                    report, exit_code = parity_check._generate_parity_report([temp_fixture])
+
+            # Exception should NOT set exit code to 1; exit code should be 0
+            assert exit_code == 0
+            # Report should mention error
+            assert "error" in report.lower()
+            assert "Extraction failed" in report
+        finally:
+            prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
+
+    def test_report_v3_only_legacy_only_count(self, parity_benefits_heavy_fixture: Path) -> None:
+        """Report includes v3-only/legacy-only text counts when legacy runs."""
+        # Mock v3 and legacy to return controlled texts for diff testing
+        v3_texts = ["Python", "SQL", "Spark", "Docker", "v3-unique"]
+        legacy_texts = ["Python", "SQL", "Spark", "Docker", "legacy-unique"]
+
+        def mock_v3_extract(text: str) -> tuple[int, list[str], dict[str, int], float, Any]:
+            # Return real SectionedResult mock with v3_texts
+            result = MagicMock()
+            result.schema_version = "3.0"
+            result.requirements = [MagicMock(text=t, final_confidence=0.9) for t in v3_texts]
+            result.requirements_by_section = {"SECTION_REQUIREMENTS": len(v3_texts)}
+            return len(v3_texts), ["SECTION_REQUIREMENTS"], {"SECTION_REQUIREMENTS": len(v3_texts)}, 0.9, result
+
+        def mock_legacy_extract(text: str, model_name: str = "en_core_web_md") -> tuple[int, list[str], Optional[str]]:
+            return len(legacy_texts), legacy_texts, None
+
+        with patch.object(parity_check, "_extract_v3_metrics", side_effect=mock_v3_extract):
+            with patch.object(parity_check, "_extract_legacy_metrics", side_effect=mock_legacy_extract):
+                with patch.object(parity_check, "_check_model_available", return_value=True):
+                    report, exit_code = parity_check._generate_parity_report([parity_benefits_heavy_fixture])
+
+        # Report should mention text diff counts
+        assert "v3-only: 1" in report
+        assert "legacy-only: 1" in report
+        assert exit_code == 0
 
 
 class TestMain:

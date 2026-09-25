@@ -5,7 +5,7 @@ Produces markdown report with parity status for each fixture.
 
 Exit codes:
   0 - Success (parity report generated, no schema violations)
-  1 - Schema invariant violations detected (confidence out of range, count mismatch)
+  1 - Schema invariant violation detected (confidence out of range, count mismatch)
   2 - Fatal error (bad argument, missing fixture file)
 """
 
@@ -76,7 +76,7 @@ def _load_fixture(fixture_path: Path) -> Optional[str]:
         return None
 
 
-def _extract_v3_metrics(text: str) -> tuple[int, list[str], dict[str, int], float]:
+def _extract_v3_metrics(text: str) -> tuple[int, list[str], dict[str, int], float, Any]:
     """Extract v3 metrics from text using SectionDetector (model-free).
 
     Uses extract_sectioned() directly, bypassing Preprocessor to avoid
@@ -87,7 +87,8 @@ def _extract_v3_metrics(text: str) -> tuple[int, list[str], dict[str, int], floa
         text: Job description text
 
     Returns:
-        Tuple of (requirement_count, sections_detected, requirements_by_section, avg_confidence)
+        Tuple of (requirement_count, sections_detected, requirements_by_section,
+                  avg_confidence, sectioned_result)
 
     Raises:
         ImportError if imports fail
@@ -100,7 +101,7 @@ def _extract_v3_metrics(text: str) -> tuple[int, list[str], dict[str, int], floa
     result = extract_sectioned(text, detector=detector)
 
     if result is None or not result.requirements:
-        return 0, [], {}, 0.0
+        return 0, [], {}, 0.0, result
 
     # Build metrics
     req_count = len(result.requirements)
@@ -110,7 +111,7 @@ def _extract_v3_metrics(text: str) -> tuple[int, list[str], dict[str, int], floa
     # Calculate average confidence
     avg_conf = sum(r.final_confidence for r in result.requirements) / req_count if req_count > 0 else 0.0
 
-    return req_count, sections, req_by_section, avg_conf
+    return req_count, sections, req_by_section, avg_conf, result
 
 
 def _extract_legacy_metrics(text: str, model_name: str = "en_core_web_md") -> tuple[int, list[str], Optional[str]]:
@@ -133,35 +134,140 @@ def _extract_legacy_metrics(text: str, model_name: str = "en_core_web_md") -> tu
         return 0, [], str(e)
 
 
-def _validate_schema(result_dict: dict[str, Any]) -> bool:
-    """Check v3 schema invariants.
+def _validate_schema_result(result: Any) -> bool:
+    """Validate v3 schema invariants against real SectionedResult.
 
     Args:
-        result_dict: Result dict from v3 extraction
+        result: SectionedResult object from extract_sectioned
 
     Returns:
         True if schema is valid, False otherwise
     """
+    if result is None:
+        return True  # Empty result is valid
+
     # Check schema_version
-    if result_dict.get("schema_version") != "3.0":
-        logger.error(f"Invalid schema_version: {result_dict.get('schema_version')}, expected '3.0'")
+    schema_version = getattr(result, "schema_version", None)
+    if schema_version != "3.0":
+        logger.error(f"Invalid schema_version: {schema_version}, expected '3.0'")
         return False
 
     # Check confidence values
-    for req in result_dict.get("requirements", []):
-        conf = req.get("final_confidence", 0.0)
+    requirements = getattr(result, "requirements", [])
+    for req in requirements:
+        conf = getattr(req, "final_confidence", 0.0)
         if not isinstance(conf, (int, float)) or conf < 0.0 or conf > 1.0:
-            logger.error(f"Confidence out of range [0.0, 1.0]: {conf} for requirement '{req.get('text', '?')}'")
+            logger.error(f"Confidence out of range [0.0, 1.0]: {conf} for requirement '{getattr(req, 'text', '?')}'")
             return False
 
     # Check requirements_by_section sum matches requirements count
-    req_count = len(result_dict.get("requirements", []))
-    section_sum = sum(result_dict.get("requirements_by_section", {}).values())
+    req_count = len(requirements)
+    req_by_section = getattr(result, "requirements_by_section", {})
+    section_sum = sum(req_by_section.values())
     if section_sum != req_count:
         logger.error(f"requirements_by_section sum ({section_sum}) != requirements count ({req_count})")
         return False
 
     return True
+
+
+def _normalize_text(text: str) -> str:
+    """Normalize text for comparison (lowercase, whitespace collapse)."""
+    return " ".join(text.lower().split())
+
+
+def _compute_text_diff(v3_texts: list[str], legacy_texts: list[str]) -> tuple[int, int]:
+    """Compute v3-only and legacy-only text counts.
+
+    Args:
+        v3_texts: List of v3 requirement texts
+        legacy_texts: List of legacy requirement texts
+
+    Returns:
+        Tuple of (v3_only_count, legacy_only_count)
+    """
+    v3_norm = {_normalize_text(t) for t in v3_texts}
+    legacy_norm = {_normalize_text(t) for t in legacy_texts}
+
+    v3_only = len(v3_norm - legacy_norm)
+    legacy_only = len(legacy_norm - v3_norm)
+
+    return v3_only, legacy_only
+
+
+def _process_fixture_row(fixture_path: Path, model_available: bool) -> tuple[str, int]:
+    """Process single fixture and return table row + exit code delta.
+
+    Args:
+        fixture_path: Path to fixture file
+        model_available: Whether spaCy model is available
+
+    Returns:
+        Tuple of (table_row_string, exit_code_delta)
+    """
+    fixture_name = fixture_path.name
+    text = _load_fixture(fixture_path)
+
+    if text is None:
+        row = f"| {fixture_name} | error | N/A | N/A | N/A | N/A | Failed to load fixture |\n"
+        return row, 0
+
+    # Extract v3 metrics with real result
+    try:
+        (v3_count, v3_sections, v3_by_section, v3_avg_conf, v3_result) = _extract_v3_metrics(text)
+    except Exception as e:
+        logger.error(f"v3 extraction failed for {fixture_name}: {e}")
+        row = f"| {fixture_name} | error | Error | N/A | N/A | N/A | v3 extraction failed: {e} |\n"
+        return row, 0
+
+    # Validate schema against REAL v3 result
+    schema_valid = _validate_schema_result(v3_result)
+    exit_delta = 0 if schema_valid else 1
+
+    # Extract legacy metrics (if model available)
+    legacy_count = 0
+    legacy_texts: list[str] = []
+    legacy_status = "skipped"
+    if model_available:
+        legacy_count, legacy_texts, error_msg = _extract_legacy_metrics(text)
+        legacy_status = "ok" if error_msg is None else "error"
+    else:
+        legacy_status = "model-unavailable"
+
+    # Get v3 requirement texts for comparison
+    v3_texts: list[str] = []
+    if v3_result is not None:
+        requirements = getattr(v3_result, "requirements", [])
+        v3_texts = [getattr(r, "text", "") for r in requirements]
+
+    # Determine parity status and notes
+    if legacy_status == "model-unavailable":
+        status = "model-unavailable"
+        notes = "spaCy model not available; legacy extraction skipped"
+    elif legacy_status == "error":
+        status = "review"
+        notes = "Legacy extraction error"
+    elif v3_count < legacy_count:
+        status = "review"
+        notes = f"v3 count ({v3_count}) < legacy count ({legacy_count})"
+    else:  # v3_count >= legacy_count
+        status = "equivalent"
+        notes = f"v3 count ({v3_count}) >= legacy count ({legacy_count})"
+
+        # Add text diff if legacy ran
+        if legacy_status == "ok" and (v3_texts or legacy_texts):
+            v3_only, legacy_only = _compute_text_diff(v3_texts, legacy_texts)
+            if v3_only > 0 or legacy_only > 0:
+                notes += f"; v3-only: {v3_only}, legacy-only: {legacy_only}"
+
+    # Format sections detected
+    sections_str = ", ".join(v3_sections) if v3_sections else "none"
+
+    # Add table row
+    row = (
+        f"| {fixture_name} | {status} | {v3_count} | {sections_str} | {v3_avg_conf:.2f} | {legacy_count} | {notes} |\n"
+    )
+    return row, exit_delta
 
 
 def _generate_parity_report(
@@ -174,7 +280,7 @@ def _generate_parity_report(
 
     Returns:
         Tuple of (markdown_report, exit_code)
-        exit_code: 0 for success, 1 for schema violation
+        exit_code: 0 for success, 1 for schema invariant violation, 2 for fatal
     """
     lines: list[str] = [
         "# Parity Report: v3 vs Legacy Preprocessing\n",
@@ -190,83 +296,22 @@ def _generate_parity_report(
     model_available = _check_model_available("en_core_web_md")
 
     for fixture_path in fixtures:
-        fixture_name = fixture_path.name
-        text = _load_fixture(fixture_path)
-
-        if text is None:
-            lines.append(f"| {fixture_name} | error | N/A | N/A | N/A | N/A | Failed to load fixture |\n")
-            continue
-
-        # Extract v3 metrics
-        try:
-            v3_count, v3_sections, v3_by_section, v3_avg_conf = _extract_v3_metrics(text)
-        except Exception as e:
-            logger.error(f"v3 extraction failed for {fixture_name}: {e}")
-            lines.append(f"| {fixture_name} | error | Error | N/A | N/A | N/A | v3 extraction failed: {e} |\n")
-            exit_code = 1
-            continue
-
-        # Validate schema for v3 result
-        # Create dummy requirements matching the count from v3_by_section
-        result_dict: dict[str, Any] = {
-            "schema_version": "3.0",
-            "requirements": [
-                {
-                    "final_confidence": 0.5,  # dummy
-                    "text": f"dummy_{i}",
-                }
-                for i in range(v3_count)
-            ],
-            "requirements_by_section": v3_by_section,
-        }
-        if not _validate_schema(result_dict):
-            exit_code = 1
-
-        # Extract legacy metrics (if model available)
-        legacy_count = 0
-        legacy_status = "skipped"
-        if model_available:
-            legacy_count, _, error_msg = _extract_legacy_metrics(text)
-            legacy_status = "ok" if error_msg is None else "error"
-        else:
-            legacy_status = "model-unavailable"
-
-        # Determine parity status
-        # Status rules:
-        # - "model-unavailable" if legacy model not available
-        # - "equivalent" if v3_count >= legacy_count
-        # - "review" if v3_count < legacy_count
-        if legacy_status == "model-unavailable":
-            status = "model-unavailable"
-            notes = "spaCy model not available; legacy extraction skipped"
-        elif legacy_status == "error":
-            status = "review"
-            notes = "Legacy extraction error"
-        elif v3_count < legacy_count:
-            status = "review"
-            notes = f"v3 count ({v3_count}) < legacy count ({legacy_count})"
-        else:  # v3_count >= legacy_count
-            status = "equivalent"
-            notes = f"v3 count ({v3_count}) >= legacy count ({legacy_count})"
-
-        # Format sections detected
-        sections_str = ", ".join(v3_sections) if v3_sections else "none"
-
-        # Add table row
-        row = (
-            f"| {fixture_name} | {status} | {v3_count} | {sections_str} | "
-            f"{v3_avg_conf:.2f} | {legacy_count} | {notes} |\n"
-        )
+        row, exit_delta = _process_fixture_row(fixture_path, model_available)
         lines.append(row)
+        if exit_delta != 0:
+            exit_code = exit_delta
 
     lines.append("\n---\n")
     lines.append("## Metadata\n\n")
     lines.append(f"- spaCy model `en_core_web_md` available: {model_available}\n")
     lines.append("- v3: Section-based requirement extraction with SectionDetector\n")
     lines.append("- Legacy: Trigger-based requirement extraction via extract_entities\n")
-    lines.append("- Status 'model-unavailable': Legacy extraction requires spaCy model; not available in CI\n")
+    lines.append("- Status 'equivalent': v3 count >= legacy count (good parity)\n")
+    lines.append("- Status 'review': v3 < legacy or legacy error (investigate)\n")
+    lines.append("- Status 'model-unavailable': spaCy model not installed (expected in CI)\n")
     lines.append("- Exit code 0: All fixtures processed, no schema violations\n")
     lines.append("- Exit code 1: Schema invariant violation detected\n")
+    lines.append("- Exit code 2: Fatal error (bad argument, missing fixture)\n")
 
     return "".join(lines), exit_code
 
@@ -278,7 +323,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         argv: Command-line arguments (default: sys.argv[1:])
 
     Returns:
-        Exit code
+        Exit code: 0 (success), 1 (schema violation), 2 (fatal error)
     """
     parser = argparse.ArgumentParser(description="Generate parity report comparing v3 vs legacy preprocessing")
     parser.add_argument(
