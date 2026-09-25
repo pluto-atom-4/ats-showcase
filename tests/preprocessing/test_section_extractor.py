@@ -403,11 +403,9 @@ class TestExtractSectioned:
 * Required knowledge of TypeScript
 """
         result = extract_sectioned(text, min_confidence=0.50)
-        # Should find at least one requirement (0.70 > 0.50)
-        assert len(result.requirements) >= 1
-        # Confidence should be lower due to section boost
-        if result.requirements:
-            assert result.requirements[0].section_boost == -0.25
+        assert len(result.requirements) == 1
+        assert result.requirements[0].section_boost == -0.25
+        assert result.requirements[0].final_confidence == pytest.approx(0.70)
 
     def test_benefits_section_ignored(self) -> None:
         """Test that Benefits section is filtered out.
@@ -540,10 +538,9 @@ class TestExtractSectioned:
 * Essential C++
 """
         result = extract_sectioned(text, min_confidence=0.40)
-        if len(result.requirements) >= 2:
-            # Check sorted by confidence descending
-            confidences = [r.final_confidence for r in result.requirements]
-            assert confidences == sorted(confidences, reverse=True)
+        assert [r.text for r in result.requirements] == ["Must know Python", "Essential C++"]
+        confidences = [r.final_confidence for r in result.requirements]
+        assert confidences == sorted(confidences, reverse=True)
 
     def test_bullet_splitting_in_extraction(self) -> None:
         """Test that bullets within sections are properly split."""
@@ -592,8 +589,8 @@ class TestExtractSectioned:
         python_reqs = [r for r in result.requirements if "python" in r.text.lower()]
 
         # Should keep only the "Must have" version (higher confidence)
-        if python_reqs:
-            assert any("Must" in r.text for r in python_reqs)
+        assert [r.text for r in python_reqs] == ["Must have Python"]
+        assert python_reqs[0].final_confidence == pytest.approx(1.0)
 
 
 # =============================================================================
@@ -619,3 +616,18 @@ class TestConstants:
     def test_default_max_requirements(self) -> None:
         """Test DEFAULT_MAX_REQUIREMENTS constant."""
         assert DEFAULT_MAX_REQUIREMENTS == 20
+
+
+class TestDedupStateSync:
+    """Replacement of a lower-confidence duplicate must keep the text index in sync."""
+
+    def test_replacement_updates_candidate_texts(self) -> None:
+        from src.preprocessing.section_extractor import _dedup_and_replace
+
+        low = {"text": "Python experience needed", "final_confidence": 0.6}
+        high = {"text": "Python experience needed!", "final_confidence": 0.9}
+        unique: list[dict] = [low]
+        texts = [low["text"]]
+        _dedup_and_replace(unique, texts, high, 0.8)
+        assert unique == [high]
+        assert texts == ["Python experience needed!"]

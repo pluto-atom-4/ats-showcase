@@ -474,12 +474,12 @@ def _dedup_and_replace(
     if score < dedup_threshold:
         unique_reqs.append(req)
         req_texts.append(req_text)
-    elif matched_text:
-        for existing in unique_reqs:
+    elif matched_text is not None:
+        for idx, existing in enumerate(unique_reqs):
             if existing["text"] == matched_text:
                 if req["final_confidence"] > existing["final_confidence"]:
-                    unique_reqs.remove(existing)
-                    unique_reqs.append(req)
+                    unique_reqs[idx] = req
+                    req_texts[req_texts.index(matched_text)] = req_text
                 break
 
 
