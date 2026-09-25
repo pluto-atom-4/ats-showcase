@@ -8,6 +8,7 @@ No src.poc imports.
 """
 
 from dataclasses import FrozenInstanceError
+from typing import Any
 
 import pytest
 
@@ -247,7 +248,7 @@ class TestRequirementItem:
             section_display_name="Requirements",
         )
         with pytest.raises(FrozenInstanceError):
-            item.text = "Java"
+            item.text = "Java"  # type: ignore[misc]
 
     def test_to_legacy_tuple(self) -> None:
         """Test to_legacy_tuple() returns (text, trigger_word, final_confidence)."""
@@ -315,7 +316,7 @@ class TestSectionedResult:
             requirements_by_section={},
         )
         with pytest.raises(FrozenInstanceError):
-            result.requirements = ()
+            result.requirements = ()  # type: ignore[misc]
 
     def test_to_json(self) -> None:
         """Test to_json() returns dict with proper structure."""
@@ -624,10 +625,10 @@ class TestDedupStateSync:
     def test_replacement_updates_candidate_texts(self) -> None:
         from src.preprocessing.section_extractor import _dedup_and_replace
 
-        low = {"text": "Python experience needed", "final_confidence": 0.6}
-        high = {"text": "Python experience needed!", "final_confidence": 0.9}
-        unique: list[dict] = [low]
-        texts = [low["text"]]
+        low: dict[str, Any] = {"text": "Python experience needed", "final_confidence": 0.6}
+        high: dict[str, Any] = {"text": "Python experience needed!", "final_confidence": 0.9}
+        unique: list[dict[str, Any]] = [low]
+        texts: list[str] = [low["text"]]
         _dedup_and_replace(unique, texts, high, 0.8)
         assert unique == [high]
         assert texts == ["Python experience needed!"]
