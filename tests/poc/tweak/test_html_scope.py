@@ -8,6 +8,7 @@ Tests validate:
 5. Empty fragment returns fragment=None
 6. Nested/complex markup handled correctly
 7. Strategy parameter: first, all, longest (Issue #367)
+8. Regression test: first match empty, second non-empty (Issue #367)
 """
 
 import pytest
@@ -316,6 +317,28 @@ class TestScopeToSelectorStrategies:
         assert result_first.fragment is None
         assert result_all.fragment is None
         assert result_longest.fragment is None
+
+    def test_strategy_first_preserves_old_behavior_first_match_empty(self):
+        """Test regression: first match empty, second non-empty, strategy='first' -> fragment None, match_count 2.
+
+        This verifies that strategy='first' preserves original behavior (uses matches[0])
+        and does NOT skip to first non-empty match.
+        """
+        # Arrange
+        html = """
+        <div class="desc"></div>
+        <div class="desc"><p>Second non-empty</p></div>
+        """
+        selector = ".desc"
+
+        # Act
+        result = scope_to_selector(html, selector, strategy="first")
+
+        # Assert
+        assert result.match_count == 2
+        assert result.fragment is None  # First match is empty, so fragment is None
+        # Verify we're NOT returning the second non-empty match
+        # (if we were, fragment would contain "Second non-empty")
 
     def test_all_empty_matches_returns_none_fragment_keeps_match_count(self):
         """Test that all-empty matches return fragment=None but preserve match_count."""

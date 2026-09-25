@@ -63,29 +63,42 @@ def scope_to_selector(html: str, selector: str, strategy: str = "first") -> Scop
         if match_count == 0:
             return ScopeResult(fragment=None, match_count=0)
 
-        # Collect all non-empty fragments
+        # Strategy "first": return first match's fragment (even if empty -> None)
+        if strategy == "first":
+            first_match = matches[0]
+            fragment = first_match.decode_contents().strip()
+            # Empty fragment -> return None
+            if not fragment:
+                return ScopeResult(fragment=None, match_count=match_count)
+            return ScopeResult(fragment=fragment, match_count=match_count)
+
+        # For "all" and "longest": collect all non-empty fragments
         fragments = []
         for match in matches:
             fragment = match.decode_contents().strip()
             if fragment:
                 fragments.append(fragment)
 
-        # Apply strategy
+        # If no non-empty fragments found, return None
         if not fragments:
-            # All matches were empty
             return ScopeResult(fragment=None, match_count=match_count)
 
+        # Strategy "all": join all non-empty fragments in document order
         if strategy == "all":
-            # Join all non-empty fragments in document order
             combined = "\n\n---\n\n".join(fragments)
             return ScopeResult(fragment=combined, match_count=match_count)
-        elif strategy == "longest":
-            # Pick the match with longest stripped inner-HTML
+
+        # Strategy "longest": pick the match with longest stripped inner-HTML
+        if strategy == "longest":
             longest_fragment = max(fragments, key=len)
             return ScopeResult(fragment=longest_fragment, match_count=match_count)
-        else:
-            # Default or unknown strategy: use "first" (current behavior)
-            return ScopeResult(fragment=fragments[0], match_count=match_count)
+
+        # Unknown strategy: treat as "first"
+        first_match = matches[0]
+        fragment = first_match.decode_contents().strip()
+        if not fragment:
+            return ScopeResult(fragment=None, match_count=match_count)
+        return ScopeResult(fragment=fragment, match_count=match_count)
 
     except Exception as e:
         # BeautifulSoup.select() raises ValueError for invalid selectors

@@ -4,9 +4,11 @@ This module runs multiple job descriptions through the 4-stage spaCy markdown
 pipeline to validate and test the processing workflow.
 
 Stages:
+0. Scope to selector (optional)
 1. HTMLPreprocessor: Clean HTML, normalize structure
 2. HTMLMarkdownConverter: Convert HTML to Markdown using MarkItDown
 3. MarkdownPolisher: Apply formatting rules for polished output
+3b. HeadingPromoter: Promote plain-text headings to markdown (optional, Issue #365)
 4. MarkdownSpanRuler: Parse sections from markdown content
 5. SectionClassifier: Classify parsed sections into semantic types
 6. RequirementProcessor: Extract requirements from sections (Issue #321)
@@ -182,6 +184,7 @@ def process_job(
     in JobResult.errors and do not abort processing.
 
     Stages:
+    0. Scope to selector (optional, Issue #363, #367)
     1. HTMLPreprocessor: Clean raw HTML
     2. HTMLMarkdownConverter: Convert HTML to Markdown
     3. MarkdownPolisher: Polish Markdown formatting
@@ -237,19 +240,19 @@ def process_job(
     if raw_html is None:
         raw_html = ""
 
-    # Stage 0: Validate and apply description_match strategy (Issue #367)
-    effective_strategy = description_match
-    if description_match not in DESCRIPTION_MATCH_STRATEGIES:
-        # Invalid strategy: log warning and use "first"
-        result.add_warning(
-            "html_scoping",
-            f"Invalid description_selector_match value '{description_match}'; "
-            f"allowed values are {sorted(DESCRIPTION_MATCH_STRATEGIES)}; falling back to 'first'",
-        )
-        effective_strategy = "first"
-
-    # Stage 1: Scope to selector if provided (Issue #363, #367)
+    # Stage 0: Scope to selector if provided (Issue #363, #367)
     if description_selector:
+        # Validate description_match strategy (only when selector is provided)
+        effective_strategy = description_match
+        if description_match not in DESCRIPTION_MATCH_STRATEGIES:
+            # Invalid strategy: log warning and use "first"
+            result.add_warning(
+                "html_scoping",
+                f"Invalid description_selector_match value '{description_match}'; "
+                f"allowed values are {sorted(DESCRIPTION_MATCH_STRATEGIES)}; falling back to 'first'",
+            )
+            effective_strategy = "first"
+
         try:
             from src.poc.tweak.html_scope import scope_to_selector
 
@@ -285,28 +288,28 @@ def process_job(
                 f"Invalid CSS selector '{description_selector}': {e}; processing full HTML",
             )
 
-    # Stage 2: Preprocess
+    # Stage 1: Preprocess
     try:
         clean_html = preprocessor.process(raw_html)
     except Exception as e:
         result.add_error("preprocessor", str(e))
         return result
 
-    # Stage 3: Convert to Markdown
+    # Stage 2: Convert to Markdown
     try:
         markdown = converter.process(clean_html)
     except Exception as e:
         result.add_error("converter", str(e))
         return result
 
-    # Stage 4: Polish Markdown
+    # Stage 3: Polish Markdown
     try:
         polished_markdown = polisher.process(markdown)
     except Exception as e:
         result.add_error("polisher", str(e))
         return result
 
-    # Stage 4b: Promote plain-text headings (optional, Issue #365)
+    # Stage 3b: Promote plain-text headings (optional, Issue #365)
     promoted_markdown = polished_markdown
     if heading_promoter is not None:
         try:
@@ -315,12 +318,12 @@ def process_job(
             result.add_error("heading_promoter", str(e))
             # Non-fatal: continue with unpromoted markdown
 
-    # Stage 5: Parse sections using MarkdownSpanRuler
+    # Stage 4: Parse sections using MarkdownSpanRuler
     try:
         sections = ruler.parse(promoted_markdown)
         result.sections_detected = len(sections)
 
-        # Stage 6: Classify each section and aggregate confidence stats
+        # Stage 5: Classify each section and aggregate confidence stats
         if sections:
             confidences = []
             markdown_sections = []
@@ -417,7 +420,7 @@ def process_job(
         # Errors in section parsing/classification do not halt further processing;
         # we report sections detected and partial confidence stats if any
 
-    # Stages 7-9: Extract requirements, skills, technologies from doc (per-stage error handling)
+    # Stages 6-8: Extract requirements, skills, technologies from doc (per-stage error handling)
     try:
         # Create a spaCy Doc for extraction using the fully-configured nlp pipeline
         # This ensures all extensions and components are available

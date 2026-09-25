@@ -788,13 +788,33 @@ class TestCLIFlags:
 
         assert "has no 'selectors.description_selector' defined" in str(exc_info.value)
 
-    def test_resolve_description_match_returns_longest_for_worksource(self):
-        """Test _resolve_description_match returns 'longest' for WorkSource from config_test."""
-        # Arrange - Using actual config_test/workdays-3.json which has WorkSource with longest
-        from src.poc.tweak.batch_processor import _resolve_description_match
+    def test_resolve_description_match_returns_longest_for_worksource(self, tmp_path):
+        """Test _resolve_description_match returns 'longest' for WorkSource with proper tmp_path config."""
+        # Arrange - Create temporary config with WorkSource entry having description_selector_match: longest
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        config_file = config_dir / "worksource.json"
+        config_file.write_text(
+            json.dumps(
+                {
+                    "companies": {
+                        "WorkSource": {
+                            "name": "WorkSource Inc.",
+                            "selectors": {
+                                "description_selector": ".job-description",
+                                "description_selector_match": "longest",
+                                "title": "h1",
+                            },
+                        }
+                    }
+                }
+            )
+        )
 
         # Act
-        strategy = _resolve_description_match("WorkSource", "config_test")
+        from src.poc.tweak.batch_processor import _resolve_description_match
+
+        strategy = _resolve_description_match("WorkSource", str(config_dir))
 
         # Assert
         assert strategy == "longest"
