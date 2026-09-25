@@ -132,6 +132,7 @@ class TestPreprocessSingleJobV3:
         preprocessor = MagicMock()
         preprocessor.nlp = MagicMock()
         preprocessor.extract_entities = MagicMock(return_value=([], [], []))
+        preprocessor.extract_sectioned_requirements = MagicMock(return_value=None)
         # Mock the doc object
         doc = MagicMock()
         doc._ = MagicMock()
@@ -185,7 +186,6 @@ class TestPreprocessSingleJobV3:
             show_estimates=False,
             job_index=1,
             preprocessing_version="v2.0",
-            section_engine=None,
         )
 
         assert result is not None
@@ -193,19 +193,27 @@ class TestPreprocessSingleJobV3:
         assert prep_job.preprocessing_version == "v2.0"
         assert prep_job.sectioned_requirements is None
 
-    def test_preprocess_single_job_v3_with_section_engine(
+    def test_preprocess_single_job_v3_with_real_detector(
         self,
         mock_preprocessor: MagicMock,
         mock_chunker: MagicMock,
         mock_counter: MagicMock,
-        mock_section_engine: MagicMock,
     ) -> None:
-        """v3.0 jobs with section_engine populate sectioned_requirements."""
+        """v3.0 jobs with real SectionDetector extract sectioned_requirements."""
         from src.cli import _preprocess_single_job
+
+        # Create a preprocessor with section_engine support
+        preprocessor_v3 = MagicMock()
+        preprocessor_v3.extract_entities = MagicMock(return_value=([], [], []))
+        preprocessor_v3.extract_sectioned_requirements = MagicMock()
+
+        # Create test text with requirements section
+        clean_text = "Test Job Description\n\n## Requirements\n- Python\n- SQL"
+
+        # Mock the result
         from src.preprocessing.section_extractor import RequirementItem, SectionedResult
         from src.preprocessing.section_patterns import SectionLabel
 
-        # Create a proper RequirementItem
         req_item = RequirementItem(
             text="Python",
             trigger_word="requires",
@@ -216,40 +224,43 @@ class TestPreprocessSingleJobV3:
             section_display_name="Requirements",
         )
 
-        # Mock extract_sectioned to return a proper SectionedResult
         mock_result = SectionedResult(
             requirements=(req_item,),
             sections_detected=("Requirements",),
             requirements_by_section={"Requirements": 1},
         )
+        preprocessor_v3.extract_sectioned_requirements.return_value = mock_result
+
+        # Mock doc object
+        doc = MagicMock()
+        doc._ = MagicMock()
+        doc._.requirements = None
+        preprocessor_v3.nlp = MagicMock(return_value=doc)
 
         job_dict = {
             "title": "Test Job",
             "company": "TestCo",
-            "description": "Test description\n\nRequirements:\n- Python\n- SQL",
+            "description": clean_text,
         }
 
-        with patch("src.preprocessing.section_extractor.extract_sectioned") as mock_extract:
-            mock_extract.return_value = mock_result
-
-            result = _preprocess_single_job(
-                job_dict,
-                mock_chunker,
-                mock_counter,
-                mock_preprocessor,
-                "2026-09-24",
-                show_estimates=False,
-                job_index=1,
-                preprocessing_version="v3.0",
-                section_engine=mock_section_engine,
-            )
+        result = _preprocess_single_job(
+            job_dict,
+            mock_chunker,
+            mock_counter,
+            preprocessor_v3,
+            "2026-09-24",
+            show_estimates=False,
+            job_index=1,
+            preprocessing_version="v3.0",
+        )
 
         assert result is not None
         prep_job, tokens, cost, reqs = result
         assert prep_job.preprocessing_version == "v3.0"
         assert prep_job.sectioned_requirements is not None
-        assert "requirements" in prep_job.sectioned_requirements
+        assert prep_job.sectioned_requirements["requirements"][0]["text"] == "Python"
         assert "sections_detected" in prep_job.sectioned_requirements
+        assert "Requirements" in prep_job.sectioned_requirements["sections_detected"]
 
     def test_preprocess_single_job_normalize_version(
         self,
@@ -275,7 +286,6 @@ class TestPreprocessSingleJobV3:
             show_estimates=False,
             job_index=1,
             preprocessing_version="3.0",  # Without v-prefix
-            section_engine=None,
         )
 
         assert result is not None

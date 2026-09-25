@@ -1300,7 +1300,6 @@ def _preprocess_single_job(
     extract_requirements: bool = True,
     show_requirements: bool = False,
     preprocessing_version: str = "v2.0",
-    section_engine: Any = None,
 ) -> Optional[tuple[Any, int, float, Optional[list[dict[str, Any]]]]]:
     """Process a single job and return preprocessed job or None on failure.
 
@@ -1353,12 +1352,9 @@ def _preprocess_single_job(
 
         # Extract sectioned requirements (Issue #281 S5) for v3.0
         sectioned_requirements_dict = None
-        if section_engine is not None:
-            from src.preprocessing.section_extractor import extract_sectioned
-
-            result = extract_sectioned(clean_text, detector=section_engine)
-            if result.requirements:
-                sectioned_requirements_dict = result.to_json()
+        result = preprocessor.extract_sectioned_requirements(clean_text)
+        if result is not None:
+            sectioned_requirements_dict = result.to_json()
 
         # Normalize preprocessing_version to v-prefixed format
         normalized_version = (
@@ -1424,7 +1420,6 @@ def _preprocess_job_file(
     extract_requirements: bool = True,
     show_requirements: bool = False,
     preprocessing_version: str = "v2.0",
-    section_engine: Any = None,
 ) -> Tuple[List[Any], int, List[dict[str, Any]]]:
     """Process all jobs in a single file.
 
@@ -1463,7 +1458,6 @@ def _preprocess_job_file(
                 extract_requirements=extract_requirements,
                 show_requirements=show_requirements,
                 preprocessing_version=preprocessing_version,
-                section_engine=section_engine,
             )
             if result:
                 prep_job, tokens, cost, requirements = result
@@ -1600,7 +1594,7 @@ def preprocess(
     """
     from datetime import date as date_class
 
-    from src.storage.job_store import JobStore
+    from src.storage.job_store import VALID_PREPROCESSING_VERSIONS, JobStore
     from src.tokenization.chunker import SemanticChunker
     from src.tokenization.counter import TokenCounter
     from src.tokenization.preprocessor import Preprocessor
@@ -1609,13 +1603,13 @@ def preprocess(
     typer.echo("🔄 Preprocessing jobs...\n")
 
     # Validate preprocessing version (Issue #281 S5)
-    clean_version = preprocessing_version.replace("v", "")
-    if clean_version not in ("1.0", "2.0", "3.0"):
+    clean_version = preprocessing_version.removeprefix("v")
+    if clean_version not in VALID_PREPROCESSING_VERSIONS:
         typer.echo(
             f"❌ Invalid preprocessing version: {preprocessing_version}",
             err=True,
         )
-        typer.echo("   Valid versions: 1.0, 2.0, 3.0", err=True)
+        typer.echo(f"   Valid versions: {', '.join(VALID_PREPROCESSING_VERSIONS)}", err=True)
         raise typer.Exit(1)
 
     # Check if doing selective re-preprocessing
@@ -1630,7 +1624,6 @@ def preprocess(
     # Initialize components
     chunker = SemanticChunker(target_chunk_size=400)
     counter = TokenCounter()
-    preprocessor = Preprocessor(extract_requirements=extract_requirements, preserve_requirement_spans=True)
     pricing_date = date_class.today().isoformat()
 
     # Initialize SectionDetector for v3.0 (built once, reused for all jobs)
@@ -1639,6 +1632,12 @@ def preprocess(
         from src.preprocessing.section_detector import SectionDetector
 
         section_engine = SectionDetector()
+
+    preprocessor = Preprocessor(
+        extract_requirements=extract_requirements,
+        preserve_requirement_spans=True,
+        section_engine=section_engine,
+    )
 
     all_preprocessed = []
     total_tokens = 0
@@ -1791,7 +1790,6 @@ def preprocess(
                 extract_requirements=extract_requirements,
                 show_requirements=show_estimates,  # Show requirements if showing estimates
                 preprocessing_version=preprocessing_version,
-                section_engine=section_engine,
             )
             all_preprocessed.extend(preprocessed_jobs)
             failed_count += file_failed
