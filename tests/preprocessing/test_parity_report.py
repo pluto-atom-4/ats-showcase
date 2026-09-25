@@ -1,18 +1,28 @@
 """MODEL-FREE tests for parity report (Issue #281 S6).
 
 Tests parity_check.py functions without requiring spaCy model.
-Uses monkeypatch to avoid model loading.
+Uses monkeypatch to avoid model loading for most tests.
+Includes regression test running real extraction path.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 from typing import Any, Optional
 from unittest.mock import MagicMock, patch
 
-import parity_check
 import pytest
+
+# Load parity_check module using importlib (no conftest.py needed)
+_SCRIPTS_DIR = Path(__file__).parent.parent.parent / "scripts"
+_PARITY_CHECK_PATH = _SCRIPTS_DIR / "parity_check.py"
+
+_spec = importlib.util.spec_from_file_location("parity_check", _PARITY_CHECK_PATH)
+parity_check = importlib.util.module_from_spec(_spec)
+sys.modules["parity_check"] = parity_check
+_spec.loader.exec_module(parity_check)
 
 
 @pytest.fixture
@@ -85,7 +95,7 @@ class TestExtractV3Metrics:
         try:
             count, sections, req_by_section, avg_conf = parity_check._extract_v3_metrics(text)
 
-            # Assertions: exact behavior based on v3 extraction
+            # Assertions: exact types and ranges
             assert isinstance(count, int)
             assert count >= 0
             assert isinstance(sections, list)
@@ -99,10 +109,12 @@ class TestExtractV3Metrics:
             assert "section_requirements" in [s.lower() for s in sections]
 
             # Benefits/Compensation should NOT be in requirements_by_section
-            # (filtered by SKIP_SECTIONS)
-            req_labels = set(req_by_section.keys())
-            assert "benefits" not in req_labels or req_by_section.get("benefits", 0) == 0
-            assert "compensation" not in req_labels or req_by_section.get("compensation", 0) == 0
+            # (filtered by SKIP_SECTIONS in v3 extraction)
+            # If "benefits" or "compensation" are present, their count must be 0
+            if "benefits" in req_by_section:
+                assert req_by_section["benefits"] == 0
+            if "compensation" in req_by_section:
+                assert req_by_section["compensation"] == 0
 
         finally:
             prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
@@ -151,6 +163,32 @@ class TestExtractV3Metrics:
             assert avg_conf == 0.0
         finally:
             prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
+
+    def test_v3_metrics_real_extraction_regression(self, parity_benefits_heavy_fixture: Path) -> None:
+        """REGRESSION: Real v3 extraction without monkeypatching (no model-free guarantee violation)."""
+        text = parity_check._load_fixture(parity_benefits_heavy_fixture)
+        assert text is not None
+
+        # Run REAL extraction path without monkeypatch
+        # extract_sectioned() is model-free, so this should work
+        try:
+            count, sections, req_by_section, avg_conf = parity_check._extract_v3_metrics(text)
+
+            # Verify types and ranges
+            assert isinstance(count, int)
+            assert count >= 0
+            assert isinstance(sections, list)
+            assert all(isinstance(s, str) for s in sections)
+            assert isinstance(req_by_section, dict)
+            assert isinstance(avg_conf, float)
+            assert 0.0 <= avg_conf <= 1.0
+
+            # Verify consistency between count and req_by_section sum
+            section_sum = sum(req_by_section.values())
+            assert section_sum == count
+        except Exception as e:
+            # If real extraction fails, it's a regression - propagate error
+            pytest.fail(f"Real v3 extraction failed (not model-free?): {e}")
 
 
 class TestExtractLegacyMetrics:
@@ -274,7 +312,7 @@ class TestGenerateParityReport:
             with patch.object(parity_check, "_check_model_available", return_value=False):
                 report, exit_code = parity_check._generate_parity_report([parity_benefits_heavy_fixture])
 
-            # Assertions on report format
+            # Assertions on report content
             assert "Parity Report" in report
             assert "parity_benefits_heavy.md" in report
             assert "Status" in report
@@ -315,8 +353,10 @@ class TestGenerateParityReport:
 
             assert table_start >= 0, "Table header not found"
             # Next line should be separator (|---|---|...)
-            assert "|" in lines[table_start + 1]
-            assert "-" in lines[table_start + 1]
+            separator_line = lines[table_start + 1]
+            assert separator_line.startswith("|")
+            assert separator_line.endswith("|")
+            assert "-" in separator_line
         finally:
             prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
 
@@ -340,7 +380,8 @@ class TestGenerateParityReport:
             output_file.write_text(report, encoding="utf-8")
 
             assert output_file.exists()
-            assert len(output_file.read_text()) > 0
+            # Exact check: file has content and matches report
+            assert output_file.read_text() == report
         finally:
             prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
 

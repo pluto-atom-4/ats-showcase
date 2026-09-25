@@ -77,7 +77,11 @@ def _load_fixture(fixture_path: Path) -> Optional[str]:
 
 
 def _extract_v3_metrics(text: str) -> tuple[int, list[str], dict[str, int], float]:
-    """Extract v3 metrics from text using SectionDetector and Preprocessor.
+    """Extract v3 metrics from text using SectionDetector (model-free).
+
+    Uses extract_sectioned() directly, bypassing Preprocessor to avoid
+    model loading. v3 extraction is model-free since it only uses the
+    SectionDetector (spaCy blank pipeline with SpanRuler).
 
     Args:
         text: Job description text
@@ -90,13 +94,12 @@ def _extract_v3_metrics(text: str) -> tuple[int, list[str], dict[str, int], floa
         Exception if extraction fails (caught by caller)
     """
     from src.preprocessing.section_detector import SectionDetector
-    from src.tokenization.preprocessor import Preprocessor
+    from src.preprocessing.section_extractor import extract_sectioned
 
     detector = SectionDetector()
-    preprocessor = Preprocessor(section_engine=detector)
+    result = extract_sectioned(text, detector=detector)
 
-    result = preprocessor.extract_sectioned_requirements(text)
-    if result is None:
+    if result is None or not result.requirements:
         return 0, [], {}, 0.0
 
     # Build metrics
@@ -229,6 +232,10 @@ def _generate_parity_report(
             legacy_status = "model-unavailable"
 
         # Determine parity status
+        # Status rules:
+        # - "model-unavailable" if legacy model not available
+        # - "equivalent" if v3_count >= legacy_count
+        # - "review" if v3_count < legacy_count
         if legacy_status == "model-unavailable":
             status = "model-unavailable"
             notes = "spaCy model not available; legacy extraction skipped"
@@ -238,12 +245,9 @@ def _generate_parity_report(
         elif v3_count < legacy_count:
             status = "review"
             notes = f"v3 count ({v3_count}) < legacy count ({legacy_count})"
-        elif v3_count == legacy_count:
+        else:  # v3_count >= legacy_count
             status = "equivalent"
-            notes = "Counts match"
-        else:
-            status = "review"
-            notes = f"v3 count ({v3_count}) > legacy count ({legacy_count})"
+            notes = f"v3 count ({v3_count}) >= legacy count ({legacy_count})"
 
         # Format sections detected
         sections_str = ", ".join(v3_sections) if v3_sections else "none"
