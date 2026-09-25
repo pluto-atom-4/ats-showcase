@@ -50,6 +50,9 @@ from src.poc.tweak.spacy_pipeline import (
 )
 from src.poc.tweak.spacy_pipeline.heading_promoter import HeadingPromoter
 
+# Allowed description_selector_match strategies
+DESCRIPTION_MATCH_STRATEGIES = {"first", "all", "longest"}
+
 
 @dataclass
 class JobResult:
@@ -170,6 +173,7 @@ def process_job(
     skill_processor: SkillProcessor,
     tech_processor: TechnologyProcessor,
     description_selector: Optional[str] = None,
+    description_match: str = "first",
     heading_promoter: Optional[HeadingPromoter] = None,
 ) -> JobResult:
     """Process a single job through the markdown pipeline.
@@ -200,6 +204,8 @@ def process_job(
         skill_processor: SkillProcessor instance
         tech_processor: TechnologyProcessor instance
         description_selector: Optional CSS selector to scope HTML fragment before processing
+        description_match: Strategy for multi-match selection: "first", "all", or "longest"
+                          (default "first"). Invalid values treated as "first" with warning.
         heading_promoter: Optional HeadingPromoter instance for promoting plain-text headings
                           (default None skips heading promotion)
 
@@ -231,12 +237,23 @@ def process_job(
     if raw_html is None:
         raw_html = ""
 
-    # Stage 0: Scope to selector if provided (Issue #363)
+    # Stage 0: Validate and apply description_match strategy (Issue #367)
+    effective_strategy = description_match
+    if description_match not in DESCRIPTION_MATCH_STRATEGIES:
+        # Invalid strategy: log warning and use "first"
+        result.add_warning(
+            "html_scoping",
+            f"Invalid description_selector_match value '{description_match}'; "
+            f"allowed values are {sorted(DESCRIPTION_MATCH_STRATEGIES)}; falling back to 'first'",
+        )
+        effective_strategy = "first"
+
+    # Stage 1: Scope to selector if provided (Issue #363, #367)
     if description_selector:
         try:
             from src.poc.tweak.html_scope import scope_to_selector
 
-            scope_result = scope_to_selector(raw_html, description_selector)
+            scope_result = scope_to_selector(raw_html, description_selector, strategy=effective_strategy)
 
             # Handle different match scenarios
             if scope_result.match_count == 0:
@@ -248,13 +265,18 @@ def process_job(
             elif scope_result.fragment:
                 # Have a fragment (matched 1+ elements)
                 if scope_result.match_count > 1:
-                    # Multiple matches: warn and use first
+                    # Multiple matches: warn with strategy name
+                    strategy_msg = {
+                        "first": "using first match",
+                        "all": "using all matches",
+                        "longest": "using longest match",
+                    }.get(effective_strategy, "using first match")
                     result.add_warning(
                         "html_scoping",
                         f"Selector '{description_selector}' matched {scope_result.match_count} "
-                        "elements; using first match",
+                        f"elements; {strategy_msg}",
                     )
-                # Use the scoped fragment (single or first of multiple)
+                # Use the scoped fragment (single or strategy-selected of multiple)
                 raw_html = scope_result.fragment
         except ValueError as e:
             # Invalid CSS selector: warn and use full HTML
@@ -263,28 +285,28 @@ def process_job(
                 f"Invalid CSS selector '{description_selector}': {e}; processing full HTML",
             )
 
-    # Stage 1: Preprocess
+    # Stage 2: Preprocess
     try:
         clean_html = preprocessor.process(raw_html)
     except Exception as e:
         result.add_error("preprocessor", str(e))
         return result
 
-    # Stage 2: Convert to Markdown
+    # Stage 3: Convert to Markdown
     try:
         markdown = converter.process(clean_html)
     except Exception as e:
         result.add_error("converter", str(e))
         return result
 
-    # Stage 3: Polish Markdown
+    # Stage 4: Polish Markdown
     try:
         polished_markdown = polisher.process(markdown)
     except Exception as e:
         result.add_error("polisher", str(e))
         return result
 
-    # Stage 3b: Promote plain-text headings (optional, Issue #365)
+    # Stage 4b: Promote plain-text headings (optional, Issue #365)
     promoted_markdown = polished_markdown
     if heading_promoter is not None:
         try:
@@ -293,12 +315,12 @@ def process_job(
             result.add_error("heading_promoter", str(e))
             # Non-fatal: continue with unpromoted markdown
 
-    # Stage 4: Parse sections using MarkdownSpanRuler
+    # Stage 5: Parse sections using MarkdownSpanRuler
     try:
         sections = ruler.parse(promoted_markdown)
         result.sections_detected = len(sections)
 
-        # Stage 5: Classify each section and aggregate confidence stats
+        # Stage 6: Classify each section and aggregate confidence stats
         if sections:
             confidences = []
             markdown_sections = []
@@ -395,7 +417,7 @@ def process_job(
         # Errors in section parsing/classification do not halt further processing;
         # we report sections detected and partial confidence stats if any
 
-    # Stages 6-8: Extract requirements, skills, technologies from doc (per-stage error handling)
+    # Stages 7-9: Extract requirements, skills, technologies from doc (per-stage error handling)
     try:
         # Create a spaCy Doc for extraction using the fully-configured nlp pipeline
         # This ensures all extensions and components are available
@@ -438,7 +460,10 @@ def process_job(
 
 
 def run_batch(
-    input_path: str, description_selector: Optional[str] = None, promote_headings: bool = True
+    input_path: str,
+    description_selector: Optional[str] = None,
+    description_match: str = "first",
+    promote_headings: bool = True,
 ) -> List[JobResult]:
     """Run batch processing on all jobs in input file.
 
@@ -448,6 +473,8 @@ def run_batch(
     Args:
         input_path: Path to JSON file with job records
         description_selector: Optional CSS selector to scope HTML fragments
+        description_match: Strategy for multi-match selection ("first", "all", "longest").
+                          Default "first".
         promote_headings: Whether to promote plain-text headings (default True, Issue #365)
 
     Returns:
@@ -506,6 +533,7 @@ def run_batch(
             skill_processor=skill_processor,
             tech_processor=tech_processor,
             description_selector=description_selector,
+            description_match=description_match,
             heading_promoter=heading_promoter,
         )
         results.append(result)
@@ -643,6 +671,41 @@ def _resolve_description_selector(company: str, config_dir: str) -> str:
     return description_selector
 
 
+def _resolve_description_match(company: str, config_dir: str) -> str:
+    """Resolve description_selector_match from company config (lazy import, Issue #367).
+
+    Loads company configs only when called (lazy import to avoid playwright/spaCy imports
+    when --company flag is not used).
+
+    Returns "first" (default) if the key is not present in config.
+
+    Args:
+        company: Company config key or name to search for
+        config_dir: Directory containing config JSON files
+
+    Returns:
+        The description_selector_match value from matched company config,
+        or "first" if key is absent
+
+    Raises:
+        ValueError: If company not found
+    """
+    # Lazy import: only import common.py when --company is used
+    from src.poc.tweak.common import load_all_company_configs, resolve_company_selectors
+
+    merged_config = load_all_company_configs(config_dir)
+
+    # Try to resolve selectors for the given company
+    selectors = resolve_company_selectors(company, merged_config)
+
+    if not selectors:
+        # No selectors found for this company
+        raise ValueError(f"No configuration found for company '{company}' in {config_dir}")
+
+    # Return the strategy value, or "first" if key is absent
+    return selectors.get("description_selector_match", "first")
+
+
 def main() -> int:
     """CLI entry point for batch processor.
 
@@ -685,18 +748,23 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    # Resolve description_selector from --company if provided
+    # Resolve description_selector and description_selector_match from --company if provided
     description_selector = None
+    description_match = "first"
     if args.company:
         try:
             description_selector = _resolve_description_selector(args.company, args.config_dir)
+            description_match = _resolve_description_match(args.company, args.config_dir)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
 
     try:
         results = run_batch(
-            args.input_path, description_selector=description_selector, promote_headings=not args.no_promote_headings
+            args.input_path,
+            description_selector=description_selector,
+            description_match=description_match,
+            promote_headings=not args.no_promote_headings,
         )
         print_summary(results)
 
