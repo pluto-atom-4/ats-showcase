@@ -489,7 +489,7 @@ class TestGenerateParityReport:
             # Exception should NOT set exit code to 1; exit code should be 0
             assert exit_code == 0
             # Report should mention error
-            assert "error" in report.lower()
+            assert "| error | Error |" in report
             assert "Extraction failed" in report
         finally:
             prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]

@@ -52,7 +52,7 @@ def _check_model_available(model_name: str) -> bool:
     if spacy is None:
         return False
     try:
-        return spacy.util.is_package(model_name)
+        return bool(spacy.util.is_package(model_name))
     except Exception:
         return False
 
