@@ -247,3 +247,174 @@ class TestSkillProcessorLineSegmentation:
         # "building scalable systems" or similar should appear exactly once
         building_count = sum(1 for s in skill_texts if "building" in s and "scalable" in s)
         assert building_count == 1
+
+
+class TestSkillProcessorNounLedBullets:
+    """Test noun-led fallback for bullet-point skills (Issue #372)."""
+
+    def test_comma_separated_skills_extracted(self, nlp) -> None:
+        """Comma-separated skills without action verb -> noun-led extraction.
+
+        Test case: "Python, C++, SQL" under "Technical Skills" title.
+        Expected: exactly {"python","c++","sql"}
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        section = _make_section(title="Technical Skills", content="Python, C++, SQL")
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        skill_texts = {s["skill"] for s in doc._.skills}
+        assert skill_texts == {"python", "c++", "sql"}
+
+    def test_bullet_points_with_qualifiers_stripped(self, nlp) -> None:
+        """Bullet points with trailing qualifiers -> qualifiers removed.
+
+        Test case: "* Python experience required" + "* C++ preferred"
+        Expected: {"python","c++"}
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = "* Python experience required\n* C++ preferred"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        skill_texts = {s["skill"] for s in doc._.skills}
+        assert skill_texts == {"python", "c++"}
+
+    def test_mixed_verb_led_and_noun_led(self, nlp) -> None:
+        """Mixed section with verb-led and noun-led lines -> both extracted.
+
+        Verb-led line should use Matcher, noun-led line should use fallback.
+        Both should be present in results.
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = "Building scalable systems\n* Python required"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        skill_texts = {s["skill"] for s in doc._.skills}
+        # Should contain both verb-led skills (like "building scalable systems")
+        # and noun-led skills (like "python")
+        assert "python" in skill_texts
+        assert any("building" in s for s in skill_texts)
+
+    def test_non_skills_section_yields_nothing(self, nlp) -> None:
+        """Non-SKILLS section with noun-led lines -> no extraction.
+
+        Section classified as QUALIFICATIONS, not SKILLS, should not extract.
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = "* Python required\n* C++ preferred"
+        section = _make_section(title="Qualifications", content=content)
+        tc = TypeClassification(SectionType.QUALIFICATIONS, 0.85, ("qualification",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        assert doc._.skills == []
+
+    def test_low_confidence_skills_section_skipped(self, nlp) -> None:
+        """Low-confidence SKILLS section (below gate) -> extraction skipped.
+
+        SKILLS confidence < min_confidence (0.70) should be skipped.
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = "* Python required\n* C++ preferred"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.50, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        assert doc._.skills == []
+
+    def test_dedup_across_lines_title_echo_skipped(self, nlp) -> None:
+        """Dedup across lines, title echoes skipped, blank lines ignored.
+
+        Test:
+        - Duplicate skills across lines should be deduplicated
+        - Title line echoing section title should not emit a skill
+        - Blank or marker-only lines should yield nothing
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        content = (
+            "Technical Skills\n"  # Title echo - should be skipped
+            "* Python required\n"
+            "* Python preferred\n"  # Duplicate of above
+            "* C++ required\n"
+            "\n"  # Blank line
+            "- \n"  # Marker-only line
+            "*\n"  # Another marker-only
+        )
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        skill_texts = {s["skill"] for s in doc._.skills}
+        # Should have exactly python and c++, no duplicates, no title echo
+        assert skill_texts == {"python", "c++"}
+        # Verify "technical skills" was not extracted
+        assert "technical skills" not in skill_texts
+
+    def test_worksource_shaped_e2e(self, nlp) -> None:
+        """End-to-end test with WorkSource-shaped text.
+
+        Uses text from test_heading_promoter.py:288-317:
+        - Section: Technical Skills
+        - Content: "* Python experience required" + "* C++ preferred"
+
+        Expected result: ["python","c++"] (order-insensitive)
+        """
+        processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
+
+        # WorkSource-shaped text for Technical Skills section
+        content = "* Python experience required\n* C++ preferred"
+        section = _make_section(title="Technical Skills", content=content)
+        tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
+        classification = SectionClassification.from_type_classifications([tc])
+
+        doc = nlp("Test document")
+        doc._.classified_sections = [(section, classification)]
+
+        # Run skill processor
+        doc = processor(doc)
+
+        # Extract skills
+        skill_texts = {s["skill"] for s in doc._.skills}
+
+        # Should contain python and c++ (order-insensitive)
+        assert "python" in skill_texts
+        assert "c++" in skill_texts

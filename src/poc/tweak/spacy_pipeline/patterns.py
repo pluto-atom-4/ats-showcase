@@ -301,3 +301,31 @@ TECH_TERMS: Set[str] = {
     "gitlab",
     "jira",
 }
+
+
+# =============================================================================
+# NOUN-LED SKILL FALLBACK PATTERNS (Issue #372)
+# =============================================================================
+
+QUALIFIER_STOPLIST: Set[str] = {
+    "required",
+    "preferred",
+    "experience",
+    "proficiency",
+    "plus",
+    "a plus",
+    "desired",
+    "nice to have",
+    "ideal",
+    "essential",
+    "mandatory",
+    "strong",
+    "expertise",
+    "ability",
+    "knowledge",
+    "background",
+    "understanding",
+    "qualification",
+    "skill",
+    "skills",
+}
