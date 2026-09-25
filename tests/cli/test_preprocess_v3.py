@@ -2,13 +2,15 @@
 
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from typer.testing import CliRunner
 
-from src.cli import app
+from src.cli import _build_sectioned_requirements, app
 from src.models.job import PreprocessedJob
+from src.preprocessing.section_detector import SectionDetector
+from src.tokenization.preprocessor import Preprocessor
 
 runner = CliRunner()
 
@@ -37,12 +39,6 @@ class TestPreprocessVersionValidation:
             # Cleanup
             if jobs_file.exists():
                 jobs_file.unlink()
-
-    def test_preprocess_default_version_is_2_0(self) -> None:
-        """Default preprocessing version is v2.0."""
-        # This is tested implicitly by checking PreprocessedJob defaults
-        # The default is set in the CLI option
-        assert True  # Placeholder
 
 
 class TestPreprocessModelDefaults:
@@ -123,6 +119,73 @@ class TestPreprocessModelDefaults:
         assert job.sectioned_requirements == sectioned
 
 
+class TestBuildSectionedRequirements:
+    """Test _build_sectioned_requirements helper with real detector."""
+
+    def test_build_sectioned_requirements_with_real_detector(self, monkeypatch: Any) -> None:
+        """Real Preprocessor with SectionDetector extracts requirements correctly."""
+        # Monkeypatch to skip spaCy model loading
+        monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
+
+        # Create real detector and preprocessor
+        detector = SectionDetector()
+        preprocessor = Preprocessor(extract_requirements=False, section_engine=detector)
+
+        # Test text with Requirements section and Benefits section
+        clean_text = """## Requirements
+- 5+ years Python experience required
+- Must know SQL
+
+## Benefits
+- Health insurance
+- 401k matching"""
+
+        # Call the helper
+        result = _build_sectioned_requirements(preprocessor, clean_text)
+
+        # Print real output first for verification
+        print("\n=== Real Sectioned Requirements Output ===")
+        print(f"Result type: {type(result)}")
+        print(f"Result: {result}")
+
+        # Assert exact values
+        assert result is not None, "Should return dict for v3.0 with section_engine"
+        assert isinstance(result, dict), "Should return dict, not SectionedResult object"
+        assert "requirements" in result, "Must have 'requirements' key"
+        assert "sections_detected" in result, "Must have 'sections_detected' key"
+        assert "schema_version" in result, "Must have 'schema_version' key"
+        assert result["schema_version"] == "3.0", "Schema version must be 3.0"
+
+        # Check that requirements were extracted from Requirements section
+        requirements = result["requirements"]
+        assert len(requirements) > 0, "Should have extracted requirements"
+        # Verify first requirement is from Requirements section
+        req_texts = [req["text"] for req in requirements]
+        assert any("Python" in t for t in req_texts), "Should extract Python requirement"
+        assert any("SQL" in t for t in req_texts), "Should extract SQL requirement"
+
+        # Check sections detected includes Requirements
+        sections = result["sections_detected"]
+        assert "SECTION_REQUIREMENTS" in sections, "Should detect SECTION_REQUIREMENTS"
+        # Benefits may or may not be detected depending on matching requirements
+
+    def test_build_sectioned_requirements_without_engine_returns_none(self, monkeypatch: Any) -> None:
+        """Preprocessor without section_engine returns None (v2.0 path)."""
+        monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
+
+        # Create preprocessor WITHOUT section_engine (v2.0 behavior)
+        preprocessor = Preprocessor(extract_requirements=False, section_engine=None)
+
+        clean_text = """## Requirements
+- Python
+- SQL"""
+
+        result = _build_sectioned_requirements(preprocessor, clean_text)
+
+        # Must return None when engine is not configured
+        assert result is None, "Should return None when section_engine is None"
+
+
 class TestPreprocessSingleJobV3:
     """Test _preprocess_single_job with v3.0 and sectioned requirements."""
 
@@ -156,12 +219,6 @@ class TestPreprocessSingleJobV3:
         counter.model = "claude-sonnet-5"
         return counter
 
-    @pytest.fixture
-    def mock_section_engine(self) -> MagicMock:
-        """Create mock SectionDetector."""
-        detector = MagicMock()
-        return detector
-
     def test_preprocess_single_job_v2_no_sectioned_requirements(
         self,
         mock_preprocessor: MagicMock,
@@ -192,75 +249,6 @@ class TestPreprocessSingleJobV3:
         prep_job, tokens, cost, reqs = result
         assert prep_job.preprocessing_version == "v2.0"
         assert prep_job.sectioned_requirements is None
-
-    def test_preprocess_single_job_v3_with_real_detector(
-        self,
-        mock_preprocessor: MagicMock,
-        mock_chunker: MagicMock,
-        mock_counter: MagicMock,
-    ) -> None:
-        """v3.0 jobs with real SectionDetector extract sectioned_requirements."""
-        from src.cli import _preprocess_single_job
-
-        # Create a preprocessor with section_engine support
-        preprocessor_v3 = MagicMock()
-        preprocessor_v3.extract_entities = MagicMock(return_value=([], [], []))
-        preprocessor_v3.extract_sectioned_requirements = MagicMock()
-
-        # Create test text with requirements section
-        clean_text = "Test Job Description\n\n## Requirements\n- Python\n- SQL"
-
-        # Mock the result
-        from src.preprocessing.section_extractor import RequirementItem, SectionedResult
-        from src.preprocessing.section_patterns import SectionLabel
-
-        req_item = RequirementItem(
-            text="Python",
-            trigger_word="requires",
-            base_confidence=0.9,
-            section_boost=0.05,
-            final_confidence=0.95,
-            source_section=SectionLabel.REQUIREMENTS,
-            section_display_name="Requirements",
-        )
-
-        mock_result = SectionedResult(
-            requirements=(req_item,),
-            sections_detected=("Requirements",),
-            requirements_by_section={"Requirements": 1},
-        )
-        preprocessor_v3.extract_sectioned_requirements.return_value = mock_result
-
-        # Mock doc object
-        doc = MagicMock()
-        doc._ = MagicMock()
-        doc._.requirements = None
-        preprocessor_v3.nlp = MagicMock(return_value=doc)
-
-        job_dict = {
-            "title": "Test Job",
-            "company": "TestCo",
-            "description": clean_text,
-        }
-
-        result = _preprocess_single_job(
-            job_dict,
-            mock_chunker,
-            mock_counter,
-            preprocessor_v3,
-            "2026-09-24",
-            show_estimates=False,
-            job_index=1,
-            preprocessing_version="v3.0",
-        )
-
-        assert result is not None
-        prep_job, tokens, cost, reqs = result
-        assert prep_job.preprocessing_version == "v3.0"
-        assert prep_job.sectioned_requirements is not None
-        assert prep_job.sectioned_requirements["requirements"][0]["text"] == "Python"
-        assert "sections_detected" in prep_job.sectioned_requirements
-        assert "Requirements" in prep_job.sectioned_requirements["sections_detected"]
 
     def test_preprocess_single_job_normalize_version(
         self,

@@ -1289,6 +1289,25 @@ def _validate_and_load_job_files(extracted_dir: Path) -> List[Path]:
     return job_files
 
 
+def _build_sectioned_requirements(preprocessor: Any, clean_text: str) -> Optional[dict[str, Any]]:
+    """Extract sectioned requirements using preprocessor's section_engine.
+
+    Returns None if section_engine is not configured (v2.0 and earlier).
+    Otherwise returns the to_json() dict from SectionedResult.
+
+    Args:
+        preprocessor: Preprocessor instance with optional section_engine
+        clean_text: Cleaned job description text
+
+    Returns:
+        Dict representation of SectionedResult, or None if no engine configured
+    """
+    result = preprocessor.extract_sectioned_requirements(clean_text)
+    if result is not None:
+        return result.to_json()  # type: ignore[no-any-return]
+    return None
+
+
 def _preprocess_single_job(
     job_dict: dict[str, Any],
     chunker: Any,
@@ -1314,7 +1333,6 @@ def _preprocess_single_job(
         extract_requirements: Whether to extract trigger-based requirements
         show_requirements: Whether to display requirements in CLI output
         preprocessing_version: Version tag for preprocessing pipeline (v1.0, v2.0, or v3.0)
-        section_engine: SectionDetector instance for v3.0 (optional, only when version is 3.0)
 
     Returns:
         Tuple of (PreprocessedJob, token_count, cost, requirements) or None if processing fails
@@ -1351,10 +1369,7 @@ def _preprocess_single_job(
                 trigger_requirements_json = json.dumps(requirements_data, ensure_ascii=False)
 
         # Extract sectioned requirements (Issue #281 S5) for v3.0
-        sectioned_requirements_dict = None
-        result = preprocessor.extract_sectioned_requirements(clean_text)
-        if result is not None:
-            sectioned_requirements_dict = result.to_json()
+        sectioned_requirements_dict = _build_sectioned_requirements(preprocessor, clean_text)
 
         # Normalize preprocessing_version to v-prefixed format
         normalized_version = (
