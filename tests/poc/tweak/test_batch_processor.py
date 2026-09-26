@@ -352,7 +352,7 @@ class TestRunBatch:
         preamble = result.markdown_sections[0]
         assert preamble.heading == "", f"Preamble should have empty heading, got {preamble.heading}"
         # (MarkdownSection with title=None is exported as heading="")
-        assert preamble.start_line == 0, f"Preamble should start at line 0, got {preamble.start_line}"
+        assert preamble.line_start == 0, f"Preamble should start at line 0, got {preamble.line_start}"
 
         # Subsequent sections should have actual headings
         role_section = result.markdown_sections[1]
