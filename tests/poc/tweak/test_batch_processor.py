@@ -302,6 +302,69 @@ class TestRunBatch:
         # This job may have content to process
         assert isinstance(job2_result.sections_detected, int)
 
+    def test_batch_processor_preamble_handling_regression(self, tmp_path):
+        """Test MarkdownSpanRuler preamble handling (Issue #373 regression).
+
+        Verifies that text before the first markdown heading is captured
+        as a separate section with title=None and level=-2, and that
+        metadata (start_line, end_line, word_count) is computed correctly
+        for the preamble and subsequent sections.
+        """
+        # Arrange - job with metadata header before first markdown section
+        test_file = tmp_path / "preamble_test.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job-preamble",
+                        "title": "Developer Position",
+                        "company": "TestCorp",
+                        "description": (
+                            "Company: TestCorp\n"
+                            "Location: Remote\n"
+                            "Posted: 2026-09-25\n"
+                            "\n"
+                            "## Role Overview\n"
+                            "We are looking for a developer.\n"
+                            "\n"
+                            "## Requirements\n"
+                            "* 5+ years Python\n"
+                            "* Django experience"
+                        ),
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(str(test_file))
+
+        # Assert
+        assert len(results) == 1
+        result = results[0]
+        assert result.job_id == "job-preamble"
+        assert not result.has_errors(), f"Batch processor should not error on preamble: {result.errors}"
+
+        # Check that markdown_sections includes the preamble
+        assert len(result.markdown_sections) >= 2, "Should have at least 2 sections: preamble + Role Overview"
+
+        # First section should be the preamble (title=None, level=-2)
+        preamble = result.markdown_sections[0]
+        assert preamble.heading == "", f"Preamble should have empty heading, got {preamble.heading}"
+        # (MarkdownSection with title=None is exported as heading="")
+        assert preamble.start_line == 0, f"Preamble should start at line 0, got {preamble.start_line}"
+
+        # Subsequent sections should have actual headings
+        role_section = result.markdown_sections[1]
+        assert role_section.heading == "Role Overview", (
+            f"Second section should be 'Role Overview', got {role_section.heading}"
+        )
+
+        # sections_detected should include the preamble
+        assert result.sections_detected >= 2, (
+            f"sections_detected should include preamble, got {result.sections_detected}"
+        )
+
 
 class TestHTMLScoping:
     """Tests for HTML scoping via description_selector (Issue #363)."""
