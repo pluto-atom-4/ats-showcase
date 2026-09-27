@@ -7,6 +7,7 @@ Tests cover:
 - Metadata calculation (word_count, line_count, has_list)
 - Export formats (dict, JSON)
 - Edge cases (empty sections, unicode, special characters)
+- Preamble handling (text before first header)
 """
 
 import json
@@ -455,6 +456,129 @@ class TestEdgeCases:
         text = "## Items\n\n* First item\n  continued here\n* Second item"
         sections = ruler.parse(text)
         assert sections[0].has_list is True
+
+
+# ============================================================================
+# Phase 4 Tests: Preamble Handling (Issue #373)
+# ============================================================================
+
+
+class TestPreambleHandling:
+    """Test preamble text before first header."""
+
+    def test_preamble_before_first_heading(self, ruler):
+        """Preamble text before first heading is emitted as a section."""
+        text = "This is preamble text.\nMore preamble.\n\n# Heading\n\nHeading content"
+        sections = ruler.parse(text)
+        assert len(sections) == 2
+        # First section is preamble (title=None, level=-2)
+        assert sections[0].title is None
+        assert sections[0].level == -2
+        assert sections[0].start_line == 0
+        assert sections[0].end_line == 2
+        assert "This is preamble text" in sections[0].content
+        # Second section is the heading
+        assert sections[1].title == "Heading"
+        assert sections[1].level == 1
+
+    def test_preamble_with_bullets(self, ruler):
+        """Preamble with bullet points is marked as has_list=True."""
+        text = "* Item 1\n* Item 2\n\n## Section\n\nContent"
+        sections = ruler.parse(text)
+        assert len(sections) == 2
+        assert sections[0].title is None
+        assert sections[0].level == -2
+        assert sections[0].has_list is True
+        assert "Item 1" in sections[0].content
+
+    def test_whitespace_only_preamble_dropped(self, ruler):
+        """Whitespace-only preamble is dropped (not emitted as section)."""
+        text = "\n\n# Heading\n\nContent"
+        sections = ruler.parse(text)
+        assert len(sections) == 1
+        assert sections[0].title == "Heading"
+
+    def test_header_at_line_zero_no_preamble(self, ruler):
+        """When header is at line 0, no preamble section."""
+        text = "# Title\n\nContent"
+        sections = ruler.parse(text)
+        assert len(sections) == 1
+        assert sections[0].title == "Title"
+        assert sections[0].start_line == 0
+
+    def test_preamble_with_multiple_headers(self, ruler):
+        """Preamble before multiple headers."""
+        text = "Preamble text\n\n# H1\n\nContent 1\n\n## H2\n\nContent 2"
+        sections = ruler.parse(text)
+        assert len(sections) == 3
+        assert sections[0].title is None
+        assert sections[0].level == -2
+        assert sections[1].title == "H1"
+        assert sections[2].title == "H2"
+
+    def test_preamble_content_boundaries(self, ruler):
+        """Preamble section has correct start and end line indices."""
+        text = "Preamble line 1\nPreamble line 2\n\n# Heading"
+        sections = ruler.parse(text)
+        preamble = sections[0]
+        assert preamble.start_line == 0
+        assert preamble.end_line == 2  # Line with empty string before heading
+
+    def test_preamble_word_count(self, ruler):
+        """Preamble word count is calculated correctly."""
+        text = "word one word two word three\n\n# Title\n\nContent"
+        sections = ruler.parse(text)
+        assert sections[0].word_count == 6
+        assert sections[0].title is None
+
+    def test_preamble_line_count(self, ruler):
+        """Preamble line count counts non-empty lines."""
+        text = "Line 1\n\nLine 3\n\n# Title\n\nContent"
+        sections = ruler.parse(text)
+        preamble = sections[0]
+        assert preamble.line_count == 2
+
+    def test_single_dash_preamble(self, ruler):
+        """Leading --- becomes a preamble section."""
+        text = "---\n\n# Title\n\nContent"
+        sections = ruler.parse(text)
+        assert len(sections) == 2
+        assert sections[0].title is None
+        assert sections[0].level == -2
+        assert "---" in sections[0].content
+
+    def test_preamble_multiple_headers_preserves_later_sections(self, ruler):
+        """Preamble insertion doesn't affect later sections."""
+        text = "Preamble\n\n# H1\n\nC1\n\n## H2\n\nC2\n\n### H3\n\nC3"
+        sections = ruler.parse(text)
+        assert len(sections) == 4
+        # Check all headers are intact
+        assert sections[1].title == "H1"
+        assert sections[2].title == "H2"
+        assert sections[3].title == "H3"
+        # Check header levels and boundaries
+        assert sections[1].level == 1
+        assert sections[2].level == 2
+        assert sections[3].level == 3
+
+    def test_preamble_export_to_dict(self, ruler):
+        """Preamble section exports correctly to dict."""
+        text = "Preamble content\n\n# Title\n\nBody"
+        sections = ruler.parse(text)
+        result = ruler.to_dict(sections)
+        assert len(result["sections"]) == 2
+        assert result["sections"][0]["title"] is None
+        assert result["sections"][0]["level"] == -2
+
+    def test_preamble_export_to_json(self, ruler):
+        """Preamble section exports correctly to JSON."""
+        text = "Preamble\n\n# Title\n\nContent"
+        sections = ruler.parse(text)
+        json_str = ruler.to_json(sections)
+        parsed = json.loads(json_str)
+        assert len(parsed["sections"]) == 2
+        assert parsed["sections"][0]["title"] is None
+        assert parsed["sections"][0]["level"] == -2
 
 
 # ============================================================================

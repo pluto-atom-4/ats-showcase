@@ -62,9 +62,10 @@ class MarkdownSection:
     """Represents a single section in markdown text.
 
     Attributes:
-        title: Optional title extracted from the header line (None if no title found)
+        title: Optional title extracted from the header line.
+               None indicates a preamble or unlabeled section (no header).
         content: Raw content of the section (preserves original formatting)
-        level: Header level (1, 2, 3 for #/##/###; -1 for bold marker; -2 for unlabeled)
+        level: Header level (1, 2, 3 for #/##/###; -1 for bold marker; -2 for preamble/unlabeled)
         start_line: Zero-based line index where this section starts
         end_line: Zero-based line index where this section ends (inclusive)
         word_count: Number of non-empty words in content
@@ -287,11 +288,14 @@ class MarkdownSpanRuler:
         extracts content between headers, and calculates metadata for each section.
         Preserves original formatting and content exactly.
 
+        Preamble text (content before the first header) is emitted as a section
+        with title=None and level=-2. Whitespace-only preambles are dropped.
+
         Args:
             text: Raw markdown text to parse
 
         Returns:
-            List of MarkdownSection objects, one per detected section
+            List of MarkdownSection objects, one per detected section (including preamble)
 
         Example:
             >>> sections = ruler.parse("# Title\\n\\nContent\\n\\n## Section 2\\nMore content")
@@ -305,6 +309,22 @@ class MarkdownSpanRuler:
 
         # Find all section boundary lines (headers)
         boundaries = self._find_boundaries(lines)
+
+        # If there's text before the first boundary, emit it as a preamble section
+        if boundaries and boundaries[0] > 0:
+            preamble_lines = lines[0 : boundaries[0]]
+            preamble_text = "\n".join(preamble_lines).strip()
+            if preamble_text:
+                # Build preamble section with title=None, level=-2
+                preamble_section = self._build_section(
+                    lines=lines,
+                    start_line=0,
+                    end_line=boundaries[0] - 1,
+                    title=None,
+                    level=-2,
+                    content=preamble_text,
+                )
+                sections.append(preamble_section)
 
         # Extract sections between boundaries
         for i, boundary_idx in enumerate(boundaries):
@@ -324,15 +344,13 @@ class MarkdownSpanRuler:
         if not boundaries and lines:
             content = "\n".join(lines).strip()
             if content:
-                section = MarkdownSection(
-                    title=None,
-                    content=content,
-                    level=-2,
+                section = self._build_section(
+                    lines=lines,
                     start_line=0,
                     end_line=len(lines) - 1,
-                    word_count=count_words(content),
-                    line_count=len([line for line in lines if line.strip()]),
-                    has_list=detect_has_list(content),
+                    title=None,
+                    level=-2,
+                    content=content,
                 )
                 sections.append(section)
 
@@ -359,6 +377,47 @@ class MarkdownSpanRuler:
             if re.match(COMBINED_PATTERN, line.strip()):
                 boundaries.append(i)
         return boundaries
+
+    def _build_section(
+        self,
+        lines: List[str],
+        start_line: int,
+        end_line: int,
+        title: Optional[str],
+        level: int,
+        content: str,
+    ) -> MarkdownSection:
+        """Build a MarkdownSection with computed metadata.
+
+        Helper function for constructing sections with consistent metadata calculation.
+
+        Args:
+            lines: All lines of text (used to compute line_count)
+            start_line: Zero-based starting line index
+            end_line: Zero-based ending line index (inclusive)
+            title: Optional title (None for preamble/unlabeled sections)
+            level: Header level (1-3, -1, -2, etc.)
+            content: Section content (already stripped)
+
+        Returns:
+            MarkdownSection object with computed metadata
+        """
+        content_lines = lines[start_line : end_line + 1]
+        word_count = count_words(content)
+        non_empty_lines = [line for line in content_lines if line.strip()]
+        line_count = len(non_empty_lines)
+        has_list = detect_has_list(content)
+
+        return MarkdownSection(
+            title=title,
+            content=content.strip() if isinstance(content, str) else content,
+            level=level,
+            start_line=start_line,
+            end_line=end_line,
+            word_count=word_count,
+            line_count=line_count,
+            has_list=has_list,
+        )
 
     def _extract_section(self, lines: List[str], start: int, end: int) -> Optional[MarkdownSection]:
         """Extract a single section from start to end line index.
@@ -388,21 +447,13 @@ class MarkdownSpanRuler:
         content_lines = lines[start : end + 1]
         content = "\n".join(content_lines)
 
-        # Calculate metadata
-        word_count = count_words(content)
-        non_empty_lines = [line for line in content_lines if line.strip()]
-        line_count = len(non_empty_lines)
-        has_list = detect_has_list(content)
-
-        return MarkdownSection(
-            title=title,
-            content=content.strip(),
-            level=level,
+        return self._build_section(
+            lines=lines,
             start_line=start,
             end_line=end,
-            word_count=word_count,
-            line_count=line_count,
-            has_list=has_list,
+            title=title,
+            level=level,
+            content=content,
         )
 
     def to_dict(self, sections: Optional[List[MarkdownSection]] = None) -> Dict[str, Any]:
