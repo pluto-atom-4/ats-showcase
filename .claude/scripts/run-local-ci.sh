@@ -110,7 +110,7 @@ if [ "$STRICT_MODE" = true ]; then
     MYPY_ARGS="--strict"
 fi
 
-if ! uv run mypy src/ $MYPY_ARGS > "$MYPY_LOG" 2>&1; then
+if ! uv run mypy src/ tests/ $MYPY_ARGS > "$MYPY_LOG" 2>&1; then
     echo "❌ mypy type checking failed"
     cat "$MYPY_LOG"
     exit 1

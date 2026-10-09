@@ -284,7 +284,7 @@ black src/ tests/
 ruff check src/ tests/
 
 # Run type checking
-mypy src/
+mypy src/ tests/
 
 # Run tests for your changes
 uv run pytest tests/test_crawler.py -v
@@ -300,7 +300,7 @@ black src/ tests/
 ruff check src/ tests/ --fix
 
 # Type check all code
-mypy src/
+mypy src/ tests/
 
 # Run all tests with coverage
 uv run pytest tests/ -v --cov=src --cov-report=term-missing
@@ -412,7 +412,7 @@ black src/ tests/
 ruff check src/ tests/ --fix
 
 # Check (don't fix) type issues
-mypy src/
+mypy src/ tests/
 ```
 
 ### Naming Conventions
