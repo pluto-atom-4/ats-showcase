@@ -44,7 +44,7 @@ Run this checklist quarterly to verify context files remain aligned with codebas
 - [ ] All referenced file paths exist (no dead links)
 
 **AGENTS.md:**
-- [ ] Agent roles clearly defined (Architect, Coder, Reviewer, Orchestrator)
+- [ ] Agent roles clearly defined (Architect, Builder, Reviewer, Orchestrator)
 - [ ] Responsibilities don't overlap
 - [ ] Examples use current tech (Typer, Playwright, Claude API)
 - [ ] No references to removed tools or phases

@@ -15,11 +15,11 @@ Global rules for GitHub Copilot IDE completions. Path-scoped rules in [.github/i
 - [.claude/rules/](.claude/rules/) – Phase-specific guidance (crawl, preprocess, assess, etc.)
 - [.github/instructions/](instructions/) – Instruction files (CLI, code patterns, issue workflow)
 
-**Workflow:** Architect (plan) → Coder (implement) → Reviewer (verify). Gate 1 + Gate 2 before merge.
+**Workflow:** Architect (plan) → Builder (implement) → Reviewer (verify). Gate 1 + Gate 2 before merge.
 
 ### WRAP Pattern
 
-**Write** clear requirements in issues. **Refine** with Architect before coding. **Atomic** tasks in Phase 1–4. **Pair** Coder + Reviewer at verification gates.
+**Write** clear requirements in issues. **Refine** with Architect before coding. **Atomic** tasks in Phase 1–4. **Pair** Builder + Reviewer at verification gates.
 
 ## Coding Conventions
 

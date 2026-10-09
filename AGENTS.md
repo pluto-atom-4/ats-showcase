@@ -13,7 +13,7 @@ Multi-agent coordination framework for ATS Playground: role boundaries + escalat
 - ✅ Read codebase, write tasks.md + docs/
 - ❌ FORBIDDEN: Write production code
 
-### Coder/Implementer
+### Builder/Implementer
 - Implement features, write tests
 - Create commits
 - Flag design issues to Architect
@@ -37,7 +37,7 @@ Multi-agent coordination framework for ATS Playground: role boundaries + escalat
 | Role | Model | Budget | Source |
 |------|-------|--------|--------|
 | **Architect** | claude-sonnet-5 | Deep planning | `.claude/agents/architect.md` |
-| **Coder** | claude-haiku-4-5 | Synthesis | `.claude/agents/coder.md` |
+| **Builder** | claude-haiku-4-5 | Synthesis | `.claude/agents/builder.md` |
 | **Reviewer** | claude-haiku-4-5 | Code review | `.claude/agents/reviewer.md` |
 | *Default* | haiku-4-5 | (all others) | `.claude/settings.json` |
 
@@ -68,7 +68,7 @@ Reviewer verifies with local tools (not predictions): pytest ✅, ruff/black ✅
 ## Handover Protocol
 
 ```
-ARCHITECT → CODER → REVIEWER → HUMAN (merge)
+ARCHITECT → BUILDER → REVIEWER → HUMAN (merge)
 ```
 
 **Approval gates:** Gate 1 (plan) before code → Gate 2 (verification) before merge
@@ -102,7 +102,7 @@ Skills live in `.claude/skills/<name>/SKILL.md` (YAML metadata, lazy-loaded).
 | Role | tasks.md | src/ | tests/ | docs/ | CLAUDE.md | .claude/ |
 |------|----------|------|--------|-------|-----------|----------|
 | Architect | W | R | R | W | R | R |
-| Coder | R | W | W | R | ❌ | ❌ |
+| Builder | R | W | W | R | ❌ | ❌ |
 | Reviewer | R | R | R | W | R | R |
 | Human | R | R | R | R | W | W |
 

@@ -82,7 +82,7 @@ fi
 
 ## Permission Enforcement
 
-**Files Protected from Coder Modification:**
+**Files Protected from Builder Modification:**
 - `AGENTS.md` - Role governance
 - `CLAUDE.md` - Project guidance
 - `.claude/agents/**` - Agent configuration
@@ -90,14 +90,14 @@ fi
 - `.claude/skills/**` - Skill definitions
 - `.claude/settings.json` - Global configuration
 
-**Enforcement Mechanism:** `.claude/agents/coder.md` includes explicit deny rules:
+**Enforcement Mechanism:** `.claude/agents/builder.md` includes explicit deny rules:
 ```yaml
 permissions:
   write:
     deny: ["AGENTS.md", "CLAUDE.md", ".claude/agents/**", ...]
 ```
 
-If Coder attempts to modify protected files:
+If Builder attempts to modify protected files:
 - Tool layer blocks write operation
 - Fallback: Pre-commit hook catches and rejects commit
 - Escalation: Human approval required (Architect or Human role)
@@ -108,7 +108,7 @@ If Coder attempts to modify protected files:
 
 Model selection by role:
 - **Architect**: Sonnet (~$3/$15 per 1M tokens) - High reasoning for planning
-- **Coder**: Sonnet (~$3/$15 per 1M tokens) - Complex synthesis
+- **Builder**: Sonnet (~$3/$15 per 1M tokens) - Complex synthesis
 - **Reviewer**: Haiku (~$0.80/$4 per 1M tokens) - Cost-efficient QA
 
 **Projected savings**: ~60% tokens for review phase by using Haiku
@@ -118,7 +118,7 @@ Model selection by role:
 ## Related
 
 - **AGENTS.md**: Role definitions and governance framework
-- **Coder Agent**: `.claude/agents/coder.md` (deny rules)
+- **Builder Agent**: `.claude/agents/builder.md` (deny rules)
 - **CI/CD Pipeline**: `.github/workflows/quality-checks.yml` (Gate 2 automation)
 
 ---

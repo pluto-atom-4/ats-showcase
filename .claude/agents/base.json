@@ -26,9 +26,9 @@
         "ALWAYS: Gate 1 approval before cross-file changes"
       ]
     },
-    "coder": {
+    "builder": {
       "model": "claude-haiku-4-5-20251001",
-      "name": "Coder/Implementer",
+      "name": "Builder/Implementer",
       "tools": {
         "allowed": ["Read", "Write", "Edit", "Bash(uv *)", "Bash(pytest *)"],
         "denied": ["Bash(rm -rf *)", "Bash(git reset *)", "Bash(git push --force *)"],
@@ -88,37 +88,37 @@
   },
   "phases": {
     "crawl": {
-      "ownerRole": "coder",
+      "ownerRole": "builder",
       "reviewerRole": "reviewer",
       "rules": ".claude/rules/crawl.md",
       "appliesTo": ["src/browser/**", "src/parsers/**"]
     },
     "preprocess": {
-      "ownerRole": "coder",
+      "ownerRole": "builder",
       "reviewerRole": "reviewer",
       "rules": ".claude/rules/preprocess.md",
       "appliesTo": ["src/tokenization/**", "src/parsers/**"]
     },
     "verify": {
-      "ownerRole": "coder",
+      "ownerRole": "builder",
       "reviewerRole": "reviewer",
       "rules": ".claude/rules/verify.md",
       "appliesTo": ["src/cli/**"]
     },
     "assess": {
-      "ownerRole": "coder",
+      "ownerRole": "builder",
       "reviewerRole": "reviewer",
       "rules": ".claude/rules/assess.md",
       "appliesTo": ["src/llm/**", "src/assessment/**"]
     },
     "storage": {
-      "ownerRole": "coder",
+      "ownerRole": "builder",
       "reviewerRole": "reviewer",
       "rules": ".claude/rules/storage.md",
       "appliesTo": ["src/storage/**"]
     },
     "tui": {
-      "ownerRole": "coder",
+      "ownerRole": "builder",
       "reviewerRole": "reviewer",
       "rules": ".claude/rules/tui/",
       "appliesTo": ["src/tui/**"]
@@ -130,7 +130,7 @@
       "appliesTo": ["tasks.md", ".claude/**"]
     }
   },
-  "handoverProtocol": "ARCHITECT → CODER → REVIEWER → HUMAN (merge)",
+  "handoverProtocol": "ARCHITECT → BUILDER → REVIEWER → HUMAN (merge)",
   "gates": {
     "gate1": {
       "stage": "Before implementation",

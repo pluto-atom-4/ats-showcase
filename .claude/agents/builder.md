@@ -1,5 +1,5 @@
 ---
-name: coder
+name: builder
 description: Implement features, write tests, manage code changes, and flag design issues to Architect
 model: haiku # Use a strong coding model for synthesis
 tools:

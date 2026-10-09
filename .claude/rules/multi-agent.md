@@ -6,12 +6,12 @@ Agent roles during crawl, preprocess, assess, and export phases.
 
 ## Phase Coordination Pattern
 
-Each phase follows: **Architect (design) → Coder (implement) → Reviewer (test)**
+Each phase follows: **Architect (design) → Builder (implement) → Reviewer (test)**
 
 ### Crawl Phase
 
 **Architect:** Define CSS selectors in `config/companies.json`, plan rate limiting
-**Coder:** Implement `BrowserManager`, handle Playwright lifecycle, error handling
+**Builder:** Implement `BrowserManager`, handle Playwright lifecycle, error handling
 **Reviewer:** Verify extraction rate, test pagination + edge cases
 
 **Handoff:** `config/companies.json` → Crawled jobs in database
@@ -19,7 +19,7 @@ Each phase follows: **Architect (design) → Coder (implement) → Reviewer (tes
 ### Preprocess Phase
 
 **Architect:** Decide chunking strategy, set token thresholds
-**Coder:** Implement `parse_html()`, `chunk_by_sentences()`, token counting
+**Builder:** Implement `parse_html()`, `chunk_by_sentences()`, token counting
 **Reviewer:** Verify chunk sizes reasonable (100–600 tokens), check cost estimates
 
 **Handoff:** MarkItDown output → Clean chunks + token counts
@@ -27,7 +27,7 @@ Each phase follows: **Architect (design) → Coder (implement) → Reviewer (tes
 ### Verify Phase
 
 **Architect:** Define review workflow (confirm/reject/skip flow), status transitions
-**Coder:** Implement `JobReviewer` interactive CLI, persist status to DB
+**Builder:** Implement `JobReviewer` interactive CLI, persist status to DB
 **Reviewer:** Test interactive prompts, re-review workflow, filtering combinations
 
 **Handoff:** User confirmations → Job reviews saved to database
@@ -35,7 +35,7 @@ Each phase follows: **Architect (design) → Coder (implement) → Reviewer (tes
 ### Assess Phase
 
 **Architect:** Define assessment prompt, score categories, filtering logic
-**Coder:** Implement `LLMProvider`, retries, rate limiting, cost tracking
+**Builder:** Implement `LLMProvider`, retries, rate limiting, cost tracking
 **Reviewer:** Verify JSON parsing, score ranges, cost accuracy
 
 **Handoff:** Assessment prompt → Results + cost metrics in database
@@ -43,7 +43,7 @@ Each phase follows: **Architect (design) → Coder (implement) → Reviewer (tes
 ### Export Phase
 
 **Architect:** Define report structure (title, summary, job table, sorting)
-**Coder:** Implement `export_markdown()`, filtering, sorting
+**Builder:** Implement `export_markdown()`, filtering, sorting
 **Reviewer:** Verify markdown output, summary stats accuracy
 
 **Handoff:** Assessment data → Markdown report
@@ -52,7 +52,7 @@ Each phase follows: **Architect (design) → Coder (implement) → Reviewer (tes
 
 ## Handoff Checklist
 
-Before Coder starts:
+Before Builder starts:
 - [ ] Architect design doc reviewed
 - [ ] API contracts defined
 - [ ] tasks.md written + approved
