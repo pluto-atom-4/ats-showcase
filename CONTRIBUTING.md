@@ -72,10 +72,10 @@ mypy --version
 ATS Playground uses a **multi-agent coordination model** to organize development work. Read [AGENTS.md](./AGENTS.md) to understand:
 
 - **Architect/Planner**: Designs features, writes tasks.md, reads DESIGN.md
-- **Coder/Implementer**: Writes production code, implements features from tasks.md
+- **Builder/Implementer**: Writes production code, implements features from tasks.md
 - **Reviewer/Tester**: Runs tests, verifies code quality, validates against tests
 
-**Key Concept**: Work flows through handovers: Architect → tasks.md → Coder → Pull Request → Reviewer → Merge
+**Key Concept**: Work flows through handovers: Architect → tasks.md → Builder → Pull Request → Reviewer → Merge
 
 See [AGENTS.md](./AGENTS.md) for:
 - Detailed role responsibilities and boundaries

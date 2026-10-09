@@ -123,7 +123,7 @@ Phase documentation organized in `.claude/rules/`:
 - **assess.md** – Claude API integration, prompt design, rate limiting, cost tracking
 - **storage.md** – SQLite schema (FTS5), markdown export, query patterns
 - **cli.md** – Typer command structure, async patterns, error handling
-- **multi-agent.md** – Phase coordination across Architect, Coder, Reviewer roles
+- **multi-agent.md** – Phase coordination across Architect, Builder, Reviewer roles
 
 See **AGENTS.md** for role-based governance and handoff protocols.
 

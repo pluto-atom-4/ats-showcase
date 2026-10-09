@@ -18,8 +18,8 @@
           "Modify CLAUDE.md, AGENTS.md, settings.json"
         ]
       },
-      "coder": {
-        "name": "Coder/Implementer",
+      "builder": {
+        "name": "Builder/Implementer",
         "model": "claude-haiku-4.5",
         "capabilities": [
           "Implement features, write tests",
@@ -52,49 +52,49 @@
     "filePermissions": {
       "tasks.md": {
         "architect": "W",
-        "coder": "R",
+        "builder": "R",
         "reviewer": "R",
         "human": "R"
       },
       "src/**": {
         "architect": "R",
-        "coder": "W",
+        "builder": "W",
         "reviewer": "R",
         "human": "R"
       },
       "tests/**": {
         "architect": "R",
-        "coder": "W",
+        "builder": "W",
         "reviewer": "R",
         "human": "R"
       },
       "docs/**": {
         "architect": "W",
-        "coder": "R",
+        "builder": "R",
         "reviewer": "W",
         "human": "R"
       },
       "CLAUDE.md": {
         "architect": "R",
-        "coder": "DENY",
+        "builder": "DENY",
         "reviewer": "R",
         "human": "W"
       },
       "AGENTS.md": {
         "architect": "R",
-        "coder": "DENY",
+        "builder": "DENY",
         "reviewer": "R",
         "human": "W"
       },
       ".claude/**": {
         "architect": "R",
-        "coder": "DENY",
+        "builder": "DENY",
         "reviewer": "R",
         "human": "W"
       },
       ".env*": {
         "architect": "DENY",
-        "coder": "DENY",
+        "builder": "DENY",
         "reviewer": "DENY",
         "human": "W"
       }
