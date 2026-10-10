@@ -3,6 +3,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -242,7 +243,7 @@ class TestJSONExportSchemaFix:
         }
 
         # Verify ISO format can be parsed back
-        parsed = datetime.fromisoformat(job_data["crawled_date"])
+        parsed = datetime.fromisoformat(cast(str, job_data["crawled_date"]))
         assert isinstance(parsed, datetime)
 
 

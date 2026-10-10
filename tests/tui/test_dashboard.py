@@ -1,5 +1,7 @@
 """Tests for TUI dashboard and panels."""
 
+from typing import cast
+
 import pytest
 
 from src.tui.dashboard import ATPDashboard, ATPDashboardApp, HeaderPanel
@@ -27,7 +29,7 @@ class TestDashboard:
     def test_dashboard_has_bindings(self, state_manager):
         """App has required keyboard bindings for command palette."""
         app = ATPDashboardApp(state_manager)
-        bindings = [binding[0] for binding in app.BINDINGS]
+        bindings = [cast(tuple[str, ...], binding)[0] for binding in app.BINDINGS]
         assert "p" in bindings
         assert "r" in bindings
         assert "q" in bindings

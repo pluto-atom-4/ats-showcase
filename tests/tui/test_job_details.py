@@ -1,5 +1,7 @@
 """Tests for inline job details viewing feature."""
 
+from typing import cast
+
 import pytest
 
 from src.tui.dialogs.job_details import JobDetailsPanel
@@ -108,7 +110,7 @@ class TestJobTableExpansion:
 
         # Manually set up job_rows (what update_rows does)
         job_1 = state_manager.jobs["job_1"]
-        table.job_rows["row_0"] = job_1
+        table.job_rows["row_0"] = job_1  # type: ignore[index]
 
         # Test expansion
         table.expanded_job_id = "job_1"
@@ -140,7 +142,7 @@ class TestJobTableExpansion:
         # Manually setup job_rows to simulate what update_rows does
         jobs = list(state_manager.jobs.values())
         for i, job in enumerate(jobs):
-            table.job_rows[f"row_{i}"] = job
+            table.job_rows[f"row_{i}"] = job  # type: ignore[index]
 
         # Without setting cursor_row (which is read-only), verify job_rows mapping
         assert len(table.job_rows) == 2
@@ -166,7 +168,7 @@ class TestAssessmentViewingWorkflow:
             "recommendations": ["Highlight Docker", "Mention AWS"],
         }
 
-        panel = JobDetailsPanel(job_data["id"], job_data)
+        panel = JobDetailsPanel(cast(str, job_data["id"]), job_data)
         content = panel.render()
 
         assert "85" in content  # Score
