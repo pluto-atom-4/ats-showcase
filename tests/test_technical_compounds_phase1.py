@@ -4,6 +4,8 @@ This test establishes baseline metrics for technical compound detection and recl
 Tests ensure that after Phase 4, technical compounds are moved from skills to technologies.
 """
 
+from typing import Any
+
 import pytest
 
 from src.tokenization.preprocessor import Preprocessor
@@ -282,7 +284,7 @@ class TestPhase1Baseline:
 
     def test_baseline_extraction_all_jobs(self, preprocessor):
         """Test baseline extraction on all 10 jobs and report metrics."""
-        results = {
+        results: dict[str, Any] = {
             "total_jobs": len(TEST_JOBS_PHASE1),
             "total_skills_extracted": 0,
             "total_technologies_extracted": 0,

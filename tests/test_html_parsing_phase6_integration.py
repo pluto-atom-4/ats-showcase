@@ -1,6 +1,7 @@
 """Phase 4: Integration validation for HTML parsing improvement (Issue #193)."""
 
 import time
+from typing import cast
 
 import pytest
 
@@ -74,7 +75,7 @@ class TestHTMLParsingIntegration:
             skills, tech, reqs = preprocessor.extract_entities(test_case["text"])
 
             # Verify minimum expected technologies extracted
-            assert len(tech) >= test_case.get("expected_tech_min", 1), (
+            assert len(tech) >= cast(int, test_case.get("expected_tech_min", 1)), (
                 f"{test_case['name']}: Expected at least {test_case.get('expected_tech_min', 1)} tech, got {len(tech)}"
             )
 
@@ -87,7 +88,7 @@ class TestHTMLParsingIntegration:
 
             # Check fragment count is below maximum if specified
             if "max_fragments" in test_case:
-                max_frags = test_case["max_fragments"]
+                max_frags = cast(int, test_case["max_fragments"])
                 assert fragment_count <= max_frags, (
                     f"{test_case['name']}: Too many fragments ({fragment_count}), expected <={max_frags}"
                 )
