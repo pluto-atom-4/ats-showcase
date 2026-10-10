@@ -4,6 +4,7 @@ import sqlite3
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -28,7 +29,7 @@ def reviewer_with_jobs(temp_db):
         cursor = reviewer.conn.cursor()
 
         # Insert test jobs with full timeline
-        jobs = [
+        jobs: list[dict[str, Any]] = [
             {
                 "job_id": "job_1",
                 "title": "Python Dev",

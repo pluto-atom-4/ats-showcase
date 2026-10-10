@@ -78,7 +78,8 @@ class TestDescriptionNormalization:
 
     def test_normalize_none_description(self):
         """Handle None description by returning empty string."""
-        result = normalize_description(None)
+        # Intentional: test passes None at runtime to verify the guard.
+        result = normalize_description(None)  # type: ignore[arg-type]
         assert result == ""
 
     def test_normalize_plain_text_passthrough(self):
