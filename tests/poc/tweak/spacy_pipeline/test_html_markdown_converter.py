@@ -234,7 +234,8 @@ class TestHTMLMarkdownConverterFallbackModes:
     def test_invalid_fallback_mode_raises_error(self):
         """Invalid fallback_mode should raise ValueError on init."""
         with pytest.raises(ValueError, match="fallback_mode must be 'html' or 'raise'"):
-            HTMLMarkdownConverter(fallback_mode="invalid")
+            # Intentionally invalid value to exercise validation
+            HTMLMarkdownConverter(fallback_mode="invalid")  # type: ignore[arg-type]
 
     def test_fallback_mode_parameter_stored(self):
         """Fallback mode parameter should be accessible."""

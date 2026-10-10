@@ -300,7 +300,7 @@ class TestExtractDescriptionFromDetailPage:
     async def test_extract_description_no_selector_configured(self):
         """Returns None when no description selector configured."""
         mock_page = AsyncMock()
-        selectors = {}  # No description_selector
+        selectors: dict[str, str] = {}  # No description_selector
 
         result = await extract_description_from_detail_page(mock_page, "https://example.com/job", selectors)
 
