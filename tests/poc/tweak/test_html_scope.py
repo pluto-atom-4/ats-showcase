@@ -200,6 +200,7 @@ class TestScopeToSelector:
 
         # Assert
         assert result.match_count == 1
+        assert result.fragment is not None
         assert "Matching content" in result.fragment
 
     def test_attribute_selector_works(self):
@@ -216,6 +217,7 @@ class TestScopeToSelector:
 
         # Assert
         assert result.match_count == 1
+        assert result.fragment is not None
         assert "job 123" in result.fragment
         assert "job 456" not in result.fragment
 
@@ -297,6 +299,7 @@ class TestScopeToSelectorStrategies:
         # Assert
         assert result_first.fragment == result_all.fragment == result_longest.fragment
         assert result_first.match_count == result_all.match_count == result_longest.match_count == 1
+        assert result_first.fragment is not None
         assert "Single match content" in result_first.fragment
 
     def test_zero_match_unchanged_across_strategies(self):
@@ -373,6 +376,7 @@ class TestScopeToSelectorStrategies:
         # Assert
         assert result_unknown.fragment == result_first.fragment
         assert result_unknown.match_count == result_first.match_count
+        assert result_unknown.fragment is not None
         assert "First content" in result_unknown.fragment
         assert "Second content" not in result_unknown.fragment
 

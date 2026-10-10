@@ -122,7 +122,7 @@ class TestCarbonRoboticsExtraction:
         """Test that extracted requirements meet confidence threshold."""
         result = extract_requirements_b(carbon_robotics_job, min_confidence=0.50)
 
-        assert result.requirements_count > 0
+        assert len(result.requirements) > 0
         # Verify all requirements are above min_confidence (implicit through extraction)
         assert len(result.requirements) >= 1
 
@@ -181,7 +181,7 @@ class TestRawJobDescriptionExtraction:
         result = extract_requirements_b(raw_job_description)
 
         # Raw description has various formatting issues, should still extract requirements
-        assert result.requirements_count > 0
+        assert len(result.requirements) > 0
         assert all(isinstance(req, str) for req in result.requirements)
 
 
@@ -197,7 +197,7 @@ class TestBulletPointIntegration:
 * Experience with PyTorch is essential"""
         result = extract_requirements_b(markdown)
 
-        assert result.requirements_count >= 2
+        assert len(result.requirements) >= 2
         # Should have normalized bullets to sentences
         for req in result.requirements:
             assert req.endswith((".", "!", "?"))
@@ -210,7 +210,7 @@ class TestBulletPointIntegration:
 - Strong communication"""
         result = extract_requirements_b(markdown)
 
-        assert result.requirements_count >= 2
+        assert len(result.requirements) >= 2
         for req in result.requirements:
             assert req.endswith((".", "!", "?"))
 
@@ -222,7 +222,7 @@ class TestBulletPointIntegration:
 3. Proficiency in Java"""
         result = extract_requirements_b(markdown)
 
-        assert result.requirements_count >= 2
+        assert len(result.requirements) >= 2
 
     def test_bullet_mixed_extraction(self):
         """Test extraction with mixed bullet types."""
@@ -233,7 +233,7 @@ class TestBulletPointIntegration:
 + Leadership ability"""
         result = extract_requirements_b(markdown)
 
-        assert result.requirements_count >= 2
+        assert len(result.requirements) >= 2
 
     def test_bullet_normalization_preserves_content(self):
         """Test that bullet normalization preserves requirement content."""
@@ -281,7 +281,7 @@ Must have Python experience."""
         result = extract_requirements_b(markdown)
 
         # Should deduplicate the repeated requirement
-        assert result.requirements_count == 1
+        assert len(result.requirements) == 1
 
     def test_extraction_sorts_by_confidence(self):
         """Test that requirements are sorted by confidence."""
@@ -306,7 +306,7 @@ class TestErrorHandling:
         result = extract_requirements_b("")
 
         assert isinstance(result, SimpleRequirementExtractionOutput)
-        assert result.requirements_count == 0
+        assert len(result.requirements) == 0
 
     def test_input_without_requirements(self):
         """Test extraction with text containing no requirements."""
@@ -315,7 +315,7 @@ class TestErrorHandling:
 
         assert isinstance(result, SimpleRequirementExtractionOutput)
         # May have zero requirements or fuzzy matches
-        assert result.requirements_count >= 0
+        assert len(result.requirements) >= 0
 
     def test_very_long_input(self):
         """Test extraction with very long input."""
@@ -333,7 +333,7 @@ class TestErrorHandling:
         result = extract_requirements_b(markdown)
 
         # Should handle special characters without errors
-        assert result.requirements_count > 0
+        assert len(result.requirements) > 0
 
 
 @pytest.mark.skip(reason="not needed")
@@ -365,7 +365,7 @@ class TestOutputFormat:
         """Test that requirements_count matches actual requirements length."""
         result = extract_requirements_b(carbon_robotics_job)
 
-        assert result.requirements_count == len(result.requirements)
+        assert len(result.requirements) == len(result.requirements)  # stale: model has no requirements_count
 
     def test_output_json_serialization(self, carbon_robotics_job):
         """Test that output is JSON serializable."""

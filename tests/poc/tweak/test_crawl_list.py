@@ -1,6 +1,7 @@
 """Tests for crawl_list.py job extraction and company crawling."""
 
 from datetime import datetime
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -178,6 +179,7 @@ class TestParseField:
         """Test extracting to end of text when no next_field provided."""
         text = "Job types: Contract\nLocation type: Hybrid"
         result = parse_field(text, "Location type:")
+        assert result is not None
         assert result.startswith("Hybrid")
 
     def test_parse_field_none_input(self):
@@ -213,6 +215,7 @@ class TestParseField:
         """Test extracting multiline field values."""
         text = "Description: Senior role\nwith benefits\nLocation: Remote"
         result = parse_field(text, "Description:", "Location:")
+        assert result is not None
         assert "Senior role" in result
         assert "with benefits" in result
 
@@ -220,6 +223,7 @@ class TestParseField:
         """Test parsing fields with special characters."""
         text = "Salary: $120k - $150k/year\nBenefits: Healthcare, 401k"
         result = parse_field(text, "Salary:", "Benefits:")
+        assert result is not None
         assert "$120k - $150k/year" in result
 
 
@@ -284,7 +288,7 @@ class TestExtractDetailPageFields:
         with patch("src.poc.tweak.crawl_list.retry_goto", new_callable=AsyncMock) as mock_retry:
             mock_retry.return_value = False  # Navigation fails
 
-            selectors = {}
+            selectors: dict[str, str] = {}
             result = await extract_detail_page_fields(page, "https://example.com/jobs?jobId=abc123", selectors)
 
         # Should return all None values on navigation failure
@@ -335,7 +339,7 @@ class TestExtractDetailPageFields:
             page.query_selector = AsyncMock(return_value=None)
             page.wait_for_timeout = AsyncMock()
 
-            selectors = {}
+            selectors: dict[str, str] = {}
 
             result = await extract_detail_page_fields(
                 page,
@@ -378,7 +382,7 @@ class TestExtractDetailPageFields:
         with patch("src.poc.tweak.crawl_list.retry_goto", new_callable=AsyncMock) as mock_retry:
             mock_retry.side_effect = Exception("Navigation error")
 
-            selectors = {}
+            selectors: dict[str, str] = {}
             result = await extract_detail_page_fields(page, "https://example.com/jobs?jobId=abc123", selectors)
 
         # Should handle exception gracefully and return default dict
@@ -823,7 +827,7 @@ class TestExtractJobFromContainer:
             page=page,
             container=container,
             company_name="WorkSource for Jobs",
-            selectors={"title": "title", "company": ".company", "location": None, "link": None},
+            selectors=cast(dict[str, str], {"title": "title", "company": ".company", "location": None, "link": None}),
             base_url="",
         )
 
@@ -862,7 +866,9 @@ class TestExtractJobFromContainer:
             page=page,
             container=container,
             company_name="WorkSource for Jobs",
-            selectors={"title": "title", "company": "p.company-name", "location": None, "link": None},
+            selectors=cast(
+                dict[str, str], {"title": "title", "company": "p.company-name", "location": None, "link": None}
+            ),
             base_url="",
         )
 
@@ -893,7 +899,7 @@ class TestExtractJobFromContainer:
             page=page,
             container=container,
             company_name="Google",
-            selectors={"title": "title", "location": None, "link": None},
+            selectors=cast(dict[str, str], {"title": "title", "location": None, "link": None}),
             base_url="",
         )
 
