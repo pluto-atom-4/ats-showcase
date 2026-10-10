@@ -286,8 +286,8 @@ class TestPreprocessorStaticMethods:
         """_extract_from_ner populates technology and requirement sets."""
         doc = preprocessor_with_mock.nlp("Google Cloud Platform")
         tech_keywords = Preprocessor._get_tech_keywords()
-        technologies = set()
-        requirements = set()
+        technologies: set[str] = set()
+        requirements: set[str] = set()
 
         Preprocessor._extract_from_ner(doc, tech_keywords, technologies, requirements)
 
@@ -298,8 +298,8 @@ class TestPreprocessorStaticMethods:
         """_extract_from_tokens extracts skills correctly."""
         doc = preprocessor_with_mock.nlp("experienced developer with machine learning")
         tech_keywords = Preprocessor._get_tech_keywords()
-        skills = set()
-        technologies = set()
+        skills: set[str] = set()
+        technologies: set[str] = set()
 
         Preprocessor._extract_from_tokens(doc, tech_keywords, skills, technologies)
 

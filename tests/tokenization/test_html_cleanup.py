@@ -94,7 +94,8 @@ class TestIsBoilerplatePhrase:
         """Handle empty or whitespace-only input."""
         assert not is_boilerplate_phrase("")
         assert not is_boilerplate_phrase("   ")
-        assert not is_boilerplate_phrase(None)
+        # Deliberately pass None to check graceful handling.
+        assert not is_boilerplate_phrase(None)  # type: ignore[arg-type]
 
     def test_category_specific_check(self):
         """Check boilerplate by specific category."""

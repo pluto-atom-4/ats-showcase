@@ -60,7 +60,7 @@ class TestHTMLParsingBaseline:
         skills, tech, reqs = preprocessor.extract_entities(test_text)
 
         # Baseline metrics
-        metrics = {
+        metrics: dict[str, float] = {
             "total_entities": len(skills) + len(tech) + len(reqs),
             "skills_count": len(skills),
             "tech_count": len(tech),
@@ -79,7 +79,7 @@ class TestHTMLParsingBaseline:
         metrics["quality_score"] = self._calculate_quality_score(suspicious_count, len(skills) + len(tech) + len(reqs))
 
         # Store baseline metrics
-        pytest.baseline_metrics = metrics
+        pytest.baseline_metrics = metrics  # type: ignore[attr-defined]
         assert metrics["quality_score"] >= 0  # Baseline can be any value
 
     def test_fragment_count_baseline(self, preprocessor):
@@ -98,7 +98,7 @@ class TestHTMLParsingBaseline:
 
         # Baseline measurement (no assertion yet - just measurement)
         baseline_fragment_count = total_fragments
-        pytest.baseline_fragment_count = baseline_fragment_count
+        pytest.baseline_fragment_count = baseline_fragment_count  # type: ignore[attr-defined]
 
     def test_quality_score_calculation(self, preprocessor):
         """Test quality score calculation: (total_entities - suspicious) / total_entities * 100."""
@@ -110,7 +110,7 @@ class TestHTMLParsingBaseline:
         quality_score = self._calculate_quality_score(self._count_suspicious_fragments(all_entities), len(all_entities))
 
         # Store for Phase 4 comparison
-        pytest.quality_score_baseline = quality_score
+        pytest.quality_score_baseline = quality_score  # type: ignore[attr-defined]
         assert 0 <= quality_score <= 100
 
     def test_signal_to_noise_ratio_baseline(self, preprocessor):
@@ -127,7 +127,7 @@ class TestHTMLParsingBaseline:
         good_count = len([e for e in all_entities if not self._has_suspicious_pattern(e)])
         ratio = (good_count / len(all_entities) * 100) if all_entities else 0
 
-        pytest.baseline_signal_to_noise_ratio = ratio
+        pytest.baseline_signal_to_noise_ratio = ratio  # type: ignore[attr-defined]
         # Baseline target: 45%+ (before Phase 2 improvements)
         assert ratio >= 0  # Baseline can be any value
 
