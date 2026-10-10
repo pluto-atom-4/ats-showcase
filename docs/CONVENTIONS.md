@@ -465,7 +465,7 @@ git commit -m "asdasdasd"
    pytest tests/ -v
    black src/ tests/
    ruff check src/ tests/
-   mypy src/ --strict
+   mypy src/ tests/
    ```
 3. **Push & create PR**:
    ```bash
@@ -499,7 +499,7 @@ How did you test? Provide commands or screenshots.
 
 ## Checklist
 - [ ] Lint passes: `ruff check src/`
-- [ ] Type check: `mypy src/ --strict`
+- [ ] Type check: `mypy src/ tests/`
 - [ ] Tests pass: `pytest tests/ -v`
 - [ ] Coverage maintained: `--cov-report=term`
 - [ ] Docs updated (if applicable)
@@ -583,7 +583,7 @@ When code changes:
 
 - [ ] All tests pass: `pytest tests/ -v --cov=src`
 - [ ] Linting passes: `ruff check src/ tests/`
-- [ ] Type check passes: `mypy src/ --strict`
+- [ ] Type check passes: `mypy src/ tests/`
 - [ ] No secrets in commits: `git log --oneline | grep -i "key\|secret\|password"`
 - [ ] All PRs merged to main
 - [ ] Bump version in `src/__init__.py` (semantic versioning)
@@ -716,7 +716,7 @@ python -m src.cli --help
 
 **Solution**:
 - Use proper types for all function arguments
-- Run type check locally before committing: `mypy src/ --strict`
+- Run type check locally before committing: `mypy src/ tests/`
 - Update function signature or cast value
 
 ### Test Failures
@@ -750,7 +750,7 @@ pytest tests/test_llm.py -v
 # Linting
 black src/ tests/
 ruff check src/ tests/
-mypy src/ --strict
+mypy src/ tests/
 
 # Git
 git checkout -b feature/my-feature

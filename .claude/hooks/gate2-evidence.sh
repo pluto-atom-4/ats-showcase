@@ -30,7 +30,7 @@ if [ ! -d "$EVIDENCE_DIR" ]; then
     echo "Create evidence artifacts by running:"
     echo "  mkdir -p .claude/evidence"
     echo "  uv run pytest tests/ -v > .claude/evidence/pytest-output.txt 2>&1"
-    echo "  uv run mypy src/ > .claude/evidence/mypy-report.txt 2>&1 || true"
+    echo "  uv run mypy src/ tests/ > .claude/evidence/mypy-report.txt 2>&1 || true"
     echo "  uv run ruff check src/ > .claude/evidence/ruff-check.txt 2>&1 || true"
     echo ""
     exit 0
