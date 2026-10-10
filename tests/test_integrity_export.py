@@ -226,6 +226,7 @@ def test_csv_has_correct_headers(exporter, sample_records, tmp_path):
     with open(output_file) as f:
         reader = csv.DictReader(f)
         headers = reader.fieldnames
+        assert headers is not None
         assert "issue_type" in headers
         assert "severity" in headers
         assert "table" in headers

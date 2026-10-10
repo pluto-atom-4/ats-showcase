@@ -287,6 +287,7 @@ class TestMultiCompanyReview:
         assert stats.total == 4
 
         # Verify all confirmed jobs have company in database
+        assert reviewer.conn is not None
         cursor = reviewer.conn.cursor()
         cursor.execute("SELECT job_id, company FROM job_reviews WHERE status='confirmed'")
         db_results = cursor.fetchall()
