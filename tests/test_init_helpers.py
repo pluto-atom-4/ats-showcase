@@ -106,7 +106,7 @@ class TestInitializeDbCommon:
 
     def test_empty_tables_dict(self, temp_db_path):
         """Test initialization with empty tables dictionary."""
-        tables = {}
+        tables: dict[str, str] = {}
 
         conn = initialize_db_common(temp_db_path, tables)
 

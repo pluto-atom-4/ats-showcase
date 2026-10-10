@@ -114,6 +114,7 @@ def test_integrity_check_with_orphan(test_db):
     """Check command should detect orphaned assessments."""
     # Create orphaned assessment
     conn = AssessmentStore(test_db).conn
+    assert conn is not None
     conn.execute(
         "INSERT INTO job_assessments (job_id, overall_score, tech_score,"
         " seniority_score, location_score, recommendations, summary,"
@@ -170,6 +171,7 @@ def test_integrity_purge_dry_run(test_db):
     """Purge command should show dry-run by default."""
     # Create orphaned assessment
     conn = AssessmentStore(test_db).conn
+    assert conn is not None
     conn.execute(
         "INSERT INTO job_assessments (job_id, overall_score, tech_score,"
         " seniority_score, location_score, recommendations, summary,"
@@ -188,6 +190,7 @@ def test_integrity_purge_requires_force(test_db):
     """Purge command should require --force for actual deletion."""
     # Create orphaned assessment first
     conn = AssessmentStore(test_db).conn
+    assert conn is not None
     conn.execute(
         "INSERT INTO job_assessments (job_id, overall_score, tech_score,"
         " seniority_score, location_score, recommendations, summary,"

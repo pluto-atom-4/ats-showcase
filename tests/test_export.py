@@ -4,6 +4,7 @@ import json
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -95,7 +96,7 @@ def store_with_assessments(temp_db):
             tech_score=assessment["tech_score"],
             seniority_score=assessment["seniority_score"],
             location_score=assessment["location_score"],
-            recommendations=json.loads(assessment["recommendations"]),
+            recommendations=json.loads(cast(str, assessment["recommendations"])),
             summary=assessment["summary"],
             tokens_used=assessment["tokens_used"],
             actual_cost=assessment["actual_cost"],
