@@ -184,7 +184,7 @@ class TestRequirementExtractionIntegration:
 
     def test_requirement_confidence_scoring(self, preprocessor, sample_jobs):
         """Verify confidence scores reflect trigger word tier."""
-        confidence_by_trigger = {}
+        confidence_by_trigger: dict[str, list[float]] = {}
 
         for job in sample_jobs:
             trigger_reqs_json = preprocessor.extract_trigger_requirements(job["description"])

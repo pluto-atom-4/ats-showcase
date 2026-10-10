@@ -3,6 +3,7 @@
 import json
 import tempfile
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -146,7 +147,7 @@ class TestAssessModeModeFilter:
             tech_score=90.0,
             seniority_score=80.0,
             location_score=95.0,
-            recommendations="Good match",
+            recommendations=cast(list[str], "Good match"),
             summary="Engineer with 5+ years",
             tokens_used=500,
             actual_cost=0.0015,
@@ -174,7 +175,7 @@ class TestAssessModeModeFilter:
             tech_score=90.0,
             seniority_score=80.0,
             location_score=95.0,
-            recommendations="Good match",
+            recommendations=cast(list[str], "Good match"),
             summary="Engineer with 5+ years",
             tokens_used=500,
             actual_cost=0.0015,
@@ -291,6 +292,7 @@ class TestModeStacksWithOtherFilters:
         # With new-only + skip_before_date, should skip due to date
         skip, reason = reviewer.should_skip_job("job_1", mode="new-only", skip_before_date="2026-07-01")
         assert skip is True
+        assert reason is not None
         assert "crawled_before" in reason
 
         reviewer._close_db()
