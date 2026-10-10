@@ -48,7 +48,7 @@ fi
 **Trigger:** All PRs and branch commits
 
 **Required Evidence:**
-- ✅ Type checking passes: `mypy src/ --strict` (0 errors)
+- ✅ Type checking passes: `mypy src/ tests/` (0 errors)
 - ✅ Linting passes: `ruff check src/ tests/` (0 errors)
 - ✅ Tests passing: `pytest tests/ -v` (all pass or xfail expected)
 - ✅ Code coverage maintained: No decrease in existing coverage
@@ -58,7 +58,7 @@ fi
 ```yaml
 # .github/workflows/quality-checks.yml
 - name: Type Check
-  run: uv run mypy src/ --strict
+  run: uv run mypy src/ tests/
 
 - name: Lint
   run: uv run ruff check src/ tests/

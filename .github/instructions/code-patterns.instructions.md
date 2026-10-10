@@ -300,7 +300,7 @@ def process_jobs(
 - Use `Optional[T]` for nullable, not `T | None` (Pydantic v1 compat)
 - Use `List`, `Dict`, `Tuple` from `typing`
 - Add brief docstring with Args/Returns sections
-- Run `mypy src/` to check types
+- Run `mypy src/ tests/` to check types
 
 ---
 

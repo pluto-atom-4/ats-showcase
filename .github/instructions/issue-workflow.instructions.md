@@ -299,8 +299,8 @@ uv run pre-commit run --all-files
 # Type check modified files
 uv run mypy src/path/to/file.py
 
-# Or type check entire src/ directory
-uv run mypy src/
+# Or type check entire src/ and tests/ directories
+uv run mypy src/ tests/
 
 # Ensure no type errors reported
 ```
@@ -345,7 +345,7 @@ uv run pytest tests/test_file.py::TestClass::test_method -xvs
 uv run pre-commit run --all-files
 
 # 2. Type checking
-uv run mypy src/
+uv run mypy src/ tests/
 
 # 3. Tests
 export PYTHONPATH="/path/to/ats-showcase/src:$PYTHONPATH"
@@ -572,7 +572,7 @@ gh pr checks   # Show CI status
 
    # Validate fixes
    uv run pre-commit run --all-files
-   uv run mypy src/
+   uv run mypy src/ tests/
    uv run pytest tests/ -q
    ```
 
@@ -649,7 +649,7 @@ vim docs/implementation-planning/issue-<N>-<title>.md
 
 # 3. Validation
 uv run pre-commit run --all-files
-uv run mypy src/
+uv run mypy src/ tests/
 export PYTHONPATH="/path/to/src:$PYTHONPATH"
 uv run pytest tests/ -q
 
@@ -811,7 +811,7 @@ Fixes #19"
 # Most auto-fix
 uv run pre-commit run --all-files
 # If mypy fails, fix manually
-uv run mypy src/ --show-error-codes
+uv run mypy src/ tests/ --show-error-codes
 ```
 
 **"Tests fail locally"**

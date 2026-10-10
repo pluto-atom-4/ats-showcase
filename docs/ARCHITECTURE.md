@@ -413,7 +413,7 @@ ENTRYPOINT ["python", "-m", "src.cli"]
 ```yaml
 # .github/workflows/test.yml
 - Run: pytest tests/ -v
-- Run: mypy src/ --strict
+- Run: mypy src/ tests/
 - Run: black --check src/
 - Run: ruff check src/
 ```
