@@ -226,15 +226,13 @@ class TestHeadingPromoterConsistency:
         """
         classifier = SectionClassifier()
 
-        # The 10 'other' phrases that should NOT be in KNOWN_PLAIN_HEADINGS
+        # The 7 'other' phrases that should NOT be in KNOWN_PLAIN_HEADINGS (duties, education,
+        # nice to have were promoted by Issue #733 and are removed from this set)
         other_phrases = {
-            "duties",
-            "education",
             "eeo statement",
             "equal employment opportunity",
             "job duties",
             "must have",
-            "nice to have",
             "the role",
             "who we are",
             "who you are",
@@ -1798,3 +1796,86 @@ class TestSingleHeadingPhraseSource:
         result = promoter.process(text)
         assert "## Additional Qualifications" in result
         assert result == "More text.\n\n## Additional Qualifications\nFluent in French."
+
+
+class TestSectionHeaderKeywordPromotion:
+    """Test promotion of the 16 section-header keywords copied from production (Issue #733)."""
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "Accountabilities",
+            "Background",
+            "Competencies",
+            "Duties",
+            "Education",
+            "Must Haves",
+            "Must-Have",
+            "Must-Haves",
+            "Needed",
+            "Nice to Have",
+            "Nice to Haves",
+            "Nice-to-Have",
+            "Nice-to-Haves",
+            "Understanding",
+            "What We're Looking For",
+            "What You'll Do",
+        ],
+    )
+    def test_isolated_phrase_promoted(self, line: str) -> None:
+        """Each copied phrase isolated by blank lines is promoted to a ## heading."""
+        promoter = HeadingPromoter()
+        text = f"Intro paragraph about the team.\n\n{line}\nBody text follows."
+        result = promoter.process(text)
+        assert f"## {line}" in result.splitlines()
+
+    @pytest.mark.parametrize("line", ["Needed:", "Duties:", "Education:", "Background:"])
+    def test_trailing_colon_variant_promoted_without_colon(self, line: str) -> None:
+        """Trailing colon is stripped from the promoted heading."""
+        promoter = HeadingPromoter()
+        text = f"Intro paragraph about the team.\n\n{line}\nBody text follows."
+        result = promoter.process(text)
+        assert f"## {line[:-1]}" in result.splitlines()
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "What You’ll Do",
+            "What We’re Looking For",
+        ],
+    )
+    def test_curly_apostrophe_variant_promoted(self, line: str) -> None:
+        """Curly apostrophe spelling matches the straight-apostrophe vocabulary entry."""
+        promoter = HeadingPromoter()
+        text = f"Intro paragraph about the team.\n\n{line}\nBody text follows."
+        result = promoter.process(text)
+        assert f"## {line}" in result.splitlines()
+
+    def test_education_sentence_not_promoted(self) -> None:
+        """'Education: Bachelor's degree required.' is a sentence, not a heading."""
+        promoter = HeadingPromoter()
+        text = "Intro paragraph about the team.\n\nEducation: Bachelor's degree required."
+        result = promoter.process(text)
+        assert not any(line.startswith("## ") for line in result.splitlines())
+
+    def test_phrase_without_preceding_blank_line_not_promoted(self) -> None:
+        """A copied phrase directly after non-blank content is not promoted."""
+        promoter = HeadingPromoter()
+        text = "Intro paragraph about the team.\nDuties\nBody text follows."
+        result = promoter.process(text)
+        assert not any(line.startswith("## ") for line in result.splitlines())
+
+    def test_phrase_inside_sentence_not_promoted(self) -> None:
+        """A copied phrase embedded in a longer line is not promoted."""
+        promoter = HeadingPromoter()
+        text = "Intro paragraph about the team.\n\nStrong understanding of distributed systems is required."
+        result = promoter.process(text)
+        assert not any(line.startswith("## ") for line in result.splitlines())
+
+    def test_known_plain_headings_size(self) -> None:
+        """Promoter vocabulary is 61 promoter-only + 6 filter + 16 copied = 83 phrases."""
+        assert len(KNOWN_PLAIN_HEADINGS) == 83
+
+    def test_known_heading_phrases_filter_set_unchanged(self) -> None:
+        """Canonical filter set in heading_text.py stays at 6 phrases."""
+        assert len(KNOWN_HEADING_PHRASES) == 6

@@ -35,10 +35,11 @@ from typing import FrozenSet, List, Optional, Tuple
 
 from src.poc.tweak.spacy_pipeline.base import PipelineComponent
 from src.poc.tweak.spacy_pipeline.heading_text import KNOWN_HEADING_PHRASES
+from src.poc.tweak.spacy_pipeline.section_header_keywords import COPIED_SECTION_HEADER_KEYWORDS_ONLY
 
 logger = logging.getLogger(__name__)
 
-# 64-phrase base set + 2 live-job-seen extras (Issue #365).
+# Promoter-only set of 61 phrases (Issue #365 base set plus live-job-seen extras; Issue #733 measured size).
 # All phrases pass consistency test: classify as non-'other' type via SectionClassifier.
 # Derived from architect's 74-phrase draft minus 10 'other' phrases (duties, education,
 # eeo statement, equal employment opportunity, job duties, must have, nice to have,
@@ -112,7 +113,11 @@ _PROMOTER_ONLY_HEADINGS: FrozenSet[str] = frozenset(
     ]
 )
 
-KNOWN_PLAIN_HEADINGS: FrozenSet[str] = _PROMOTER_ONLY_HEADINGS | KNOWN_HEADING_PHRASES
+# Full promoter vocabulary (83 phrases): promoter-only (61) + canonical filter phrases (6) +
+# 16 section-header keywords copied from production _SECTION_HEADER_KEYWORDS (Issue #733).
+KNOWN_PLAIN_HEADINGS: FrozenSet[str] = (
+    _PROMOTER_ONLY_HEADINGS | KNOWN_HEADING_PHRASES | COPIED_SECTION_HEADER_KEYWORDS_ONLY
+)
 
 # Normalised form of the synthesized heading, used by Guard 5 to detect an existing EEO heading.
 EEO_HEADING_NORMALIZED = "equal opportunity employer"
@@ -688,7 +693,7 @@ class HeadingPromoter(PipelineComponent):
         text = text.casefold()
 
         # Normalise apostrophes (both straight ' and curly ')
-        text = text.replace("'", "'").replace("'", "'")
+        text = text.replace("\u2019", "'").replace("\u2018", "'")
 
         # Collapse multiple spaces
         text = " ".join(text.split())
