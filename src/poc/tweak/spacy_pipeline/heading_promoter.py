@@ -39,11 +39,12 @@ from src.poc.tweak.spacy_pipeline.section_header_keywords import COPIED_SECTION_
 
 logger = logging.getLogger(__name__)
 
-# Promoter-only set of 61 phrases (Issue #365 base set plus live-job-seen extras; Issue #733 measured size).
+# Promoter-only set: 61 phrases (Issue #365 base set plus live-job-seen extras).
 # All phrases pass consistency test: classify as non-'other' type via SectionClassifier.
-# Derived from architect's 74-phrase draft minus 10 'other' phrases (duties, education,
-# eeo statement, equal employment opportunity, job duties, must have, nice to have,
-# the role, who we are, who you are).
+# Excludes the 7 'other' phrases from the architect's draft: eeo statement, equal employment
+# opportunity, job duties, must have, the role, who we are, who you are.
+# duties, education and nice to have are also 'other' but are deliberately in-vocabulary via
+# COPIED_SECTION_HEADER_KEYWORDS_ONLY (Issue #733), not in this set.
 # Extras: "in this role you will" (RESPONSIBILITIES), "what will make you succeed" (QUALIFICATIONS).
 # Promoter-only phrases. The 6 canonical filter phrases (KNOWN_HEADING_PHRASES in heading_text.py)
 # are unioned in below, so the five overlapping phrases are not listed twice.
@@ -115,6 +116,9 @@ _PROMOTER_ONLY_HEADINGS: FrozenSet[str] = frozenset(
 
 # Full promoter vocabulary (83 phrases): promoter-only (61) + canonical filter phrases (6) +
 # 16 section-header keywords copied from production _SECTION_HEADER_KEYWORDS (Issue #733).
+# The 16 copied phrases are promoted even though SectionClassifier classifies 15 of 16 as
+# SectionType.OTHER (only "what you'll do" is RESPONSIBILITIES). This is a human decision for
+# Issue #733, not a classifier-consistency result. The allowlist test pins this behaviour.
 KNOWN_PLAIN_HEADINGS: FrozenSet[str] = (
     _PROMOTER_ONLY_HEADINGS | KNOWN_HEADING_PHRASES | COPIED_SECTION_HEADER_KEYWORDS_ONLY
 )
