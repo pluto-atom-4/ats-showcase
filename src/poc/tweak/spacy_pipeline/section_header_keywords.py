@@ -13,7 +13,7 @@ from typing import FrozenSet
 
 # Phrases present in production _SECTION_HEADER_KEYWORDS but absent from the POC
 # promoter union (KNOWN_PLAIN_HEADINGS). All entries are lowercase.
-COPIED_SECTION_HEADER_KEYWORDS_ONLY: FrozenSet[str] = frozenset(
+SECTION_HEADER_KEYWORDS_ONLY: FrozenSet[str] = frozenset(
     [
         "accountabilities",
         "background",

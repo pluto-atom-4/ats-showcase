@@ -15,7 +15,7 @@ Run with:
 from src.poc.tweak.spacy_pipeline.heading_promoter import _PROMOTER_ONLY_HEADINGS
 from src.poc.tweak.spacy_pipeline.heading_text import KNOWN_HEADING_PHRASES
 from src.poc.tweak.spacy_pipeline.section_header_keywords import (
-    COPIED_SECTION_HEADER_KEYWORDS_ONLY,
+    SECTION_HEADER_KEYWORDS_ONLY,
 )
 
 EXPECTED_ENTRIES = frozenset(
@@ -40,34 +40,34 @@ EXPECTED_ENTRIES = frozenset(
 )
 
 
-class TestCopiedSectionHeaderKeywords:
+class TestSectionHeaderKeywordsOnly:
     """Shape and content of the copied vocabulary."""
 
     def test_matches_exact_literal_set(self) -> None:
-        assert len(COPIED_SECTION_HEADER_KEYWORDS_ONLY) == 16
-        assert COPIED_SECTION_HEADER_KEYWORDS_ONLY == EXPECTED_ENTRIES
+        assert len(SECTION_HEADER_KEYWORDS_ONLY) == 16
+        assert SECTION_HEADER_KEYWORDS_ONLY == EXPECTED_ENTRIES
 
     def test_no_entry_is_empty(self) -> None:
-        assert all(entry for entry in COPIED_SECTION_HEADER_KEYWORDS_ONLY)
+        assert all(entry for entry in SECTION_HEADER_KEYWORDS_ONLY)
 
     def test_no_entry_has_surrounding_whitespace(self) -> None:
-        assert all(entry == entry.strip() for entry in COPIED_SECTION_HEADER_KEYWORDS_ONLY)
+        assert all(entry == entry.strip() for entry in SECTION_HEADER_KEYWORDS_ONLY)
 
     def test_no_entry_has_colon(self) -> None:
-        assert all(":" not in entry for entry in COPIED_SECTION_HEADER_KEYWORDS_ONLY)
+        assert all(":" not in entry for entry in SECTION_HEADER_KEYWORDS_ONLY)
 
     def test_no_entry_has_leading_marker(self) -> None:
-        assert all(not entry.startswith(("#", "*", "_")) for entry in COPIED_SECTION_HEADER_KEYWORDS_ONLY)
+        assert all(not entry.startswith(("#", "*", "_")) for entry in SECTION_HEADER_KEYWORDS_ONLY)
 
     def test_all_entries_lowercase(self) -> None:
-        assert all(entry == entry.lower() for entry in COPIED_SECTION_HEADER_KEYWORDS_ONLY)
+        assert all(entry == entry.lower() for entry in SECTION_HEADER_KEYWORDS_ONLY)
 
 
 class TestDisjointness:
     """Copied entries must not overlap the existing POC vocabularies."""
 
     def test_disjoint_from_known_heading_phrases(self) -> None:
-        assert COPIED_SECTION_HEADER_KEYWORDS_ONLY.isdisjoint(KNOWN_HEADING_PHRASES)
+        assert SECTION_HEADER_KEYWORDS_ONLY.isdisjoint(KNOWN_HEADING_PHRASES)
 
     def test_disjoint_from_promoter_only_headings(self) -> None:
-        assert COPIED_SECTION_HEADER_KEYWORDS_ONLY.isdisjoint(_PROMOTER_ONLY_HEADINGS)
+        assert SECTION_HEADER_KEYWORDS_ONLY.isdisjoint(_PROMOTER_ONLY_HEADINGS)

@@ -9,7 +9,7 @@ import pytest
 from src.poc.tweak.markdown_section_classifier import SectionClassifier, SectionType
 from src.poc.tweak.spacy_pipeline.heading_promoter import KNOWN_PLAIN_HEADINGS, HeadingPromoter
 from src.poc.tweak.spacy_pipeline.heading_text import KNOWN_HEADING_PHRASES
-from src.poc.tweak.spacy_pipeline.section_header_keywords import COPIED_SECTION_HEADER_KEYWORDS_ONLY
+from src.poc.tweak.spacy_pipeline.section_header_keywords import SECTION_HEADER_KEYWORDS_ONLY
 
 
 class TestHeadingPromoterBasic:
@@ -278,16 +278,16 @@ class TestHeadingPromoterConsistency:
                     f"Phrase '{phrase}' classified as OTHER; should promote non-'other' phrases only"
                 )
 
-    def test_copied_phrases_in_allowlist_and_other_set_pinned(self) -> None:
+    def test_section_header_phrases_in_allowlist_and_other_set_pinned(self) -> None:
         """The 16 copied phrases are in KNOWN_PLAIN_HEADINGS, and the classifier's 'other' subset is pinned.
 
         Human decision for Issue #733: these phrases are promoted even though SectionClassifier maps
         15 of 16 to SectionType.OTHER. Only "what you'll do" is RESPONSIBILITIES. A classifier or
-        copied-list change must update EXPECTED_COPIED_OTHER deliberately.
+        copied-list change must update EXPECTED_SECTION_HEADER_OTHER deliberately.
         """
         from src.poc.tweak.multi_line_paragraph import MarkdownSection
 
-        EXPECTED_COPIED_OTHER = frozenset(
+        EXPECTED_SECTION_HEADER_OTHER = frozenset(
             {
                 "accountabilities",
                 "background",
@@ -306,11 +306,11 @@ class TestHeadingPromoterConsistency:
                 "what we're looking for",
             }
         )
-        assert len(COPIED_SECTION_HEADER_KEYWORDS_ONLY) == 16
+        assert len(SECTION_HEADER_KEYWORDS_ONLY) == 16
 
         classifier = SectionClassifier()
         other_copied: set[str] = set()
-        for phrase in COPIED_SECTION_HEADER_KEYWORDS_ONLY:
+        for phrase in SECTION_HEADER_KEYWORDS_ONLY:
             assert phrase in KNOWN_PLAIN_HEADINGS, f"Copied phrase '{phrase}' missing from KNOWN_PLAIN_HEADINGS"
             section = MarkdownSection(
                 title=phrase.upper(),
@@ -326,7 +326,7 @@ class TestHeadingPromoterConsistency:
             if classification.all_types[0].section_type == SectionType.OTHER:
                 other_copied.add(phrase)
 
-        assert frozenset(other_copied) == EXPECTED_COPIED_OTHER
+        assert frozenset(other_copied) == EXPECTED_SECTION_HEADER_OTHER
 
 
 class TestHeadingPromoterIntegration:
@@ -1962,7 +1962,7 @@ class TestHeadingPromoterNormalize:
         assert promoter._normalize("What You’ll Do:") == "what you'll do"
 
 
-class TestCopiedHeadingGuard2EEO:
+class TestSectionHeaderGuard2EEO:
     """Guard 2 splits a copied heading line that shares a paragraph with the EEO sentence (Issue #733)."""
 
     @pytest.mark.parametrize(
@@ -1988,7 +1988,7 @@ class TestCopiedHeadingGuard2EEO:
             ("What You’ll Do", "What You’ll Do"),
         ],
     )
-    def test_copied_heading_in_eeo_paragraph_is_split(self, heading_line: str, heading: str) -> None:
+    def test_section_header_in_eeo_paragraph_is_split(self, heading_line: str, heading: str) -> None:
         promoter = HeadingPromoter()
         text = f"More text.\n\n{heading_line}\nWe are an equal opportunity employer."
         expected = (
@@ -1999,10 +1999,10 @@ class TestCopiedHeadingGuard2EEO:
         assert promoter.process(result) == result
 
 
-class TestCopiedHeadingNegativeContexts:
+class TestSectionHeaderNegativeContexts:
     """Copied words inside bullet lists or as list items under a heading are not promoted (Issue #733)."""
 
-    def test_bulleted_copied_words_not_promoted(self) -> None:
+    def test_bulleted_section_header_words_not_promoted(self) -> None:
         promoter = HeadingPromoter()
         text = "Intro paragraph about the team.\n\n- Duties\n\n* Education\n\nClosing text."
         assert promoter.process(text) == text
