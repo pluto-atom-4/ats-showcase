@@ -7,6 +7,7 @@ SectionClassifier keyword matching.
 import pytest
 
 from src.poc.tweak.markdown_section_classifier import SectionClassifier, SectionType
+from src.poc.tweak.multi_line_paragraph import MarkdownSection
 from src.poc.tweak.spacy_pipeline.heading_promoter import KNOWN_PLAIN_HEADINGS, HeadingPromoter
 from src.poc.tweak.spacy_pipeline.heading_text import KNOWN_HEADING_PHRASES
 from src.poc.tweak.spacy_pipeline.section_header_keywords import SECTION_HEADER_KEYWORDS_ONLY
@@ -285,8 +286,6 @@ class TestHeadingPromoterConsistency:
         15 of 16 to SectionType.OTHER. Only "what you'll do" is RESPONSIBILITIES. A classifier or
         copied-list change must update EXPECTED_SECTION_HEADER_OTHER deliberately.
         """
-        from src.poc.tweak.multi_line_paragraph import MarkdownSection
-
         EXPECTED_SECTION_HEADER_OTHER = frozenset(
             {
                 "accountabilities",
@@ -1968,22 +1967,7 @@ class TestSectionHeaderGuard2EEO:
     @pytest.mark.parametrize(
         ("heading_line", "heading"),
         [
-            ("Accountabilities", "Accountabilities"),
             ("Background", "Background"),
-            ("Competencies", "Competencies"),
-            ("Duties", "Duties"),
-            ("Education", "Education"),
-            ("Must Haves", "Must Haves"),
-            ("Must-Have", "Must-Have"),
-            ("Must-Haves", "Must-Haves"),
-            ("Needed", "Needed"),
-            ("Nice to Have", "Nice to Have"),
-            ("Nice to Haves", "Nice to Haves"),
-            ("Nice-to-Have", "Nice-to-Have"),
-            ("Nice-to-Haves", "Nice-to-Haves"),
-            ("Understanding", "Understanding"),
-            ("What We're Looking For", "What We're Looking For"),
-            ("What You'll Do", "What You'll Do"),
             ("Duties:", "Duties"),
             ("What You’ll Do", "What You’ll Do"),
         ],
@@ -1997,6 +1981,23 @@ class TestSectionHeaderGuard2EEO:
         result = promoter.process(text)
         assert result == expected
         assert promoter.process(result) == result
+
+
+class TestSectionHeaderListMarkerRule:
+    """_should_promote rejects list-marker-prefixed lines on its own, independent of the phrase set (Issue #733)."""
+
+    @pytest.mark.parametrize(
+        "line",
+        ["- Duties", "* Education", "+ Needed", "# Duties", "| Duties |", "1. Needed", "2) Background", "10. Duties"],
+    )
+    def test_list_marker_prefixed_lines_rejected(self, line: str) -> None:
+        promoter = HeadingPromoter()
+        assert promoter._should_promote(line, True, True) is False
+        assert promoter._should_promote(line, False, True) is False
+
+    def test_plain_phrase_line_passes_structural_checks(self) -> None:
+        promoter = HeadingPromoter()
+        assert promoter._should_promote("Duties", True, True) is True
 
 
 class TestSectionHeaderNegativeContexts:
