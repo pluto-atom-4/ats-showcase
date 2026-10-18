@@ -56,6 +56,7 @@ from src.poc.tweak.spacy_pipeline import (
     TechnologyProcessor,
 )
 from src.poc.tweak.spacy_pipeline.heading_promoter import HeadingPromoter
+from src.poc.tweak.spacy_pipeline.heading_text import is_heading_only
 
 # Allowed description_selector_match strategies
 DESCRIPTION_MATCH_STRATEGIES = {"first", "all", "longest"}
@@ -71,6 +72,14 @@ def _normalize_section_content(text: str) -> str:
     and skill extraction depend on them.
     """
     return _WHITESPACE_RUN_RE.sub(" ", text).strip()
+
+
+def _blank_if_heading_only(content: str, heading: str) -> str:
+    """Return "" when content merely repeats the section heading (Issue #268/#728).
+
+    Section is kept (not dropped) so section counts and line ranges stay stable.
+    """
+    return "" if is_heading_only(content, heading) else content
 
 
 @dataclass
@@ -388,7 +397,10 @@ def process_job(
                         md_section = MarkdownSection(
                             section_id=f"sec_{section_idx}",
                             heading=section.title or "",
-                            content=_normalize_section_content(section.content),
+                            content=_blank_if_heading_only(
+                                _normalize_section_content(section.content),
+                                section.title or "",
+                            ),
                             section_type=primary_type.section_type.value,
                             confidence=primary_type.confidence,
                             line_start=section.start_line or 0,
@@ -406,7 +418,10 @@ def process_job(
                         md_section = MarkdownSection(
                             section_id=f"sec_{section_idx}",
                             heading=section.title or "",
-                            content=_normalize_section_content(section.content),
+                            content=_blank_if_heading_only(
+                                _normalize_section_content(section.content),
+                                section.title or "",
+                            ),
                             section_type="unknown",
                             confidence=0.0,
                             line_start=section.start_line or 0,

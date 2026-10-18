@@ -10,6 +10,7 @@ Tests validate:
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -1630,3 +1631,88 @@ class TestNormalizeSectionContent:
         assert sections, "Expected at least one markdown section in fixture output"
         for sec in sections:
             assert "\n" not in sec.content, f"Newline in section content: {sec.content!r}"
+
+
+class _NoTypesClassifier:
+    """Stub classifier: every section comes back with no candidate types (no-types branch)."""
+
+    def classify(self, section):
+        return SimpleNamespace(all_types=[], labels=[], is_skip=False, keyword_matches=[])
+
+
+class TestHeadingOnlySectionContent:
+    """markdown_sections[].content must be blank for heading-only sections (Issue #268/#643/#727)."""
+
+    HEADING_ONLY_DESCRIPTION = "## Minimum Qualifications\n\n## Responsibilities\n\n- Build APIs in Python.\n"
+
+    @pytest.mark.parametrize("force_no_types", [False, True], ids=["all_types_present", "no_types"])
+    def test_heading_only_section_content_is_blank(self, tmp_path, monkeypatch, force_no_types):
+        """Heading-only section (content == heading after normalization) yields content == ''."""
+        # Arrange
+        import src.poc.tweak.batch_processor as bp
+
+        if force_no_types:
+            monkeypatch.setattr(bp, "SectionClassifier", _NoTypesClassifier)
+        test_file = tmp_path / "heading_only.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Dev",
+                        "company": "Co",
+                        "description": self.HEADING_ONLY_DESCRIPTION,
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(str(test_file))
+
+        # Assert
+        assert len(results) == 1
+        result = results[0]
+        assert not result.has_errors(), f"Unexpected errors: {result.errors}"
+        sections = result.markdown_sections
+        assert len(sections) == result.sections_detected, "markdown_sections count must match sections_detected"
+
+        # Select by fixture heading, not content equality: blanking removes the equality.
+        heading_only = [s for s in sections if s.heading == "Minimum Qualifications"]
+        assert heading_only, (
+            f"Fixture produced no heading-only section; sections={[(s.heading, s.content) for s in sections]!r}"
+        )
+        for sec in heading_only:
+            assert sec.content == "", f"Heading-only section {sec.heading!r} kept content {sec.content!r}"
+
+    @pytest.mark.parametrize("force_no_types", [False, True], ids=["all_types_present", "no_types"])
+    def test_section_with_body_keeps_content(self, tmp_path, monkeypatch, force_no_types):
+        """Regression guard: heading followed by real body text keeps non-empty content."""
+        # Arrange
+        import src.poc.tweak.batch_processor as bp
+
+        if force_no_types:
+            monkeypatch.setattr(bp, "SectionClassifier", _NoTypesClassifier)
+        test_file = tmp_path / "heading_with_body.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Dev",
+                        "company": "Co",
+                        "description": "## Minimum Qualifications\n\n- 5 years of Python experience required.\n",
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(str(test_file))
+
+        # Assert
+        sections = results[0].markdown_sections
+        body_sections = [s for s in sections if "5 years of Python experience required." in s.content]
+        assert body_sections, f"Body text missing from sections: {[(s.heading, s.content) for s in sections]!r}"
+        for sec in body_sections:
+            assert sec.content.strip() != "", f"Section {sec.heading!r} content blanked"

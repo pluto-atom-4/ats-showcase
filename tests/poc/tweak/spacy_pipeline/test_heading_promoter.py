@@ -7,7 +7,10 @@ SectionClassifier keyword matching.
 import pytest
 
 from src.poc.tweak.markdown_section_classifier import SectionClassifier, SectionType
+from src.poc.tweak.multi_line_paragraph import MarkdownSection
 from src.poc.tweak.spacy_pipeline.heading_promoter import KNOWN_PLAIN_HEADINGS, HeadingPromoter
+from src.poc.tweak.spacy_pipeline.heading_text import KNOWN_HEADING_PHRASES
+from src.poc.tweak.spacy_pipeline.section_header_keywords import SECTION_HEADER_KEYWORDS_ONLY
 
 
 class TestHeadingPromoterBasic:
@@ -225,15 +228,13 @@ class TestHeadingPromoterConsistency:
         """
         classifier = SectionClassifier()
 
-        # The 10 'other' phrases that should NOT be in KNOWN_PLAIN_HEADINGS
+        # The 7 'other' phrases that should NOT be in KNOWN_PLAIN_HEADINGS (duties, education,
+        # nice to have were promoted by Issue #733 and are removed from this set)
         other_phrases = {
-            "duties",
-            "education",
             "eeo statement",
             "equal employment opportunity",
             "job duties",
             "must have",
-            "nice to have",
             "the role",
             "who we are",
             "who you are",
@@ -255,8 +256,6 @@ class TestHeadingPromoterConsistency:
         for phrase in test_phrases:
             if phrase in KNOWN_PLAIN_HEADINGS:
                 # Classify as title to get the type
-                from src.poc.tweak.multi_line_paragraph import MarkdownSection
-
                 section = MarkdownSection(
                     title=phrase.upper(),  # titles are uppercase
                     content="",
@@ -277,6 +276,54 @@ class TestHeadingPromoterConsistency:
                 assert primary_type.section_type != SectionType.OTHER, (
                     f"Phrase '{phrase}' classified as OTHER; should promote non-'other' phrases only"
                 )
+
+    def test_section_header_phrases_in_allowlist_and_other_set_pinned(self) -> None:
+        """The 16 copied phrases are in KNOWN_PLAIN_HEADINGS, and the classifier's 'other' subset is pinned.
+
+        Human decision for Issue #733: these phrases are promoted even though SectionClassifier maps
+        15 of 16 to SectionType.OTHER. Only "what you'll do" is RESPONSIBILITIES. A classifier or
+        copied-list change must update EXPECTED_SECTION_HEADER_OTHER deliberately.
+        """
+        EXPECTED_SECTION_HEADER_OTHER = frozenset(
+            {
+                "accountabilities",
+                "background",
+                "competencies",
+                "duties",
+                "education",
+                "must haves",
+                "must-have",
+                "must-haves",
+                "needed",
+                "nice to have",
+                "nice to haves",
+                "nice-to-have",
+                "nice-to-haves",
+                "understanding",
+                "what we're looking for",
+            }
+        )
+        assert len(SECTION_HEADER_KEYWORDS_ONLY) == 16
+
+        classifier = SectionClassifier()
+        other_copied: set[str] = set()
+        for phrase in SECTION_HEADER_KEYWORDS_ONLY:
+            assert phrase in KNOWN_PLAIN_HEADINGS, f"Copied phrase '{phrase}' missing from KNOWN_PLAIN_HEADINGS"
+            section = MarkdownSection(
+                title=phrase.upper(),
+                content="",
+                level=1,
+                start_line=0,
+                end_line=0,
+                word_count=len(phrase.split()),
+                line_count=1,
+                has_list=False,
+            )
+            classification = classifier.classify(section)
+            if classification.all_types[0].section_type == SectionType.OTHER:
+                other_copied.add(phrase)
+
+        assert frozenset(other_copied) == EXPECTED_SECTION_HEADER_OTHER
 
 
 class TestHeadingPromoterIntegration:
@@ -1779,3 +1826,187 @@ class TestEEODiscriminateWordingScope:
         assert result == text
         assert "## Equal Opportunity Employer" not in result
         assert promoter.process(result) == result
+
+
+class TestSingleHeadingPhraseSource:
+    """KNOWN_PLAIN_HEADINGS is built from the single KNOWN_HEADING_PHRASES source (Issue #268)."""
+
+    def test_known_heading_phrases_subset_of_plain_headings(self) -> None:
+        assert KNOWN_HEADING_PHRASES <= KNOWN_PLAIN_HEADINGS
+
+    def test_additional_qualifications_is_plain_heading(self) -> None:
+        assert "additional qualifications" in KNOWN_PLAIN_HEADINGS
+
+    def test_plain_additional_qualifications_promoted(self) -> None:
+        """Plain 'Additional Qualifications' line after a blank line gets promoted."""
+        promoter = HeadingPromoter()
+        text = "More text.\n\nAdditional Qualifications\nFluent in French."
+        result = promoter.process(text)
+        assert "## Additional Qualifications" in result
+        assert result == "More text.\n\n## Additional Qualifications\nFluent in French."
+
+
+class TestSectionHeaderKeywordPromotion:
+    """Test promotion of the 16 section-header keywords copied from production (Issue #733)."""
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "Accountabilities",
+            "Background",
+            "Competencies",
+            "Duties",
+            "Education",
+            "Must Haves",
+            "Must-Have",
+            "Must-Haves",
+            "Needed",
+            "Nice to Have",
+            "Nice to Haves",
+            "Nice-to-Have",
+            "Nice-to-Haves",
+            "Understanding",
+            "What We're Looking For",
+            "What You'll Do",
+        ],
+    )
+    def test_isolated_phrase_promoted(self, line: str) -> None:
+        """Each copied phrase isolated by blank lines is promoted to a ## heading."""
+        promoter = HeadingPromoter()
+        text = f"Intro paragraph about the team.\n\n{line}\nBody text follows."
+        result = promoter.process(text)
+        assert f"## {line}" in result.splitlines()
+
+    @pytest.mark.parametrize("line", ["Needed:", "Duties:", "Education:", "Background:"])
+    def test_trailing_colon_variant_promoted_without_colon(self, line: str) -> None:
+        """Trailing colon is stripped from the promoted heading."""
+        promoter = HeadingPromoter()
+        text = f"Intro paragraph about the team.\n\n{line}\nBody text follows."
+        result = promoter.process(text)
+        assert f"## {line[:-1]}" in result.splitlines()
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "What You’ll Do",
+            "What We’re Looking For",
+        ],
+    )
+    def test_curly_apostrophe_variant_promoted(self, line: str) -> None:
+        """Curly apostrophe spelling matches the straight-apostrophe vocabulary entry."""
+        promoter = HeadingPromoter()
+        text = f"Intro paragraph about the team.\n\n{line}\nBody text follows."
+        result = promoter.process(text)
+        assert f"## {line}" in result.splitlines()
+
+    def test_education_sentence_not_promoted(self) -> None:
+        """'Education: Bachelor's degree required.' is a sentence, not a heading."""
+        promoter = HeadingPromoter()
+        text = "Intro paragraph about the team.\n\nEducation: Bachelor's degree required."
+        result = promoter.process(text)
+        assert not any(line.startswith("## ") for line in result.splitlines())
+
+    def test_phrase_without_preceding_blank_line_not_promoted(self) -> None:
+        """A copied phrase directly after non-blank content is not promoted."""
+        promoter = HeadingPromoter()
+        text = "Intro paragraph about the team.\nDuties\nBody text follows."
+        result = promoter.process(text)
+        assert not any(line.startswith("## ") for line in result.splitlines())
+
+    def test_phrase_inside_sentence_not_promoted(self) -> None:
+        """A copied phrase embedded in a longer line is not promoted."""
+        promoter = HeadingPromoter()
+        text = "Intro paragraph about the team.\n\nStrong understanding of distributed systems is required."
+        result = promoter.process(text)
+        assert not any(line.startswith("## ") for line in result.splitlines())
+
+    def test_known_plain_headings_size(self) -> None:
+        """Promoter vocabulary is 61 promoter-only + 6 filter + 16 copied = 83 phrases."""
+        assert len(KNOWN_PLAIN_HEADINGS) == 83
+
+    def test_known_heading_phrases_filter_set_unchanged(self) -> None:
+        """Canonical filter set in heading_text.py stays at 6 phrases."""
+        assert len(KNOWN_HEADING_PHRASES) == 6
+        assert KNOWN_HEADING_PHRASES == frozenset(
+            {
+                "minimum qualifications",
+                "additional qualifications",
+                "preferred qualifications",
+                "required qualifications",
+                "working conditions",
+                "key responsibilities",
+            }
+        )
+
+
+class TestHeadingPromoterNormalize:
+    """Direct tests of HeadingPromoter._normalize apostrophe folding (Issue #733)."""
+
+    def test_right_single_quotation_mark_folds_to_straight(self) -> None:
+        promoter = HeadingPromoter()
+        assert promoter._normalize("you’ll") == "you'll"
+
+    def test_left_single_quotation_mark_folds_to_straight(self) -> None:
+        promoter = HeadingPromoter()
+        assert promoter._normalize("you‘ll") == "you'll"
+
+    def test_straight_apostrophe_is_noop(self) -> None:
+        promoter = HeadingPromoter()
+        assert promoter._normalize("you'll") == "you'll"
+
+    def test_curly_heading_with_trailing_colon_normalizes(self) -> None:
+        promoter = HeadingPromoter()
+        assert promoter._normalize("What You’ll Do:") == "what you'll do"
+
+
+class TestSectionHeaderGuard2EEO:
+    """Guard 2 splits a copied heading line that shares a paragraph with the EEO sentence (Issue #733)."""
+
+    @pytest.mark.parametrize(
+        ("heading_line", "heading"),
+        [
+            ("Background", "Background"),
+            ("Duties:", "Duties"),
+            ("What You’ll Do", "What You’ll Do"),
+        ],
+    )
+    def test_section_header_in_eeo_paragraph_is_split(self, heading_line: str, heading: str) -> None:
+        promoter = HeadingPromoter()
+        text = f"More text.\n\n{heading_line}\nWe are an equal opportunity employer."
+        expected = (
+            f"More text.\n\n## {heading}\n\n## Equal Opportunity Employer\n\nWe are an equal opportunity employer."
+        )
+        result = promoter.process(text)
+        assert result == expected
+        assert promoter.process(result) == result
+
+
+class TestSectionHeaderListMarkerRule:
+    """_should_promote rejects list-marker-prefixed lines on its own, independent of the phrase set (Issue #733)."""
+
+    @pytest.mark.parametrize(
+        "line",
+        ["- Duties", "* Education", "+ Needed", "# Duties", "| Duties |", "1. Needed", "2) Background", "10. Duties"],
+    )
+    def test_list_marker_prefixed_lines_rejected(self, line: str) -> None:
+        promoter = HeadingPromoter()
+        assert promoter._should_promote(line, True, True) is False
+        assert promoter._should_promote(line, False, True) is False
+
+    def test_plain_phrase_line_passes_structural_checks(self) -> None:
+        promoter = HeadingPromoter()
+        assert promoter._should_promote("Duties", True, True) is True
+
+
+class TestSectionHeaderNegativeContexts:
+    """Copied words inside bullet lists or as list items under a heading are not promoted (Issue #733)."""
+
+    def test_bulleted_section_header_words_not_promoted(self) -> None:
+        promoter = HeadingPromoter()
+        text = "Intro paragraph about the team.\n\n- Duties\n\n* Education\n\nClosing text."
+        assert promoter.process(text) == text
+
+    def test_list_items_under_heading_not_promoted(self) -> None:
+        promoter = HeadingPromoter()
+        text = "## Requirements\n\n- Background\n\n- Needed\n\n- Understanding\n\nClosing text."
+        assert promoter.process(text) == text
