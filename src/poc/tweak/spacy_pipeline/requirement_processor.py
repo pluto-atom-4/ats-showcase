@@ -33,6 +33,7 @@ from spacy.language import Language
 from spacy.tokens import Doc
 
 from src.poc.tweak.patterns import SectionType
+from src.poc.tweak.spacy_pipeline.heading_text import is_heading_only
 from src.poc.tweak.spacy_pipeline.patterns import REQUIREMENT_PATTERNS
 
 logger = logging.getLogger(__name__)
@@ -220,7 +221,9 @@ class RequirementProcessor:
 
                         # Issue #375: skip literal markdown heading lines
                         # (e.g. "## Essential Qualifications") inside content.
-                        if sentence.startswith("#"):
+                        # Issue #268: also skip bold/colon/known-phrase headings
+                        # matching the section title (via is_heading_only).
+                        if sentence.startswith("#") or is_heading_only(sentence, section.title):
                             continue
 
                         req = self._classify_sentence(sentence)
