@@ -20,8 +20,9 @@ Issue #268: Drop heading-only requirements. Issue #724: shared helper.
 import re
 from typing import Optional
 
-# Edge-anchored only: interior punctuation (e.g. "C++", "snake_case") is kept.
-_HEADING_MARKER_PATTERN = re.compile(r"^[#*_\s]+|[#*_:\s]+$")
+# Edge-anchored only: interior punctuation (e.g. "C++", "snake_case", "e.g.") is kept.
+# Trailing '.' is stripped together with markers so "**Foo**." matches "**Foo.**".
+_HEADING_MARKER_PATTERN = re.compile(r"^[#*_\s]+|[#*_:.\s]+$")
 
 _INNER_WHITESPACE_PATTERN = re.compile(r"\s+")
 
@@ -45,7 +46,7 @@ KNOWN_BOILERPLATE_SENTENCES: frozenset[str] = frozenset(
 
 
 def normalize_heading_text(text: str) -> str:
-    """Strip heading markers and trailing colon, collapse whitespace, lowercase.
+    """Strip heading markers and trailing colon/period, collapse whitespace, lowercase.
 
     Args:
         text: Raw candidate text (may contain markdown emphasis or ``#`` marks)
@@ -79,12 +80,11 @@ def is_heading_only(candidate: str, heading: Optional[str] = None) -> bool:
         True if the candidate should be dropped as heading/boilerplate text.
         False for empty candidates.
     """
-    norm = normalize_heading_text(candidate)
-    if not norm:
+    key = normalize_heading_text(candidate)
+    if not key:
         return False
-    key = norm.rstrip(".")
     if heading is not None:
-        norm_heading = normalize_heading_text(heading).rstrip(".")
+        norm_heading = normalize_heading_text(heading)
         if norm_heading and key == norm_heading:
             return True
     return key in KNOWN_HEADING_PHRASES or key in KNOWN_BOILERPLATE_SENTENCES

@@ -52,6 +52,21 @@ class TestNormalizeHeadingText:
     def test_interior_markers_preserved(self) -> None:
         assert normalize_heading_text("C++ and snake_case") == "c++ and snake_case"
 
+    def test_interior_period_kept_trailing_period_stripped(self) -> None:
+        assert normalize_heading_text("Node.js and e.g. Python.") == "node.js and e.g. python"
+
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            ("**Python**.", "python"),
+            ("**Python.**", "python"),
+            ("**Python**..", "python"),
+            ("_Python_.", "python"),
+        ],
+    )
+    def test_period_after_closing_marker_stripped(self, raw: str, expected: str) -> None:
+        assert normalize_heading_text(raw) == expected
+
 
 class TestIsHeadingOnly:
     """is_heading_only behavior."""
@@ -140,6 +155,8 @@ class TestIsHeadingOnly:
             "{s}.",
             "**{s}**",
             "**{s}.**",
+            "**{s}**.",
+            "{title}",
             "{title}.",
         ],
     )
@@ -147,10 +164,23 @@ class TestIsHeadingOnly:
         text = variant.format(s=BOILERPLATE_SENTENCE, title=BOILERPLATE_SENTENCE.capitalize())
         assert is_heading_only(text) is True
 
-    def test_boilerplate_sentence_with_trailing_period_true(self) -> None:
-        sentence = "Applicants who do not meet these qualifications will not be forwarded to the hiring department."
-        assert is_heading_only(sentence) is True
+    @pytest.mark.parametrize("phrase", sorted(KNOWN_HEADING_PHRASES))
+    @pytest.mark.parametrize("variant", ["**{p}**.", "**{p}.**", "**{p}:**.", "_{p}_."])
+    def test_known_phrase_closing_marker_period_true(self, phrase: str, variant: str) -> None:
+        assert is_heading_only(variant.format(p=phrase)) is True
 
-    def test_boilerplate_sentence_without_period_true(self) -> None:
-        sentence = "Applicants who do not meet these qualifications will not be forwarded to the hiring department"
-        assert is_heading_only(sentence) is True
+    @pytest.mark.parametrize(
+        "candidate, heading",
+        [
+            ("**Python**.", "Python"),
+            ("**Python.**", "Python"),
+            ("Python", "**Python**."),
+            ("**Team Overview**.", "Team Overview"),
+            ("**Team Overview.**", "**Team Overview**."),
+        ],
+    )
+    def test_heading_equality_with_closing_marker_period_true(self, candidate: str, heading: str) -> None:
+        assert is_heading_only(candidate, heading) is True
+
+    def test_closing_marker_period_on_requirement_is_false(self) -> None:
+        assert is_heading_only("**Python experience**.", "Team Overview") is False
