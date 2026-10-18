@@ -41,7 +41,17 @@ KNOWN_HEADING_PHRASES: frozenset[str] = frozenset(
     }
 )
 
-# Boilerplate sentences that are not headings but are dropped as non-requirements.
+# Boilerplate sentence family dropped as non-requirements. Deliberately narrow: it matches only
+# the "applicants who do not meet ... will not be forwarded to the hiring department" notice and
+# its small wording variants, not a general boilerplate detector. Matched against the normalized
+# key (lowercased, markers/trailing periods stripped, whitespace collapsed).
+_BOILERPLATE_PATTERN = re.compile(
+    r"applicants who do not meet (?:these|the minimum|the) qualifications "
+    r"will not be forwarded to the hiring department$"
+)
+
+# Compatibility only: the canonical boilerplate sentence, kept so existing imports keep working.
+# is_heading_only uses _BOILERPLATE_PATTERN, not this set.
 KNOWN_BOILERPLATE_SENTENCES: frozenset[str] = frozenset(
     {
         "applicants who do not meet these qualifications will not be forwarded to the hiring department",
@@ -70,7 +80,7 @@ def is_heading_only(candidate: str, heading: Optional[str] = None) -> bool:
 
     A candidate is dropped when, after normalization and stripping trailing
     periods, it equals the section heading, matches a ``KNOWN_HEADING_PHRASES``
-    entry, or matches a ``KNOWN_BOILERPLATE_SENTENCES`` entry.
+    entry, or matches ``_BOILERPLATE_PATTERN`` (the narrow applicants-not-forwarded notice).
 
     Accepted trade-off: a candidate equal to its section title is dropped even
     when it is a real one-word requirement (e.g. "Python" under a section
@@ -91,4 +101,4 @@ def is_heading_only(candidate: str, heading: Optional[str] = None) -> bool:
         norm_heading = normalize_heading_text(heading)
         if norm_heading and key == norm_heading:
             return True
-    return key in KNOWN_HEADING_PHRASES or key in KNOWN_BOILERPLATE_SENTENCES
+    return key in KNOWN_HEADING_PHRASES or _BOILERPLATE_PATTERN.match(key) is not None

@@ -34,6 +34,7 @@ import re
 from typing import FrozenSet, List, Optional, Tuple
 
 from src.poc.tweak.spacy_pipeline.base import PipelineComponent
+from src.poc.tweak.spacy_pipeline.heading_text import KNOWN_HEADING_PHRASES
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,9 @@ logger = logging.getLogger(__name__)
 # eeo statement, equal employment opportunity, job duties, must have, nice to have,
 # the role, who we are, who you are).
 # Extras: "in this role you will" (RESPONSIBILITIES), "what will make you succeed" (QUALIFICATIONS).
-KNOWN_PLAIN_HEADINGS: FrozenSet[str] = frozenset(
+# Promoter-only phrases. The 6 canonical filter phrases (KNOWN_HEADING_PHRASES in heading_text.py)
+# are unioned in below, so the five overlapping phrases are not listed twice.
+_PROMOTER_ONLY_HEADINGS: FrozenSet[str] = frozenset(
     [
         "ability",
         "about",
@@ -75,21 +78,17 @@ KNOWN_PLAIN_HEADINGS: FrozenSet[str] = frozenset(
         "job description",
         "job overview",
         "job responsibilities",
-        "key responsibilities",
         "knowledge",
-        "minimum qualifications",
         "minimum requirements",
         "organization overview",
         "overview",
         "physical requirements",
         "position description",
         "position overview",
-        "preferred qualifications",
         "preferred requirements",
         "preferred skills",
         "qualifications",
         "required experience",
-        "required qualifications",
         "required skills",
         "requirement",
         "requirements",
@@ -110,9 +109,10 @@ KNOWN_PLAIN_HEADINGS: FrozenSet[str] = frozenset(
         "what you will bring",
         "what you will do",
         "work location",
-        "working conditions",
     ]
 )
+
+KNOWN_PLAIN_HEADINGS: FrozenSet[str] = _PROMOTER_ONLY_HEADINGS | KNOWN_HEADING_PHRASES
 
 # Normalised form of the synthesized heading, used by Guard 5 to detect an existing EEO heading.
 EEO_HEADING_NORMALIZED = "equal opportunity employer"
