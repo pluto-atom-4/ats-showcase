@@ -354,6 +354,95 @@ class TestRequirementProcessorHeadingExclusion:
 
         assert all(req["text"] != "Required Skills" for req in doc._.requirements)
 
+    def test_bold_heading_marker_not_emitted_as_requirement(self, nlp) -> None:
+        """Issue #268: a bold-marked heading line matching the section title is not emitted as a requirement."""
+        processor = RequirementProcessor(nlp, "requirement_processor")
+
+        doc = nlp("Test")
+        section = MarkdownSection(
+            title="Required Qualifications",
+            content="**Required Qualifications**",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=2,
+            line_count=1,
+            has_list=False,
+        )
+        classification = _make_classification(confidence=0.85)
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        assert all("Required Qualifications" not in req["text"] for req in doc._.requirements)
+
+    def test_trailing_colon_heading_not_emitted(self, nlp) -> None:
+        """Issue #268: a bold heading with a trailing colon is not emitted as a requirement."""
+        processor = RequirementProcessor(nlp, "requirement_processor")
+
+        doc = nlp("Test")
+        section = MarkdownSection(
+            title="Required Qualifications",
+            content="**Required Qualifications:**",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=2,
+            line_count=1,
+            has_list=False,
+        )
+        classification = _make_classification(confidence=0.85)
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        assert all("Required Qualifications" not in req["text"] for req in doc._.requirements)
+
+    def test_known_phrase_fallback_without_matching_title(self, nlp) -> None:
+        """Issue #268: a known boilerplate phrase is dropped even when the section title does not match a heading."""
+        processor = RequirementProcessor(nlp, "requirement_processor")
+
+        doc = nlp("Test")
+        section = MarkdownSection(
+            title="Minimum Qualifications",
+            content=("Applicants who do not meet these qualifications WILL NOT be forwarded to the Hiring Department."),
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=16,
+            line_count=1,
+            has_list=False,
+        )
+        classification = _make_classification(confidence=0.85)
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        assert all("will not be forwarded" not in req["text"].lower() for req in doc._.requirements)
+
+    def test_required_colon_python_still_emitted(self, nlp) -> None:
+        """Issue #268 guard: a 'Required: Python' body line is still extracted as a requirement."""
+        processor = RequirementProcessor(nlp, "requirement_processor")
+
+        doc = nlp("Test")
+        section = MarkdownSection(
+            title="Qualifications",
+            content="Required: Python",
+            level=2,
+            start_line=0,
+            end_line=0,
+            word_count=2,
+            line_count=1,
+            has_list=False,
+        )
+        classification = _make_classification(confidence=0.85)
+        doc._.classified_sections = [(section, classification)]
+
+        doc = processor(doc)
+
+        texts = [req["text"] for req in doc._.requirements]
+        assert any("Python" in t for t in texts)
+
 
 # ============================================================================
 # Run with: uv run pytest tests/poc/tweak/spacy_pipeline/test_requirement_processor.py -v
