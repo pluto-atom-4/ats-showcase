@@ -20,9 +20,12 @@ Issue #268: Drop heading-only requirements. Issue #724: shared helper.
 import re
 from typing import Optional
 
-# Edge-anchored only: interior punctuation (e.g. "C++", "snake_case", "e.g.") is kept.
+# Edge-anchored only. Leading: '#', '*', '_', whitespace. Trailing: '*', '_', ':', '.',
+# whitespace, plus a closing ATX run of '#' only when preceded by whitespace
+# ("## Heading ##"). A '#' attached to a word is kept, so "C#" stays "c#".
+# Interior punctuation (e.g. "C++", "snake_case", "e.g.") is kept.
 # Trailing '.' is stripped together with markers so "**Foo**." matches "**Foo.**".
-_HEADING_MARKER_PATTERN = re.compile(r"^[#*_\s]+|[#*_:.\s]+$")
+_HEADING_MARKER_PATTERN = re.compile(r"^[#*_\s]+|[*_:.\s]+$|\s+#+\s*$")
 
 _INNER_WHITESPACE_PATTERN = re.compile(r"\s+")
 

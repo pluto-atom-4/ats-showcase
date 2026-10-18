@@ -55,6 +55,13 @@ class TestNormalizeHeadingText:
     def test_interior_period_kept_trailing_period_stripped(self) -> None:
         assert normalize_heading_text("Node.js and e.g. Python.") == "node.js and e.g. python"
 
+    def test_attached_trailing_hash_kept(self) -> None:
+        assert normalize_heading_text("C#") == "c#"
+        assert normalize_heading_text("**C#**") == "c#"
+
+    def test_closing_atx_hashes_stripped(self) -> None:
+        assert normalize_heading_text("## Minimum Qualifications ##") == "minimum qualifications"
+
     @pytest.mark.parametrize(
         "raw, expected",
         [
@@ -184,3 +191,20 @@ class TestIsHeadingOnly:
 
     def test_closing_marker_period_on_requirement_is_false(self) -> None:
         assert is_heading_only("**Python experience**.", "Team Overview") is False
+
+    def test_bare_csharp_not_dropped_as_heading(self) -> None:
+        # Trailing '#' attached to a word is content, not an ATX closer.
+        assert is_heading_only("C#", "C") is False
+        assert is_heading_only("C#") is False
+
+    def test_cplusplus_not_dropped_as_heading(self) -> None:
+        assert is_heading_only("C++", "C") is False
+
+    def test_bold_csharp_equals_heading(self) -> None:
+        assert is_heading_only("**C#**", "C#") is True
+
+    def test_closing_atx_heading_still_heading_only(self) -> None:
+        assert is_heading_only("## Minimum Qualifications ##") is True
+
+    def test_experience_with_csharp_is_false(self) -> None:
+        assert is_heading_only("Experience with C#") is False
