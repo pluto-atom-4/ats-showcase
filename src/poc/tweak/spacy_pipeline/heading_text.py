@@ -33,6 +33,12 @@ KNOWN_HEADING_PHRASES: frozenset[str] = frozenset(
         "required qualifications",
         "working conditions",
         "key responsibilities",
+    }
+)
+
+# Boilerplate sentences that are not headings but are dropped as non-requirements.
+KNOWN_BOILERPLATE_SENTENCES: frozenset[str] = frozenset(
+    {
         "applicants who do not meet these qualifications will not be forwarded to the hiring department",
     }
 )
@@ -55,22 +61,30 @@ def normalize_heading_text(text: str) -> str:
 
 
 def is_heading_only(candidate: str, heading: Optional[str] = None) -> bool:
-    """Return True if candidate is heading text rather than a requirement.
+    """Return True if candidate is heading or boilerplate text, not a requirement.
+
+    A candidate is dropped when, after normalization and stripping trailing
+    periods, it equals the section heading, matches a ``KNOWN_HEADING_PHRASES``
+    entry, or matches a ``KNOWN_BOILERPLATE_SENTENCES`` entry.
+
+    Accepted trade-off: a candidate equal to its section title is dropped even
+    when it is a real one-word requirement (e.g. "Python" under a section
+    titled "Python").
 
     Args:
         candidate: Requirement text to test
-        heading: Optional known section heading to compare against
+        heading: Optional section heading to compare against
 
     Returns:
-        True if normalized candidate equals normalized heading, or matches a
-        known heading phrase (optionally with a trailing period). False for
-        empty candidates.
+        True if the candidate should be dropped as heading/boilerplate text.
+        False for empty candidates.
     """
     norm = normalize_heading_text(candidate)
     if not norm:
         return False
+    key = norm.rstrip(".")
     if heading is not None:
-        norm_heading = normalize_heading_text(heading)
-        if norm_heading and norm == norm_heading:
+        norm_heading = normalize_heading_text(heading).rstrip(".")
+        if norm_heading and key == norm_heading:
             return True
-    return norm.rstrip(".") in KNOWN_HEADING_PHRASES
+    return key in KNOWN_HEADING_PHRASES or key in KNOWN_BOILERPLATE_SENTENCES

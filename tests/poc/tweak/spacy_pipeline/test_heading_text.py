@@ -1,10 +1,12 @@
-"""Tests for heading_text helpers (Issue #268, #724).
+"""Tests for heading_text helpers (Issue #268, #724, #731).
 
 Coverage:
 - normalize_heading_text strips **, _, #, trailing colon, mixed whitespace
 - is_heading_only: None/empty heading handling
-- All 7 KNOWN_HEADING_PHRASES in bold/colon/plain/uppercase variants -> True
-- Heading equality -> True
+- All 6 KNOWN_HEADING_PHRASES in bold/colon/plain/uppercase variants -> True
+- KNOWN_BOILERPLATE_SENTENCES dropped, and kept out of KNOWN_HEADING_PHRASES
+- Trailing-period handling consistent across heading-equality and known-phrase paths
+- Generic-title trade-off (candidate == section title is dropped) pinned
 - Requirement sentences containing colons or periods -> False
 
 Run with:
@@ -14,10 +16,13 @@ Run with:
 import pytest
 
 from src.poc.tweak.spacy_pipeline.heading_text import (
+    KNOWN_BOILERPLATE_SENTENCES,
     KNOWN_HEADING_PHRASES,
     is_heading_only,
     normalize_heading_text,
 )
+
+BOILERPLATE_SENTENCE = "applicants who do not meet these qualifications will not be forwarded to the hiring department"
 
 
 class TestNormalizeHeadingText:
@@ -81,7 +86,36 @@ class TestIsHeadingOnly:
         assert is_heading_only("5+ years of software engineering experience.") is False
 
     def test_known_phrases_count(self) -> None:
-        assert len(KNOWN_HEADING_PHRASES) == 7
+        assert len(KNOWN_HEADING_PHRASES) == 6
+
+    def test_boilerplate_not_in_known_heading_phrases(self) -> None:
+        assert BOILERPLATE_SENTENCE not in KNOWN_HEADING_PHRASES
+        assert BOILERPLATE_SENTENCE in KNOWN_BOILERPLATE_SENTENCES
+
+    def test_known_phrases_and_boilerplate_are_disjoint(self) -> None:
+        assert KNOWN_HEADING_PHRASES.isdisjoint(KNOWN_BOILERPLATE_SENTENCES)
+
+    def test_trailing_period_on_known_phrase_true(self) -> None:
+        assert is_heading_only("Required Qualifications.") is True
+        assert is_heading_only("**Required Qualifications.**") is True
+
+    def test_heading_equality_ignores_trailing_period_on_candidate(self) -> None:
+        assert is_heading_only("Python.", "Python") is True
+
+    def test_heading_equality_ignores_trailing_period_on_heading(self) -> None:
+        assert is_heading_only("Python", "Python.") is True
+
+    def test_heading_equality_ignores_period_on_both(self) -> None:
+        assert is_heading_only("**Team Overview.**", "Team Overview.") is True
+
+    def test_period_only_candidate_is_false(self) -> None:
+        assert is_heading_only(".", "Python") is False
+        assert is_heading_only(".", ".") is False
+
+    def test_generic_title_equal_to_heading_is_dropped(self) -> None:
+        # Accepted trade-off: a real one-word requirement equal to its section
+        # title is dropped. Pinned so any change to this behavior is deliberate.
+        assert is_heading_only("Python", "Python") is True
 
     @pytest.mark.parametrize("phrase", sorted(KNOWN_HEADING_PHRASES))
     @pytest.mark.parametrize(
@@ -99,6 +133,24 @@ class TestIsHeadingOnly:
         text = variant.format(p=phrase, upper=phrase.upper(), title=phrase.title())
         assert is_heading_only(text) is True
 
-    def test_applicants_sentence_with_trailing_period_true(self) -> None:
+    @pytest.mark.parametrize(
+        "variant",
+        [
+            "{s}",
+            "{s}.",
+            "**{s}**",
+            "**{s}.**",
+            "{title}.",
+        ],
+    )
+    def test_boilerplate_sentence_variants_true(self, variant: str) -> None:
+        text = variant.format(s=BOILERPLATE_SENTENCE, title=BOILERPLATE_SENTENCE.capitalize())
+        assert is_heading_only(text) is True
+
+    def test_boilerplate_sentence_with_trailing_period_true(self) -> None:
         sentence = "Applicants who do not meet these qualifications will not be forwarded to the hiring department."
+        assert is_heading_only(sentence) is True
+
+    def test_boilerplate_sentence_without_period_true(self) -> None:
+        sentence = "Applicants who do not meet these qualifications will not be forwarded to the hiring department"
         assert is_heading_only(sentence) is True
