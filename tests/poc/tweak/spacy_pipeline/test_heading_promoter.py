@@ -256,8 +256,6 @@ class TestHeadingPromoterConsistency:
         for phrase in test_phrases:
             if phrase in KNOWN_PLAIN_HEADINGS:
                 # Classify as title to get the type
-                from src.poc.tweak.multi_line_paragraph import MarkdownSection
-
                 section = MarkdownSection(
                     title=phrase.upper(),  # titles are uppercase
                     content="",
