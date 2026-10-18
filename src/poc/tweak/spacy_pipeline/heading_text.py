@@ -50,14 +50,6 @@ _BOILERPLATE_PATTERN = re.compile(
     r"will not be forwarded to the hiring department$"
 )
 
-# Compatibility only: the canonical boilerplate sentence, kept so existing imports keep working.
-# is_heading_only uses _BOILERPLATE_PATTERN, not this set.
-KNOWN_BOILERPLATE_SENTENCES: frozenset[str] = frozenset(
-    {
-        "applicants who do not meet these qualifications will not be forwarded to the hiring department",
-    }
-)
-
 
 def normalize_heading_text(text: str) -> str:
     """Strip heading markers and trailing colon/period, collapse whitespace, lowercase.

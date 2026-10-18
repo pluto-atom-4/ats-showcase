@@ -8,6 +8,7 @@ import pytest
 
 from src.poc.tweak.markdown_section_classifier import SectionClassifier, SectionType
 from src.poc.tweak.spacy_pipeline.heading_promoter import KNOWN_PLAIN_HEADINGS, HeadingPromoter
+from src.poc.tweak.spacy_pipeline.heading_text import KNOWN_HEADING_PHRASES
 
 
 class TestHeadingPromoterBasic:
@@ -1779,3 +1780,21 @@ class TestEEODiscriminateWordingScope:
         assert result == text
         assert "## Equal Opportunity Employer" not in result
         assert promoter.process(result) == result
+
+
+class TestSingleHeadingPhraseSource:
+    """KNOWN_PLAIN_HEADINGS is built from the single KNOWN_HEADING_PHRASES source (Issue #268)."""
+
+    def test_known_heading_phrases_subset_of_plain_headings(self) -> None:
+        assert KNOWN_HEADING_PHRASES <= KNOWN_PLAIN_HEADINGS
+
+    def test_additional_qualifications_is_plain_heading(self) -> None:
+        assert "additional qualifications" in KNOWN_PLAIN_HEADINGS
+
+    def test_plain_additional_qualifications_promoted(self) -> None:
+        """Plain 'Additional Qualifications' line after a blank line gets promoted."""
+        promoter = HeadingPromoter()
+        text = "More text.\n\nAdditional Qualifications\nFluent in French."
+        result = promoter.process(text)
+        assert "## Additional Qualifications" in result
+        assert result == "More text.\n\n## Additional Qualifications\nFluent in French."

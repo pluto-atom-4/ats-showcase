@@ -4,7 +4,7 @@ Coverage:
 - normalize_heading_text strips **, _, #, trailing colon, mixed whitespace
 - is_heading_only: None/empty heading handling
 - All 6 KNOWN_HEADING_PHRASES in bold/colon/plain/uppercase variants -> True
-- KNOWN_BOILERPLATE_SENTENCES dropped, and kept out of KNOWN_HEADING_PHRASES
+- Boilerplate notice matched by _BOILERPLATE_PATTERN via is_heading_only, kept out of KNOWN_HEADING_PHRASES
 - Trailing-period handling consistent across heading-equality and known-phrase paths
 - Generic-title trade-off (candidate == section title is dropped) pinned
 - Requirement sentences containing colons or periods -> False
@@ -16,7 +16,6 @@ Run with:
 import pytest
 
 from src.poc.tweak.spacy_pipeline.heading_text import (
-    KNOWN_BOILERPLATE_SENTENCES,
     KNOWN_HEADING_PHRASES,
     is_heading_only,
     normalize_heading_text,
@@ -128,10 +127,33 @@ class TestIsHeadingOnly:
 
     def test_boilerplate_not_in_known_heading_phrases(self) -> None:
         assert BOILERPLATE_SENTENCE not in KNOWN_HEADING_PHRASES
-        assert BOILERPLATE_SENTENCE in KNOWN_BOILERPLATE_SENTENCES
+        # Matched by the boilerplate regex path, not by set membership.
+        assert is_heading_only(BOILERPLATE_SENTENCE) is True
 
-    def test_known_phrases_and_boilerplate_are_disjoint(self) -> None:
-        assert KNOWN_HEADING_PHRASES.isdisjoint(KNOWN_BOILERPLATE_SENTENCES)
+    @pytest.mark.parametrize(
+        "candidate",
+        [
+            "Applicants who do not meet the minimum qualifications will not be forwarded to the hiring department",
+            "Applicants who do not meet the qualifications will not be forwarded to the hiring department",
+            "**Applicants who do not meet these qualifications will not be forwarded to the hiring department.**",
+        ],
+    )
+    def test_boilerplate_regex_variants_true(self, candidate: str) -> None:
+        assert is_heading_only(candidate) is True
+
+    @pytest.mark.parametrize(
+        "candidate",
+        [
+            "Applicants who do not meet these qualifications will not be forwarded to the hiring department of Acme",
+            "Applicants who meet these qualifications will be forwarded.",
+            "Applicants must meet these qualifications.",
+        ],
+    )
+    def test_boilerplate_regex_near_misses_false(self, candidate: str) -> None:
+        assert is_heading_only(candidate) is False
+
+    def test_bold_bullet_value_under_required_qualifications_is_false(self) -> None:
+        assert is_heading_only("**5+ years of experience**", "Required Qualifications") is False
 
     def test_trailing_period_on_known_phrase_true(self) -> None:
         assert is_heading_only("Required Qualifications.") is True
