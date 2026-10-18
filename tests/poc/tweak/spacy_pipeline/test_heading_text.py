@@ -65,6 +65,22 @@ class TestNormalizeHeadingText:
     @pytest.mark.parametrize(
         "raw, expected",
         [
+            ("**Minimum Qualifications** ##", "minimum qualifications"),
+            ("## **Minimum Qualifications** ##", "minimum qualifications"),
+            ("**Minimum Qualifications ##**", "minimum qualifications"),
+            ("## Minimum Qualifications ##", "minimum qualifications"),
+            ("**Required Qualifications**.", "required qualifications"),
+            ("C#", "c#"),
+            ("**C#**", "c#"),
+            ("C++", "c++"),
+        ],
+    )
+    def test_marker_orders_and_attached_symbols(self, raw: str, expected: str) -> None:
+        assert normalize_heading_text(raw) == expected
+
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
             ("**Python**.", "python"),
             ("**Python.**", "python"),
             ("**Python**..", "python"),
@@ -208,3 +224,19 @@ class TestIsHeadingOnly:
 
     def test_experience_with_csharp_is_false(self) -> None:
         assert is_heading_only("Experience with C#") is False
+
+    @pytest.mark.parametrize(
+        "candidate",
+        [
+            "**Minimum Qualifications** ##",
+            "## **Minimum Qualifications** ##",
+            "## Minimum Qualifications ##",
+            "**Required Qualifications**.",
+        ],
+    )
+    def test_marker_order_variants_heading_only_true(self, candidate: str) -> None:
+        assert is_heading_only(candidate) is True
+
+    @pytest.mark.parametrize("candidate", ["Experience with C#", "Python experience"])
+    def test_non_heading_with_hash_or_text_is_false(self, candidate: str) -> None:
+        assert is_heading_only(candidate) is False
