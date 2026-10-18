@@ -221,8 +221,10 @@ class RequirementProcessor:
 
                         # Issue #375: skip literal markdown heading lines
                         # (e.g. "## Essential Qualifications") inside content.
-                        # Issue #268: also skip bold/colon/known-phrase headings
-                        # matching the section title (via is_heading_only).
+                        # Issue #268: skip bold/colon/known-phrase headings matching the
+                        # section title (via is_heading_only). `startswith('#')` stays as a
+                        # generic literal-heading-marker fallback for headings that match
+                        # neither the section title nor the known phrases.
                         if sentence.startswith("#") or is_heading_only(sentence, section.title):
                             continue
 

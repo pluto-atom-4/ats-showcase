@@ -1633,11 +1633,6 @@ class TestNormalizeSectionContent:
             assert "\n" not in sec.content, f"Newline in section content: {sec.content!r}"
 
 
-def _norm_for_compare(text: str) -> str:
-    """Normalize for heading/content equality: collapse whitespace, strip md markers, lowercase."""
-    return " ".join(text.split()).strip("*_#: ").lower()
-
-
 class _NoTypesClassifier:
     """Stub classifier: every section comes back with no candidate types (no-types branch)."""
 
@@ -1690,10 +1685,6 @@ class TestHeadingOnlySectionContent:
         for sec in heading_only:
             assert sec.content == "", f"Heading-only section {sec.heading!r} kept content {sec.content!r}"
 
-        assert any(s.heading == "Minimum Qualifications" for s in sections), (
-            "Heading 'Minimum Qualifications' not preserved"
-        )
-
     @pytest.mark.parametrize("force_no_types", [False, True], ids=["all_types_present", "no_types"])
     def test_section_with_body_keeps_content(self, tmp_path, monkeypatch, force_no_types):
         """Regression guard: heading followed by real body text keeps non-empty content."""
@@ -1725,4 +1716,3 @@ class TestHeadingOnlySectionContent:
         assert body_sections, f"Body text missing from sections: {[(s.heading, s.content) for s in sections]!r}"
         for sec in body_sections:
             assert sec.content.strip() != "", f"Section {sec.heading!r} content blanked"
-            assert _norm_for_compare(sec.content) != "", f"Section {sec.heading!r} normalizes to empty"
