@@ -20,7 +20,6 @@ from src.poc.tweak.batch_processor import (
     load_jobs,
     run_batch,
 )
-from src.poc.tweak.spacy_pipeline.heading_text import is_heading_only
 
 
 class TestLoadJobs:
@@ -1552,7 +1551,7 @@ class TestBatchSentences:
         # Assert
         assert len(results) == 1
         sentences = results[0].sentences
-        assert not any(is_heading_only(s) for s in sentences), f"Heading leaked: {sentences!r}"
+        assert not any("required qualifications" in s.lower() for s in sentences), f"Heading leaked: {sentences!r}"
         assert any("You must know Python." in s for s in sentences), f"Real sentence dropped: {sentences!r}"
 
     def test_boilerplate_notice_sentence_is_dropped(self, tmp_path):
