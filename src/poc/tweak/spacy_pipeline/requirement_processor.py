@@ -225,9 +225,7 @@ class RequirementProcessor:
                         # section title (via is_heading_only). `startswith('#')` stays as a
                         # generic literal-heading-marker fallback for headings that match
                         # neither the section title nor the known phrases.
-                        if sentence.startswith("#") or is_heading_only(
-                            sentence, section.title, section.level
-                        ):
+                        if sentence.startswith("#") or is_heading_only(sentence, section.title, section.level):
                             continue
 
                         req = self._classify_sentence(sentence)
