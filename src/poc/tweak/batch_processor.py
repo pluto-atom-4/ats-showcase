@@ -16,7 +16,8 @@ Stages:
 8. TechnologyProcessor: Extract technologies from sections (Issue #321)
 
 Stage 9 (Issue #643): poc_sentence_splitter populates ``JobResult.sentences`` from the
-polished markdown; disable with ``--no-poc-sentences`` / ``enable_poc_sentence_splitter=False``.
+polished markdown, dropping known heading/boilerplate-only lines (Issue #732 item 2);
+disable with ``--no-poc-sentences`` / ``enable_poc_sentence_splitter=False``.
 
 Components are instantiated once and reused across all jobs for efficiency.
 Per-job errors are captured without aborting the batch.
@@ -101,7 +102,8 @@ class JobResult:
         markdown_sections: List of MarkdownSection objects with full metadata (Issue #338)
         errors: List of (stage_name, error_message) tuples for per-stage errors
         warnings: List of (stage_name, warning_message) tuples for per-job warnings (not failures)
-        sentences: Sentences split from polished_markdown by poc_sentence_splitter (Issue #643)
+        sentences: Sentences split from polished_markdown by poc_sentence_splitter (Issue #643),
+            with heading/boilerplate-only sentences dropped via is_heading_only(sentence) (Issue #732 item 2)
     """
 
     job_id: str
@@ -461,8 +463,9 @@ def process_job(
         # Create a spaCy Doc for extraction using the fully-configured nlp pipeline
         # This ensures all extensions and components are available
         doc = nlp(polished_markdown)
-        # Sentences come from polished_markdown, not promoted_markdown (intentional; no section alignment)
-        result.sentences = list(doc._.poc_sentences or [])
+        # Sentences come from polished_markdown, not promoted_markdown (intentional; no section alignment).
+        # Known heading/boilerplate-only sentences are dropped (Issue #732 item 2).
+        result.sentences = [s for s in (doc._.poc_sentences or []) if not is_heading_only(s)]
 
         # Ensure sections are populated on the doc for classification
         doc._.sections = sections  # Pre-populate sections from ruler output
