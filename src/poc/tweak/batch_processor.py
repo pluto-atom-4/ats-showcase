@@ -16,10 +16,15 @@ Stages:
 8. TechnologyProcessor: Extract technologies from sections (Issue #321)
 
 Stage 9 (Issue #643): poc_sentence_splitter populates ``JobResult.sentences`` from the
-polished markdown. Sentences that are exactly a KNOWN_HEADING_PHRASES entry or the
-applicants-not-forwarded boilerplate notice are dropped (Issue #732 item 2). Company-specific
-section titles (e.g. "Nice to Have", "About the Role") are NOT dropped; that needs per-sentence
-section context. Disable with ``--no-poc-sentences`` / ``enable_poc_sentence_splitter=False``.
+polished markdown. A sentence is dropped (Issue #732 item 2) when its normalized form
+(case-folded, markdown markers and trailing periods stripped, whitespace collapsed,
+backslash-escapes on markers removed) equals a KNOWN_HEADING_PHRASES entry, or matches the
+boilerplate notice pattern. That pattern is narrow: only the applicants-not-forwarded notice
+of the form "applicants who do not meet (these|the minimum|the) qualifications will not be
+forwarded to the hiring department". Interior emphasis markers and other wordings are not
+matched. Company-specific section titles (e.g. "Nice to Have", "About the Role") are NOT
+dropped; that needs per-sentence section context. Disable with ``--no-poc-sentences`` /
+``enable_poc_sentence_splitter=False``.
 
 Components are instantiated once and reused across all jobs for efficiency.
 Per-job errors are captured without aborting the batch.
@@ -118,9 +123,9 @@ class JobResult:
         errors: List of (stage_name, error_message) tuples for per-stage errors
         warnings: List of (stage_name, warning_message) tuples for per-job warnings (not failures)
         sentences: Sentences split from polished_markdown by poc_sentence_splitter (Issue #643).
-            Sentences matching KNOWN_HEADING_PHRASES or the boilerplate notice (after de-escaping
-            markdown markers) are dropped (Issue #732 item 2). Company-specific section titles
-            such as "Nice to Have" are not dropped.
+            Sentences whose normalized form matches KNOWN_HEADING_PHRASES or the narrow
+            boilerplate notice pattern are dropped (Issue #732 item 2). Company-specific section
+            titles such as "Nice to Have" are not dropped.
     """
 
     job_id: str
