@@ -262,3 +262,64 @@ class TestIsHeadingOnly:
     @pytest.mark.parametrize("candidate", ["Experience with C#", "Python experience"])
     def test_non_heading_with_hash_or_text_is_false(self, candidate: str) -> None:
         assert is_heading_only(candidate) is False
+
+
+class TestIsHeadingOnlyStructuralLevel:
+    """Issue #732: optional ruler ``level`` narrows is_heading_only (never standalone)."""
+
+    @pytest.mark.parametrize(
+        "candidate, heading",
+        [
+            ("**Required Qualifications**", "Required Qualifications"),
+            ("Python experience", "Python experience"),
+            ("**Team Overview:**", None),
+            ("Python experience", "Team Overview"),
+            ("**5+ years of experience**", "Required Qualifications"),
+        ],
+    )
+    def test_level_none_matches_legacy_behavior(self, candidate: str, heading: str | None) -> None:
+        assert is_heading_only(candidate, heading, level=None) is is_heading_only(candidate, heading)
+
+    def test_level_none_is_default(self) -> None:
+        assert is_heading_only("**Also required:**", "Requirements") is False
+        assert is_heading_only("**Also required:**", "Requirements", None) is False
+
+    def test_level_bold_title_equal_drops(self) -> None:
+        assert is_heading_only("**Team Overview**", "Team Overview", level=-1) is True
+
+    def test_level_bold_trailing_colon_non_title_drops(self) -> None:
+        assert is_heading_only("**Also required:**", "Requirements", level=-1) is True
+        assert is_heading_only("**Also required:**", None, level=-1) is True
+
+    def test_level_bold_trailing_colon_with_closing_markers_drops(self) -> None:
+        assert is_heading_only("**Also required:**.", "Requirements", level=-1) is True
+        assert is_heading_only("__Also required:__ ", "Requirements", level=-1) is True
+
+    def test_level_bold_real_requirement_kept(self) -> None:
+        # Regression guard: bold real requirement under its heading must survive.
+        assert is_heading_only("**5+ years of experience**", "Required Qualifications", level=-1) is False
+        assert is_heading_only("**5+ years of experience**", None, level=-1) is False
+
+    def test_level_bold_requirement_with_inner_colon_kept(self) -> None:
+        assert is_heading_only("**Experience: 5+ years**", "Required Qualifications", level=-1) is False
+
+    def test_level_atx_title_equal_drops(self) -> None:
+        assert is_heading_only("## Team Overview", "Team Overview", level=2) is True
+
+    def test_level_atx_real_requirement_kept(self) -> None:
+        assert is_heading_only("5+ years of experience", "Required Qualifications", level=2) is False
+
+    def test_level_atx_trailing_colon_drops(self) -> None:
+        assert is_heading_only("### Also required:", "Requirements", level=3) is True
+
+    def test_level_non_structural_does_not_enable_colon_carve_out(self) -> None:
+        # Level 0 is not a structural ruler level, so the colon carve-out must not fire.
+        assert is_heading_only("**Also required:**", "Requirements", level=0) is False
+        assert is_heading_only("Also required:", "Requirements", level=7) is False
+
+    def test_level_never_standalone_trigger(self) -> None:
+        assert is_heading_only("Python experience", "Requirements", level=-1) is False
+        assert is_heading_only("**Python experience**", None, level=-1) is False
+
+    def test_level_known_phrase_still_dropped(self) -> None:
+        assert is_heading_only("**Required Qualifications**", None, level=-1) is True
