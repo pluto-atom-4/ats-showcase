@@ -443,6 +443,41 @@ class TestRequirementProcessorHeadingExclusion:
         texts = [req["text"] for req in doc._.requirements]
         assert any("Python" in t for t in texts)
 
+    def test_ruler_level_narrows_colon_heading_but_keeps_real_requirement(self, nlp) -> None:
+        """Issue #732 Task 1b: level -1 drops a trailing-colon bold sentence; level -2 colon rule is inert."""
+        processor = RequirementProcessor(nlp, "requirement_processor")
+
+        doc = nlp("Test")
+        bold_section = MarkdownSection(
+            title="Required Qualifications",
+            content="**Also required:**\n**5+ years of experience**",
+            level=-1,
+            start_line=0,
+            end_line=0,
+            word_count=6,
+            line_count=2,
+            has_list=False,
+        )
+        preamble_section = MarkdownSection(
+            title="Required Qualifications",
+            content="Must have experience with the following:",
+            level=-2,
+            start_line=0,
+            end_line=0,
+            word_count=7,
+            line_count=1,
+            has_list=False,
+        )
+        classification = _make_classification(confidence=0.85)
+        doc._.classified_sections = [(bold_section, classification), (preamble_section, classification)]
+
+        doc = processor(doc)
+
+        texts = [req["text"] for req in doc._.requirements]
+        assert all("Also required" not in t for t in texts)
+        assert any("5+ years of experience" in t for t in texts)
+        assert any("Must have experience with the following:" in t for t in texts)
+
 
 # ============================================================================
 # Run with: uv run pytest tests/poc/tweak/spacy_pipeline/test_requirement_processor.py -v
