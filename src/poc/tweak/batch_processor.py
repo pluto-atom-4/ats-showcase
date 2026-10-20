@@ -20,9 +20,11 @@ polished markdown. A sentence is dropped when its normalized form (case-folded, 
 markers and trailing periods stripped, whitespace collapsed, backslash-escapes on markers
 removed) either equals a KNOWN_HEADING_PHRASES entry, matches the narrow boilerplate notice
 pattern (applicants-not-forwarded wording only), or equals the normalized title of a structural
-section (ATX or bold-only) in the same job (Issue #732 items 2 and 2b). Other sentences are
-kept unchanged. A real sentence identical to a section title is dropped too. Disable with
-``--no-poc-sentences`` / ``enable_poc_sentence_splitter=False``.
+section (ATX or bold-only, at most 10 words) in the same job (Issue #732 items 2 and 2b). Other
+sentences are kept unchanged. A real sentence identical to a section title is dropped too.
+Known gap: raw markdown ``**Title**`` lines whose markers arrive escaped (``\\*\\*...``) are not
+parsed as sections, so they are not dropped; HTML ``<strong>`` and ATX-derived sections are.
+Disable with ``--no-poc-sentences`` / ``enable_poc_sentence_splitter=False``.
 
 Components are instantiated once and reused across all jobs for efficiency.
 Per-job errors are captured without aborting the batch.
@@ -102,6 +104,9 @@ def _unescape_markdown_markers(text: str) -> str:
     return _MARKDOWN_ESCAPE_RE.sub(r"\1", text)
 
 
+_MAX_SECTION_TITLE_WORDS = 10
+
+
 def _normalized_section_titles(sections: List[RulerSection]) -> frozenset[str]:
     """Normalized titles of structural sections, for dropping sentences that repeat a heading.
 
@@ -109,8 +114,13 @@ def _normalized_section_titles(sections: List[RulerSection]) -> frozenset[str]:
     is structural (ATX 1-6 or bold-only -1). Preamble sections (level -2, title=None) never
     contribute. Titles are de-escaped and normalized the same way as sentences.
 
+    Length cap: titles longer than ``_MAX_SECTION_TITLE_WORDS`` (10) normalized words do not
+    contribute. The ruler emits bold-only level -1 for any fully bold line, so long bold
+    job-summary paragraphs and bold lead-ins are body text, not headings. Real headings are
+    short.
+
     Accepted trade-off: a real sentence whose normalized text equals a structural section
-    title anywhere in the job is dropped, not only the title of its own section.
+    title (within the cap) anywhere in the job is dropped, not only the title of its own section.
 
     Args:
         sections: Parsed sections for this job (``ruler.parse(promoted_markdown)`` output).
@@ -122,10 +132,11 @@ def _normalized_section_titles(sections: List[RulerSection]) -> frozenset[str]:
     for section in sections:
         if not section.title:
             continue
+        # Mirrors heading_text._is_structural_level (module-private there); kept inline to stay in scope.
         if not (section.level == -1 or 1 <= section.level <= 6):
             continue
         normalized = normalize_heading_text(_unescape_markdown_markers(section.title))
-        if normalized:
+        if normalized and len(normalized.split()) <= _MAX_SECTION_TITLE_WORDS:
             titles.add(normalized)
     return frozenset(titles)
 
@@ -152,7 +163,9 @@ class JobResult:
         sentences: Sentences split from polished_markdown by poc_sentence_splitter (Issue #643).
             Sentences whose normalized form matches KNOWN_HEADING_PHRASES, the narrow
             boilerplate notice pattern, or the normalized title of a structural section in the
-            job are dropped (Issue #732 items 2 and 2b). Kept sentences keep their original text.
+            job (at most 10 words) are dropped (Issue #732 items 2 and 2b). Kept sentences keep
+            their original text. Known gap: raw escaped ``\\*\\*Title\\*\\*`` markdown lines are not
+            dropped, since they do not parse as sections.
     """
 
     job_id: str

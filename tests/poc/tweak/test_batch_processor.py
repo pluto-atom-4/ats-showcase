@@ -1698,6 +1698,49 @@ class TestBatchSentences:
         assert "You must know Python." in sentences
         assert not any("nice to have" in s.lower() for s in sentences), f"Title leaked: {sentences!r}"
 
+    def test_escaped_marker_section_title_is_dropped(self, tmp_path):
+        """Escaped interior markers in a section title still drop (de-escape path, Issue #732 2b)."""
+        # Arrange / Act
+        result = _run_single_description(tmp_path, "## Nice to Have \\*Plus\\*\n\nYou must know Python.")
+
+        # Assert
+        sentences = result.sentences
+        assert not any("nice to have" in s.lower() for s in sentences), f"Escaped title leaked: {sentences!r}"
+        assert "You must know Python." in sentences, f"Real sentence dropped: {sentences!r}"
+
+    def test_long_bold_body_line_is_kept(self, tmp_path):
+        """Bold-only body line over 10 words is body text, not a title, so it is kept (Issue #732 2b)."""
+        # Arrange
+        description = (
+            "<p><strong>The Office of Research Information Services has an outstanding opportunity "
+            "for a JavaScript Engineer to join their team.</strong></p>\n<p>You must know Python.</p>"
+        )
+
+        # Act
+        result = _run_single_description(tmp_path, description)
+
+        # Assert
+        sentences = result.sentences
+        assert any("outstanding opportunity" in s for s in sentences), f"Long bold line dropped: {sentences!r}"
+        assert "You must know Python." in sentences
+
+    def test_long_hashtag_footer_line_is_kept(self, tmp_path):
+        """Hashtag footer over 10 words (ruler misparses as ATX level 1) is not treated as a title (Issue #732 2b)."""
+        # Arrange
+        hashtags = (
+            "#talentacquisition #laserweeding #laserweeder #weedcontrol #agtech #agtechnology #farmtech "
+            "#robotics #lasers #lasersandrobots #missiondriven #AI #startup #wearehiring #computervision "
+            "#machinelearning #carbonrobotics"
+        )
+
+        # Act
+        result = _run_single_description(tmp_path, f"Join us.\n\n{hashtags}")
+
+        # Assert
+        sentences = result.sentences
+        assert any("#talentacquisition" in s for s in sentences), f"Hashtag footer dropped: {sentences!r}"
+        assert "Join us." in sentences
+
     def test_flag_on_adds_pipe_flag_off_omits_it(self, monkeypatch):
         """Pipe is present by default and absent when enable_poc_sentence_splitter=False."""
         import src.poc.tweak.batch_processor as bp
@@ -1778,6 +1821,9 @@ class TestBatchSentences:
         assert "You must know Python." in sentences, f"Body sentence missing: {sentences!r}"
         assert not any("requirements" in s.lower() for s in sentences), f"Heading leaked: {sentences!r}"
         assert all("\n" not in s for s in sentences), f"Entry contains newline: {sentences!r}"
+        # Split invariant: with promotion off a plain heading line stays its own entry, not merged with body.
+        plain = _run_single_description(tmp_path, "Requirements\n\nYou must know Python.", promote_headings=False)
+        assert plain.sentences == ["Requirements", "You must know Python."], f"Not split: {plain.sentences!r}"
 
 
 class TestNormalizeSectionContent:
