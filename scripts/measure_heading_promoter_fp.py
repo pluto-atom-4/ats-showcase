@@ -60,9 +60,9 @@ from src.poc.tweak.spacy_pipeline.section_header_keywords import (  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_INPUTS: list[Path] = [Path("data/work/my_details.json")]
+DEFAULT_INPUTS: list[Path] = [_PROJECT_ROOT / "data/work/my_details.json"]
 # Under data/, which .gitignore covers (`data/`), so the generated report is never committed.
-DEFAULT_OUTPUT: Path = Path("data/work/heading_promoter_fp_report.md")
+DEFAULT_OUTPUT: Path = _PROJECT_ROOT / "data/work/heading_promoter_fp_report.md"
 MISMATCH_WORD_COUNT_THRESHOLD: int = 8
 PREVIEW_CHARS: int = 120
 SMALL_SAMPLE_WARNING_THRESHOLD: int = 30
@@ -118,11 +118,9 @@ class Hit:
     title: str
     phrase: str
     heading_text: str
-    line_start: int
     section_type: str
     confidence: float
     content_preview: str  # section.content[:120]
-    content_word_count: int
     mismatch_flag: bool  # section_type == "other" and content_word_count < MISMATCH_WORD_COUNT_THRESHOLD
 
 
@@ -250,11 +248,9 @@ def find_hits_and_deltas(jobs: list[dict[str, Any]]) -> tuple[list[Hit], list[Jo
                     title=str(result_after.title),
                     phrase=phrase,
                     heading_text=section.heading,
-                    line_start=section.line_start,
                     section_type=str(section.section_type),
                     confidence=float(section.confidence),
                     content_preview=section.content[:PREVIEW_CHARS],
-                    content_word_count=word_count,
                     mismatch_flag=(str(section.section_type) == "other" and word_count < MISMATCH_WORD_COUNT_THRESHOLD),
                 )
             )
@@ -426,6 +422,7 @@ def render_report(jobs: list[dict[str, Any]], hits: list[Hit], deltas: list[JobD
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
 
+# (raw, expected normalized value); expected must be one of the 16 phrases
 SELF_TEST_CASES: list[tuple[str, str]] = [
     ("Nice to Have", "nice to have"),
     ("Background:", "background"),
@@ -433,6 +430,21 @@ SELF_TEST_CASES: list[tuple[str, str]] = [
     ("What you\u2018ll do", "what you'll do"),
     ("What you\u2019ll do:", "what you'll do"),
     ("  What   We\u2019re  Looking   For: ", "what we're looking for"),
+]
+
+
+# Raw strings that must match HeadingPromoter._normalize exactly (not necessarily phrases)
+SELF_TEST_PARITY_ONLY: list[str] = [
+    "Needed: :",
+    "Needed\u00a0:",
+    "Nice\tto\tHave",
+    "Nice\u00a0to\u00a0Have",
+    "Nice\u2013to\u2014have",
+    "Background.",
+    "Background!?",
+    "",
+    ":",
+    "   ",
 ]
 
 
@@ -448,12 +460,17 @@ def run_self_test() -> int:
         if got != expected or got != promoter._normalize(raw) or got not in SECTION_HEADER_KEYWORDS_ONLY:
             failures += 1
             print(f"FAIL: {raw!r} -> {got!r} (expected {expected!r}, promoter {promoter._normalize(raw)!r})")
+    for raw in SELF_TEST_PARITY_ONLY:
+        if normalize_heading(raw) != promoter._normalize(raw):
+            failures += 1
+            print(f"FAIL: parity {raw!r} -> {normalize_heading(raw)!r} vs promoter {promoter._normalize(raw)!r}")
     for phrase in sorted(SECTION_HEADER_KEYWORDS_ONLY):
         if normalize_heading(phrase) != phrase or promoter._normalize(phrase) != phrase:
             failures += 1
             print(f"FAIL: phrase {phrase!r} does not round-trip through normalization")
     print(
-        f"self-test: {len(SELF_TEST_CASES)} cases + {len(SECTION_HEADER_KEYWORDS_ONLY)} phrases, {failures} failure(s)"
+        f"self-test: {len(SELF_TEST_CASES)} cases + {len(SELF_TEST_PARITY_ONLY)} parity-only strings "
+        f"+ {len(SECTION_HEADER_KEYWORDS_ONLY)} phrases, {failures} failure(s)"
     )
     return 1 if failures else 0
 
@@ -473,15 +490,15 @@ def main(argv: list[str] | None = None) -> int:
         nargs="+",
         type=Path,
         default=DEFAULT_INPUTS,
-        help="Job JSON file(s) to measure (default: data/work/my_details.json)",
+        help="Job JSON file(s) to measure (default: <repo root>/data/work/my_details.json)",
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=DEFAULT_OUTPUT,
         help=(
-            "Markdown report path (default: data/work/heading_promoter_fp_report.md; data/ is gitignored, "
-            "so the report is not committed)"
+            "Markdown report path (default: <repo root>/data/work/heading_promoter_fp_report.md; "
+            "data/ is gitignored, so the report is not committed)"
         ),
     )
     parser.add_argument(
