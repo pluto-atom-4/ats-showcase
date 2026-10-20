@@ -121,7 +121,7 @@ class Hit:
     section_type: str
     confidence: float
     content_preview: str  # section.content[:120]
-    mismatch_flag: bool  # section_type == "other" and content_word_count < MISMATCH_WORD_COUNT_THRESHOLD
+    mismatch_flag: bool  # section_type == "other" and word_count < MISMATCH_WORD_COUNT_THRESHOLD
 
 
 @dataclass
