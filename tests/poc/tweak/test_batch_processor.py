@@ -1528,6 +1528,59 @@ class TestBatchSentences:
             assert isinstance(entry["sentences"], list)
         assert any(entry["sentences"] for entry in entries)
 
+    def test_known_heading_phrase_sentence_is_dropped(self, tmp_path):
+        """Known heading phrase line is dropped from sentences; real sibling sentence survives."""
+        # Arrange
+        test_file = tmp_path / "heading_phrase_sentences.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer Position",
+                        "company": "TechCorp",
+                        "description": "**Required Qualifications:**\n\nYou must know Python.",
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(str(test_file))
+
+        # Assert
+        assert len(results) == 1
+        sentences = results[0].sentences
+        assert not any("required qualifications" in s.lower() for s in sentences), f"Heading leaked: {sentences!r}"
+        assert any("You must know Python." in s for s in sentences), f"Real sentence dropped: {sentences!r}"
+
+    def test_boilerplate_notice_sentence_is_dropped(self, tmp_path):
+        """Applicants-not-forwarded boilerplate notice is dropped from sentences."""
+        # Arrange
+        boilerplate = "Applicants who do not meet the qualifications will not be forwarded to the hiring department"
+        test_file = tmp_path / "boilerplate_sentences.json"
+        test_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "job1",
+                        "title": "Developer Position",
+                        "company": "TechCorp",
+                        "description": f"You must know Python.\n\n{boilerplate}",
+                    }
+                ]
+            )
+        )
+
+        # Act
+        results = run_batch(str(test_file))
+
+        # Assert
+        assert len(results) == 1
+        sentences = results[0].sentences
+        assert not any("will not be forwarded" in s for s in sentences), f"Boilerplate leaked: {sentences!r}"
+        assert any("You must know Python." in s for s in sentences), f"Real sentence dropped: {sentences!r}"
+
     def test_flag_on_adds_pipe_flag_off_omits_it(self, monkeypatch):
         """Pipe is present by default and absent when enable_poc_sentence_splitter=False."""
         import src.poc.tweak.batch_processor as bp

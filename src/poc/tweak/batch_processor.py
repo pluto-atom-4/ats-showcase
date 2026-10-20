@@ -16,7 +16,15 @@ Stages:
 8. TechnologyProcessor: Extract technologies from sections (Issue #321)
 
 Stage 9 (Issue #643): poc_sentence_splitter populates ``JobResult.sentences`` from the
-polished markdown; disable with ``--no-poc-sentences`` / ``enable_poc_sentence_splitter=False``.
+polished markdown. A sentence is dropped (Issue #732 item 2) when its normalized form
+(case-folded, markdown markers and trailing periods stripped, whitespace collapsed,
+backslash-escapes on markers removed) equals a KNOWN_HEADING_PHRASES entry, or matches the
+boilerplate notice pattern. That pattern is narrow: only the applicants-not-forwarded notice
+of the form "applicants who do not meet (these|the minimum|the) qualifications will not be
+forwarded to the hiring department". Interior emphasis markers and other wordings are not
+matched. Company-specific section titles (e.g. "Nice to Have", "About the Role") are NOT
+dropped; that needs per-sentence section context. Disable with ``--no-poc-sentences`` /
+``enable_poc_sentence_splitter=False``.
 
 Components are instantiated once and reused across all jobs for efficiency.
 Per-job errors are captured without aborting the batch.
@@ -82,6 +90,19 @@ def _blank_if_heading_only(content: str, heading: str) -> str:
     return "" if is_heading_only(content, heading) else content
 
 
+_MARKDOWN_ESCAPE_RE = re.compile(r"\\([*_`\[\]])")
+
+
+def _unescape_markdown_markers(text: str) -> str:
+    """Strip backslash escapes on markdown markers (``\\*`` -> ``*``) for matching only.
+
+    Upstream cause: the Stage 2 HTML-to-markdown converter (MarkItDown) escapes
+    emphasis markers, so ``**Required Qualifications:**`` arrives as ``\\*\\*...``.
+    ``normalize_heading_text`` does not strip ``\\*``, so the heading check would miss it.
+    """
+    return _MARKDOWN_ESCAPE_RE.sub(r"\1", text)
+
+
 @dataclass
 class JobResult:
     """Result of processing a single job through the markdown pipeline.
@@ -101,7 +122,10 @@ class JobResult:
         markdown_sections: List of MarkdownSection objects with full metadata (Issue #338)
         errors: List of (stage_name, error_message) tuples for per-stage errors
         warnings: List of (stage_name, warning_message) tuples for per-job warnings (not failures)
-        sentences: Sentences split from polished_markdown by poc_sentence_splitter (Issue #643)
+        sentences: Sentences split from polished_markdown by poc_sentence_splitter (Issue #643).
+            Sentences whose normalized form matches KNOWN_HEADING_PHRASES or the narrow
+            boilerplate notice pattern are dropped (Issue #732 item 2). Company-specific section
+            titles such as "Nice to Have" are not dropped.
     """
 
     job_id: str
@@ -461,8 +485,12 @@ def process_job(
         # Create a spaCy Doc for extraction using the fully-configured nlp pipeline
         # This ensures all extensions and components are available
         doc = nlp(polished_markdown)
-        # Sentences come from polished_markdown, not promoted_markdown (intentional; no section alignment)
-        result.sentences = list(doc._.poc_sentences or [])
+        # Sentences come from polished_markdown, not promoted_markdown (intentional; no section alignment).
+        # Drop only known heading/boilerplate sentences (Issue #732 item 2); the check sees
+        # de-escaped text but the kept sentence keeps its original form.
+        result.sentences = [
+            s for s in (doc._.poc_sentences or []) if not is_heading_only(_unescape_markdown_markers(s))
+        ]
 
         # Ensure sections are populated on the doc for classification
         doc._.sections = sections  # Pre-populate sections from ruler output
