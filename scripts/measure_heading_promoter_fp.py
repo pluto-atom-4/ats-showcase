@@ -61,17 +61,11 @@ from src.poc.tweak.spacy_pipeline.section_header_keywords import (  # noqa: E402
 logger = logging.getLogger(__name__)
 
 DEFAULT_INPUTS: list[Path] = [Path("data/work/my_details.json")]
-DEFAULT_OUTPUT: Path = Path(
-    "/home/pluto-atom-4/tmp/claude-1001/"
-    "-home-pluto-atom-4-Documents-full-stack-ats-playground/"
-    "729f1af3-41ba-4999-a479-0f1619c4000f/scratchpad/"
-    "issue734-heading-promoter-fp-report.md"
-)
+# Under data/, which .gitignore covers (`data/`), so the generated report is never committed.
+DEFAULT_OUTPUT: Path = Path("data/work/heading_promoter_fp_report.md")
 MISMATCH_WORD_COUNT_THRESHOLD: int = 8
 PREVIEW_CHARS: int = 120
 SMALL_SAMPLE_WARNING_THRESHOLD: int = 30
-
-_APOSTROPHE_FOLD = str.maketrans({"\u2019": "'"})
 
 
 def load_and_dedupe_jobs(input_paths: list[Path]) -> list[dict[str, Any]]:
@@ -102,19 +96,23 @@ def load_and_dedupe_jobs(input_paths: list[Path]) -> list[dict[str, Any]]:
 
 
 def normalize_heading(text: str) -> str:
-    """casefold; strip one trailing ':'; collapse internal whitespace runs to one
-    space; strip leading/trailing whitespace; fold '\u2019' to "'" before comparing
-    (two of the 16 phrases contain apostrophes: "what you'll do", "what we're
-    looking for").
+    """Normalize a heading for comparison against SECTION_HEADER_KEYWORDS_ONLY.
+
+    Mirrors ``HeadingPromoter._normalize`` in
+    ``src/poc/tweak/spacy_pipeline/heading_promoter.py`` step for step (casefold;
+    fold U+2019 and U+2018 to "'"; collapse whitespace; strip all trailing ':' and
+    surrounding whitespace). That method is private and has no public equivalent,
+    so it is mirrored here; ``run_self_test`` asserts the two agree.
     """
-    folded = text.casefold().translate(_APOSTROPHE_FOLD).strip()
-    if folded.endswith(":"):
-        folded = folded[:-1]
-    return " ".join(folded.split())
+    text = text.casefold()
+    text = text.replace("\u2019", "'").replace("\u2018", "'")
+    text = " ".join(text.split())
+    return text.rstrip(":").strip()
 
 
 @dataclass
 class Hit:
+    record_index: int  # 1-based position in the de-duplicated job list
     job_id: str
     company: str
     title: str
@@ -124,13 +122,13 @@ class Hit:
     section_type: str
     confidence: float
     content_preview: str  # section.content[:120]
-    is_skip: bool
     content_word_count: int
     mismatch_flag: bool  # section_type == "other" and content_word_count < MISMATCH_WORD_COUNT_THRESHOLD
 
 
 @dataclass
 class JobDelta:
+    record_index: int  # 1-based position in the de-duplicated job list
     job_id: str
     requirements_before: int
     requirements_after: int
@@ -235,7 +233,7 @@ def find_hits_and_deltas(jobs: list[dict[str, Any]]) -> tuple[list[Hit], list[Jo
 
     hits: list[Hit] = []
     deltas: list[JobDelta] = []
-    for job in jobs:
+    for record_index, job in enumerate(jobs, start=1):
         result_before, result_after = run_before_after(job, nlp, components)
 
         before_starts = {section.line_start for section in result_before.markdown_sections}
@@ -246,6 +244,7 @@ def find_hits_and_deltas(jobs: list[dict[str, Any]]) -> tuple[list[Hit], list[Jo
             word_count = len(section.content.split())
             hits.append(
                 Hit(
+                    record_index=record_index,
                     job_id=str(result_after.job_id),
                     company=str(result_after.company),
                     title=str(result_after.title),
@@ -255,7 +254,6 @@ def find_hits_and_deltas(jobs: list[dict[str, Any]]) -> tuple[list[Hit], list[Jo
                     section_type=str(section.section_type),
                     confidence=float(section.confidence),
                     content_preview=section.content[:PREVIEW_CHARS],
-                    is_skip=bool(section.is_skip),
                     content_word_count=word_count,
                     mismatch_flag=(str(section.section_type) == "other" and word_count < MISMATCH_WORD_COUNT_THRESHOLD),
                 )
@@ -263,6 +261,7 @@ def find_hits_and_deltas(jobs: list[dict[str, Any]]) -> tuple[list[Hit], list[Jo
 
         deltas.append(
             JobDelta(
+                record_index=record_index,
                 job_id=str(result_after.job_id),
                 requirements_before=len(result_before.requirements),
                 requirements_after=len(result_after.requirements),
@@ -304,13 +303,13 @@ def _render_delta_table(deltas: list[JobDelta]) -> list[str]:
     lines = [
         "## Per-job requirements / skills / technologies (before vs after)",
         "",
-        "| job_id | requirements before | requirements after | skills before | skills after "
+        "| # | job_id | requirements before | requirements after | skills before | skills after "
         "| technologies before | technologies after |",
-        "|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for d in deltas:
         lines.append(
-            f"| {_md_cell(d.job_id)} | {d.requirements_before} | {d.requirements_after} "
+            f"| {d.record_index} | {_md_cell(d.job_id)} | {d.requirements_before} | {d.requirements_after} "
             f"| {d.skills_before} | {d.skills_after} | {d.technologies_before} | {d.technologies_after} |"
         )
     lines.append("")
@@ -321,13 +320,14 @@ def _render_hit_details(hits: list[Hit]) -> list[str]:
     lines = [
         "## Hit details",
         "",
-        "| job_id | company | title | phrase | heading_text | section_type | confidence "
+        "| # | job_id | company | title | phrase | heading_text | section_type | confidence "
         "| content_preview | mismatch_flag |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for h in hits:
         lines.append(
-            f"| {_md_cell(h.job_id)} | {_md_cell(h.company)} | {_md_cell(h.title)} | {_md_cell(h.phrase)} "
+            f"| {h.record_index} | {_md_cell(h.job_id)} | {_md_cell(h.company)} | {_md_cell(h.title)} "
+            f"| {_md_cell(h.phrase)} "
             f"| {_md_cell(h.heading_text)} | {_md_cell(h.section_type)} | {h.confidence:.2f} "
             f"| {_md_cell(h.content_preview)} | {h.mismatch_flag} |"
         )
@@ -341,13 +341,13 @@ def _render_manual_review(hits: list[Hit]) -> list[str]:
         "",
         "Placeholder: verdicts are filled in by a human reviewer, not by this script.",
         "",
-        "| job_id | phrase | heading_text | section_type | Verdict (true heading / false positive) |",
-        "|---|---|---|---|---|",
+        "| # | job_id | title | phrase | heading_text | section_type | Verdict (true heading / false positive) |",
+        "|---|---|---|---|---|---|---|",
     ]
     for h in hits:
         lines.append(
-            f"| {_md_cell(h.job_id)} | {_md_cell(h.phrase)} | {_md_cell(h.heading_text)} "
-            f"| {_md_cell(h.section_type)} | |"
+            f"| {h.record_index} | {_md_cell(h.job_id)} | {_md_cell(h.title)} | {_md_cell(h.phrase)} "
+            f"| {_md_cell(h.heading_text)} | {_md_cell(h.section_type)} | |"
         )
     lines.append("")
     return lines
@@ -372,7 +372,7 @@ def _data_loss_line(deltas: list[JobDelta]) -> str:
         if d.technologies_after < d.technologies_before:
             drops.append(f"technologies {d.technologies_before}->{d.technologies_after}")
         if drops:
-            decreased.append(f"{d.job_id} ({', '.join(drops)})")
+            decreased.append(f"#{d.record_index} {d.job_id} ({', '.join(drops)})")
     if decreased:
         return (
             "Decrease found in after-count vs before-count for requirements/skills/technologies in "
@@ -426,6 +426,38 @@ def render_report(jobs: list[dict[str, Any]], hits: list[Hit], deltas: list[JobD
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
 
+SELF_TEST_CASES: list[tuple[str, str]] = [
+    ("Nice to Have", "nice to have"),
+    ("Background:", "background"),
+    ("Needed::", "needed"),
+    ("What you\u2018ll do", "what you'll do"),
+    ("What you\u2019ll do:", "what you'll do"),
+    ("  What   We\u2019re  Looking   For: ", "what we're looking for"),
+]
+
+
+def run_self_test() -> int:
+    """Check normalize_heading() against HeadingPromoter._normalize and the phrase set.
+
+    Returns 0 when every case passes, 1 otherwise.
+    """
+    promoter = HeadingPromoter()
+    failures = 0
+    for raw, expected in SELF_TEST_CASES:
+        got = normalize_heading(raw)
+        if got != expected or got != promoter._normalize(raw) or got not in SECTION_HEADER_KEYWORDS_ONLY:
+            failures += 1
+            print(f"FAIL: {raw!r} -> {got!r} (expected {expected!r}, promoter {promoter._normalize(raw)!r})")
+    for phrase in sorted(SECTION_HEADER_KEYWORDS_ONLY):
+        if normalize_heading(phrase) != phrase or promoter._normalize(phrase) != phrase:
+            failures += 1
+            print(f"FAIL: phrase {phrase!r} does not round-trip through normalization")
+    print(
+        f"self-test: {len(SELF_TEST_CASES)} cases + {len(SECTION_HEADER_KEYWORDS_ONLY)} phrases, {failures} failure(s)"
+    )
+    return 1 if failures else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """argparse: --input (nargs='+', type=Path, default=DEFAULT_INPUTS), --output
     (type=Path, default=DEFAULT_OUTPUT). Calls load_and_dedupe_jobs, then
@@ -447,9 +479,19 @@ def main(argv: list[str] | None = None) -> int:
         "--output",
         type=Path,
         default=DEFAULT_OUTPUT,
-        help="Markdown report path (default: scratchpad issue734-heading-promoter-fp-report.md)",
+        help=(
+            "Markdown report path (default: data/work/heading_promoter_fp_report.md; data/ is gitignored, "
+            "so the report is not committed)"
+        ),
+    )
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="Only check normalize_heading() against HeadingPromoter._normalize and exit (no spaCy run)",
     )
     args = parser.parse_args(argv)
+    if args.self_test:
+        return run_self_test()
 
     missing = [str(p) for p in args.input if not p.exists()]
     if missing:
