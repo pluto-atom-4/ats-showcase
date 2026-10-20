@@ -16,15 +16,15 @@ Stages:
 8. TechnologyProcessor: Extract technologies from sections (Issue #321)
 
 Stage 9 (Issue #643): poc_sentence_splitter populates ``JobResult.sentences`` from the
-polished markdown. A sentence is dropped (Issue #732 item 2) when its normalized form
-(case-folded, markdown markers and trailing periods stripped, whitespace collapsed,
-backslash-escapes on markers removed) equals a KNOWN_HEADING_PHRASES entry, or matches the
-boilerplate notice pattern. That pattern is narrow: only the applicants-not-forwarded notice
-of the form "applicants who do not meet (these|the minimum|the) qualifications will not be
-forwarded to the hiring department". Interior emphasis markers and other wordings are not
-matched. Company-specific section titles (e.g. "Nice to Have", "About the Role") are NOT
-dropped; that needs per-sentence section context. Disable with ``--no-poc-sentences`` /
-``enable_poc_sentence_splitter=False``.
+polished markdown. A sentence is dropped when its normalized form (case-folded, markdown
+markers and trailing periods stripped, whitespace collapsed, backslash-escapes on markers
+removed) either equals a KNOWN_HEADING_PHRASES entry, matches the narrow boilerplate notice
+pattern (applicants-not-forwarded wording only), or equals the normalized title of a structural
+section (ATX or bold-only, at most 10 words) in the same job (Issue #732 items 2 and 2b). Other
+sentences are kept unchanged. A real sentence identical to a section title is dropped too.
+Known gap: raw markdown ``**Title**`` lines whose markers arrive escaped (``\\*\\*...``) are not
+parsed as sections, so they are not dropped; HTML ``<strong>`` and ATX-derived sections are.
+Disable with ``--no-poc-sentences`` / ``enable_poc_sentence_splitter=False``.
 
 Components are instantiated once and reused across all jobs for efficiency.
 Per-job errors are captured without aborting the batch.
@@ -53,6 +53,7 @@ import spacy
 
 import src.poc.sentence_splitter  # noqa: F401  (registers poc_sentence_splitter factory + doc extension)
 from src.poc.tweak.markdown_section_classifier import SectionClassifier
+from src.poc.tweak.multi_line_paragraph import MarkdownSection as RulerSection
 from src.poc.tweak.multi_line_paragraph import MarkdownSpanRuler
 from src.poc.tweak.section_model import MarkdownSection
 from src.poc.tweak.spacy_pipeline import (
@@ -64,7 +65,7 @@ from src.poc.tweak.spacy_pipeline import (
     TechnologyProcessor,
 )
 from src.poc.tweak.spacy_pipeline.heading_promoter import HeadingPromoter
-from src.poc.tweak.spacy_pipeline.heading_text import is_heading_only
+from src.poc.tweak.spacy_pipeline.heading_text import is_heading_only, normalize_heading_text
 
 # Allowed description_selector_match strategies
 DESCRIPTION_MATCH_STRATEGIES = {"first", "all", "longest"}
@@ -103,6 +104,43 @@ def _unescape_markdown_markers(text: str) -> str:
     return _MARKDOWN_ESCAPE_RE.sub(r"\1", text)
 
 
+_MAX_SECTION_TITLE_WORDS = 10
+
+
+def _normalized_section_titles(sections: List[RulerSection]) -> frozenset[str]:
+    """Normalized titles of structural sections, for dropping sentences that repeat a heading.
+
+    Issue #732 item 2b. A section contributes only when its title is non-empty AND its level
+    is structural (ATX 1-6 or bold-only -1). Preamble sections (level -2, title=None) never
+    contribute. Titles are de-escaped and normalized the same way as sentences.
+
+    Length cap: titles longer than ``_MAX_SECTION_TITLE_WORDS`` (10) normalized words do not
+    contribute. The ruler emits bold-only level -1 for any fully bold line, so long bold
+    job-summary paragraphs and bold lead-ins are body text, not headings. Real headings are
+    short.
+
+    Accepted trade-off: a real sentence whose normalized text equals a structural section
+    title (within the cap) anywhere in the job is dropped, not only the title of its own section.
+
+    Args:
+        sections: Parsed sections for this job (``ruler.parse(promoted_markdown)`` output).
+
+    Returns:
+        Frozenset of normalized title strings (never contains "").
+    """
+    titles: set[str] = set()
+    for section in sections:
+        if not section.title:
+            continue
+        # Mirrors heading_text._is_structural_level (module-private there); kept inline to stay in scope.
+        if not (section.level == -1 or 1 <= section.level <= 6):
+            continue
+        normalized = normalize_heading_text(_unescape_markdown_markers(section.title))
+        if normalized and len(normalized.split()) <= _MAX_SECTION_TITLE_WORDS:
+            titles.add(normalized)
+    return frozenset(titles)
+
+
 @dataclass
 class JobResult:
     """Result of processing a single job through the markdown pipeline.
@@ -123,9 +161,11 @@ class JobResult:
         errors: List of (stage_name, error_message) tuples for per-stage errors
         warnings: List of (stage_name, warning_message) tuples for per-job warnings (not failures)
         sentences: Sentences split from polished_markdown by poc_sentence_splitter (Issue #643).
-            Sentences whose normalized form matches KNOWN_HEADING_PHRASES or the narrow
-            boilerplate notice pattern are dropped (Issue #732 item 2). Company-specific section
-            titles such as "Nice to Have" are not dropped.
+            Sentences whose normalized form matches KNOWN_HEADING_PHRASES, the narrow
+            boilerplate notice pattern, or the normalized title of a structural section in the
+            job (at most 10 words) are dropped (Issue #732 items 2 and 2b). Kept sentences keep
+            their original text. Known gap: raw escaped ``\\*\\*Title\\*\\*`` markdown lines are not
+            dropped, since they do not parse as sections.
     """
 
     job_id: str
@@ -486,11 +526,19 @@ def process_job(
         # This ensures all extensions and components are available
         doc = nlp(polished_markdown)
         # Sentences come from polished_markdown, not promoted_markdown (intentional; no section alignment).
-        # Drop only known heading/boilerplate sentences (Issue #732 item 2); the check sees
-        # de-escaped text but the kept sentence keeps its original form.
-        result.sentences = [
-            s for s in (doc._.poc_sentences or []) if not is_heading_only(_unescape_markdown_markers(s))
-        ]
+        # Drop known heading/boilerplate sentences (Issue #732 item 2) and sentences that equal a
+        # structural section title (Issue #732 item 2b). Checks see de-escaped text; kept sentences
+        # keep their original form.
+        known_section_titles = _normalized_section_titles(sections)
+        kept_sentences: List[str] = []
+        for s in doc._.poc_sentences or []:
+            unescaped = _unescape_markdown_markers(s)
+            if is_heading_only(unescaped):
+                continue
+            if normalize_heading_text(unescaped) in known_section_titles:
+                continue
+            kept_sentences.append(s)
+        result.sentences = kept_sentences
 
         # Ensure sections are populated on the doc for classification
         doc._.sections = sections  # Pre-populate sections from ruler output

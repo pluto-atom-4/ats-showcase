@@ -1441,6 +1441,27 @@ def _run_main(argv_tail: list) -> int:
         sys.argv = old_argv
 
 
+def _run_single_description(tmp_path, description: str, *, promote_headings: bool = True):
+    """Run one job with the given description through run_batch and return its JobResult."""
+    test_file = tmp_path / "item2b_sentences.json"
+    test_file.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "job1",
+                    "title": "Developer Position",
+                    "company": "TechCorp",
+                    "description": description,
+                }
+            ]
+        )
+    )
+    results = run_batch(str(test_file), promote_headings=promote_headings)
+    assert len(results) == 1
+    assert not results[0].has_errors(), f"Unexpected errors: {results[0].errors}"
+    return results[0]
+
+
 class TestBatchSentences:
     """Tests for JobResult.sentences and the poc_sentence_splitter flag (Issue #643)."""
 
@@ -1581,6 +1602,145 @@ class TestBatchSentences:
         assert not any("will not be forwarded" in s for s in sentences), f"Boilerplate leaked: {sentences!r}"
         assert any("You must know Python." in s for s in sentences), f"Real sentence dropped: {sentences!r}"
 
+    def test_atx_section_title_sentence_is_dropped(self, tmp_path):
+        """ATX section title ("## Nice to Have") is dropped from sentences; body sentence survives (Issue #732 2b)."""
+        # Arrange / Act
+        result = _run_single_description(tmp_path, "## Nice to Have\n\nYou must know Python.")
+
+        # Assert
+        sentences = result.sentences
+        assert not any("nice to have" in s.lower() for s in sentences), f"Title leaked: {sentences!r}"
+        assert "You must know Python." in sentences, f"Real sentence dropped: {sentences!r}"
+
+    def test_bold_only_section_title_sentence_is_dropped(self, tmp_path):
+        """Bold-only title ("About the Role", ruler level -1) is dropped; real sentence survives (Issue #732 2b).
+
+        Uses HTML <strong> input: raw ``**...**`` markdown in a description is escaped by the
+        converter and not parsed as a bold-only section, so this is the path that reaches the rule.
+        """
+        # Arrange
+        description = "<p><strong>About the Role</strong></p>\n<p>You must know Python.</p>"
+
+        # Act
+        result = _run_single_description(tmp_path, description)
+
+        # Assert
+        assert any(sec.heading == "About the Role" for sec in result.markdown_sections), (
+            "Bold-only section not detected"
+        )
+        sentences = result.sentences
+        assert not any("about the role" in s.lower() for s in sentences), f"Title leaked: {sentences!r}"
+        assert "You must know Python." in sentences, f"Real sentence dropped: {sentences!r}"
+
+    def test_preamble_text_matching_a_heading_phrase_is_kept(self, tmp_path):
+        """Plain text equal to a title is kept when no structural section carries that title (Issue #732 2b).
+
+        Heading promotion is disabled so "Nice to Have" stays a plain body line with no section title.
+        """
+        # Arrange / Act
+        result = _run_single_description(tmp_path, "Nice to Have\n\nYou must know Python.", promote_headings=False)
+
+        # Assert
+        assert not any(sec.heading == "Nice to Have" for sec in result.markdown_sections)
+        assert "Nice to Have" in result.sentences, f"Preamble text wrongly dropped: {result.sentences!r}"
+        assert "You must know Python." in result.sentences
+
+    def test_duplicate_section_titles_both_dropped_no_crash(self, tmp_path):
+        """Two sections sharing a title both drop; sections_detected is unchanged (Issue #732 2b)."""
+        # Arrange
+        description = "## Nice to Have\n\nYou must know Python.\n\n## Nice to Have\n\nYou must know Go."
+
+        # Act
+        result = _run_single_description(tmp_path, description)
+
+        # Assert
+        assert result.sections_detected == 2
+        sentences = result.sentences
+        assert not any("nice to have" in s.lower() for s in sentences), f"Title leaked: {sentences!r}"
+        assert "You must know Python." in sentences
+        assert "You must know Go." in sentences
+
+    def test_real_sentence_equal_to_its_section_title_is_dropped(self, tmp_path):
+        """Intentional trade-off: a sentence equal to its structural section title is dropped (Issue #732 2b)."""
+        # Arrange / Act
+        result = _run_single_description(tmp_path, "## Python\n\nPython.")
+
+        # Assert
+        assert not any(s.strip().rstrip(".").lower() == "python" for s in result.sentences), (
+            f"Title-equal sentence kept: {result.sentences!r}"
+        )
+
+    def test_known_heading_and_section_title_dropped_together(self, tmp_path):
+        """Known heading phrase and a company-specific title in one job are both dropped; real sentence survives."""
+        # Arrange
+        description = "**Required Qualifications:**\n\n## Nice to Have\n\nYou must know Python."
+
+        # Act
+        result = _run_single_description(tmp_path, description)
+
+        # Assert
+        sentences = result.sentences
+        assert not any("required qualifications" in s.lower() for s in sentences), f"Heading leaked: {sentences!r}"
+        assert not any("nice to have" in s.lower() for s in sentences), f"Title leaked: {sentences!r}"
+        assert "You must know Python." in sentences, f"Real sentence dropped: {sentences!r}"
+
+    def test_untitled_preamble_sentence_is_kept_alongside_titled_section(self, tmp_path):
+        """Untitled preamble (level -2, title None) never populates the drop set; its sentence survives."""
+        # Arrange
+        description = "Intro line here.\n\n## Nice to Have\n\nYou must know Python."
+
+        # Act
+        result = _run_single_description(tmp_path, description)
+
+        # Assert
+        sentences = result.sentences
+        assert "Intro line here." in sentences, f"Preamble sentence dropped: {sentences!r}"
+        assert "You must know Python." in sentences
+        assert not any("nice to have" in s.lower() for s in sentences), f"Title leaked: {sentences!r}"
+
+    def test_escaped_marker_section_title_is_dropped(self, tmp_path):
+        """Escaped interior markers in a section title still drop (de-escape path, Issue #732 2b)."""
+        # Arrange / Act
+        result = _run_single_description(tmp_path, "## Nice to Have \\*Plus\\*\n\nYou must know Python.")
+
+        # Assert
+        sentences = result.sentences
+        assert not any("nice to have" in s.lower() for s in sentences), f"Escaped title leaked: {sentences!r}"
+        assert "You must know Python." in sentences, f"Real sentence dropped: {sentences!r}"
+
+    def test_long_bold_body_line_is_kept(self, tmp_path):
+        """Bold-only body line over 10 words is body text, not a title, so it is kept (Issue #732 2b)."""
+        # Arrange
+        description = (
+            "<p><strong>The Office of Research Information Services has an outstanding opportunity "
+            "for a JavaScript Engineer to join their team.</strong></p>\n<p>You must know Python.</p>"
+        )
+
+        # Act
+        result = _run_single_description(tmp_path, description)
+
+        # Assert
+        sentences = result.sentences
+        assert any("outstanding opportunity" in s for s in sentences), f"Long bold line dropped: {sentences!r}"
+        assert "You must know Python." in sentences
+
+    def test_long_hashtag_footer_line_is_kept(self, tmp_path):
+        """Hashtag footer over 10 words (ruler misparses as ATX level 1) is not treated as a title (Issue #732 2b)."""
+        # Arrange
+        hashtags = (
+            "#talentacquisition #laserweeding #laserweeder #weedcontrol #agtech #agtechnology #farmtech "
+            "#robotics #lasers #lasersandrobots #missiondriven #AI #startup #wearehiring #computervision "
+            "#machinelearning #carbonrobotics"
+        )
+
+        # Act
+        result = _run_single_description(tmp_path, f"Join us.\n\n{hashtags}")
+
+        # Assert
+        sentences = result.sentences
+        assert any("#talentacquisition" in s for s in sentences), f"Hashtag footer dropped: {sentences!r}"
+        assert "Join us." in sentences
+
     def test_flag_on_adds_pipe_flag_off_omits_it(self, monkeypatch):
         """Pipe is present by default and absent when enable_poc_sentence_splitter=False."""
         import src.poc.tweak.batch_processor as bp
@@ -1635,7 +1795,8 @@ class TestBatchSentences:
     def test_heading_splits_into_separate_sentence(self, tmp_path):
         """After #677/#643 a markdown heading and the following sentence are separate entries.
 
-        No sentence entry contains an embedded newline.
+        Issue #732 2b: the structural heading "## Requirements" is now dropped from sentences,
+        so only the body sentence remains. No sentence entry contains an embedded newline.
         """
         # Arrange
         test_file = tmp_path / "heading_sentences.json"
@@ -1657,10 +1818,12 @@ class TestBatchSentences:
 
         # Assert - heading and following sentence are separate entries, no embedded newline
         sentences = results[0].sentences
-        assert len(sentences) >= 2, f"Expected heading and sentence as separate entries, got {sentences!r}"
+        assert "You must know Python." in sentences, f"Body sentence missing: {sentences!r}"
+        assert not any("requirements" in s.lower() for s in sentences), f"Heading leaked: {sentences!r}"
         assert all("\n" not in s for s in sentences), f"Entry contains newline: {sentences!r}"
-        assert any("Requirements" in s for s in sentences), f"Heading missing: {sentences!r}"
-        assert any("You must know Python." in s for s in sentences), f"Sentence missing: {sentences!r}"
+        # Split invariant: with promotion off a plain heading line stays its own entry, not merged with body.
+        plain = _run_single_description(tmp_path, "Requirements\n\nYou must know Python.", promote_headings=False)
+        assert plain.sentences == ["Requirements", "You must know Python."], f"Not split: {plain.sentences!r}"
 
 
 class TestNormalizeSectionContent:
