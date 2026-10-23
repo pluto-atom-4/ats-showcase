@@ -52,6 +52,13 @@ from typing import Any, Dict, List, Optional, Tuple
 import spacy
 
 import src.poc.sentence_splitter  # noqa: F401  (registers poc_sentence_splitter factory + doc extension)
+from src.poc.tweak.extraction_status import (
+    FALLBACK_MIN_SECTION_CONFIDENCE,
+    MIN_DESCRIPTION_CHARS,
+    MIN_SECTIONS_FOR_REAL_JD,
+    ExtractionOutcome,
+    classify_extraction_outcome,
+)
 from src.poc.tweak.markdown_section_classifier import SectionClassifier
 from src.poc.tweak.multi_line_paragraph import MarkdownSection as RulerSection
 from src.poc.tweak.multi_line_paragraph import MarkdownSpanRuler
@@ -166,6 +173,8 @@ class JobResult:
             job (at most 10 words) are dropped (Issue #732 items 2 and 2b). Kept sentences keep
             their original text. Known gap: raw escaped ``\\*\\*Title\\*\\*`` markdown lines are not
             dropped, since they do not parse as sections.
+        extraction_outcome: Classified extraction outcome (Issue #738, Part of #735). None when the
+            job was not classified. Additive: ``has_errors()`` is unaffected.
     """
 
     job_id: str
@@ -183,6 +192,7 @@ class JobResult:
     errors: List[tuple[str, str]] = field(default_factory=list)
     warnings: List[Tuple[str, str]] = field(default_factory=list)
     sentences: List[str] = field(default_factory=list)
+    extraction_outcome: Optional[ExtractionOutcome] = None
 
     def add_error(self, stage: str, error: str) -> None:
         """Add a per-stage error to the result.
@@ -269,6 +279,8 @@ def process_job(
     description_selector: Optional[str] = None,
     description_match: str = "first",
     heading_promoter: Optional[HeadingPromoter] = None,
+    min_sections: int = MIN_SECTIONS_FOR_REAL_JD,
+    min_description_chars: int = MIN_DESCRIPTION_CHARS,
 ) -> JobResult:
     """Process a single job through the markdown pipeline.
 
@@ -303,6 +315,10 @@ def process_job(
                           (default "first"). Invalid values treated as "first" with warning.
         heading_promoter: Optional HeadingPromoter instance for promoting plain-text headings
                           (default None skips heading promotion)
+        min_sections: Minimum sections for the input to count as a real JD when classifying
+                          extraction_outcome (default MIN_SECTIONS_FOR_REAL_JD, Issue #738)
+        min_description_chars: Minimum stripped text length for the input to count as a real JD
+                          when classifying extraction_outcome (default MIN_DESCRIPTION_CHARS, Issue #738)
 
     Returns:
         JobResult with processing stats and any errors encountered
@@ -387,6 +403,7 @@ def process_job(
         clean_html = preprocessor.process(raw_html)
     except Exception as e:
         result.add_error("preprocessor", str(e))
+        result.extraction_outcome = ExtractionOutcome.ERROR
         return result
 
     # Stage 2: Convert to Markdown
@@ -394,6 +411,7 @@ def process_job(
         markdown = converter.process(clean_html)
     except Exception as e:
         result.add_error("converter", str(e))
+        result.extraction_outcome = ExtractionOutcome.ERROR
         return result
 
     # Stage 3: Polish Markdown
@@ -401,7 +419,11 @@ def process_job(
         polished_markdown = polisher.process(markdown)
     except Exception as e:
         result.add_error("polisher", str(e))
+        result.extraction_outcome = ExtractionOutcome.ERROR
         return result
+
+    # Length of the polished markdown: the text-length signal for classify_extraction_outcome (Issue #738)
+    stripped_text_len = len(polished_markdown)
 
     # Stage 3b: Promote plain-text headings (optional, Issue #365)
     promoted_markdown = polished_markdown
@@ -573,6 +595,12 @@ def process_job(
     except Exception as e:
         result.add_error("extraction_pipeline", str(e))
 
+    result.extraction_outcome = classify_extraction_outcome(
+        result,
+        stripped_text_len,
+        min_sections=min_sections,
+        min_description_chars=min_description_chars,
+    )
     return result
 
 
@@ -583,6 +611,9 @@ def run_batch(
     promote_headings: bool = True,
     config_dir: str = "config_test",
     enable_poc_sentence_splitter: bool = True,
+    min_sections_for_real_jd: int = MIN_SECTIONS_FOR_REAL_JD,
+    min_description_chars: int = MIN_DESCRIPTION_CHARS,
+    fallback_min_section_confidence: float = FALLBACK_MIN_SECTION_CONFIDENCE,
 ) -> List[JobResult]:
     """Run batch processing on all jobs in input file.
 
@@ -610,6 +641,13 @@ def run_batch(
                           selectors from ``source_config`` (default "config_test")
         enable_poc_sentence_splitter: Whether to add the poc_sentence_splitter pipe and
                           populate ``JobResult.sentences`` (default True, Issue #643)
+        min_sections_for_real_jd: Section threshold for extraction_outcome classification
+                          (default MIN_SECTIONS_FOR_REAL_JD, Issue #738; CLI --min-sections-for-real-jd)
+        min_description_chars: Stripped-text threshold for extraction_outcome classification
+                          (default MIN_DESCRIPTION_CHARS, Issue #738; CLI --min-description-chars)
+        fallback_min_section_confidence: Reserved for the Spec 4 fallback extraction pass (#739).
+                          Accepted so the CLI surface is stable; not consumed yet (Issue #738;
+                          CLI --fallback-min-section-confidence)
 
     Returns:
         List of JobResult objects (one per job)
@@ -686,6 +724,8 @@ def run_batch(
             description_selector=job_selector,
             description_match=job_match,
             heading_promoter=heading_promoter,
+            min_sections=min_sections_for_real_jd,
+            min_description_chars=min_description_chars,
         )
         if resolve_error is not None:
             # Unknown/invalid source_config: process job unscoped (as before), record a warning
@@ -742,6 +782,8 @@ def print_summary(results: List[JobResult]) -> str:
             lines.append(f"  Errors ({len(result.errors)}):")
             for stage, error in result.errors:
                 lines.append(f"    - {stage}: {error}")
+        elif result.extraction_outcome is not None:
+            lines.append(f"  Status: {result.extraction_outcome.value.upper()}")
         else:
             lines.append("  Status: SUCCESS")
 
@@ -775,6 +817,9 @@ def print_summary(results: List[JobResult]) -> str:
     lines.append(f"Total Requirements Extracted: {total_requirements}")
     lines.append(f"Total Skills Extracted: {total_skills}")
     lines.append(f"Total Technologies Extracted: {total_technologies}")
+    for outcome in ExtractionOutcome:
+        outcome_count = sum(1 for r in results if r.extraction_outcome is outcome)
+        lines.append(f"{outcome.value.replace('_', ' ').capitalize()}: {outcome_count}")
 
     # Confidence stats
     confidences_with_values = [r.confidence_avg for r in results if r.sections_detected > 0 and r.confidence_avg > 0]
@@ -933,8 +978,42 @@ def main() -> int:
         action="store_true",
         help="Disable poc_sentence_splitter; sentences field stays empty (default: enabled, Issue #643)",
     )
+    parser.add_argument(
+        "--min-sections-for-real-jd",
+        type=int,
+        default=MIN_SECTIONS_FOR_REAL_JD,
+        help=(
+            "Min sections for a real JD when classifying extraction_outcome "
+            f"(default: {MIN_SECTIONS_FOR_REAL_JD}, Issue #738)"
+        ),
+    )
+    parser.add_argument(
+        "--min-description-chars",
+        type=int,
+        default=MIN_DESCRIPTION_CHARS,
+        help=(
+            "Min stripped text chars for a real JD when classifying extraction_outcome "
+            f"(default: {MIN_DESCRIPTION_CHARS}, Issue #738)"
+        ),
+    )
+    parser.add_argument(
+        "--fallback-min-section-confidence",
+        type=float,
+        default=FALLBACK_MIN_SECTION_CONFIDENCE,
+        help=(
+            "Min section confidence for the fallback extraction pass "
+            f"(default: {FALLBACK_MIN_SECTION_CONFIDENCE}, Issue #738; no effect until Spec 4 / #739)"
+        ),
+    )
 
     args = parser.parse_args()
+
+    if args.min_sections_for_real_jd < 0:
+        parser.error("--min-sections-for-real-jd must be >= 0")
+    if args.min_description_chars < 0:
+        parser.error("--min-description-chars must be >= 0")
+    if not 0.0 <= args.fallback_min_section_confidence <= 1.0:
+        parser.error("--fallback-min-section-confidence must be between 0.0 and 1.0")
 
     # Resolve description_selector and description_selector_match from --company if provided
     description_selector = None
@@ -955,13 +1034,22 @@ def main() -> int:
             promote_headings=not args.no_promote_headings,
             config_dir=args.config_dir,
             enable_poc_sentence_splitter=not args.no_poc_sentences,
+            min_sections_for_real_jd=args.min_sections_for_real_jd,
+            min_description_chars=args.min_description_chars,
+            fallback_min_section_confidence=args.fallback_min_section_confidence,
         )
         print_summary(results)
 
         # Export to JSON if requested
         if args.output_json:
+            payload = []
+            for r in results:
+                entry = asdict(r)
+                # Enum serialized as its string value; null when not classified (Issue #738)
+                entry["extraction_outcome"] = r.extraction_outcome.value if r.extraction_outcome is not None else None
+                payload.append(entry)
             with open(args.output_json, "w") as f:
-                json.dump([asdict(r) for r in results], f, indent=2)
+                json.dump(payload, f, indent=2)
             print(f"\nResults saved to {args.output_json}")
 
         return 0
