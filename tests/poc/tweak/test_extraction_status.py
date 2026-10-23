@@ -19,6 +19,7 @@ from src.poc.tweak.extraction_status import (
 
 SHELL_STRIPPED_CHARS = 460
 REAL_CONTENT_CHARS = 2400
+WALMART_JOB9_DESC_CHARS = 31591  # Reference desc_len for Walmart job 9 (design doc 1.1/1.3).
 
 
 def make_job_result(
@@ -132,6 +133,9 @@ class TestClassifyLikelyUnparseable:
         assert outcome is ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT
 
     def test_short_stripped_text_alone_is_unparseable(self):
+        # Intended product decision (design doc jd-zero-extraction-fallback.md 2.1/2.4):
+        # short stripped text alone marks the input as unparseable, even when section count
+        # is healthy. Do not relax this to require both signals.
         result = make_job_result(10)
         outcome = classify_extraction_outcome(result, MIN_DESCRIPTION_CHARS - 1)
         assert outcome is ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT
@@ -161,9 +165,9 @@ class TestClassifyNeedsHumanReview:
         assert outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW
 
     def test_walmart_job_9_zero_yield_needs_review(self):
-        # Reference: Walmart job 9 has 7 sections, dense skill/tech text, zero yield.
+        # Reference: Walmart job 9 has 7 sections, desc_len 31591 (design doc 1.1/1.3), zero yield.
         result = make_job_result(7)
-        outcome = classify_extraction_outcome(result, REAL_CONTENT_CHARS)
+        outcome = classify_extraction_outcome(result, WALMART_JOB9_DESC_CHARS)
         assert outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW
 
     def test_exact_thresholds_are_real_content(self):
