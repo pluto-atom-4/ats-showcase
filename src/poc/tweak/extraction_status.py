@@ -21,8 +21,9 @@ class ExtractionOutcome(str, Enum):
 
     Values:
         COMPLETE: No stage errors and at least one of requirements/skills/technologies extracted.
-        NEEDS_HUMAN_REVIEW: No stage errors, zero extraction yield, but the input has real
-            content (enough sections and stripped text length). The pipeline could not parse it.
+        NEEDS_HUMAN_REVIEW: No stage errors, zero extraction yield; the input is not flagged
+            as a shell (neither too few sections nor too little stripped text). The pipeline
+            could not parse real content.
         LIKELY_UNPARSEABLE_INPUT: Zero extraction yield and the input looks like a shell or
             boilerplate page (too few sections or too little stripped text). Points at the crawler.
         ERROR: A pipeline stage raised an error.
@@ -53,7 +54,11 @@ def classify_extraction_outcome(
     Evaluation order (first match wins):
         1. Any pipeline-stage error -> ERROR.
         2. Any requirements/skills/technologies extracted -> COMPLETE.
-        3. Too few sections or too little stripped text -> LIKELY_UNPARSEABLE_INPUT.
+        3. Too few sections OR too little stripped text -> LIKELY_UNPARSEABLE_INPUT.
+           Either signal alone is enough to flag a suspected shell. The OR is deliberate:
+           a thin page is more likely a crawler failure than an extractor failure, so we err
+           toward flagging the crawler. A false flag only sends the job to crawler investigation,
+           whereas a missed shell would hide a crawler failure as NEEDS_HUMAN_REVIEW.
         4. Otherwise -> NEEDS_HUMAN_REVIEW.
 
     Args:
