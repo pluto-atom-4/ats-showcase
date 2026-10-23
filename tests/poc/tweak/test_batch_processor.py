@@ -1932,3 +1932,278 @@ class TestHeadingOnlySectionContent:
         assert body_sections, f"Body text missing from sections: {[(s.heading, s.content) for s in sections]!r}"
         for sec in body_sections:
             assert sec.content.strip() != "", f"Section {sec.heading!r} content blanked"
+
+
+# ---------------------------------------------------------------------------
+# Issue #738 (Part of #735): wire extraction_outcome into JobResult / print_summary / CLI
+# ---------------------------------------------------------------------------
+
+_SHELL_DESCRIPTION = "<h1>Software Engineer</h1><h2>Apply</h2><p>Apply now.</p>"
+
+_TECH_DESCRIPTION = (
+    "<h2>Requirements</h2>"
+    "<ul><li>5+ years of Python experience building web services</li>"
+    "<li>Hands-on work with Kubernetes and AWS</li></ul>"
+    "<h2>Responsibilities</h2>"
+    "<p>Design and operate backend services used by customers every day.</p>"
+    "<h2>Benefits</h2><p>Health coverage, paid leave, and a learning budget.</p>"
+    "<h2>Location</h2><p>Hybrid work from our city office.</p>"
+    "<h2>Equal Opportunity</h2><p>We welcome applicants from every background.</p>"
+)
+
+
+def _filler_description() -> str:
+    """Real-looking JD body with six sections and no extractable skill/tech yield (pre-fallback NEEDS_HUMAN_REVIEW)."""
+    sentence = "The group meets every week to review progress and agree on the next steps for the team. "
+    parts = [f"<h2>Part {i}</h2><p>{sentence * 3}</p>" for i in range(1, 7)]
+    return "".join(parts)
+
+
+def _reference_fixture_jobs() -> list[dict]:
+    """Representative 11-job fixture: 6 shell pages, 3 no-yield real-content JDs, 2 extractable JDs."""
+    shell = [
+        {"id": f"shell-{i}", "title": f"Shell {i}", "company": "Acme", "description": _SHELL_DESCRIPTION}
+        for i in range(6)
+    ]
+    filler = [
+        {"id": f"filler-{i}", "title": f"Filler {i}", "company": "Acme", "description": _filler_description()}
+        for i in range(3)
+    ]
+    tech = [
+        {"id": f"tech-{i}", "title": f"Tech {i}", "company": "Acme", "description": _TECH_DESCRIPTION} for i in range(2)
+    ]
+    return shell + filler + tech
+
+
+def _make_outcome_result(job_id: str, outcome, **overrides) -> JobResult:
+    """Build a JobResult with a given extraction_outcome (no spaCy needed)."""
+    return JobResult(
+        job_id=job_id,
+        title="Engineer",
+        company="Acme",
+        sections_detected=6,
+        keyword_matches=0,
+        confidence_min=0.5,
+        confidence_max=0.5,
+        confidence_avg=0.5,
+        extraction_outcome=outcome,
+        **overrides,
+    )
+
+
+def _run_cli_to_json(tmp_path, jobs: list[dict], extra_args: list[str]) -> list[dict]:
+    """Write jobs, run the CLI with --output-json, and return the parsed JSON payload."""
+    input_file = tmp_path / "jobs_738.json"
+    input_file.write_text(json.dumps(jobs))
+    out_file = tmp_path / "out_738.json"
+    rc = _run_main(["--input-path", str(input_file), "--output-json", str(out_file), *extra_args])
+    assert rc == 0
+    payload: list[dict] = json.loads(out_file.read_text())
+    return payload
+
+
+class TestExtractionOutcomeWiring:
+    """Tests for JobResult.extraction_outcome, print_summary, JSON output, and CLI overrides (Issue #738)."""
+
+    def test_reference_fixture_distribution(self, tmp_path):
+        """Representative 11-job fixture yields 6 LIKELY_UNPARSEABLE_INPUT, 3 NEEDS_HUMAN_REVIEW, 2 COMPLETE."""
+        from collections import Counter
+
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        jobs = _reference_fixture_jobs()
+        input_file = tmp_path / "fixture_738.json"
+        input_file.write_text(json.dumps(jobs))
+
+        results = run_batch(str(input_file))
+
+        assert len(results) == 11
+        counts = Counter(r.extraction_outcome for r in results)
+        assert counts[ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT] == 6
+        assert counts[ExtractionOutcome.NEEDS_HUMAN_REVIEW] == 3
+        assert counts[ExtractionOutcome.COMPLETE] == 2
+        assert counts[ExtractionOutcome.ERROR] == 0
+        assert all(r.extraction_outcome is not None for r in results)
+
+    def test_extraction_outcome_defaults_to_none_and_keeps_has_errors(self):
+        """Field is optional; setting it does not change has_errors()."""
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        bare = _make_outcome_result("j1", None)
+        assert bare.extraction_outcome is None
+        assert bare.has_errors() is False
+
+        classified = _make_outcome_result("j2", ExtractionOutcome.COMPLETE)
+        assert classified.has_errors() is False
+
+    def test_print_summary_status_shows_outcome_when_no_errors(self):
+        """Status line uses the outcome value when no stage error occurred."""
+        from src.poc.tweak.batch_processor import print_summary
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        summary = print_summary([_make_outcome_result("j1", ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT)])
+
+        assert "  Status: LIKELY_UNPARSEABLE_INPUT" in summary
+        assert "Status: SUCCESS" not in summary
+
+    def test_print_summary_status_success_kept_when_outcome_unset(self):
+        """Without an outcome the legacy SUCCESS line is unchanged."""
+        from src.poc.tweak.batch_processor import print_summary
+
+        summary = print_summary([_make_outcome_result("j1", None)])
+
+        assert "  Status: SUCCESS" in summary
+
+    def test_print_summary_error_branch_unchanged(self):
+        """A job with stage errors still lists errors and prints no Status line."""
+        from src.poc.tweak.batch_processor import print_summary
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        result = _make_outcome_result("j1", ExtractionOutcome.ERROR)
+        result.add_error("converter", "boom")
+
+        summary = print_summary([result])
+
+        assert "  Errors (1):" in summary
+        assert "    - converter: boom" in summary
+        assert "  Status:" not in summary
+
+    def test_print_summary_aggregate_outcome_counts(self):
+        """Aggregate section has one count line per outcome, using a human-readable label."""
+        from src.poc.tweak.batch_processor import print_summary
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        results = [
+            _make_outcome_result("a", ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT),
+            _make_outcome_result("b", ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT),
+            _make_outcome_result("c", ExtractionOutcome.NEEDS_HUMAN_REVIEW),
+        ]
+
+        summary = print_summary(results)
+
+        assert "Likely unparseable input: 2" in summary
+        assert "Needs human review: 1" in summary
+        assert "Complete: 0" in summary
+        assert "Error: 0" in summary
+
+    def test_json_output_includes_extraction_outcome_value(self, tmp_path):
+        """--output-json writes extraction_outcome as its string value."""
+        payload = _run_cli_to_json(tmp_path, [_reference_fixture_jobs()[0]], [])
+
+        assert payload[0]["extraction_outcome"] == "likely_unparseable_input"
+
+    def test_json_output_null_when_outcome_unset(self, tmp_path, monkeypatch):
+        """Unclassified results serialize extraction_outcome as null."""
+        import src.poc.tweak.batch_processor as bp
+
+        monkeypatch.setattr(bp, "run_batch", lambda *a, **k: [_make_outcome_result("j1", None)])
+        payload = _run_cli_to_json(tmp_path, [_reference_fixture_jobs()[0]], [])
+
+        assert payload[0]["extraction_outcome"] is None
+
+    def test_cli_min_description_chars_changes_outcome(self, tmp_path):
+        """--min-description-chars 100 flips a shell-length no-yield job from LIKELY to NEEDS_HUMAN_REVIEW."""
+        # Short no-yield body with 5+ sections: LIKELY under default 800-char threshold.
+        short = (
+            "<h2>Overview</h2><p>We are a friendly team building office software for local businesses.</p>"
+            "<h2>Responsibilities</h2><p>Work with colleagues on planning and delivery of customer projects.</p>"
+            "<h2>Benefits</h2><p>Flexible hours, paid leave, and a generous learning budget.</p>"
+            "<h2>Location</h2><p>Our office is in the city centre with easy access by train.</p>"
+            "<h2>Equal Opportunity</h2><p>We welcome applicants from all backgrounds.</p>"
+        )
+        jobs = [{"id": "short-1", "title": "Ops", "company": "Acme", "description": short}]
+
+        (tmp_path / "default").mkdir()
+        (tmp_path / "flagged").mkdir()
+        default_payload = _run_cli_to_json(tmp_path / "default", jobs, [])
+        flagged_payload = _run_cli_to_json(tmp_path / "flagged", jobs, ["--min-description-chars", "100"])
+
+        assert default_payload[0]["extraction_outcome"] == "likely_unparseable_input"
+        assert flagged_payload[0]["extraction_outcome"] == "needs_human_review"
+
+    def test_cli_min_sections_flag_changes_outcome(self, tmp_path):
+        """--min-sections-for-real-jd above the section count forces LIKELY_UNPARSEABLE_INPUT."""
+        jobs = [_reference_fixture_jobs()[6]]  # filler job: 6 sections, no yield, long text
+        (tmp_path / "strict").mkdir()
+        (tmp_path / "lenient").mkdir()
+
+        strict = _run_cli_to_json(tmp_path / "strict", jobs, ["--min-sections-for-real-jd", "50"])
+        lenient = _run_cli_to_json(tmp_path / "lenient", jobs, ["--min-sections-for-real-jd", "1"])
+
+        assert strict[0]["extraction_outcome"] == "likely_unparseable_input"
+        assert lenient[0]["extraction_outcome"] == "needs_human_review"
+
+    def test_cli_rejects_negative_thresholds(self):
+        """Negative thresholds and out-of-range fallback confidence exit via argparse."""
+        with pytest.raises(SystemExit):
+            _run_main(["--min-description-chars", "-1"])
+        with pytest.raises(SystemExit):
+            _run_main(["--min-sections-for-real-jd", "-1"])
+        with pytest.raises(SystemExit):
+            _run_main(["--fallback-min-section-confidence", "1.5"])
+
+    @pytest.mark.parametrize("stage", ["preprocessor", "converter", "polisher"])
+    def test_early_return_error_path_sets_error_outcome(self, monkeypatch, stage):
+        """Each early-return stage (preprocessor, converter, polisher) classifies as ERROR (Issue #738, W1)."""
+        from src.poc.tweak.batch_processor import process_job
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        kwargs = _process_job_kwargs()
+
+        def boom(*args, **kw):
+            raise RuntimeError(f"{stage} exploded")
+
+        monkeypatch.setattr(kwargs[stage], "process", boom)
+
+        result = process_job(_reference_fixture_jobs()[0], **kwargs)
+
+        assert result.extraction_outcome is ExtractionOutcome.ERROR
+        assert result.errors == [(stage, f"{stage} exploded")]
+        # Early return: no downstream stage ran, so no extraction output was produced.
+        assert result.requirements == [] and result.skills == [] and result.technologies == []
+
+    @pytest.mark.parametrize("index", [0, 6, 9])
+    def test_success_path_never_leaves_outcome_unclassified(self, index):
+        """process_job on a non-early-return path always sets a classified outcome, never None (Issue #738, W1)."""
+        from src.poc.tweak.batch_processor import process_job
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        result = process_job(_reference_fixture_jobs()[index], **_process_job_kwargs())
+
+        assert result.extraction_outcome is not None
+        assert isinstance(result.extraction_outcome, ExtractionOutcome)
+
+
+def _process_job_kwargs() -> dict:
+    """Collaborators for process_job, built the same way run_batch builds them (Issue #738, W1)."""
+    import spacy
+
+    from src.poc.tweak.batch_processor import TechnologyProcessor
+    from src.poc.tweak.markdown_section_classifier import SectionClassifier
+    from src.poc.tweak.multi_line_paragraph import MarkdownSpanRuler
+    from src.poc.tweak.spacy_pipeline import (
+        HTMLMarkdownConverter,
+        HTMLPreprocessor,
+        MarkdownPolisher,
+        RequirementProcessor,
+        SkillProcessor,
+    )
+
+    nlp = spacy.load("en_core_web_md")
+    if "entity_ruler" not in nlp.pipe_names:
+        nlp.add_pipe("entity_ruler", before="ner")
+    if "poc_sentence_splitter" not in nlp.pipe_names:
+        nlp.add_pipe("poc_sentence_splitter")
+    nlp.get_pipe("entity_ruler").add_patterns(TechnologyProcessor.generate_tech_patterns())  # type: ignore
+
+    return {
+        "nlp": nlp,
+        "preprocessor": HTMLPreprocessor(),
+        "converter": HTMLMarkdownConverter(),
+        "polisher": MarkdownPolisher(),
+        "classifier": SectionClassifier(),
+        "ruler": MarkdownSpanRuler(nlp),
+        "req_processor": RequirementProcessor(nlp, "requirement_processor"),
+        "skill_processor": SkillProcessor(nlp, "skill_processor"),
+        "tech_processor": TechnologyProcessor(nlp, "technology_processor"),
+    }
