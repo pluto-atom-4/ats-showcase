@@ -43,6 +43,7 @@ CLI:
 
 import argparse
 import json
+import logging
 import re
 import sys
 from dataclasses import asdict, dataclass, field
@@ -71,8 +72,11 @@ from src.poc.tweak.spacy_pipeline import (
     SkillProcessor,
     TechnologyProcessor,
 )
+from src.poc.tweak.spacy_pipeline.fallback_processor import apply_fallback
 from src.poc.tweak.spacy_pipeline.heading_promoter import HeadingPromoter
 from src.poc.tweak.spacy_pipeline.heading_text import is_heading_only, normalize_heading_text
+
+logger = logging.getLogger(__name__)
 
 # Allowed description_selector_match strategies
 DESCRIPTION_MATCH_STRATEGIES = {"first", "all", "longest"}
@@ -298,6 +302,9 @@ def process_job(
     6. RequirementProcessor: Extract requirements (Issue #321)
     7. SkillProcessor: Extract skills (Issue #321)
     8. TechnologyProcessor: Extract technologies (Issue #321)
+    9. apply_fallback: Tier 1+2 recovery for NEEDS_HUMAN_REVIEW jobs (Issue #739, wired in #754).
+       Runs after classification and is a no-op for other outcomes. On recovery it sets
+       COMPLETE itself; a fallback exception is logged and leaves the job unchanged.
 
     Args:
         job: Job record dict (must have 'id', 'title', 'company', 'description')
@@ -601,6 +608,18 @@ def process_job(
         min_sections=min_sections,
         min_description_chars=min_description_chars,
     )
+
+    # Stage 9 (Issue #754): tier 1+2 fallback for NEEDS_HUMAN_REVIEW jobs (Issue #739).
+    # apply_fallback sets COMPLETE itself when it recovers entries; do not set it here.
+    # A fallback failure must not crash the job. It is logged, not recorded in result.errors
+    # (has_errors() would turn the job into ERROR), and any partial appends are rolled back so
+    # the job keeps its pre-fallback NEEDS_HUMAN_REVIEW state.
+    pre_fallback_lists = (list(result.requirements), list(result.skills), list(result.technologies))
+    try:
+        apply_fallback(result, polished_markdown, shared_nlp=nlp)
+    except Exception:
+        logger.exception(f"Fallback failed for job {result.job_id}; keeping pre-fallback results")
+        result.requirements, result.skills, result.technologies = pre_fallback_lists
     return result
 
 
@@ -645,8 +664,9 @@ def run_batch(
                           (default MIN_SECTIONS_FOR_REAL_JD, Issue #738; CLI --min-sections-for-real-jd)
         min_description_chars: Stripped-text threshold for extraction_outcome classification
                           (default MIN_DESCRIPTION_CHARS, Issue #738; CLI --min-description-chars)
-        fallback_min_section_confidence: Reserved for the Spec 4 fallback extraction pass (#739).
-                          Accepted so the CLI surface is stable; not consumed yet (Issue #738;
+        fallback_min_section_confidence: Documented no-op. apply_fallback (#739, wired in #754) uses its
+                          fixed FALLBACK_MIN_SECTION_CONFIDENCE; this value is not threaded through yet.
+                          Follow-up: add an apply_fallback parameter (Issue #738;
                           CLI --fallback-min-section-confidence)
 
     Returns:
@@ -1002,7 +1022,8 @@ def main() -> int:
         default=FALLBACK_MIN_SECTION_CONFIDENCE,
         help=(
             "Min section confidence for the fallback extraction pass "
-            f"(default: {FALLBACK_MIN_SECTION_CONFIDENCE}, Issue #738; no effect until Spec 4 / #739)"
+            f"(default: {FALLBACK_MIN_SECTION_CONFIDENCE}, Issue #738; currently a no-op: awaits an "
+            "apply_fallback parameter, follow-up to #754)"
         ),
     )
 

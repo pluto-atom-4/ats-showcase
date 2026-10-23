@@ -2101,8 +2101,11 @@ class TestExtractionOutcomeWiring:
 
         assert payload[0]["extraction_outcome"] is None
 
-    def test_cli_min_description_chars_changes_outcome(self, tmp_path):
+    def test_cli_min_description_chars_changes_outcome(self, tmp_path, monkeypatch):
         """--min-description-chars 100 flips a shell-length no-yield job from LIKELY to NEEDS_HUMAN_REVIEW."""
+        # Isolate the classification threshold: the Issue #754 fallback would otherwise recover a
+        # tier-2 phrase from this job and move it to COMPLETE (covered in TestFallbackWiring).
+        _without_fallback(monkeypatch)
         # Short no-yield body with 5+ sections: LIKELY under default 800-char threshold.
         short = (
             "<h2>Overview</h2><p>We are a friendly team building office software for local businesses.</p>"
@@ -2207,3 +2210,158 @@ def _process_job_kwargs() -> dict:
         "skill_processor": SkillProcessor(nlp, "skill_processor"),
         "tech_processor": TechnologyProcessor(nlp, "technology_processor"),
     }
+
+
+def _fallback_recoverable_job() -> dict:
+    """NEEDS_HUMAN_REVIEW before the fallback (zero normal-path yield) with stack terms in an unlabelled section.
+
+    The fallback recovers the terms: tier-tagged skills/technologies and COMPLETE (Issue #754).
+    """
+    sentence = "The group meets every week to review progress and agree on the next steps for the team. "
+    parts = [f"<h2>Part {i}</h2><p>{sentence * 3}</p>" for i in range(1, 6)]
+    parts.append(
+        "<h2>Our stack</h2><p>We build services in Python and Kubernetes on AWS, with Docker and Terraform. "
+        f"{sentence * 3}</p>"
+    )
+    return {"id": "recoverable-754", "title": "Engineer", "company": "Acme", "description": "".join(parts)}
+
+
+def _without_fallback(monkeypatch) -> None:
+    """Replace the wired apply_fallback call with an identity no-op for baseline comparisons."""
+    import src.poc.tweak.batch_processor as bp
+
+    monkeypatch.setattr(bp, "apply_fallback", lambda result, markdown, *, shared_nlp: result)
+
+
+def _job_snapshot(result: JobResult) -> tuple:
+    """Comparable view of a JobResult's outcome and extraction output."""
+    return (
+        result.extraction_outcome,
+        list(result.requirements),
+        list(result.skills),
+        list(result.technologies),
+        list(result.errors),
+    )
+
+
+class TestFallbackWiring:
+    """process_job calls apply_fallback after classification; only NEEDS_HUMAN_REVIEW jobs change (Issue #754)."""
+
+    def test_needs_human_review_job_recovers_to_complete_with_tier_tags(self, monkeypatch):
+        """Recoverable NEEDS_HUMAN_REVIEW job ends COMPLETE, with recovered entries tier-tagged."""
+        from src.poc.tweak.batch_processor import process_job
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+        from src.poc.tweak.spacy_pipeline.fallback_processor import TIER1_TAG, TIER2_TAG
+
+        job = _fallback_recoverable_job()
+        result = process_job(job, **_process_job_kwargs())
+
+        _without_fallback(monkeypatch)
+        baseline = process_job(job, **_process_job_kwargs())
+        assert baseline.extraction_outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW  # precondition
+
+        assert result.extraction_outcome is ExtractionOutcome.COMPLETE
+        assert result.has_errors() is False
+        recovered = result.skills + result.technologies
+        assert recovered, "fallback should recover at least one skill or technology"
+        assert {entry["extraction_tier"] for entry in recovered} <= {TIER1_TAG, TIER2_TAG}
+        assert all(0.0 < entry["confidence"] <= 0.5 for entry in recovered)
+        tech_names = {entry["tech"].lower() for entry in result.technologies}
+        assert {"python", "kubernetes", "aws"} <= tech_names
+
+    def test_fallback_recovery_adds_no_duplicate_entries(self):
+        """Each output list keeps unique normalized text after recovery."""
+        from src.poc.tweak.batch_processor import process_job
+
+        result = process_job(_fallback_recoverable_job(), **_process_job_kwargs())
+
+        for key, entries in (("skill", result.skills), ("tech", result.technologies)):
+            texts = [" ".join(str(e[key]).split()).lower() for e in entries]
+            assert len(texts) == len(set(texts))
+
+    @pytest.mark.parametrize("index", [0, 9])  # 0: shell -> LIKELY_UNPARSEABLE_INPUT; 9: extractable -> COMPLETE
+    def test_fallback_leaves_likely_and_complete_jobs_untouched(self, index, monkeypatch):
+        """For non-NEEDS_HUMAN_REVIEW outcomes the wired fallback changes nothing."""
+        from src.poc.tweak.batch_processor import process_job
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        job = _reference_fixture_jobs()[index]
+        with_fallback = process_job(job, **_process_job_kwargs())
+        _without_fallback(monkeypatch)
+        without_fallback = process_job(job, **_process_job_kwargs())
+
+        assert with_fallback.extraction_outcome is not ExtractionOutcome.NEEDS_HUMAN_REVIEW
+        assert _job_snapshot(with_fallback) == _job_snapshot(without_fallback)
+        assert all(e.get("extraction_tier") is None for e in with_fallback.skills + with_fallback.technologies)
+
+    def test_error_outcome_skips_fallback(self, monkeypatch):
+        """ERROR early-return jobs never reach the fallback call."""
+        import src.poc.tweak.batch_processor as bp
+        from src.poc.tweak.batch_processor import process_job
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        calls: list[str] = []
+
+        def spy(result, markdown, *, shared_nlp):
+            calls.append(result.job_id)
+            return result
+
+        kwargs = _process_job_kwargs()
+
+        def boom(*args, **kw):
+            raise RuntimeError("polisher exploded")
+
+        monkeypatch.setattr(kwargs["polisher"], "process", boom)
+        monkeypatch.setattr(bp, "apply_fallback", spy)
+        result = process_job(_fallback_recoverable_job(), **kwargs)
+
+        assert result.extraction_outcome is ExtractionOutcome.ERROR
+        assert calls == []
+        assert result.requirements == [] and result.skills == [] and result.technologies == []
+
+    def test_fallback_exception_is_logged_and_job_keeps_needs_human_review(self, monkeypatch, caplog):
+        """A raising fallback neither crashes the job nor adds errors; partial appends are rolled back."""
+        import src.poc.tweak.batch_processor as bp
+        from src.poc.tweak.batch_processor import process_job
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        def partial_then_boom(result, markdown, *, shared_nlp):
+            result.skills.append({"skill": "partial", "confidence": 0.5, "extraction_tier": "tier1_relaxed_section"})
+            raise RuntimeError("fallback exploded")
+
+        monkeypatch.setattr(bp, "apply_fallback", partial_then_boom)
+        with caplog.at_level("ERROR", logger="src.poc.tweak.batch_processor"):
+            result = process_job(_fallback_recoverable_job(), **_process_job_kwargs())
+
+        assert result.extraction_outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW
+        assert result.errors == []
+        assert result.has_errors() is False
+        assert result.skills == [] and result.requirements == [] and result.technologies == []
+        assert "Fallback failed for job recoverable-754" in caplog.text
+
+    def test_shared_entity_ruler_patterns_unchanged_after_batch_of_jobs(self):
+        """apply_fallback never adds patterns to the shared batch pipeline's entity_ruler."""
+        from src.poc.tweak.batch_processor import process_job
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        kwargs = _process_job_kwargs()
+        ruler = kwargs["nlp"].get_pipe("entity_ruler")
+        patterns_before = list(ruler.patterns)
+
+        jobs = [_fallback_recoverable_job(), _reference_fixture_jobs()[9], _reference_fixture_jobs()[0]]
+        results = [process_job(job, **kwargs) for job in jobs]
+
+        assert results[0].extraction_outcome is ExtractionOutcome.COMPLETE  # fallback did run
+        assert list(ruler.patterns) == patterns_before
+
+    def test_run_batch_recovers_needs_human_review_job(self, tmp_path):
+        """End to end through run_batch: the recoverable job ends COMPLETE with tier-tagged output."""
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        input_file = tmp_path / "fallback_754.json"
+        input_file.write_text(json.dumps([_fallback_recoverable_job()]))
+
+        results = run_batch(str(input_file))
+
+        assert results[0].extraction_outcome is ExtractionOutcome.COMPLETE
+        assert any(e.get("extraction_tier") for e in results[0].skills + results[0].technologies)
