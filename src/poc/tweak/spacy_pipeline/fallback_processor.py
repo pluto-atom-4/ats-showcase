@@ -73,6 +73,9 @@ _RELAXED_COMPONENT_NAME = "fallback_relaxed"
 def _dedicated_tech_extractor() -> TechExtractor:
     """Build the dedicated spaCy pipeline and TechExtractor once per process.
 
+    Batch processing is sequential, so the first call is the only one that loads the model.
+    If two threads ever raced the first call, the duplicate load would be discarded harmlessly.
+
     Owned by this module. ``TechExtractor.__init__`` adds TECH patterns to this pipeline's
     entity_ruler; the cache guarantees that happens exactly once (a second construction
     would add the patterns again).
@@ -121,7 +124,8 @@ def _to_ruler_section(section: MarkdownSection) -> RulerSection:
     """Rebuild the parsed-section object the processors read from a persisted MarkdownSection.
 
     Approximation: ``level`` is not persisted on MarkdownSection, so titled sections use
-    ATX level 2 and untitled sections use the preamble level -2.
+    ATX level 2 and untitled sections use the preamble level -2. No processor reads ``.level``
+    today, so the approximation has no effect on output; revisit if one starts to.
     """
     content = section.content or ""
     lines = content.splitlines()

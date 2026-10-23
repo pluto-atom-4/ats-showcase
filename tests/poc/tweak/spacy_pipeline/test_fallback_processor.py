@@ -294,8 +294,12 @@ def test_tier2_skills_skipped_when_skills_already_present(shared_nlp: Language) 
 # ============================================================================
 
 
-def test_complete_job_with_existing_output_is_untouched(shared_nlp: Language) -> None:
-    """Trade Desk shape (skills=2): a COMPLETE job never reaches the fallback, so no duplicates appear."""
+def test_complete_job_skips_fallback_outcome_gate(shared_nlp: Language) -> None:
+    """Outcome gate only (not de-dupe): a COMPLETE job with existing output is returned untouched.
+
+    Trade Desk shape (skills=2). The fallback never runs for COMPLETE, so this checks the
+    NEEDS_HUMAN_REVIEW gate. Duplicate suppression is covered by the de-dupe tests below.
+    """
     normal_skills = [
         {"skill": "design systems", "confidence": 1.0},
         {"skill": "build pipelines", "confidence": 1.0},
@@ -329,6 +333,28 @@ def test_no_duplicate_text_across_normal_and_fallback_output(shared_nlp: Languag
     assert len(tech_texts) == len(set(tech_texts))
     skill_texts = _texts(result.skills, "skill")
     assert len(skill_texts) == len(set(skill_texts))
+
+
+def test_fallback_does_not_reappend_case_variant_of_normal_entry(shared_nlp: Language) -> None:
+    """Normal path holds '  Python ' (case/whitespace variant); the relaxed tech pass yields 'python'.
+
+    The guard must drop the fallback copy and keep the normal-path entry unchanged.
+    """
+    content = "- Build scalable data pipelines using Spark\n- Python\n"
+    normal_tech = [{"tech": "  Python ", "confidence": 1.0}]
+    job = _job(
+        [_section(0, "Skills", content, [("skills", 0.55)])],
+        technologies=normal_tech,
+    )
+
+    # Precondition: the relaxed pass really does produce 'python', so the guard is what is tested.
+    relaxed = fp._relaxed_section_pass(job, shared_nlp)
+    assert "python" in [text.lower() for text, _ in relaxed["technologies"]]
+
+    result = apply_fallback(job, f"## Skills\n\n{content}", shared_nlp=shared_nlp)
+
+    assert result.technologies == normal_tech
+    assert _texts(result.technologies, "tech") == ["  Python "]
 
 
 def test_no_duplicate_text_within_fallback_output(shared_nlp: Language) -> None:
