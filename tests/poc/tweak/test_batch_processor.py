@@ -2141,3 +2141,69 @@ class TestExtractionOutcomeWiring:
             _run_main(["--min-sections-for-real-jd", "-1"])
         with pytest.raises(SystemExit):
             _run_main(["--fallback-min-section-confidence", "1.5"])
+
+    @pytest.mark.parametrize("stage", ["preprocessor", "converter", "polisher"])
+    def test_early_return_error_path_sets_error_outcome(self, monkeypatch, stage):
+        """Each early-return stage (preprocessor, converter, polisher) classifies as ERROR (Issue #738, W1)."""
+        from src.poc.tweak.batch_processor import process_job
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        kwargs = _process_job_kwargs()
+
+        def boom(*args, **kw):
+            raise RuntimeError(f"{stage} exploded")
+
+        monkeypatch.setattr(kwargs[stage], "process", boom)
+
+        result = process_job(_reference_fixture_jobs()[0], **kwargs)
+
+        assert result.extraction_outcome is ExtractionOutcome.ERROR
+        assert result.errors == [(stage, f"{stage} exploded")]
+        # Early return: no downstream stage ran, so no extraction output was produced.
+        assert result.requirements == [] and result.skills == [] and result.technologies == []
+
+    @pytest.mark.parametrize("index", [0, 6, 9])
+    def test_success_path_never_leaves_outcome_unclassified(self, index):
+        """process_job on a non-early-return path always sets a classified outcome, never None (Issue #738, W1)."""
+        from src.poc.tweak.batch_processor import process_job
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+
+        result = process_job(_reference_fixture_jobs()[index], **_process_job_kwargs())
+
+        assert result.extraction_outcome is not None
+        assert isinstance(result.extraction_outcome, ExtractionOutcome)
+
+
+def _process_job_kwargs() -> dict:
+    """Collaborators for process_job, built the same way run_batch builds them (Issue #738, W1)."""
+    import spacy
+
+    from src.poc.tweak.batch_processor import TechnologyProcessor
+    from src.poc.tweak.markdown_section_classifier import SectionClassifier
+    from src.poc.tweak.multi_line_paragraph import MarkdownSpanRuler
+    from src.poc.tweak.spacy_pipeline import (
+        HTMLMarkdownConverter,
+        HTMLPreprocessor,
+        MarkdownPolisher,
+        RequirementProcessor,
+        SkillProcessor,
+    )
+
+    nlp = spacy.load("en_core_web_md")
+    if "entity_ruler" not in nlp.pipe_names:
+        nlp.add_pipe("entity_ruler", before="ner")
+    if "poc_sentence_splitter" not in nlp.pipe_names:
+        nlp.add_pipe("poc_sentence_splitter")
+    nlp.get_pipe("entity_ruler").add_patterns(TechnologyProcessor.generate_tech_patterns())  # type: ignore
+
+    return {
+        "nlp": nlp,
+        "preprocessor": HTMLPreprocessor(),
+        "converter": HTMLMarkdownConverter(),
+        "polisher": MarkdownPolisher(),
+        "classifier": SectionClassifier(),
+        "ruler": MarkdownSpanRuler(nlp),
+        "req_processor": RequirementProcessor(nlp, "requirement_processor"),
+        "skill_processor": SkillProcessor(nlp, "skill_processor"),
+        "tech_processor": TechnologyProcessor(nlp, "technology_processor"),
+    }
