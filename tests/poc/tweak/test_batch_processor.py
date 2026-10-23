@@ -2326,7 +2326,9 @@ class TestFallbackWiring:
         from src.poc.tweak.extraction_status import ExtractionOutcome
 
         def partial_then_boom(result, markdown, *, shared_nlp):
-            result.requirements.append({"text": "partial req", "confidence": 0.5, "extraction_tier": "tier1_relaxed_section"})
+            result.requirements.append(
+                {"text": "partial req", "confidence": 0.5, "extraction_tier": "tier1_relaxed_section"}
+            )
             result.skills.append({"skill": "partial", "confidence": 0.5, "extraction_tier": "tier1_relaxed_section"})
             result.technologies.append({"tech": "partial tech", "confidence": 0.3, "extraction_tier": "tier2_taxonomy"})
             result.extraction_outcome = ExtractionOutcome.COMPLETE  # raise after outcome is set, as in apply_fallback
