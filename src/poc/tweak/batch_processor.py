@@ -613,13 +613,16 @@ def process_job(
     # apply_fallback sets COMPLETE itself when it recovers entries; do not set it here.
     # A fallback failure must not crash the job. It is logged, not recorded in result.errors
     # (has_errors() would turn the job into ERROR), and any partial appends are rolled back so
-    # the job keeps its pre-fallback NEEDS_HUMAN_REVIEW state.
+    # the job keeps its pre-fallback NEEDS_HUMAN_REVIEW state, whatever stage of apply_fallback raised
+    # (apply_fallback sets COMPLETE before its final log line).
+    pre_fallback_outcome = result.extraction_outcome
     pre_fallback_lists = (list(result.requirements), list(result.skills), list(result.technologies))
     try:
         apply_fallback(result, polished_markdown, shared_nlp=nlp)
     except Exception:
-        logger.exception(f"Fallback failed for job {result.job_id}; keeping pre-fallback results")
+        logger.exception("Fallback failed for job %s; keeping pre-fallback results", result.job_id)
         result.requirements, result.skills, result.technologies = pre_fallback_lists
+        result.extraction_outcome = pre_fallback_outcome
     return result
 
 

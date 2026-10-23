@@ -2326,7 +2326,10 @@ class TestFallbackWiring:
         from src.poc.tweak.extraction_status import ExtractionOutcome
 
         def partial_then_boom(result, markdown, *, shared_nlp):
+            result.requirements.append({"text": "partial req", "confidence": 0.5, "extraction_tier": "tier1_relaxed_section"})
             result.skills.append({"skill": "partial", "confidence": 0.5, "extraction_tier": "tier1_relaxed_section"})
+            result.technologies.append({"tech": "partial tech", "confidence": 0.3, "extraction_tier": "tier2_taxonomy"})
+            result.extraction_outcome = ExtractionOutcome.COMPLETE  # raise after outcome is set, as in apply_fallback
             raise RuntimeError("fallback exploded")
 
         monkeypatch.setattr(bp, "apply_fallback", partial_then_boom)
@@ -2336,7 +2339,7 @@ class TestFallbackWiring:
         assert result.extraction_outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW
         assert result.errors == []
         assert result.has_errors() is False
-        assert result.skills == [] and result.requirements == [] and result.technologies == []
+        assert result.requirements == [] and result.skills == [] and result.technologies == []
         assert "Fallback failed for job recoverable-754" in caplog.text
 
     def test_shared_entity_ruler_patterns_unchanged_after_batch_of_jobs(self):
