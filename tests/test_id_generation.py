@@ -296,10 +296,8 @@ class TestIdGeneration:
         # Should be same because portal ID is the anchor
         assert id1 == id2
 
-    def test_generate_job_id_collides_for_worksource_search_urls(self):
-        """WorkSource search URLs differing only by jobId query param collide."""
-        # Characterizes known bug (#736/#759).
-        # TODO(#763): flip to assert id1 != id2 when jobId is wired into generate_job_id.
+    def test_generate_job_id_distinct_for_worksource_search_urls(self):
+        """WorkSource search URLs differing only by jobId get distinct ids (#736/#763)."""
         id1 = generate_job_id(
             company="WorkSource",
             title="Warehouse Associate",
@@ -312,4 +310,98 @@ class TestIdGeneration:
             location="Spokane, WA",
             url="https://my.site.com/search?jobId=MuTqf",
         )
-        assert id1 == id2
+        assert id1 != id2
+
+
+class TestCustomPortalJobIdAnchor:
+    """Custom-portal jobId is the id discriminator (#763); other portals unchanged."""
+
+    @staticmethod
+    def _gen(url, title="Warehouse Associate", location="Spokane, WA", portal=None):
+        return generate_job_id(
+            company="WorkSource",
+            title=title,
+            location=location,
+            url=url,
+            portal=portal,
+        )
+
+    def test_custom_portal_distinct_jobid_distinct_ids(self):
+        """Custom portal: different jobId -> different ids."""
+        id1 = self._gen("https://my.site.com/search?jobId=AAA111")
+        id2 = self._gen("https://my.site.com/search?jobId=BBB222")
+        assert id1 != id2
+        assert id1.startswith("custom:")
+        assert id2.startswith("custom:")
+
+    def test_custom_portal_same_jobid_other_params_same_id(self):
+        """Custom portal: same jobId, different other params/fragment -> same id."""
+        id1 = self._gen("https://my.site.com/search?jobId=AAA111&utm_source=indeed")
+        id2 = self._gen("https://my.site.com/search?ref=zzz&jobId=AAA111#apply")
+        id3 = self._gen("https://my.site.com/search?jobId=AAA111")
+        assert id1 == id2 == id3
+
+    def test_custom_portal_without_jobid_falls_back(self):
+        """Custom portal without jobId keeps existing query-stripping behavior."""
+        url_a = "https://example.com/careers?utm_source=indeed"
+        url_b = "https://example.com/careers?utm_source=linkedin"
+        # Existing behavior: query stripped, so the two URLs share an anchor.
+        assert self._gen(url_a) == self._gen(url_b)
+        # Matches the pre-#763 result: anchor == clean_canonical_url(url).
+        expected = generate_job_id(
+            company="WorkSource",
+            title="Warehouse Associate",
+            location="Spokane, WA",
+            url="https://example.com/careers",
+        )
+        assert self._gen(url_a) == expected
+
+    def test_custom_portal_empty_jobid_falls_back(self):
+        """Empty jobId value is treated as absent -> existing behavior."""
+        assert self._gen("https://example.com/careers?jobId=") == self._gen("https://example.com/careers?jobId=&x=1")
+        assert self._gen("https://example.com/careers?jobId=") == generate_job_id(
+            company="WorkSource",
+            title="Warehouse Associate",
+            location="Spokane, WA",
+            url="https://example.com/careers",
+        )
+
+    def test_custom_portal_jobid_wins_over_numeric_path(self):
+        """Custom portal jobId anchor applies even when path carries an 8-15 digit id."""
+        id1 = self._gen("https://example.com/jobs/12345678/apply?jobId=A1")
+        id2 = self._gen("https://example.com/jobs/12345678/apply?jobId=B2")
+        assert id1 != id2
+
+    def test_non_custom_portal_ignores_jobid_discriminator(self):
+        """Non-custom portals keep query-stripping: jobId does not split ids."""
+        # Greenhouse: anchor is gh_jid, unchanged by jobId.
+        g1 = generate_job_id(
+            company="Co",
+            title="Engineer",
+            location="Remote",
+            url="https://job-boards.greenhouse.io/co/jobs?gh_jid=12345678&jobId=1",
+        )
+        g2 = generate_job_id(
+            company="Co",
+            title="Engineer",
+            location="Remote",
+            url="https://job-boards.greenhouse.io/co/jobs?gh_jid=12345678&jobId=2",
+        )
+        assert g1 == g2
+        # Explicit non-custom portal name with jobId: query stripped, ids collide.
+        p1 = generate_job_id(
+            company="Co",
+            title="Engineer",
+            location="Remote",
+            url="https://example.com/careers?jobId=1",
+            portal="custom_ats",
+        )
+        p2 = generate_job_id(
+            company="Co",
+            title="Engineer",
+            location="Remote",
+            url="https://example.com/careers?jobId=2",
+            portal="custom_ats",
+        )
+        assert p1 == p2
+        assert p1.startswith("custom_ats:")
