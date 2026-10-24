@@ -83,16 +83,12 @@ class TestCanonicalUrlWithQueryKeys:
     def test_keeps_jobid_drops_other_params(self):
         """Only the listed key survives; other params are dropped."""
         url = "https://example.com/careers?utm_source=indeed&jobId=12345&ref=abc"
-        assert canonical_url_with_query_keys(url, ["jobId"]) == (
-            "https://example.com/careers?jobId=12345"
-        )
+        assert canonical_url_with_query_keys(url, ["jobId"]) == ("https://example.com/careers?jobId=12345")
 
     def test_drops_fragment(self):
         """Fragment is always dropped."""
         url = "https://example.com/careers?jobId=9#apply-now"
-        assert canonical_url_with_query_keys(url, ["jobId"]) == (
-            "https://example.com/careers?jobId=9"
-        )
+        assert canonical_url_with_query_keys(url, ["jobId"]) == ("https://example.com/careers?jobId=9")
 
     def test_missing_key_yields_no_query(self):
         """If the listed key is absent, result has path only."""
