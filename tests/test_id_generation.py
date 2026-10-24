@@ -3,7 +3,12 @@
 import pytest
 
 from src.id_generation import generate_job_id
-from src.id_generation.url_utils import clean_canonical_url, detect_portal, extract_portal_id
+from src.id_generation.url_utils import (
+    canonical_url_with_query_keys,
+    clean_canonical_url,
+    detect_portal,
+    extract_portal_id,
+)
 
 
 class TestUrlUtils:
@@ -65,6 +70,45 @@ class TestUrlUtils:
         url = "https://example.com/en-US/careers/jobs?id=123"
         clean = clean_canonical_url(url)
         assert "/en-US/careers/jobs" in clean
+
+    def test_clean_canonical_url_unchanged_drops_all_query_keys(self):
+        """clean_canonical_url still drops every query param, including jobId."""
+        url = "https://example.com/careers?jobId=42&gh_jid=7#apply"
+        assert clean_canonical_url(url) == "https://example.com/careers"
+
+
+class TestCanonicalUrlWithQueryKeys:
+    """Test query-key-preserving canonicalization (custom portal anchor)."""
+
+    def test_keeps_jobid_drops_other_params(self):
+        """Only the listed key survives; other params are dropped."""
+        url = "https://example.com/careers?utm_source=indeed&jobId=12345&ref=abc"
+        assert canonical_url_with_query_keys(url, ["jobId"]) == ("https://example.com/careers?jobId=12345")
+
+    def test_drops_fragment(self):
+        """Fragment is always dropped."""
+        url = "https://example.com/careers?jobId=9#apply-now"
+        assert canonical_url_with_query_keys(url, ["jobId"]) == ("https://example.com/careers?jobId=9")
+
+    def test_missing_key_yields_no_query(self):
+        """If the listed key is absent, result has path only."""
+        url = "https://example.com/careers?utm_source=indeed"
+        assert canonical_url_with_query_keys(url, ["jobId"]) == "https://example.com/careers"
+
+    def test_empty_keys_matches_clean_canonical_url(self):
+        """No keys means behaviour matches clean_canonical_url."""
+        url = "https://example.com/jobs?jobId=1#top"
+        assert canonical_url_with_query_keys(url, []) == clean_canonical_url(url)
+
+    def test_empty_url(self):
+        """Empty URL returns empty string."""
+        assert canonical_url_with_query_keys("", ["jobId"]) == ""
+
+    def test_different_job_ids_stay_distinct(self):
+        """Two jobs on the same path with different jobId get different anchors."""
+        a = canonical_url_with_query_keys("https://example.com/careers?jobId=1", ["jobId"])
+        b = canonical_url_with_query_keys("https://example.com/careers?jobId=2", ["jobId"])
+        assert a != b
 
 
 class TestIdGeneration:
