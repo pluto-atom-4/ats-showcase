@@ -1,6 +1,6 @@
 import re
-from typing import Optional
-from urllib.parse import urlparse, urlunparse
+from typing import Iterable, Optional
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 
 def clean_canonical_url(url: str) -> str:
@@ -8,6 +8,20 @@ def clean_canonical_url(url: str) -> str:
     parsed = urlparse(url)
     # Reconstruct without query string or fragment
     return urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))
+
+
+def canonical_url_with_query_keys(url: str, keys: Iterable[str]) -> str:
+    """Canonicalize URL like clean_canonical_url, but keep only the listed query keys.
+
+    Used for portals where a query param is the discriminator (e.g. ``jobId``).
+    Fragments are always dropped; query params not in ``keys`` are dropped; the
+    original order of kept params is preserved.
+    """
+    wanted = set(keys)
+    parsed = urlparse(url)
+    kept = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k in wanted]
+    query = urlencode(kept)
+    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", query, ""))
 
 
 def extract_portal_id(url: str) -> Optional[str]:
