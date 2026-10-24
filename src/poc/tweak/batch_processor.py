@@ -285,6 +285,7 @@ def process_job(
     heading_promoter: Optional[HeadingPromoter] = None,
     min_sections: int = MIN_SECTIONS_FOR_REAL_JD,
     min_description_chars: int = MIN_DESCRIPTION_CHARS,
+    min_section_confidence: float = FALLBACK_MIN_SECTION_CONFIDENCE,
 ) -> JobResult:
     """Process a single job through the markdown pipeline.
 
@@ -326,6 +327,8 @@ def process_job(
                           extraction_outcome (default MIN_SECTIONS_FOR_REAL_JD, Issue #738)
         min_description_chars: Minimum stripped text length for the input to count as a real JD
                           when classifying extraction_outcome (default MIN_DESCRIPTION_CHARS, Issue #738)
+        min_section_confidence: Section confidence floor passed to apply_fallback (Tier 1 sub-pass A)
+                          (default FALLBACK_MIN_SECTION_CONFIDENCE, 0.45; CLI --fallback-min-section-confidence)
 
     Returns:
         JobResult with processing stats and any errors encountered
@@ -618,7 +621,7 @@ def process_job(
     pre_fallback_outcome = result.extraction_outcome
     pre_fallback_lists = (list(result.requirements), list(result.skills), list(result.technologies))
     try:
-        apply_fallback(result, polished_markdown, shared_nlp=nlp)
+        apply_fallback(result, polished_markdown, shared_nlp=nlp, min_section_confidence=min_section_confidence)
     except Exception:
         logger.exception("Fallback failed for job %s; keeping pre-fallback results", result.job_id)
         result.requirements, result.skills, result.technologies = pre_fallback_lists
@@ -667,10 +670,9 @@ def run_batch(
                           (default MIN_SECTIONS_FOR_REAL_JD, Issue #738; CLI --min-sections-for-real-jd)
         min_description_chars: Stripped-text threshold for extraction_outcome classification
                           (default MIN_DESCRIPTION_CHARS, Issue #738; CLI --min-description-chars)
-        fallback_min_section_confidence: Documented no-op. apply_fallback (#739, wired in #754) uses its
-                          fixed FALLBACK_MIN_SECTION_CONFIDENCE; this value is not threaded through yet.
-                          Follow-up: add an apply_fallback parameter (Issue #738;
-                          CLI --fallback-min-section-confidence)
+        fallback_min_section_confidence: Section confidence floor for apply_fallback Tier 1 sub-pass A
+                          (default FALLBACK_MIN_SECTION_CONFIDENCE, 0.45; CLI --fallback-min-section-confidence;
+                          Issue #756)
 
     Returns:
         List of JobResult objects (one per job)
@@ -749,6 +751,7 @@ def run_batch(
             heading_promoter=heading_promoter,
             min_sections=min_sections_for_real_jd,
             min_description_chars=min_description_chars,
+            min_section_confidence=fallback_min_section_confidence,
         )
         if resolve_error is not None:
             # Unknown/invalid source_config: process job unscoped (as before), record a warning
@@ -1025,8 +1028,8 @@ def main() -> int:
         default=FALLBACK_MIN_SECTION_CONFIDENCE,
         help=(
             "Min section confidence for the fallback extraction pass "
-            f"(default: {FALLBACK_MIN_SECTION_CONFIDENCE}, Issue #738; currently a no-op: awaits an "
-            "apply_fallback parameter, follow-up to #754)"
+            f"(default: {FALLBACK_MIN_SECTION_CONFIDENCE}, Issue #738; Tier 1 sub-pass A confidence floor "
+            "for apply_fallback, Issue #756)"
         ),
     )
 
