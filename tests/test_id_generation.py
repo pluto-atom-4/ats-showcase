@@ -251,3 +251,20 @@ class TestIdGeneration:
         )
         # Should be same because portal ID is the anchor
         assert id1 == id2
+
+    def test_generate_job_id_collides_for_worksource_search_urls(self):
+        """WorkSource search URLs differing only by jobId query param collide."""
+        # documents known bug, see #736
+        id1 = generate_job_id(
+            company="WorkSource",
+            title="Warehouse Associate",
+            location="Spokane, WA",
+            url="https://my.site.com/search?jobId=MuW5N",
+        )
+        id2 = generate_job_id(
+            company="WorkSource",
+            title="Warehouse Associate",
+            location="Spokane, WA",
+            url="https://my.site.com/search?jobId=MuTqf",
+        )
+        assert id1 == id2
