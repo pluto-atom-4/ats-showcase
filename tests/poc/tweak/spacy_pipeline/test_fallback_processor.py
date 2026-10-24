@@ -419,3 +419,49 @@ def test_dedicated_pipeline_is_separate_and_built_once(shared_nlp: Language) -> 
     apply_fallback(job, TAXONOMY_MD, shared_nlp=shared_nlp)
 
     assert len(dedicated.nlp.get_pipe("entity_ruler").patterns) == count  # type: ignore[attr-defined]
+
+
+# ============================================================================
+# min_section_confidence parameter (Issue #756, part 1/2)
+# ============================================================================
+
+
+def test_default_min_section_confidence_matches_module_constant(shared_nlp: Language) -> None:
+    """Omitting the parameter and passing the constant explicitly give identical output."""
+    implicit = apply_fallback(_uw_walmart_job(), UW_WALMART_MD, shared_nlp=shared_nlp)
+    explicit = apply_fallback(
+        _uw_walmart_job(),
+        UW_WALMART_MD,
+        shared_nlp=shared_nlp,
+        min_section_confidence=FALLBACK_MIN_SECTION_CONFIDENCE,
+    )
+
+    assert implicit == explicit
+    assert any(s["extraction_tier"] == TIER1_TAG for s in implicit.skills)
+
+
+def test_min_section_confidence_flag_changes_tier1_acceptance(shared_nlp: Language) -> None:
+    """UW/Walmart sections sit at 0.55: accepted at the default floor, rejected above it."""
+    accepted = apply_fallback(_uw_walmart_job(), UW_WALMART_MD, shared_nlp=shared_nlp)
+    rejected = apply_fallback(_uw_walmart_job(), UW_WALMART_MD, shared_nlp=shared_nlp, min_section_confidence=0.60)
+
+    assert any(s["extraction_tier"] == TIER1_TAG for s in accepted.skills)
+    assert _texts(accepted.requirements, "text") == ["Must have 5+ years of Python experience"]
+    assert not [e for e in rejected.requirements if e.get("extraction_tier") == TIER1_TAG]
+    assert not [e for e in rejected.skills if e.get("extraction_tier") == TIER1_TAG]
+    assert not [e for e in rejected.technologies if e.get("extraction_tier") == TIER1_TAG]
+
+
+def test_min_section_confidence_lowering_recovers_below_default(shared_nlp: Language) -> None:
+    """A section at 0.40 is not recovered at the default 0.45 floor but is at a lowered floor."""
+    content = "- Build scalable data pipelines using Spark"
+    md = f"## Skills\n\n{content}\n"
+    job_default = _job([_section(0, "Skills", content, [("skills", 0.40)])])
+    job_lowered = _job([_section(0, "Skills", content, [("skills", 0.40)])])
+
+    default = apply_fallback(job_default, md, shared_nlp=shared_nlp)
+    lowered = apply_fallback(job_lowered, md, shared_nlp=shared_nlp, min_section_confidence=0.30)
+
+    assert not [s for s in default.skills if s.get("extraction_tier") == TIER1_TAG]
+    assert _texts(lowered.skills, "skill") == ["build scalable data pipelines using spark"]
+    assert all(s["extraction_tier"] == TIER1_TAG for s in lowered.skills)

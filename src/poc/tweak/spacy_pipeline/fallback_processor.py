@@ -6,7 +6,8 @@ of zero yield on real content, so the fallback recovers output in two sub-passes
 
 Sub-pass A (``tier1_relaxed_section``): re-runs the existing RequirementProcessor,
 SkillProcessor and TechnologyProcessor over the section classifications already computed by
-the normal path, with their confidence gate lowered to ``FALLBACK_MIN_SECTION_CONFIDENCE``.
+the normal path, with their confidence gate lowered to ``min_section_confidence`` (default
+``FALLBACK_MIN_SECTION_CONFIDENCE``).
 The classifications are rebuilt from ``JobResult.markdown_sections`` (their ``all_types``
 data is persisted there), so no section classification is recomputed.
 
@@ -71,14 +72,12 @@ _RELAXED_COMPONENT_NAME = "fallback_relaxed"
 
 @functools.lru_cache(maxsize=1)
 def _dedicated_tech_extractor() -> TechExtractor:
-    """Build the dedicated spaCy pipeline and TechExtractor once per process.
-
-    Batch processing is sequential, so the first call is the only one that loads the model.
-    If two threads ever raced the first call, the duplicate load would be discarded harmlessly.
+    """Return the cached dedicated TechExtractor, building it on first use.
 
     Owned by this module. ``TechExtractor.__init__`` adds TECH patterns to this pipeline's
-    entity_ruler; the cache guarantees that happens exactly once (a second construction
-    would add the patterns again).
+    entity_ruler, so the pipeline must not be shared with the batch nlp. Batch processing is
+    sequential, so in practice the model is loaded once. Under a first-call race, at most one
+    retained instance is kept; a duplicate load is discarded.
     """
     return TechExtractor(spacy.load(_SPACY_MODEL))
 
@@ -162,11 +161,16 @@ def _to_classification(section: MarkdownSection) -> Optional[SectionClassificati
     )
 
 
-def _relaxed_section_pass(job_result: "JobResult", shared_nlp: Language) -> Dict[str, List[Tuple[str, float]]]:
+def _relaxed_section_pass(
+    job_result: "JobResult",
+    shared_nlp: Language,
+    min_section_confidence: float = FALLBACK_MIN_SECTION_CONFIDENCE,
+) -> Dict[str, List[Tuple[str, float]]]:
     """Sub-pass A: rerun the processors over computed classifications at the relaxed threshold.
 
     The processors run on ``shared_nlp`` (read-only here). Sections already above the normal
     0.70 gate yield the same entries as the normal path; the de-duplication guard drops them.
+    Sections below ``min_section_confidence`` are not accepted.
 
     Returns:
         Mapping with "requirements", "skills" and "technologies" lists of (text, confidence).
@@ -185,10 +189,9 @@ def _relaxed_section_pass(job_result: "JobResult", shared_nlp: Language) -> Dict
     doc = Doc(shared_nlp.vocab)
     doc._.classified_sections = pairs
 
-    relaxed = FALLBACK_MIN_SECTION_CONFIDENCE
-    req_processor = RequirementProcessor(shared_nlp, _RELAXED_COMPONENT_NAME, min_confidence=relaxed)
-    skill_processor = SkillProcessor(shared_nlp, _RELAXED_COMPONENT_NAME, min_confidence=relaxed)
-    tech_processor = TechnologyProcessor(shared_nlp, _RELAXED_COMPONENT_NAME, min_confidence=relaxed)
+    req_processor = RequirementProcessor(shared_nlp, _RELAXED_COMPONENT_NAME, min_confidence=min_section_confidence)
+    skill_processor = SkillProcessor(shared_nlp, _RELAXED_COMPONENT_NAME, min_confidence=min_section_confidence)
+    tech_processor = TechnologyProcessor(shared_nlp, _RELAXED_COMPONENT_NAME, min_confidence=min_section_confidence)
 
     doc = req_processor(doc)
     requirements = [(r["text"], min(float(r["confidence"]), TIER1_CONFIDENCE)) for r in doc._.requirements]
@@ -217,7 +220,13 @@ def _taxonomy_pass(
     return result
 
 
-def apply_fallback(job_result: "JobResult", polished_markdown: str, *, shared_nlp: Language) -> "JobResult":
+def apply_fallback(
+    job_result: "JobResult",
+    polished_markdown: str,
+    *,
+    shared_nlp: Language,
+    min_section_confidence: float = FALLBACK_MIN_SECTION_CONFIDENCE,
+) -> "JobResult":
     """Recover zero-yield extraction for a NEEDS_HUMAN_REVIEW job (Issue #739).
 
     No-op unless ``job_result.extraction_outcome`` is ``NEEDS_HUMAN_REVIEW``. Mutates and
@@ -230,6 +239,9 @@ def apply_fallback(job_result: "JobResult", polished_markdown: str, *, shared_nl
         polished_markdown: The job's polished markdown (the text ``process_job`` parsed).
             Not stored on JobResult, so the caller must pass it.
         shared_nlp: The batch pipeline's nlp. Read-only here; its entity_ruler is never modified.
+        min_section_confidence: Section confidence floor for sub-pass A (Tier 1). Sections below
+            it are not accepted. Defaults to ``FALLBACK_MIN_SECTION_CONFIDENCE`` (0.45), which is
+            the behavior without this argument. Sub-pass B (Tier 2) is ungated and ignores it.
 
     Returns:
         The same JobResult object, updated in place.
@@ -237,7 +249,7 @@ def apply_fallback(job_result: "JobResult", polished_markdown: str, *, shared_nl
     if job_result.extraction_outcome is not ExtractionOutcome.NEEDS_HUMAN_REVIEW:
         return job_result
 
-    relaxed = _relaxed_section_pass(job_result, shared_nlp)
+    relaxed = _relaxed_section_pass(job_result, shared_nlp, min_section_confidence)
     recovered = 0
     recovered += _append_new(job_result.requirements, "text", relaxed["requirements"], TIER1_TAG)
     recovered += _append_new(job_result.skills, "skill", relaxed["skills"], TIER1_TAG)
