@@ -2230,7 +2230,7 @@ def _without_fallback(monkeypatch) -> None:
     """Replace the wired apply_fallback call with an identity no-op for baseline comparisons."""
     import src.poc.tweak.batch_processor as bp
 
-    monkeypatch.setattr(bp, "apply_fallback", lambda result, markdown, *, shared_nlp: result)
+    monkeypatch.setattr(bp, "apply_fallback", lambda result, markdown, *, shared_nlp, **_kw: result)
 
 
 def _job_snapshot(result: JobResult) -> tuple:
@@ -2302,7 +2302,7 @@ class TestFallbackWiring:
 
         calls: list[str] = []
 
-        def spy(result, markdown, *, shared_nlp):
+        def spy(result, markdown, *, shared_nlp, **_kw):
             calls.append(result.job_id)
             return result
 
@@ -2325,7 +2325,7 @@ class TestFallbackWiring:
         from src.poc.tweak.batch_processor import process_job
         from src.poc.tweak.extraction_status import ExtractionOutcome
 
-        def partial_then_boom(result, markdown, *, shared_nlp):
+        def partial_then_boom(result, markdown, *, shared_nlp, **_kw):
             result.requirements.append(
                 {"text": "partial req", "confidence": 0.5, "extraction_tier": "tier1_relaxed_section"}
             )
@@ -2370,3 +2370,55 @@ class TestFallbackWiring:
 
         assert results[0].extraction_outcome is ExtractionOutcome.COMPLETE
         assert any(e.get("extraction_tier") for e in results[0].skills + results[0].technologies)
+
+
+class TestFallbackMinSectionConfidenceThreading:
+    """--fallback-min-section-confidence reaches apply_fallback via run_batch -> process_job (Issue #756)."""
+
+    @staticmethod
+    def _recording_apply_fallback(monkeypatch) -> list:
+        """Spy on apply_fallback: record the min_section_confidence kwarg, leave the result untouched."""
+        import src.poc.tweak.batch_processor as bp
+
+        seen: list = []
+
+        def spy(result, markdown, *, shared_nlp, min_section_confidence):
+            seen.append(min_section_confidence)
+            return result
+
+        monkeypatch.setattr(bp, "apply_fallback", spy)
+        return seen
+
+    def test_process_job_default_passes_default_confidence(self, monkeypatch):
+        """Omitting the kwarg forwards FALLBACK_MIN_SECTION_CONFIDENCE, so default behaviour is unchanged."""
+        from src.poc.tweak.batch_processor import process_job
+        from src.poc.tweak.extraction_status import FALLBACK_MIN_SECTION_CONFIDENCE
+
+        seen = self._recording_apply_fallback(monkeypatch)
+        process_job(_fallback_recoverable_job(), **_process_job_kwargs())
+
+        assert seen == [FALLBACK_MIN_SECTION_CONFIDENCE]
+
+    def test_process_job_non_default_confidence_reaches_apply_fallback(self, monkeypatch):
+        """A non-default value passed to process_job is the value apply_fallback receives."""
+        from src.poc.tweak.batch_processor import process_job
+
+        seen = self._recording_apply_fallback(monkeypatch)
+        process_job(_fallback_recoverable_job(), min_section_confidence=0.2, **_process_job_kwargs())
+
+        assert seen == [0.2]
+
+    def test_run_batch_non_default_confidence_reaches_apply_fallback(self, tmp_path, monkeypatch):
+        """run_batch(fallback_min_section_confidence=...) threads the value through to apply_fallback."""
+        from src.poc.tweak.extraction_status import FALLBACK_MIN_SECTION_CONFIDENCE
+
+        seen = self._recording_apply_fallback(monkeypatch)
+        input_file = tmp_path / "fallback_756.json"
+        input_file.write_text(json.dumps([_fallback_recoverable_job()]))
+
+        run_batch(str(input_file), fallback_min_section_confidence=0.3)
+        assert seen == [0.3]
+
+        seen.clear()
+        run_batch(str(input_file))
+        assert seen == [FALLBACK_MIN_SECTION_CONFIDENCE]
