@@ -254,7 +254,8 @@ class TestIdGeneration:
 
     def test_generate_job_id_collides_for_worksource_search_urls(self):
         """WorkSource search URLs differing only by jobId query param collide."""
-        # documents known bug, see #736
+        # Characterizes known bug (#736/#759).
+        # TODO(#763): flip to assert id1 != id2 when jobId is wired into generate_job_id.
         id1 = generate_job_id(
             company="WorkSource",
             title="Warehouse Associate",
