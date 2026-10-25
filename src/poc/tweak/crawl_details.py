@@ -25,6 +25,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from playwright.async_api import Browser, Page, Playwright
 
@@ -183,34 +184,103 @@ async def selector_present(page: Page, selector: Optional[str], timeout_ms: int)
 # ============================================================================
 
 
-async def extract_description_from_detail_page(
+# WorkSource (Issue #765). No JSON-LD exists on WorkSource: primary source is the
+# getJobDetails Apex response; fallback is the DOM at the stable job-details URL.
+WORKSOURCE_COMPANY_KEY = "WorkSource"
+WORKSOURCE_API_PATH = "/webruntime/api/apex/execute"
+WORKSOURCE_API_METHOD = "getJobDetails"
+WORKSOURCE_DETAIL_URL = "https://worksource.my.site.com/worksourcewa/job-search/job-details"
+
+# Shell = WorkSource search-list page (rendered when the job-search URL with jobId is loaded).
+# Length cannot discriminate: the shell (~15.5k text chars) is longer than a real detail page
+# (~6.7k text chars). These phrases appear on the shell and on NO real detail page capture
+# (verified against .playwright-mcp worksource_shell_search.json / worksource_real_detail.json).
+# Two distinct hits are required so one phrase in ordinary prose is not treated as shell.
+WORKSOURCE_SHELL_MARKERS = ("Refine your search", "Clear filters", "Viewing 1 - 20 of")
+SHELL_MARKER_MIN_HITS = 2
+
+
+def is_shell_content(html: str) -> bool:
+    """
+    Return True if html looks like the WorkSource search-list shell, not a job description.
+
+    Empty or whitespace-only input counts as shell. Otherwise checks for at least
+    SHELL_MARKER_MIN_HITS distinct WORKSOURCE_SHELL_MARKERS. Real detail pages carry none
+    of these markers, so the check does not depend on content length.
+    """
+    if not html or not html.strip():
+        return True
+    hits = sum(1 for marker in WORKSOURCE_SHELL_MARKERS if marker in html)
+    return hits >= SHELL_MARKER_MIN_HITS
+
+
+def _is_get_job_details_request(response: Any) -> bool:
+    """
+    Predicate for page.expect_response(): POST to the Apex execute endpoint whose JSON body
+    names method getJobDetails. Never matches on the `classname` query param (build hash).
+    """
+    request = response.request
+    if WORKSOURCE_API_PATH not in response.url or request.method != "POST":
+        return False
+    try:
+        body = json.loads(request.post_data or "")
+    except (TypeError, ValueError):
+        return False
+    return isinstance(body, dict) and body.get("method") == WORKSOURCE_API_METHOD
+
+
+async def fetch_worksource_job_via_api(
     page: Page,
     job_url: str,
-    selectors: Dict[str, str],
-    timeout_ms: int = 30000,
-) -> Optional[str]:
+    api_timeout_ms: int = 10000,
+) -> Optional[Dict[str, Any]]:
     """
-    Extract job description from detail page.
+    Navigate to a WorkSource job URL and intercept its getJobDetails Apex response.
 
-    Handles both:
-    1. Iframe-based descriptions (Greenhouse)
-    2. Direct-DOM descriptions (Workday, etc.)
-
-    Falls back to original HTML structure if extraction fails.
+    Does not wait for networkidle (WorkSource is an SPA where it never settles).
 
     Args:
-        page: Playwright page object (already navigated to job URL)
-        job_url: Job URL (for logging)
-        selectors: CSS selectors with description_selector, inner_description_selector
-        timeout_ms: Page navigation timeout in milliseconds
+        page: Playwright page object
+        job_url: WorkSource job URL (job-search URL carrying jobId)
+        api_timeout_ms: Max wait for the getJobDetails response in milliseconds
 
     Returns:
-        Extracted description HTML/text, or None if extraction failed
+        The response's returnValue dict, or None on timeout, non-OK status,
+        JSON decode error, missing returnValue, or any other exception
     """
+    try:
+        async with page.expect_response(_is_get_job_details_request, timeout=api_timeout_ms) as info:
+            await page.goto(job_url, wait_until="commit")
+        response = await info.value
+        if not response.ok:
+            logger.debug(f"getJobDetails returned status {response.status} for {job_url}")
+            return None
+        payload = await response.json()
+        return_value = payload.get("returnValue") if isinstance(payload, dict) else None
+        if not isinstance(return_value, dict):
+            logger.debug(f"getJobDetails response had no returnValue object for {job_url}")
+            return None
+        return return_value
+    except Exception as e:
+        logger.debug(f"getJobDetails intercept failed for {job_url}: {e}")
+        return None
+
+
+def _worksource_detail_url(job_url: str) -> str:
+    """Build the stable job-details URL from the jobId query param of job_url."""
+    job_id = parse_qs(urlparse(job_url).query).get("jobId", [""])[0]
+    if not job_id:
+        logger.warning(f"No jobId in WorkSource URL; using as-is: {job_url}")
+        return job_url
+    return f"{WORKSOURCE_DETAIL_URL}?{urlencode({'jobId': job_id})}"
+
+
+async def _extract_dom_description(page: Page, selectors: Dict[str, str]) -> Optional[str]:
+    """Read description from the DOM via description_selector (iframe or direct element)."""
     try:
         desc_selector = selectors.get("description_selector")
         if not desc_selector:
-            logger.debug(f"No description selector configured for {job_url}")
+            logger.debug("No description selector configured")
             return None
 
         desc_elem = await page.query_selector(desc_selector)
@@ -238,6 +308,78 @@ async def extract_description_from_detail_page(
             except Exception as e:
                 logger.debug(f"Error extracting inner HTML: {e}")
 
+        return description if description else None
+
+    except Exception as e:
+        logger.debug(f"Error extracting description: {e}")
+        return None
+
+
+async def _extract_worksource_description(
+    page: Page,
+    job_url: str,
+    selectors: Dict[str, str],
+    timeout_ms: int,
+    api_timeout_ms: int,
+) -> Optional[str]:
+    """API intercept first; on any failure or shell content, read the DOM at job-details?jobId=."""
+    return_value = await fetch_worksource_job_via_api(page, job_url, api_timeout_ms=api_timeout_ms)
+    api_description = return_value.get("jobDescription") if return_value else None
+    if isinstance(api_description, str) and api_description.strip() and not is_shell_content(api_description):
+        return api_description.strip()
+
+    logger.warning(f"WorkSource API description unavailable for {job_url}; falling back to DOM")
+    detail_url = _worksource_detail_url(job_url)
+    try:
+        await page.goto(detail_url, wait_until="domcontentloaded", timeout=timeout_ms)
+    except Exception as e:
+        logger.warning(f"WorkSource DOM fallback navigation failed for {detail_url}: {e}")
+        return None
+
+    if not await selector_present(page, selectors.get("description_selector"), timeout_ms):
+        return None
+    return await _extract_dom_description(page, selectors)
+
+
+async def extract_description_from_detail_page(
+    page: Page,
+    job_url: str,
+    selectors: Dict[str, str],
+    timeout_ms: int = 30000,
+    company_key: str = "",
+    api_timeout_ms: int = 10000,
+) -> Optional[str]:
+    """
+    Extract job description from detail page.
+
+    Handles both:
+    1. Iframe-based descriptions (Greenhouse)
+    2. Direct-DOM descriptions (Workday, etc.)
+
+    For company_key "WorkSource" (Issue #765), tries the getJobDetails API intercept first
+    and falls back to the job-details DOM. Any description matching is_shell_content() is
+    rejected for every company (returns None) so shell pages are not stored as descriptions.
+
+    Args:
+        page: Playwright page object (already navigated to job URL)
+        job_url: Job URL (for logging)
+        selectors: CSS selectors with description_selector, inner_description_selector
+        timeout_ms: Page navigation timeout in milliseconds
+        company_key: Config key of the company (source_config); "" for default behaviour
+        api_timeout_ms: Max wait for the WorkSource getJobDetails response in milliseconds
+
+    Returns:
+        Extracted description HTML/text, or None if extraction failed
+    """
+    try:
+        if company_key == WORKSOURCE_COMPANY_KEY:
+            description = await _extract_worksource_description(page, job_url, selectors, timeout_ms, api_timeout_ms)
+        else:
+            description = await _extract_dom_description(page, selectors)
+
+        if description and is_shell_content(description):
+            logger.warning(f"Shell content detected instead of description for {job_url}; discarding")
+            return None
         return description if description else None
 
     except Exception as e:
@@ -276,6 +418,8 @@ async def fetch_job_details(
     company_name = job.get("company", "")
     job_id = job.get("id")
     job_title = job.get("title", "")
+    # Config key set by crawl_list (source_config = company_key); identifies WorkSource (Issue #765)
+    company_key = str(job.get("source_config") or "").strip()
 
     if not job_url:
         logger.warning(f"Job has no URL: {job_title}")
@@ -317,13 +461,16 @@ async def fetch_job_details(
             desc_selector = selectors.get("description_selector")
             selector_found = await selector_present(detail_page, desc_selector, attempt_timeout)
 
-            if selector_found:
+            # WorkSource: the listing page has no description node, so the selector gate would
+            # skip the getJobDetails intercept entirely. Always attempt extraction for it (#765).
+            if selector_found or company_key == WORKSOURCE_COMPANY_KEY:
                 # Attempt extraction
                 description = await extract_description_from_detail_page(
                     detail_page,
                     job_url,
                     selectors,
                     timeout_ms=timeout_ms,
+                    company_key=company_key,
                 )
                 if description:
                     job_copy["description"] = description
