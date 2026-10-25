@@ -493,6 +493,13 @@ class _FakeExpectResponse:
         return False
 
 
+def _captured_predicate(page: AsyncMock) -> Any:
+    """Return the predicate passed to page.expect_response() by the code under test."""
+    call = page.expect_response.call_args
+    assert call is not None
+    return call.args[0]
+
+
 def make_worksource_page(
     api_responses: Optional[List[Any]] = None,
     dom_description: Optional[str] = None,
@@ -553,14 +560,16 @@ class TestFetchWorksourceJobViaApi:
 
         assert result == {"jobDescription": WS_API_DESCRIPTION}
         page.goto.assert_awaited_once_with(WS_JOB_URL, wait_until="commit")
-        assert page.expect_response.call_args.kwargs == {"timeout": 10000}
+        call = page.expect_response.call_args
+        assert call is not None
+        assert call.kwargs == {"timeout": 10000}
 
     @pytest.mark.asyncio
     async def test_predicate_ignores_classname_hash(self):
         """Predicate matches on path/method/body only; any build-specific classname hash matches."""
         page = make_worksource_page(api_responses=[])
         await fetch_worksource_job_via_api(page, WS_JOB_URL)
-        predicate = page.expect_response.call_args.args[0]
+        predicate = _captured_predicate(page)
 
         other_build = make_api_response(
             url=WS_API_URL.replace("9f8e7d6c5b4a", "0000deadbeef"),
@@ -572,7 +581,7 @@ class TestFetchWorksourceJobViaApi:
     async def test_predicate_rejects_wrong_method_path_or_body(self):
         page = make_worksource_page(api_responses=[])
         await fetch_worksource_job_via_api(page, WS_JOB_URL)
-        predicate = page.expect_response.call_args.args[0]
+        predicate = _captured_predicate(page)
 
         assert predicate(make_api_response(method="GET")) is False
         assert predicate(make_api_response(url="https://worksource.my.site.com/other/path")) is False
@@ -758,7 +767,9 @@ class TestFetchJobDetailsWorksourceWiring:
 
         assert result["description"] == WS_API_DESCRIPTION
         assert mock_extract.await_count == 1
-        assert mock_extract.await_args.kwargs["company_key"] == "WorkSource"
+        extract_call = mock_extract.await_args
+        assert extract_call is not None
+        assert extract_call.kwargs["company_key"] == "WorkSource"
 
     @pytest.mark.asyncio
     async def test_non_worksource_selector_gate_unchanged(self):
