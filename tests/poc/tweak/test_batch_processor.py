@@ -251,6 +251,8 @@ class TestRunBatch:
         assert max(tech_counts) > 0, "No technologies extracted - entity_ruler patterns not loaded"
 
         # Verify structure of extracted technologies
+        from src.poc.tweak.spacy_pipeline.fallback_processor import TIER2_CONFIDENCE, TIER2_TAG
+
         for result in results:
             for tech in result.technologies:
                 assert isinstance(tech, dict), "Technology should be a dict"
@@ -258,7 +260,13 @@ class TestRunBatch:
                 assert "confidence" in tech, "Technology dict must have 'confidence' key"
                 assert isinstance(tech["tech"], str), "Tech value should be string"
                 assert isinstance(tech["confidence"], float), "Confidence should be float"
-                assert tech["confidence"] == 1.0, "Technology confidence should always be 1.0"
+                if tech.get("extraction_tier") == TIER2_TAG:
+                    # Tier 2 taxonomy recovery on complete-gap jobs (#757 B) carries its own cap
+                    assert tech["confidence"] == TIER2_CONFIDENCE, (
+                        "Tier 2 technology confidence must be TIER2_CONFIDENCE"
+                    )
+                else:
+                    assert tech["confidence"] == 1.0, "Normal-path technology confidence should always be 1.0"
 
     def test_batch_processor_handles_null_description_gracefully(self, tmp_path):
         """Test that jobs with null descriptions are processed without errors.
@@ -2006,7 +2014,11 @@ class TestExtractionOutcomeWiring:
     """Tests for JobResult.extraction_outcome, print_summary, JSON output, and CLI overrides (Issue #738)."""
 
     def test_reference_fixture_distribution(self, tmp_path):
-        """Representative 11-job fixture yields 6 LIKELY_UNPARSEABLE_INPUT, 3 NEEDS_HUMAN_REVIEW, 2 COMPLETE."""
+        """Representative 11-job fixture yields 6 LIKELY_UNPARSEABLE_INPUT, 3 NEEDS_HUMAN_REVIEW, 2 PARTIAL_RECOVERY.
+
+        The 2 tech jobs are COMPLETE complete-gap jobs (no technologies, no skills) before the fallback;
+        Tier 2 recovers taxonomy terms, so they end PARTIAL_RECOVERY (#757 B, #757 C).
+        """
         from collections import Counter
 
         from src.poc.tweak.extraction_status import ExtractionOutcome
@@ -2021,7 +2033,8 @@ class TestExtractionOutcomeWiring:
         counts = Counter(r.extraction_outcome for r in results)
         assert counts[ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT] == 6
         assert counts[ExtractionOutcome.NEEDS_HUMAN_REVIEW] == 3
-        assert counts[ExtractionOutcome.COMPLETE] == 2
+        assert counts[ExtractionOutcome.PARTIAL_RECOVERY] == 2
+        assert counts[ExtractionOutcome.COMPLETE] == 0
         assert counts[ExtractionOutcome.ERROR] == 0
         assert all(r.extraction_outcome is not None for r in results)
 
@@ -2226,6 +2239,24 @@ def _fallback_recoverable_job() -> dict:
     return {"id": "recoverable-754", "title": "Engineer", "company": "Acme", "description": "".join(parts)}
 
 
+def _untouched_job(case: str) -> dict:
+    """Job whose outcome the fallback must not change (#757 C).
+
+    - ``likely_unparseable``: shell page -> LIKELY_UNPARSEABLE_INPUT.
+    - ``complete_all_categories``: details fixture greenhouse job, COMPLETE with requirements, skills, technologies.
+    - ``complete_no_requirements``: details fixture greenhouse job, COMPLETE with skills and technologies only.
+    """
+    if case == "likely_unparseable":
+        return _reference_fixture_jobs()[0]
+    ids = {
+        "complete_all_categories": "greenhouse:bc6e32a68ce33a45",
+        "complete_no_requirements": "greenhouse:e9694271c60f8ccc",
+    }
+    fixture = Path(__file__).parent.parent / "fixtures" / "details_test_fixture.json"
+    jobs = {job["id"]: job for job in json.loads(fixture.read_text())}
+    return dict(jobs[ids[case]])
+
+
 def _without_fallback(monkeypatch) -> None:
     """Replace the wired apply_fallback call with an identity no-op for baseline comparisons."""
     import src.poc.tweak.batch_processor as bp
@@ -2247,8 +2278,8 @@ def _job_snapshot(result: JobResult) -> tuple:
 class TestFallbackWiring:
     """process_job calls apply_fallback after classification; only NEEDS_HUMAN_REVIEW jobs change (Issue #754)."""
 
-    def test_needs_human_review_job_recovers_to_complete_with_tier_tags(self, monkeypatch):
-        """Recoverable NEEDS_HUMAN_REVIEW job ends COMPLETE, with recovered entries tier-tagged."""
+    def test_needs_human_review_job_recovers_to_partial_recovery_with_tier_tags(self, monkeypatch):
+        """Recoverable NEEDS_HUMAN_REVIEW job ends PARTIAL_RECOVERY, with recovered entries tier-tagged (#757 A)."""
         from src.poc.tweak.batch_processor import process_job
         from src.poc.tweak.extraction_status import ExtractionOutcome
         from src.poc.tweak.spacy_pipeline.fallback_processor import TIER1_TAG, TIER2_TAG
@@ -2260,7 +2291,7 @@ class TestFallbackWiring:
         baseline = process_job(job, **_process_job_kwargs())
         assert baseline.extraction_outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW  # precondition
 
-        assert result.extraction_outcome is ExtractionOutcome.COMPLETE
+        assert result.extraction_outcome is ExtractionOutcome.PARTIAL_RECOVERY
         assert result.has_errors() is False
         recovered = result.skills + result.technologies
         assert recovered, "fallback should recover at least one skill or technology"
@@ -2279,20 +2310,50 @@ class TestFallbackWiring:
             texts = [" ".join(str(e[key]).split()).lower() for e in entries]
             assert len(texts) == len(set(texts))
 
-    @pytest.mark.parametrize("index", [0, 9])  # 0: shell -> LIKELY_UNPARSEABLE_INPUT; 9: extractable -> COMPLETE
-    def test_fallback_leaves_likely_and_complete_jobs_untouched(self, index, monkeypatch):
-        """For non-NEEDS_HUMAN_REVIEW outcomes the wired fallback changes nothing."""
+    @pytest.mark.parametrize("case", ["likely_unparseable", "complete_all_categories", "complete_no_requirements"])
+    def test_fallback_leaves_likely_and_complete_jobs_untouched(self, case, monkeypatch):
+        """Jobs outside both admitted shapes (LIKELY_UNPARSEABLE_INPUT; COMPLETE with technologies) are unchanged.
+
+        Complete-gap jobs (COMPLETE, no technologies, missing skills or requirements) are admitted and are covered
+        in test_fallback_admits_complete_gap_job_to_partial_recovery (#757 C).
+        """
         from src.poc.tweak.batch_processor import process_job
         from src.poc.tweak.extraction_status import ExtractionOutcome
 
-        job = _reference_fixture_jobs()[index]
+        job = _untouched_job(case)
         with_fallback = process_job(job, **_process_job_kwargs())
         _without_fallback(monkeypatch)
         without_fallback = process_job(job, **_process_job_kwargs())
 
         assert with_fallback.extraction_outcome is not ExtractionOutcome.NEEDS_HUMAN_REVIEW
+        assert with_fallback.extraction_outcome is not ExtractionOutcome.PARTIAL_RECOVERY
         assert _job_snapshot(with_fallback) == _job_snapshot(without_fallback)
         assert all(e.get("extraction_tier") is None for e in with_fallback.skills + with_fallback.technologies)
+
+    def test_fallback_admits_complete_gap_job_to_partial_recovery(self, monkeypatch):
+        """COMPLETE complete-gap job (no technologies, no skills) gets Tier 2 only and ends PARTIAL_RECOVERY (#757 B).
+
+        Requirements are never modified; recovered entries are Tier 2 tagged at TIER2_CONFIDENCE.
+        """
+        from src.poc.tweak.batch_processor import process_job
+        from src.poc.tweak.extraction_status import ExtractionOutcome
+        from src.poc.tweak.spacy_pipeline.fallback_processor import TIER2_CONFIDENCE, TIER2_TAG
+
+        job = _reference_fixture_jobs()[9]  # tech-0 fixture job
+        result = process_job(job, **_process_job_kwargs())
+        _without_fallback(monkeypatch)
+        baseline = process_job(job, **_process_job_kwargs())
+
+        # Precondition: the job really has the complete-gap shape before the fallback.
+        assert baseline.extraction_outcome is ExtractionOutcome.COMPLETE
+        assert baseline.technologies == [] and baseline.skills == []
+
+        assert result.extraction_outcome is ExtractionOutcome.PARTIAL_RECOVERY
+        assert result.requirements == baseline.requirements
+        recovered = result.skills + result.technologies
+        assert recovered, "Tier 2 should recover at least one taxonomy term"
+        assert all(e["extraction_tier"] == TIER2_TAG for e in recovered)
+        assert all(e["confidence"] == TIER2_CONFIDENCE for e in recovered)
 
     def test_error_outcome_skips_fallback(self, monkeypatch):
         """ERROR early-return jobs never reach the fallback call."""
@@ -2356,11 +2417,11 @@ class TestFallbackWiring:
         jobs = [_fallback_recoverable_job(), _reference_fixture_jobs()[9], _reference_fixture_jobs()[0]]
         results = [process_job(job, **kwargs) for job in jobs]
 
-        assert results[0].extraction_outcome is ExtractionOutcome.COMPLETE  # fallback did run
+        assert results[0].extraction_outcome is ExtractionOutcome.PARTIAL_RECOVERY  # fallback did run
         assert list(ruler.patterns) == patterns_before
 
     def test_run_batch_recovers_needs_human_review_job(self, tmp_path):
-        """End to end through run_batch: the recoverable job ends COMPLETE with tier-tagged output."""
+        """End to end through run_batch: the recoverable job ends PARTIAL_RECOVERY with tier-tagged output."""
         from src.poc.tweak.extraction_status import ExtractionOutcome
 
         input_file = tmp_path / "fallback_754.json"
@@ -2368,7 +2429,7 @@ class TestFallbackWiring:
 
         results = run_batch(str(input_file))
 
-        assert results[0].extraction_outcome is ExtractionOutcome.COMPLETE
+        assert results[0].extraction_outcome is ExtractionOutcome.PARTIAL_RECOVERY
         assert any(e.get("extraction_tier") for e in results[0].skills + results[0].technologies)
 
 
