@@ -1,4 +1,7 @@
-"""Merged Tier 1+2 fallback extraction for NEEDS_HUMAN_REVIEW jobs (Issue #739, Part of #735).
+"""Merged Tier 1+2 fallback extraction for NEEDS_HUMAN_REVIEW and complete-gap jobs (Issue #739, #757 B, Part of #735).
+
+Admitted shapes: ``NEEDS_HUMAN_REVIEW`` (Tier 1 then Tier 2), and ``COMPLETE`` with technologies
+empty and requirements or skills empty (complete-gap, Tier 2 only).
 
 Runs when a job's ``extraction_outcome`` is ``NEEDS_HUMAN_REVIEW`` (no stage errors,
 zero extraction yield, real-looking input), or is ``COMPLETE`` with technologies empty and
@@ -277,6 +280,7 @@ def apply_fallback(
         polished_markdown,
         shared_nlp,
         need_skills=not job_result.skills,
+        # Always True on the complete-gap path (technologies is empty there by definition).
         need_technologies=not job_result.technologies,
     )
     recovered += _append_new(job_result.skills, "skill", [(s, TIER2_CONFIDENCE) for s in taxonomy["skills"]], TIER2_TAG)
