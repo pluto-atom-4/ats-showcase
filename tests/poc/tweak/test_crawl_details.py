@@ -87,6 +87,7 @@ class TestFetchJobDetailsRetryLogic:
 
         mock_browser = AsyncMock()
         mock_page = AsyncMock()
+        mock_page.set_default_timeout = MagicMock()
         mock_browser.new_page = AsyncMock(return_value=mock_page)
 
         # Mock retry_goto to succeed
@@ -124,6 +125,7 @@ class TestFetchJobDetailsRetryLogic:
 
         mock_browser = AsyncMock()
         mock_page = AsyncMock()
+        mock_page.set_default_timeout = MagicMock()
         mock_browser.new_page = AsyncMock(return_value=mock_page)
 
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock) as mock_retry:
@@ -161,6 +163,7 @@ class TestFetchJobDetailsRetryLogic:
 
         mock_browser = AsyncMock()
         mock_page = AsyncMock()
+        mock_page.set_default_timeout = MagicMock()
         mock_browser.new_page = AsyncMock(return_value=mock_page)
 
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock) as mock_retry:
@@ -190,6 +193,7 @@ class TestFetchJobDetailsRetryLogic:
 
         mock_browser = AsyncMock()
         mock_page = AsyncMock()
+        mock_page.set_default_timeout = MagicMock()
         mock_browser.new_page = AsyncMock(return_value=mock_page)
 
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock) as mock_retry:
@@ -223,6 +227,7 @@ class TestFetchJobDetailsRetryLogic:
 
         mock_browser = AsyncMock()
         mock_page = AsyncMock()
+        mock_page.set_default_timeout = MagicMock()
         mock_browser.new_page = AsyncMock(return_value=mock_page)
 
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock) as mock_retry:
@@ -352,6 +357,7 @@ class TestGracefulDegradation:
 
         mock_browser = AsyncMock()
         mock_page = AsyncMock()
+        mock_page.set_default_timeout = MagicMock()
         mock_browser.new_page = AsyncMock(return_value=mock_page)
 
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock) as mock_retry:
@@ -385,6 +391,7 @@ class TestGracefulDegradation:
 
         mock_browser = AsyncMock()
         mock_page = AsyncMock()
+        mock_page.set_default_timeout = MagicMock()
         mock_browser.new_page = AsyncMock(return_value=mock_page)
 
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock) as mock_retry:
