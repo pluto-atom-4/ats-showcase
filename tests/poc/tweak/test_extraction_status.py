@@ -50,13 +50,14 @@ def make_job_result(
 class TestExtractionOutcomeEnum:
     """Tests for the ExtractionOutcome enum values."""
 
-    def test_has_exactly_four_states(self):
-        assert len(ExtractionOutcome) == 4
+    def test_has_exactly_five_states(self):
+        assert len(ExtractionOutcome) == 5
 
     @pytest.mark.parametrize(
         "member, value",
         [
             (ExtractionOutcome.COMPLETE, "complete"),
+            (ExtractionOutcome.PARTIAL_RECOVERY, "partial_recovery"),
             (ExtractionOutcome.NEEDS_HUMAN_REVIEW, "needs_human_review"),
             (ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT, "likely_unparseable_input"),
             (ExtractionOutcome.ERROR, "error"),
@@ -68,6 +69,11 @@ class TestExtractionOutcomeEnum:
 
     def test_is_str_subclass(self):
         assert isinstance(ExtractionOutcome.COMPLETE, str)
+        assert isinstance(ExtractionOutcome.PARTIAL_RECOVERY, str)
+
+    def test_partial_recovery_exists(self):
+        assert hasattr(ExtractionOutcome, "PARTIAL_RECOVERY")
+        assert ExtractionOutcome.PARTIAL_RECOVERY.value == "partial_recovery"
 
 
 class TestDefaultConstants:
@@ -174,6 +180,35 @@ class TestClassifyNeedsHumanReview:
         result = make_job_result(MIN_SECTIONS_FOR_REAL_JD)
         outcome = classify_extraction_outcome(result, MIN_DESCRIPTION_CHARS)
         assert outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW
+
+
+class TestClassifyNeverPartialRecovery:
+    """PARTIAL_RECOVERY is set only by apply_fallback, never by classify_extraction_outcome."""
+
+    @pytest.mark.parametrize("errors", [None, [("converter", "boom")]])
+    @pytest.mark.parametrize("requirements", [0, 1])
+    @pytest.mark.parametrize("skills", [0, 2])
+    @pytest.mark.parametrize("technologies", [0, 3])
+    @pytest.mark.parametrize("sections", [0, MIN_SECTIONS_FOR_REAL_JD - 1, MIN_SECTIONS_FOR_REAL_JD, 24])
+    @pytest.mark.parametrize("stripped_len", [0, SHELL_STRIPPED_CHARS, MIN_DESCRIPTION_CHARS, REAL_CONTENT_CHARS])
+    def test_sweep_never_returns_partial_recovery(
+        self, errors, requirements, skills, technologies, sections, stripped_len
+    ):
+        result = make_job_result(
+            sections,
+            requirements=requirements,
+            skills=skills,
+            technologies=technologies,
+            errors=errors,
+        )
+        outcome = classify_extraction_outcome(result, stripped_len)
+        assert outcome is not ExtractionOutcome.PARTIAL_RECOVERY
+        assert outcome in {
+            ExtractionOutcome.COMPLETE,
+            ExtractionOutcome.NEEDS_HUMAN_REVIEW,
+            ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT,
+            ExtractionOutcome.ERROR,
+        }
 
 
 class TestKeywordOverrides:
