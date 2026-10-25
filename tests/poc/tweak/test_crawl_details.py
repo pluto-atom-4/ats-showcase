@@ -742,7 +742,9 @@ class TestFetchJobDetailsWorksourceWiring:
     async def test_source_config_passed_as_company_key_and_selector_gate_bypassed(self):
         job = {"url": WS_JOB_URL, "company": "WorkSource for Jobs", "title": "Eng", "source_config": "WorkSource"}
         mock_browser = AsyncMock()
-        mock_browser.new_page = AsyncMock(return_value=AsyncMock())
+        detail_page = AsyncMock()
+        detail_page.set_default_timeout = MagicMock()  # sync Playwright method
+        mock_browser.new_page = AsyncMock(return_value=detail_page)
 
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock, return_value=True):
             with patch("src.poc.tweak.crawl_details.selector_present", new_callable=AsyncMock, return_value=False):
@@ -762,7 +764,9 @@ class TestFetchJobDetailsWorksourceWiring:
     async def test_non_worksource_selector_gate_unchanged(self):
         job = {"url": "https://example.com/job", "company": "Acme", "title": "Eng", "source_config": "Acme"}
         mock_browser = AsyncMock()
-        mock_browser.new_page = AsyncMock(return_value=AsyncMock())
+        detail_page = AsyncMock()
+        detail_page.set_default_timeout = MagicMock()  # sync Playwright method
+        mock_browser.new_page = AsyncMock(return_value=detail_page)
 
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock, return_value=True):
             with patch("src.poc.tweak.crawl_details.selector_present", new_callable=AsyncMock, return_value=False):
