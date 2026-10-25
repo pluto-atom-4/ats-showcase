@@ -21,6 +21,10 @@ class ExtractionOutcome(str, Enum):
 
     Values:
         COMPLETE: No stage errors and at least one of requirements/skills/technologies extracted.
+        PARTIAL_RECOVERY: Job was originally classified COMPLETE (with empty skills/technologies)
+            or NEEDS_HUMAN_REVIEW, and the fallback pass (``apply_fallback``) then recovered at
+            least one entry via Tier 1 and/or Tier 2. Set ONLY by ``apply_fallback``, never by
+            ``classify_extraction_outcome``.
         NEEDS_HUMAN_REVIEW: No stage errors, zero extraction yield; the input is not flagged
             as a shell (neither too few sections nor too little stripped text). The pipeline
             could not parse real content.
@@ -30,6 +34,7 @@ class ExtractionOutcome(str, Enum):
     """
 
     COMPLETE = "complete"
+    PARTIAL_RECOVERY = "partial_recovery"
     NEEDS_HUMAN_REVIEW = "needs_human_review"
     LIKELY_UNPARSEABLE_INPUT = "likely_unparseable_input"
     ERROR = "error"

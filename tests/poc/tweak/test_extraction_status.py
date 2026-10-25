@@ -50,13 +50,14 @@ def make_job_result(
 class TestExtractionOutcomeEnum:
     """Tests for the ExtractionOutcome enum values."""
 
-    def test_has_exactly_four_states(self):
-        assert len(ExtractionOutcome) == 4
+    def test_has_exactly_five_states(self):
+        assert len(ExtractionOutcome) == 5
 
     @pytest.mark.parametrize(
         "member, value",
         [
             (ExtractionOutcome.COMPLETE, "complete"),
+            (ExtractionOutcome.PARTIAL_RECOVERY, "partial_recovery"),
             (ExtractionOutcome.NEEDS_HUMAN_REVIEW, "needs_human_review"),
             (ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT, "likely_unparseable_input"),
             (ExtractionOutcome.ERROR, "error"),
@@ -68,6 +69,11 @@ class TestExtractionOutcomeEnum:
 
     def test_is_str_subclass(self):
         assert isinstance(ExtractionOutcome.COMPLETE, str)
+        assert isinstance(ExtractionOutcome.PARTIAL_RECOVERY, str)
+
+    def test_partial_recovery_exists(self):
+        assert hasattr(ExtractionOutcome, "PARTIAL_RECOVERY")
+        assert ExtractionOutcome.PARTIAL_RECOVERY.value == "partial_recovery"
 
 
 class TestDefaultConstants:
@@ -174,6 +180,25 @@ class TestClassifyNeedsHumanReview:
         result = make_job_result(MIN_SECTIONS_FOR_REAL_JD)
         outcome = classify_extraction_outcome(result, MIN_DESCRIPTION_CHARS)
         assert outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW
+
+
+class TestClassifyNeverPartialRecovery:
+    """PARTIAL_RECOVERY is set only by apply_fallback, never by classify_extraction_outcome."""
+
+    @pytest.mark.parametrize(
+        "sections, stripped_len, errors, kwargs",
+        [
+            pytest.param(24, REAL_CONTENT_CHARS, [("converter", "boom")], {}, id="error-branch"),
+            pytest.param(24, REAL_CONTENT_CHARS, None, {"skills": 2}, id="yield-branch"),
+            pytest.param(4, REAL_CONTENT_CHARS, None, {}, id="shell-sections-branch"),
+            pytest.param(24, SHELL_STRIPPED_CHARS, None, {}, id="shell-text-branch"),
+            pytest.param(24, REAL_CONTENT_CHARS, None, {}, id="default-review-branch"),
+            pytest.param(0, 0, None, {}, id="empty-input-branch"),
+        ],
+    )
+    def test_representative_inputs_never_partial_recovery(self, sections, stripped_len, errors, kwargs):
+        result = make_job_result(sections, errors=errors, **kwargs)
+        assert classify_extraction_outcome(result, stripped_len) is not ExtractionOutcome.PARTIAL_RECOVERY
 
 
 class TestKeywordOverrides:
