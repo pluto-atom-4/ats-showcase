@@ -7,7 +7,7 @@ fallback patterns.
 import asyncio
 import json
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

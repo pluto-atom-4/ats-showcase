@@ -325,6 +325,9 @@ async def _extract_worksource_description(
     """API intercept first; on any failure or shell content, read the DOM at job-details?jobId=."""
     return_value = await fetch_worksource_job_via_api(page, job_url, api_timeout_ms=api_timeout_ms)
     api_description = return_value.get("jobDescription") if return_value else None
+    # Deliberately overlaps the generic shell guard in extract_description_from_detail_page
+    # (~line 380): that guard would discard shell content, but this check must run first so
+    # shell API content triggers the DOM fallback instead of returning None.
     if isinstance(api_description, str) and api_description.strip() and not is_shell_content(api_description):
         return api_description.strip()
 
@@ -362,7 +365,7 @@ async def extract_description_from_detail_page(
 
     Args:
         page: Playwright page object (already navigated to job URL)
-        job_url: Job URL (for logging)
+        job_url: Job URL; navigation target for the WorkSource API intercept, also used for logging
         selectors: CSS selectors with description_selector, inner_description_selector
         timeout_ms: Page navigation timeout in milliseconds
         company_key: Config key of the company (source_config); "" for default behaviour
