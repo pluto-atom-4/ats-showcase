@@ -1,11 +1,13 @@
 """Tests for the merged Tier 1+2 fallback pass (Issue #739, Part of #735).
 
 Covers:
-- apply_fallback is a no-op unless extraction_outcome is NEEDS_HUMAN_REVIEW.
+- apply_fallback is a no-op unless extraction_outcome is NEEDS_HUMAN_REVIEW, or the complete-gap
+  shape (COMPLETE, technologies empty, and requirements or skills empty) (Issue #757 B).
 - Sub-pass A (tier1_relaxed_section): section confidence between FALLBACK_MIN_SECTION_CONFIDENCE
   and the 0.70 gate recovers requirements, skills and technologies (Walmart / UW shape).
 - Sub-pass B (tier2_taxonomy): ungated whole-text taxonomy when skills/technologies are still empty.
-- Confidence caps, extraction_tier tags and the COMPLETE outcome after recovery.
+- Complete-gap path: Tier 2 only (no Tier 1), requirements never modified (Issue #757 B).
+- Confidence caps, extraction_tier tags and the PARTIAL_RECOVERY outcome after recovery.
 - The shared de-duplication guard: no duplicate text across normal-path and fallback output.
 - Pipeline isolation: the shared batch nlp's entity_ruler patterns are unchanged after a fallback run.
 
@@ -149,10 +151,10 @@ def _texts(entries: List[Dict[str, Any]], key: str) -> List[str]:
 
 @pytest.mark.parametrize(
     "outcome",
-    [ExtractionOutcome.COMPLETE, ExtractionOutcome.ERROR, ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT],
+    [ExtractionOutcome.ERROR, ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT],
 )
-def test_noop_unless_needs_human_review(shared_nlp: Language, outcome: ExtractionOutcome) -> None:
-    """Only NEEDS_HUMAN_REVIEW jobs are eligible; other outcomes come back untouched."""
+def test_noop_for_error_and_unparseable_outcomes(shared_nlp: Language, outcome: ExtractionOutcome) -> None:
+    """ERROR and LIKELY_UNPARSEABLE_INPUT are never eligible, even with empty categories."""
     job = _uw_walmart_job()
     job.extraction_outcome = outcome
     before = copy.deepcopy(job)
@@ -200,7 +202,7 @@ def test_tier1_recovers_skills_and_technologies_walmart_shape(shared_nlp: Langua
     assert "kubernetes" in tech_texts
     assert all(s["extraction_tier"] == TIER1_TAG for s in result.skills)
     assert all(t["extraction_tier"] == TIER1_TAG for t in result.technologies)
-    assert result.extraction_outcome is ExtractionOutcome.COMPLETE
+    assert result.extraction_outcome is ExtractionOutcome.PARTIAL_RECOVERY
 
 
 def test_tier1_recovers_requirements_uw_shape(shared_nlp: Language) -> None:
@@ -254,7 +256,7 @@ def test_tier2_taxonomy_runs_when_sections_yield_nothing(shared_nlp: Language) -
     assert "docker" in _texts(result.technologies, "tech")
     assert result.technologies and all(t["extraction_tier"] == TIER2_TAG for t in result.technologies)
     assert result.skills and all(s["extraction_tier"] == TIER2_TAG for s in result.skills)
-    assert result.extraction_outcome is ExtractionOutcome.COMPLETE
+    assert result.extraction_outcome is ExtractionOutcome.PARTIAL_RECOVERY
 
 
 def test_tier2_confidence_is_lower_than_tier1_and_normal_path(shared_nlp: Language) -> None:
@@ -295,11 +297,13 @@ def test_tier2_skills_skipped_when_skills_already_present(shared_nlp: Language) 
 
 
 def test_complete_job_skips_fallback_outcome_gate(shared_nlp: Language) -> None:
-    """Outcome gate only (not de-dupe): a COMPLETE job with existing output is returned untouched.
+    """Trade Desk shape (req>0, skills>0, tech=0) is NOT admitted by the complete-gap gate.
 
-    Trade Desk shape (skills=2). The fallback never runs for COMPLETE, so this checks the
-    NEEDS_HUMAN_REVIEW gate. Duplicate suppression is covered by the de-dupe tests below.
+    Requirements and skills are both present, so the gap rule (technologies empty AND
+    (requirements empty OR skills empty)) does not hold. The job comes back untouched.
+    Duplicate suppression is covered by the de-dupe tests below.
     """
+    normal_reqs = [{"text": "Must have 5+ years of Python experience", "confidence": 1.0}]
     normal_skills = [
         {"skill": "design systems", "confidence": 1.0},
         {"skill": "build pipelines", "confidence": 1.0},
@@ -307,6 +311,7 @@ def test_complete_job_skips_fallback_outcome_gate(shared_nlp: Language) -> None:
     job = _job(
         [_section(0, "Skills", "- Build pipelines\n- Python", [("skills", 0.55)])],
         outcome=ExtractionOutcome.COMPLETE,
+        requirements=normal_reqs,
         skills=normal_skills,
     )
     before = copy.deepcopy(job)
@@ -465,3 +470,134 @@ def test_min_section_confidence_lowering_recovers_below_default(shared_nlp: Lang
     assert not [s for s in default.skills if s.get("extraction_tier") == TIER1_TAG]
     assert _texts(lowered.skills, "skill") == ["build scalable data pipelines using spark"]
     assert all(s["extraction_tier"] == TIER1_TAG for s in lowered.skills)
+
+
+# ============================================================================
+# Complete-gap gate (Issue #757 B)
+# ============================================================================
+#
+# A COMPLETE job is admitted when technologies are empty AND (requirements are empty OR
+# skills are empty). Only Tier 2 runs on this path; requirements are never modified.
+
+
+def _complete_job(
+    *,
+    requirements: Optional[List[Dict[str, Any]]] = None,
+    skills: Optional[List[Dict[str, Any]]] = None,
+    technologies: Optional[List[Dict[str, Any]]] = None,
+) -> JobResult:
+    return _job(
+        [_section(0, "About the role", TAXONOMY_MD, [("description", 0.90)])],
+        outcome=ExtractionOutcome.COMPLETE,
+        requirements=requirements,
+        skills=skills,
+        technologies=technologies,
+    )
+
+
+NORMAL_REQ = {"text": "Must have 5+ years of Python experience", "confidence": 1.0}
+NORMAL_SKILL = {"skill": "lead platform teams", "confidence": 1.0}
+NORMAL_TECH = {"tech": "terraform", "confidence": 1.0}
+
+
+def test_complete_gap_req_present_runs_tier2_only(shared_nlp: Language, monkeypatch: pytest.MonkeyPatch) -> None:
+    """req>0, skills=0, tech=0: Tier 2 fills skills and technologies, Tier 1 is never invoked."""
+    tier1_calls: List[Any] = []
+    real_relaxed = fp._relaxed_section_pass
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        tier1_calls.append(args)
+        return real_relaxed(*args, **kwargs)
+
+    monkeypatch.setattr(fp, "_relaxed_section_pass", spy)
+    job = _complete_job(requirements=[dict(NORMAL_REQ)])
+    before_reqs = copy.deepcopy(job.requirements)
+
+    result = apply_fallback(job, TAXONOMY_MD, shared_nlp=shared_nlp)
+
+    assert tier1_calls == []
+    assert result.skills and all(s["extraction_tier"] == TIER2_TAG for s in result.skills)
+    assert result.technologies and all(t["extraction_tier"] == TIER2_TAG for t in result.technologies)
+    assert "python" in _texts(result.technologies, "tech")
+    assert result.requirements == before_reqs
+    assert result.extraction_outcome is ExtractionOutcome.PARTIAL_RECOVERY
+
+
+def test_complete_gap_skills_present_req_empty_fills_tech_only(
+    shared_nlp: Language, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """req=0, skills>0, tech=0: only technologies are needed, so skills are not refilled."""
+    tier1_calls: List[Any] = []
+    real_relaxed = fp._relaxed_section_pass
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        tier1_calls.append(args)
+        return real_relaxed(*args, **kwargs)
+
+    monkeypatch.setattr(fp, "_relaxed_section_pass", spy)
+    job = _complete_job(skills=[dict(NORMAL_SKILL)])
+
+    result = apply_fallback(job, TAXONOMY_MD, shared_nlp=shared_nlp)
+
+    assert tier1_calls == []
+    assert result.skills == [NORMAL_SKILL]
+    assert result.requirements == []
+    assert "python" in _texts(result.technologies, "tech")
+    assert all(t["extraction_tier"] == TIER2_TAG for t in result.technologies)
+    assert result.extraction_outcome is ExtractionOutcome.PARTIAL_RECOVERY
+
+
+def test_complete_gap_without_recoverable_text_stays_complete(shared_nlp: Language) -> None:
+    """Complete-gap shape but no taxonomy hits: nothing appended, outcome stays COMPLETE."""
+    md = "Welcome to the team. We value curiosity and kindness."
+    job = _job(
+        [_section(0, "Welcome", md, [("description", 0.90)])],
+        outcome=ExtractionOutcome.COMPLETE,
+        requirements=[dict(NORMAL_REQ)],
+    )
+    before = copy.deepcopy(job)
+
+    result = apply_fallback(job, md, shared_nlp=shared_nlp)
+
+    assert result == before
+    assert result.extraction_outcome is ExtractionOutcome.COMPLETE
+    assert result.skills == []
+    assert result.technologies == []
+
+
+def _install_taxonomy_spy(monkeypatch: pytest.MonkeyPatch, calls: List[Any]) -> None:
+    """Replace the taxonomy pass with a recorder that returns nothing, so any call is visible."""
+
+    def spy(*args: Any, **kwargs: Any) -> Dict[str, List[str]]:
+        calls.append(args)
+        return {"skills": [], "technologies": []}
+
+    monkeypatch.setattr(fp, "_taxonomy_pass", spy)
+
+
+def test_complete_with_technologies_present_is_untouched(shared_nlp: Language, monkeypatch: pytest.MonkeyPatch) -> None:
+    """COMPLETE with technologies present is not admitted, even when skills and requirements are empty."""
+    calls: List[Any] = []
+    _install_taxonomy_spy(monkeypatch, calls)
+    job = _complete_job(technologies=[dict(NORMAL_TECH)])
+    before = copy.deepcopy(job)
+
+    result = apply_fallback(job, TAXONOMY_MD, shared_nlp=shared_nlp)
+
+    assert calls == []
+    assert result == before
+
+
+def test_complete_with_all_categories_present_is_untouched(
+    shared_nlp: Language, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """COMPLETE with requirements, skills and technologies all present: untouched, no passes run."""
+    calls: List[Any] = []
+    _install_taxonomy_spy(monkeypatch, calls)
+    job = _complete_job(requirements=[dict(NORMAL_REQ)], skills=[dict(NORMAL_SKILL)], technologies=[dict(NORMAL_TECH)])
+    before = copy.deepcopy(job)
+
+    result = apply_fallback(job, TAXONOMY_MD, shared_nlp=shared_nlp)
+
+    assert calls == []
+    assert result == before
