@@ -612,12 +612,13 @@ def process_job(
         min_description_chars=min_description_chars,
     )
 
-    # Stage 9 (Issue #754): tier 1+2 fallback for NEEDS_HUMAN_REVIEW jobs (Issue #739).
-    # apply_fallback sets COMPLETE itself when it recovers entries; do not set it here.
+    # Stage 9 (Issue #754, #757 B): fallback for NEEDS_HUMAN_REVIEW jobs (tier 1+2) and for COMPLETE
+    # complete-gap jobs (tier 2 only). apply_fallback sets PARTIAL_RECOVERY itself when it recovers
+    # entries (zero recovery leaves the outcome unchanged); do not set the outcome here.
     # A fallback failure must not crash the job. It is logged, not recorded in result.errors
     # (has_errors() would turn the job into ERROR), and any partial appends are rolled back so
-    # the job keeps its pre-fallback NEEDS_HUMAN_REVIEW state, whatever stage of apply_fallback raised
-    # (apply_fallback sets COMPLETE before its final log line).
+    # the job keeps its pre-fallback outcome (NEEDS_HUMAN_REVIEW or COMPLETE), whatever stage of apply_fallback raised
+    # (apply_fallback sets PARTIAL_RECOVERY before its final log line).
     pre_fallback_outcome = result.extraction_outcome
     pre_fallback_lists = (list(result.requirements), list(result.skills), list(result.technologies))
     try:
