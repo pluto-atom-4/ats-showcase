@@ -731,3 +731,34 @@ def test_purge_orphaned_job_reviews_actual(purger):
     cursor.execute("SELECT COUNT(*) FROM job_reviews")
     after = cursor.fetchone()[0]
     assert after == 0
+
+
+def test_regenerate_null_job_ids_dedups_identical_title_company_location(purger):
+    """Characterization (#766): NULL-job_id rows sharing (title, company, location) collapse to one.
+
+    url=None is intentional: job_assessments has no url column, so the dedup key is
+    (title, company, location) by design. Current behavior only; no logic change.
+    """
+    from src.id_generation import generate_job_id
+
+    p, store, db_path = purger
+    conn = p.conn
+
+    for _ in range(2):
+        conn.execute(
+            "INSERT INTO job_assessments "
+            "(job_id, title, company, location, overall_score, tech_score, "
+            "seniority_score, location_score, recommendations, summary, tokens_used, actual_cost) "
+            "VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("Python Developer", "Acme", "Remote", 75, 80, 70, 60, "[]", "Test", 100, 0.01),
+        )
+    conn.commit()
+
+    count, ids = p.regenerate_null_job_ids(dry_run=False)
+    assert count == 2
+    assert ids == []
+
+    rows = conn.execute("SELECT job_id FROM job_assessments").fetchall()
+    assert len(rows) == 1
+    expected_id = generate_job_id(company="Acme", title="Python Developer", location="Remote", url=None)
+    assert rows[0][0] == expected_id

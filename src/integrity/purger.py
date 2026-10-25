@@ -429,6 +429,11 @@ class DataPurger:
         """Regenerate job_id for assessments with NULL job_id using title/company/location.
 
         First removes duplicate assessments (keeping first/best), then regenerates job_ids.
+
+        Intentional ``url=None``: only NULL-job_id rows are touched and job_assessments has
+        no url column, so (title, company, location) is the dedup key by design. Independent
+        of the #763 custom-portal jobId anchor, which applies to new crawls only. Manual
+        repair utility; dormant unless explicitly invoked (see #766).
         """
         try:
             cursor = self.conn.cursor()
