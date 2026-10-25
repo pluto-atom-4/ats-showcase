@@ -6,7 +6,8 @@ fallback patterns.
 
 import asyncio
 import json
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,6 +15,8 @@ import pytest
 from src.poc.tweak.crawl_details import (
     extract_description_from_detail_page,
     fetch_job_details,
+    fetch_worksource_job_via_api,
+    is_shell_content,
     selector_present,
 )
 
@@ -410,3 +413,379 @@ class TestGracefulDegradation:
         assert result["title"] == "QA Engineer"
         assert result["location"] == "Remote"
         assert result["extra_field"] == "custom_value"
+
+
+# ============================================================================
+# WORKSOURCE API INTERCEPT + SHELL DETECTION (Issue #765)
+# ============================================================================
+
+WS_JOB_URL = "https://worksource.my.site.com/worksourcewa/job-search?keyword=engineer&jobId=J988117"
+WS_DETAIL_URL = "https://worksource.my.site.com/worksourcewa/job-search/job-details?jobId=J988117"
+WS_API_URL = (
+    "https://worksource.my.site.com/webruntime/api/apex/execute"
+    "?language=en-US&asGuest=true&htmlEncode=false&classname=9f8e7d6c5b4a&method=ApexActionController.execute"
+)
+
+# Trimmed excerpts of the real captures (.playwright-mcp/worksource_shell_search.json = shell,
+# worksource_real_detail.json = real detail). Only the discriminating markers are kept.
+WS_SHELL_EXCERPT = (
+    '<div class="refine-your-job-container"><h2 class="refine-your-search-heading">Refine your search</h2>'
+    '<button class="refine-your-job-clear-button">Clear filters</button></div>'
+    '<h2 class="search-result">Viewing 1 - 20 of 476 jobs</h2>'
+)
+WS_REAL_EXCERPT = (
+    '<div class="common-jobdetails"><p class="wswa-h5"><span>Job ID:</span><span>J988117</span></p>'
+    "<p><strong>Pay:</strong>$198,000 - $246,000/year</p><button>Apply</button></div>"
+    "<div><h3>Job details</h3><p>Lead the platform team across three sites.</p></div>"
+)
+WS_API_DESCRIPTION = "<p>Lead the platform team across three sites.</p>"
+WS_DOM_DESCRIPTION = "<p>DOM read description text.</p>"
+
+
+def make_api_response(
+    *,
+    url: str = WS_API_URL,
+    method: str = "POST",
+    post_data: Optional[str] = None,
+    ok: bool = True,
+    status: int = 200,
+    payload: Any = None,
+    json_error: Optional[Exception] = None,
+) -> SimpleNamespace:
+    """Fake Playwright Response for an Apex getJobDetails call."""
+    if post_data is None:
+        post_data = json.dumps({"method": "getJobDetails", "params": {"jobId": "J988117"}})
+    if payload is None:
+        payload = {"returnValue": {"jobDescription": WS_API_DESCRIPTION}}
+    json_mock = AsyncMock(side_effect=json_error) if json_error else AsyncMock(return_value=payload)
+    return SimpleNamespace(
+        url=url,
+        ok=ok,
+        status=status,
+        request=SimpleNamespace(method=method, post_data=post_data),
+        json=json_mock,
+    )
+
+
+async def _return(value: Any) -> Any:
+    return value
+
+
+class _FakeExpectResponse:
+    """Stand-in for page.expect_response(): matches canned responses when the block exits."""
+
+    def __init__(self, predicate: Any, responses: List[Any], timeout: int) -> None:
+        self._predicate = predicate
+        self._responses = responses
+        self._timeout = timeout
+        self.value: Any = None
+
+    async def __aenter__(self) -> "_FakeExpectResponse":
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+        if exc_type is not None:
+            return False
+        matched = next((r for r in self._responses if self._predicate(r)), None)
+        if matched is None:
+            raise asyncio.TimeoutError(f"no matching response within {self._timeout}ms")
+        self.value = _return(matched)
+        return False
+
+
+def _captured_predicate(page: AsyncMock) -> Any:
+    """Return the predicate passed to page.expect_response() by the code under test."""
+    call = page.expect_response.call_args
+    assert call is not None
+    return call.args[0]
+
+
+def make_worksource_page(
+    api_responses: Optional[List[Any]] = None,
+    dom_description: Optional[str] = None,
+) -> AsyncMock:
+    """AsyncMock page wired for WorkSource: expect_response, goto, and an optional DOM description."""
+    page = AsyncMock()
+    responses = list(api_responses or [])
+    page.expect_response = MagicMock(
+        side_effect=lambda predicate, timeout: _FakeExpectResponse(predicate, responses, timeout)
+    )
+    page.goto = AsyncMock()
+    page.wait_for_selector = AsyncMock()
+    if dom_description is None:
+        page.query_selector = AsyncMock(return_value=None)
+    else:
+        elem = AsyncMock()
+        elem.evaluate = AsyncMock(return_value="div")
+        elem.inner_html = AsyncMock(return_value=dom_description)
+        page.query_selector = AsyncMock(return_value=elem)
+    return page
+
+
+WS_SELECTORS = {"description_selector": "div.job-description"}
+
+
+class TestIsShellContent:
+    """Shell detection: WorkSource search-list shell vs real detail page."""
+
+    def test_shell_excerpt_is_shell(self):
+        assert is_shell_content(WS_SHELL_EXCERPT) is True
+
+    def test_real_excerpt_is_not_shell(self):
+        assert is_shell_content(WS_REAL_EXCERPT) is False
+
+    def test_empty_string_is_shell(self):
+        assert is_shell_content("") is True
+
+    def test_whitespace_only_is_shell(self):
+        assert is_shell_content("   \n\t ") is True
+
+    def test_single_marker_is_not_enough(self):
+        """One marker alone (e.g. 'Clear filters' in prose) does not classify as shell."""
+        assert is_shell_content("<p>Use Clear filters to reset the form.</p>") is False
+
+    def test_plain_description_is_not_shell(self):
+        assert is_shell_content("<p>We are hiring a Python engineer.</p>") is False
+
+
+class TestFetchWorksourceJobViaApi:
+    """fetch_worksource_job_via_api(): intercept getJobDetails response."""
+
+    @pytest.mark.asyncio
+    async def test_success_returns_return_value(self):
+        response = make_api_response()
+        page = make_worksource_page(api_responses=[response])
+
+        result = await fetch_worksource_job_via_api(page, WS_JOB_URL, api_timeout_ms=10000)
+
+        assert result == {"jobDescription": WS_API_DESCRIPTION}
+        page.goto.assert_awaited_once_with(WS_JOB_URL, wait_until="commit")
+        call = page.expect_response.call_args
+        assert call is not None
+        assert call.kwargs == {"timeout": 10000}
+
+    @pytest.mark.asyncio
+    async def test_predicate_ignores_classname_hash(self):
+        """Predicate matches on path/method/body only; any build-specific classname hash matches."""
+        page = make_worksource_page(api_responses=[])
+        await fetch_worksource_job_via_api(page, WS_JOB_URL)
+        predicate = _captured_predicate(page)
+
+        other_build = make_api_response(
+            url=WS_API_URL.replace("9f8e7d6c5b4a", "0000deadbeef"),
+        )
+        assert predicate(other_build) is True
+        assert predicate(make_api_response()) is True
+
+    @pytest.mark.asyncio
+    async def test_predicate_rejects_wrong_method_path_or_body(self):
+        page = make_worksource_page(api_responses=[])
+        await fetch_worksource_job_via_api(page, WS_JOB_URL)
+        predicate = _captured_predicate(page)
+
+        assert predicate(make_api_response(method="GET")) is False
+        assert predicate(make_api_response(url="https://worksource.my.site.com/other/path")) is False
+        assert predicate(make_api_response(post_data=json.dumps({"method": "getOther"}))) is False
+        assert predicate(make_api_response(post_data="message=%7B%7D&aura.context=x")) is False
+
+    @pytest.mark.asyncio
+    async def test_timeout_returns_none(self):
+        page = make_worksource_page(api_responses=[])
+
+        result = await fetch_worksource_job_via_api(page, WS_JOB_URL, api_timeout_ms=50)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_non_ok_response_returns_none(self):
+        page = make_worksource_page(api_responses=[make_api_response(ok=False, status=500)])
+
+        assert await fetch_worksource_job_via_api(page, WS_JOB_URL) is None
+
+    @pytest.mark.asyncio
+    async def test_bad_json_returns_none(self):
+        page = make_worksource_page(api_responses=[make_api_response(json_error=ValueError("bad json"))])
+
+        assert await fetch_worksource_job_via_api(page, WS_JOB_URL) is None
+
+    @pytest.mark.asyncio
+    async def test_missing_return_value_returns_none(self):
+        page = make_worksource_page(api_responses=[make_api_response(payload={"unexpected": True})])
+
+        assert await fetch_worksource_job_via_api(page, WS_JOB_URL) is None
+
+    @pytest.mark.asyncio
+    async def test_navigation_error_returns_none(self):
+        page = make_worksource_page(api_responses=[])
+        page.goto = AsyncMock(side_effect=RuntimeError("net::ERR_ABORTED"))
+
+        assert await fetch_worksource_job_via_api(page, WS_JOB_URL) is None
+
+
+class TestWorksourceDescriptionFlow:
+    """extract_description_from_detail_page() for company_key == 'WorkSource'."""
+
+    @pytest.mark.asyncio
+    async def test_api_success_skips_dom(self):
+        page = make_worksource_page(
+            api_responses=[make_api_response()],
+            dom_description=WS_DOM_DESCRIPTION,
+        )
+
+        result = await extract_description_from_detail_page(page, WS_JOB_URL, WS_SELECTORS, company_key="WorkSource")
+
+        assert result == WS_API_DESCRIPTION
+        page.query_selector.assert_not_called()
+        page.wait_for_selector.assert_not_called()
+        assert page.goto.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_api_timeout_falls_back_to_dom(self):
+        page = make_worksource_page(api_responses=[], dom_description=WS_DOM_DESCRIPTION)
+
+        result = await extract_description_from_detail_page(
+            page, WS_JOB_URL, WS_SELECTORS, api_timeout_ms=50, company_key="WorkSource"
+        )
+
+        assert result == WS_DOM_DESCRIPTION
+        assert page.goto.await_count == 2
+        assert page.goto.await_args_list[1].args[0] == WS_DETAIL_URL
+
+    @pytest.mark.asyncio
+    async def test_api_shell_description_falls_back_to_dom(self):
+        page = make_worksource_page(
+            api_responses=[make_api_response(payload={"returnValue": {"jobDescription": WS_SHELL_EXCERPT}})],
+            dom_description=WS_DOM_DESCRIPTION,
+        )
+
+        result = await extract_description_from_detail_page(page, WS_JOB_URL, WS_SELECTORS, company_key="WorkSource")
+
+        assert result == WS_DOM_DESCRIPTION
+        assert page.goto.await_args_list[1].args[0] == WS_DETAIL_URL
+
+    @pytest.mark.asyncio
+    async def test_api_empty_description_falls_back_to_dom(self):
+        page = make_worksource_page(
+            api_responses=[make_api_response(payload={"returnValue": {"jobDescription": ""}})],
+            dom_description=WS_DOM_DESCRIPTION,
+        )
+
+        result = await extract_description_from_detail_page(page, WS_JOB_URL, WS_SELECTORS, company_key="WorkSource")
+
+        assert result == WS_DOM_DESCRIPTION
+
+    @pytest.mark.asyncio
+    async def test_fallback_without_job_id_uses_job_url_as_is(self):
+        url = "https://worksource.my.site.com/worksourcewa/job-search?keyword=engineer"
+        page = make_worksource_page(api_responses=[], dom_description=WS_DOM_DESCRIPTION)
+
+        result = await extract_description_from_detail_page(
+            page, url, WS_SELECTORS, api_timeout_ms=50, company_key="WorkSource"
+        )
+
+        assert result == WS_DOM_DESCRIPTION
+        assert page.goto.await_args_list[1].args[0] == url
+
+    @pytest.mark.asyncio
+    async def test_dom_fallback_shell_content_returns_none(self):
+        page = make_worksource_page(api_responses=[], dom_description=WS_SHELL_EXCERPT)
+
+        result = await extract_description_from_detail_page(
+            page, WS_JOB_URL, WS_SELECTORS, api_timeout_ms=50, company_key="WorkSource"
+        )
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_dom_fallback_navigation_error_returns_none(self):
+        page = make_worksource_page(api_responses=[], dom_description=WS_DOM_DESCRIPTION)
+        page.goto = AsyncMock(side_effect=[None, RuntimeError("net::ERR_ABORTED")])
+
+        result = await extract_description_from_detail_page(
+            page, WS_JOB_URL, WS_SELECTORS, api_timeout_ms=50, company_key="WorkSource"
+        )
+
+        assert result is None
+
+
+class TestNonWorksourceUnchanged:
+    """Regression: non-WorkSource extraction never touches the API path and keeps DOM behaviour."""
+
+    @pytest.mark.asyncio
+    async def test_real_content_returned_without_api_or_goto(self):
+        page = make_worksource_page(api_responses=[make_api_response()], dom_description=WS_REAL_EXCERPT)
+        page.expect_response = MagicMock()
+
+        for key in ("", "CarbonRobotics"):
+            result = await extract_description_from_detail_page(
+                page, "https://example.com/job", WS_SELECTORS, company_key=key
+            )
+            assert result == WS_REAL_EXCERPT
+
+        page.expect_response.assert_not_called()
+        page.goto.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_default_company_key_is_backward_compatible(self):
+        page = make_worksource_page(dom_description="<p>Direct DOM content</p>")
+
+        result = await extract_description_from_detail_page(page, "https://example.com/job", WS_SELECTORS)
+
+        assert result == "<p>Direct DOM content</p>"
+
+    @pytest.mark.asyncio
+    async def test_generic_shell_guard_returns_none_for_other_companies(self):
+        page = make_worksource_page(dom_description=WS_SHELL_EXCERPT)
+
+        result = await extract_description_from_detail_page(
+            page, "https://example.com/job", WS_SELECTORS, company_key="CarbonRobotics"
+        )
+
+        assert result is None
+
+
+class TestFetchJobDetailsWorksourceWiring:
+    """fetch_job_details() reads source_config and passes company_key through."""
+
+    @pytest.mark.asyncio
+    async def test_source_config_passed_as_company_key_and_selector_gate_bypassed(self):
+        job = {"url": WS_JOB_URL, "company": "WorkSource for Jobs", "title": "Eng", "source_config": "WorkSource"}
+        mock_browser = AsyncMock()
+        detail_page = AsyncMock()
+        detail_page.set_default_timeout = MagicMock()  # sync Playwright method
+        mock_browser.new_page = AsyncMock(return_value=detail_page)
+
+        with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock, return_value=True):
+            with patch("src.poc.tweak.crawl_details.selector_present", new_callable=AsyncMock, return_value=False):
+                with patch("src.poc.tweak.crawl_details.resolve_company_selectors", return_value=WS_SELECTORS):
+                    with patch(
+                        "src.poc.tweak.crawl_details.extract_description_from_detail_page",
+                        new_callable=AsyncMock,
+                        return_value=WS_API_DESCRIPTION,
+                    ) as mock_extract:
+                        result = await fetch_job_details(mock_browser, job, {})
+
+        assert result["description"] == WS_API_DESCRIPTION
+        assert mock_extract.await_count == 1
+        extract_call = mock_extract.await_args
+        assert extract_call is not None
+        assert extract_call.kwargs["company_key"] == "WorkSource"
+
+    @pytest.mark.asyncio
+    async def test_non_worksource_selector_gate_unchanged(self):
+        job = {"url": "https://example.com/job", "company": "Acme", "title": "Eng", "source_config": "Acme"}
+        mock_browser = AsyncMock()
+        detail_page = AsyncMock()
+        detail_page.set_default_timeout = MagicMock()  # sync Playwright method
+        mock_browser.new_page = AsyncMock(return_value=detail_page)
+
+        with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock, return_value=True):
+            with patch("src.poc.tweak.crawl_details.selector_present", new_callable=AsyncMock, return_value=False):
+                with patch("src.poc.tweak.crawl_details.resolve_company_selectors", return_value=WS_SELECTORS):
+                    with patch(
+                        "src.poc.tweak.crawl_details.extract_description_from_detail_page",
+                        new_callable=AsyncMock,
+                    ) as mock_extract:
+                        await fetch_job_details(mock_browser, job, {})
+
+        mock_extract.assert_not_awaited()
