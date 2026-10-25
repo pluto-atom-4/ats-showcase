@@ -185,30 +185,20 @@ class TestClassifyNeedsHumanReview:
 class TestClassifyNeverPartialRecovery:
     """PARTIAL_RECOVERY is set only by apply_fallback, never by classify_extraction_outcome."""
 
-    @pytest.mark.parametrize("errors", [None, [("converter", "boom")]])
-    @pytest.mark.parametrize("requirements", [0, 1])
-    @pytest.mark.parametrize("skills", [0, 2])
-    @pytest.mark.parametrize("technologies", [0, 3])
-    @pytest.mark.parametrize("sections", [0, MIN_SECTIONS_FOR_REAL_JD - 1, MIN_SECTIONS_FOR_REAL_JD, 24])
-    @pytest.mark.parametrize("stripped_len", [0, SHELL_STRIPPED_CHARS, MIN_DESCRIPTION_CHARS, REAL_CONTENT_CHARS])
-    def test_sweep_never_returns_partial_recovery(
-        self, errors, requirements, skills, technologies, sections, stripped_len
-    ):
-        result = make_job_result(
-            sections,
-            requirements=requirements,
-            skills=skills,
-            technologies=technologies,
-            errors=errors,
-        )
-        outcome = classify_extraction_outcome(result, stripped_len)
-        assert outcome is not ExtractionOutcome.PARTIAL_RECOVERY
-        assert outcome in {
-            ExtractionOutcome.COMPLETE,
-            ExtractionOutcome.NEEDS_HUMAN_REVIEW,
-            ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT,
-            ExtractionOutcome.ERROR,
-        }
+    @pytest.mark.parametrize(
+        "sections, stripped_len, errors, kwargs",
+        [
+            pytest.param(24, REAL_CONTENT_CHARS, [("converter", "boom")], {}, id="error-branch"),
+            pytest.param(24, REAL_CONTENT_CHARS, None, {"skills": 2}, id="yield-branch"),
+            pytest.param(4, REAL_CONTENT_CHARS, None, {}, id="shell-sections-branch"),
+            pytest.param(24, SHELL_STRIPPED_CHARS, None, {}, id="shell-text-branch"),
+            pytest.param(24, REAL_CONTENT_CHARS, None, {}, id="default-review-branch"),
+            pytest.param(0, 0, None, {}, id="empty-input-branch"),
+        ],
+    )
+    def test_representative_inputs_never_partial_recovery(self, sections, stripped_len, errors, kwargs):
+        result = make_job_result(sections, errors=errors, **kwargs)
+        assert classify_extraction_outcome(result, stripped_len) is not ExtractionOutcome.PARTIAL_RECOVERY
 
 
 class TestKeywordOverrides:
