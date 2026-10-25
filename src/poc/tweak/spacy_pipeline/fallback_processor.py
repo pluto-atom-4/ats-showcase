@@ -1,7 +1,9 @@
 """Merged Tier 1+2 fallback extraction for NEEDS_HUMAN_REVIEW jobs (Issue #739, Part of #735).
 
-Runs only when a job's ``extraction_outcome`` is ``NEEDS_HUMAN_REVIEW`` (no stage errors,
-zero extraction yield, real-looking input). Section-type gating at 0.70 is the dominant cause
+Runs when a job's ``extraction_outcome`` is ``NEEDS_HUMAN_REVIEW`` (no stage errors,
+zero extraction yield, real-looking input), or is ``COMPLETE`` with technologies empty and
+requirements or skills empty (complete-gap, Issue #757 B). Complete-gap jobs run sub-pass B
+only. Section-type gating at 0.70 is the dominant cause
 of zero yield on real content, so the fallback recovers output in two sub-passes:
 
 Sub-pass A (``tier1_relaxed_section``): re-runs the existing RequirementProcessor,
@@ -220,6 +222,15 @@ def _taxonomy_pass(
     return result
 
 
+def _is_complete_gap(job_result: "JobResult") -> bool:
+    """True for a COMPLETE job with no technologies and a missing requirements or skills list (#757 B)."""
+    return (
+        job_result.extraction_outcome is ExtractionOutcome.COMPLETE
+        and not job_result.technologies
+        and (not job_result.requirements or not job_result.skills)
+    )
+
+
 def apply_fallback(
     job_result: "JobResult",
     polished_markdown: str,
@@ -227,12 +238,17 @@ def apply_fallback(
     shared_nlp: Language,
     min_section_confidence: float = FALLBACK_MIN_SECTION_CONFIDENCE,
 ) -> "JobResult":
-    """Recover zero-yield extraction for a NEEDS_HUMAN_REVIEW job (Issue #739).
+    """Recover zero-yield extraction for NEEDS_HUMAN_REVIEW and complete-gap jobs (Issue #739, #757 B).
 
-    No-op unless ``job_result.extraction_outcome`` is ``NEEDS_HUMAN_REVIEW``. Mutates and
-    returns ``job_result``: recovered entries are appended to requirements/skills/technologies
-    with ``extraction_tier`` tags. When anything is recovered, ``extraction_outcome`` is set to
-    ``COMPLETE``; otherwise it is left as ``NEEDS_HUMAN_REVIEW``.
+    Two admitted shapes:
+      - ``NEEDS_HUMAN_REVIEW``: Tier 1 (relaxed sections) then Tier 2 (taxonomy).
+      - ``COMPLETE`` with empty technologies and empty requirements or skills (complete-gap):
+        Tier 2 only. Requirements are never modified.
+
+    All other outcomes, and COMPLETE jobs outside the gap shape, are returned untouched.
+    Mutates and returns ``job_result``: recovered entries are appended to
+    requirements/skills/technologies with ``extraction_tier`` tags. When anything is recovered,
+    ``extraction_outcome`` is set to ``PARTIAL_RECOVERY``; otherwise it is left unchanged.
 
     Args:
         job_result: Result of ``process_job`` for the job.
@@ -246,14 +262,16 @@ def apply_fallback(
     Returns:
         The same JobResult object, updated in place.
     """
-    if job_result.extraction_outcome is not ExtractionOutcome.NEEDS_HUMAN_REVIEW:
+    is_needs_review = job_result.extraction_outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW
+    if not is_needs_review and not _is_complete_gap(job_result):
         return job_result
 
-    relaxed = _relaxed_section_pass(job_result, shared_nlp, min_section_confidence)
     recovered = 0
-    recovered += _append_new(job_result.requirements, "text", relaxed["requirements"], TIER1_TAG)
-    recovered += _append_new(job_result.skills, "skill", relaxed["skills"], TIER1_TAG)
-    recovered += _append_new(job_result.technologies, "tech", relaxed["technologies"], TIER1_TAG)
+    if is_needs_review:
+        relaxed = _relaxed_section_pass(job_result, shared_nlp, min_section_confidence)
+        recovered += _append_new(job_result.requirements, "text", relaxed["requirements"], TIER1_TAG)
+        recovered += _append_new(job_result.skills, "skill", relaxed["skills"], TIER1_TAG)
+        recovered += _append_new(job_result.technologies, "tech", relaxed["technologies"], TIER1_TAG)
 
     taxonomy = _taxonomy_pass(
         polished_markdown,
@@ -267,7 +285,7 @@ def apply_fallback(
     )
 
     if recovered:
-        job_result.extraction_outcome = ExtractionOutcome.COMPLETE
+        job_result.extraction_outcome = ExtractionOutcome.PARTIAL_RECOVERY
     logger.info(f"Fallback for job {job_result.job_id}: recovered {recovered} entries")
     return job_result
 
