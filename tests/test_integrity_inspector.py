@@ -617,3 +617,166 @@ def test_check_job_reviews_anomalies_orphaned_id(checker):
     assert len(issues) == 1
     assert issues[0].issue_type == "orphaned_job_review"
     assert "not in job_assessments" in issues[0].details
+
+
+# ============================================================================
+# Duplicate inspection (issue #786): read-only scans
+# ============================================================================
+
+
+def _write_json(path, payload):
+    """Write JSON payload (or raw string) to path, creating parent dirs."""
+    import json
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(payload, str):
+        path.write_text(payload, encoding="utf-8")
+    else:
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _fresh_checker(tmp_path):
+    """Return IntegrityChecker on a fresh tmp DB (schema created by AssessmentStore)."""
+    return IntegrityChecker(str(tmp_path / "inspect.db"))
+
+
+def _insert_assessment(conn, job_id):
+    """Insert minimal job_assessments row (no PK-dependent logic)."""
+    conn.execute(
+        "INSERT INTO job_assessments (job_id, overall_score, tech_score, seniority_score,"
+        " location_score, recommendations, summary) VALUES (?, 50, 50, 50, 50, '[]', 's')",
+        (job_id,),
+    )
+
+
+def test_scan_json_same_id_different_url_flagged(tmp_path):
+    """Same id with >1 distinct url -> exactly one duplicate_id_json warning."""
+    json_dir = tmp_path / "work"
+    _write_json(
+        json_dir / "acme_jobs.json",
+        [
+            {"id": "abc123", "url": "https://x.example/jobs/1"},
+            {"id": "abc123", "url": "https://x.example/jobs/2"},
+            {"id": "other", "url": "https://x.example/jobs/3"},
+        ],
+    )
+    checker = _fresh_checker(tmp_path)
+
+    issues = checker.scan_json_duplicate_ids(json_dir=str(json_dir))
+
+    assert len(issues) == 1
+    issue = issues[0]
+    assert issue.issue_type == "duplicate_id_json"
+    assert issue.severity == "warning"
+    assert issue.table == "acme_jobs.json"
+    assert issue.record_id == "abc123"
+    assert "2 rows share id 'abc123' across 2 distinct URLs" in issue.details
+    assert "Manual review" in issue.suggested_action
+
+
+def test_scan_json_same_id_same_url_not_flagged(tmp_path):
+    """Exact re-export duplicates (same id AND url) are out of scope -> no issue."""
+    json_dir = tmp_path / "work"
+    _write_json(
+        json_dir / "dupes_jobs.json",
+        {
+            "jobs": [
+                {"id": "same", "url": "https://x.example/jobs/9"},
+                {"id": "same", "url": "https://x.example/jobs/9"},
+            ]
+        },
+    )
+    checker = _fresh_checker(tmp_path)
+
+    assert checker.scan_json_duplicate_ids(json_dir=str(json_dir)) == []
+
+
+def test_scan_json_malformed_and_non_job_files_skipped(tmp_path):
+    """Malformed JSON and non-job shapes are skipped; scan still finds valid dupes."""
+    json_dir = tmp_path / "work"
+    _write_json(json_dir / "broken.json", "{not valid json")
+    _write_json(json_dir / "scalar.json", 42)
+    _write_json(json_dir / "unrelated.json", {"settings": {"depth": 3}})
+    _write_json(json_dir / "no_ids.json", [{"job_id": "x", "score": 1}, "string-row"])
+    _write_json(
+        json_dir / "good_jobs.json",
+        [
+            {"id": "d1", "url": "https://x.example/a"},
+            {"id": "d1", "url": "https://x.example/b"},
+        ],
+    )
+    checker = _fresh_checker(tmp_path)
+
+    issues = checker.scan_json_duplicate_ids(json_dir=str(json_dir))
+
+    assert len(issues) == 1
+    assert issues[0].table == "good_jobs.json"
+    assert issues[0].record_id == "d1"
+
+
+def test_scan_db_duplicate_custom_job_id_flagged(tmp_path):
+    """Duplicate custom:% job_id -> duplicate_id_db warning; singles -> custom_portal_row info.
+
+    job_id is PRIMARY KEY in the real schema, so duplicates cannot be seeded there.
+    This test recreates job_assessments WITHOUT the PK constraint
+    (same columns, empty copy) to simulate legacy rows that predate the PK.
+    job_reviews is not created by AssessmentStore, so it is absent here and
+    exercises the missing-table path.
+    """
+    checker = _fresh_checker(tmp_path)
+    conn = checker.conn
+    conn.execute("CREATE TABLE job_assessments_nopk AS SELECT * FROM job_assessments WHERE 0")
+    conn.execute("DROP TABLE job_assessments")
+    conn.execute("ALTER TABLE job_assessments_nopk RENAME TO job_assessments")
+    _insert_assessment(conn, "custom:dup")
+    _insert_assessment(conn, "custom:dup")
+    _insert_assessment(conn, "custom:solo")
+    conn.commit()
+
+    issues = checker.scan_db_custom_portal_rows()
+
+    dup = [i for i in issues if i.issue_type == "duplicate_id_db"]
+    solo = [i for i in issues if i.issue_type == "custom_portal_row"]
+    assert len(dup) == 1
+    assert dup[0].severity == "warning"
+    assert dup[0].record_id == "custom:dup"
+    assert len(solo) == 1
+    assert solo[0].severity == "info"
+    assert solo[0].record_id == "custom:solo"
+
+
+def test_scan_db_empty_or_missing_tables_returns_empty(tmp_path):
+    """Empty DB and missing tables must not raise; both scans return []."""
+    checker = _fresh_checker(tmp_path)
+    assert checker.scan_db_custom_portal_rows() == []
+
+    checker.conn.execute("DROP TABLE job_assessments")
+    checker.conn.commit()
+    assert checker.scan_db_custom_portal_rows() == []
+
+    empty_dir = tmp_path / "no_json"
+    empty_dir.mkdir()
+    assert checker.scan_json_duplicate_ids(json_dir=str(empty_dir)) == []
+
+
+def test_run_duplicate_inspection_composes_both_scans(tmp_path):
+    """run_duplicate_inspection returns report with total_checks=2 and both scans' issues."""
+    json_dir = tmp_path / "work"
+    _write_json(
+        json_dir / "x_jobs.json",
+        [
+            {"id": "k", "url": "https://x.example/1"},
+            {"id": "k", "url": "https://x.example/2"},
+        ],
+    )
+    checker = _fresh_checker(tmp_path)
+    _insert_assessment(checker.conn, "custom:one")
+    checker.conn.commit()
+
+    report = checker.run_duplicate_inspection(json_dir=str(json_dir))
+
+    assert isinstance(report, IntegrityReport)
+    assert report.total_checks == 2
+    types = {i.issue_type for i in report.issues_found}
+    assert types == {"duplicate_id_json", "custom_portal_row"}
+    assert report.summary_by_type["duplicate_id_json"] == 1

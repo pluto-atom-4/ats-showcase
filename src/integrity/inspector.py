@@ -4,7 +4,8 @@ import json
 import logging
 import sqlite3
 from datetime import datetime
-from typing import List, cast
+from pathlib import Path
+from typing import Any, Dict, List, cast
 
 from src.integrity.models import IntegrityIssue, IntegrityReport
 from src.storage.assessment_store import AssessmentStore
@@ -523,3 +524,148 @@ class IntegrityChecker:
             recommendations.append("resolve_duplicate_assessments (manual review required)")
 
         return recommendations
+
+    # ------------------------------------------------------------------
+    # Duplicate inspection (issue #786): read-only, advisory only
+    # ------------------------------------------------------------------
+
+    _JOB_LIST_KEYS = ("jobs", "items", "results", "data")
+
+    @classmethod
+    def _extract_job_records(cls, payload: Any) -> List[Dict[str, Any]]:
+        """Return dict rows from a job-list payload (list, or dict holding a job-list key).
+
+        Non-job shapes return [] so the caller skips them silently.
+        """
+        if isinstance(payload, list):
+            rows = payload
+        elif isinstance(payload, dict):
+            rows = next((payload[key] for key in cls._JOB_LIST_KEYS if isinstance(payload.get(key), list)), [])
+        else:
+            return []
+        return [row for row in rows if isinstance(row, dict)]
+
+    def scan_json_duplicate_ids(self, json_dir: str = "data/work", pattern: str = "*.json") -> List[IntegrityIssue]:
+        """Flag ids that map to more than one distinct url within a single JSON file.
+
+        Exact re-export duplicates (same id AND same url) are out of scope and emit nothing.
+        """
+        issues: List[IntegrityIssue] = []
+        try:
+            paths = sorted(Path(json_dir).glob(pattern))
+        except (OSError, ValueError) as e:
+            logger.error(f"Error listing JSON files in {json_dir}: {e}")
+            return issues
+
+        for path in paths:
+            if not path.is_file():
+                continue
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError, KeyError, TypeError, OSError) as e:
+                logger.warning(f"Skipping unreadable JSON file {path.name}: {e}")
+                continue
+
+            rows_by_id: Dict[str, List[str]] = {}
+            for record in self._extract_job_records(payload):
+                record_id = record.get("id")
+                if not isinstance(record_id, str) or not record_id:
+                    continue
+                rows_by_id.setdefault(record_id, []).append(str(record.get("url")))
+
+            for record_id in sorted(rows_by_id):
+                row_urls = rows_by_id[record_id]
+                distinct_urls = sorted(set(row_urls))
+                if len(distinct_urls) <= 1:
+                    continue
+                issues.append(
+                    IntegrityIssue(
+                        issue_type="duplicate_id_json",
+                        severity="warning",
+                        table=path.name,
+                        record_id=record_id,
+                        details=(
+                            f"{len(row_urls)} rows share id '{record_id}' across "
+                            f"{len(distinct_urls)} distinct URLs: {distinct_urls}"
+                        ),
+                        suggested_action=(
+                            "Manual review: re-crawl affected URLs to get distinct ids under the post-#774 anchor, "
+                            "then purge stale rows."
+                        ),
+                    )
+                )
+
+        logger.info(f"Found {len(issues)} duplicate ids across JSON files in {json_dir}")
+        return issues
+
+    def scan_db_custom_portal_rows(self) -> List[IntegrityIssue]:
+        """Report custom:% job_id rows: duplicates as warning, singles as advisory info.
+
+        Missing tables are skipped; any error logs and returns [].
+        """
+        issues: List[IntegrityIssue] = []
+        try:
+            cursor = self.conn.cursor()
+            for table in ("job_assessments", "job_reviews"):
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
+                if not cursor.fetchone():
+                    continue
+                cursor.execute(
+                    f"""
+                    SELECT job_id, COUNT(*) AS cnt
+                    FROM {table}
+                    WHERE job_id LIKE 'custom:%'
+                    GROUP BY job_id
+                    """
+                )
+                for job_id, count in cursor.fetchall():
+                    if count > 1:
+                        issues.append(
+                            IntegrityIssue(
+                                issue_type="duplicate_id_db",
+                                severity="warning",
+                                table=table,
+                                record_id=job_id,
+                                details=f"{count} rows share custom job_id '{job_id}' in {table}",
+                                suggested_action="Manual review: re-crawl affected URLs, then purge stale rows",
+                            )
+                        )
+                    else:
+                        issues.append(
+                            IntegrityIssue(
+                                issue_type="custom_portal_row",
+                                severity="info",
+                                table=table,
+                                record_id=job_id,
+                                details=f"Custom-portal job_id '{job_id}' present in {table}",
+                                suggested_action="Advisory only: no action required",
+                            )
+                        )
+            logger.info(f"Found {len(issues)} custom-portal DB issues")
+        except Exception as e:
+            logger.error(f"Error scanning custom-portal rows: {e}")
+            return []
+
+        return issues
+
+    def run_duplicate_inspection(self, json_dir: str = "data/work", pattern: str = "*.json") -> IntegrityReport:
+        """Run read-only duplicate inspection (JSON + DB) and return aggregated report."""
+        logger.info("Starting duplicate inspection")
+        self.issues = []
+        self.issues.extend(self.scan_json_duplicate_ids(json_dir=json_dir, pattern=pattern))
+        self.issues.extend(self.scan_db_custom_portal_rows())
+
+        summary_by_type: dict[str, int] = {}
+        for issue in self.issues:
+            summary_by_type[issue.issue_type] = summary_by_type.get(issue.issue_type, 0) + 1
+
+        affected_records = len({issue.record_id for issue in self.issues})
+
+        return IntegrityReport(
+            timestamp=datetime.utcnow(),
+            total_checks=2,
+            issues_found=self.issues,
+            summary_by_type=summary_by_type,
+            total_records_affected=affected_records,
+            purge_recommendations=[],
+        )
