@@ -280,21 +280,34 @@ class TestIdGeneration:
 
     def test_greenhouse_portal_id_in_hash(self):
         """Greenhouse portal ID is extracted and used in hash."""
-        # Two different URLs with same gh_jid should have same ID
-        id1 = generate_job_id(
+        # Same gh_jid on different hosts -> same ID (portal ID is the anchor).
+        same_1 = generate_job_id(
             company="Company",
             title="Engineer",
             location="Remote",
             url="https://company.com/jobs?gh_jid=12345678",
         )
-        id2 = generate_job_id(
+        same_2 = generate_job_id(
             company="Company",
             title="Engineer",
             location="Remote",
             url="https://greenhouse.io/jobs?gh_jid=12345678",
         )
-        # Should be same because portal ID is the anchor
-        assert id1 == id2
+        assert same_1 == same_2
+        # Different gh_jid on the same company/title/location -> different IDs.
+        diff_1 = generate_job_id(
+            company="Company",
+            title="Engineer",
+            location="Remote",
+            url="https://company.com/jobs?gh_jid=11111111",
+        )
+        diff_2 = generate_job_id(
+            company="Company",
+            title="Engineer",
+            location="Remote",
+            url="https://company.com/jobs?gh_jid=22222222",
+        )
+        assert diff_1 != diff_2
 
     def test_generate_job_id_distinct_for_worksource_search_urls(self):
         """WorkSource search URLs differing only by jobId get distinct ids (#736/#763)."""
@@ -405,3 +418,30 @@ class TestCustomPortalJobIdAnchor:
         )
         assert p1 == p2
         assert p1.startswith("custom_ats:")
+
+
+class TestAnchorOverwrite768:
+    """Extracted portal id must survive the anchor chain (#768)."""
+
+    @staticmethod
+    def _gen(url, company="Acme", title="Engineer", location="Remote"):
+        return generate_job_id(company=company, title=title, location=location, url=url)
+
+    def test_digit_path_id_distinct_ids_distinct(self):
+        """Same company/title/location, different 8-15 digit path id -> different ids."""
+        id1 = self._gen("https://acme.wd1.myworkdayjobs.com/job/12345678")
+        id2 = self._gen("https://acme.wd1.myworkdayjobs.com/job/87654321")
+        assert id1 != id2
+
+    def test_custom_portal_digit_path_anchors_on_digit_id(self):
+        """Custom portal, digit path, no jobId: anchor is the digit id (behavior change)."""
+        id1 = self._gen("https://example.com/jobs/12345678")
+        id2 = self._gen("https://example.com/jobs/87654321")
+        assert id1 != id2
+        # Anchor is the extracted digit id, not the normalized company.
+        assert id1 != generate_job_id(company="Acme", title="Engineer", location="Remote", url=None)
+
+    def test_url_none_uses_company_anchor(self):
+        """url=None keeps norm_company anchor (unchanged)."""
+        assert self._gen(None) == generate_job_id(company="Acme", title="Engineer", location="Remote", url=None)
+        assert self._gen(None).startswith("custom:")
