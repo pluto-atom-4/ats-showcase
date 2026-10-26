@@ -3505,6 +3505,103 @@ def check(
         raise typer.Exit(1) from None
 
 
+@integrity_app.command(name="inspect-duplicates")
+def inspect_duplicates(
+    json_dir: str = typer.Option(
+        "data/work",
+        "--json-dir",
+        help="Directory containing crawled job JSON files",
+    ),
+    json_pattern: str = typer.Option(
+        "*.json",
+        "--json-pattern",
+        help="Glob pattern for JSON files inside --json-dir",
+    ),
+    db_path: str = typer.Option(
+        "data/ats_playground.db",
+        "--db",
+        help="Path to assessment database",
+    ),
+    format: str = typer.Option(
+        "markdown",
+        "--format",
+        "-f",
+        help="Report format: markdown or json",
+    ),
+    output: Optional[str] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Save report to file (default: display to stdout)",
+    ),
+) -> None:
+    """Read-only scan for duplicate job ids (JSON files and DB custom-portal rows).
+
+    Never modifies data. Exits 0 on success regardless of findings.
+
+    Examples:
+        uv run python -m src.cli integrity inspect-duplicates
+        uv run python -m src.cli integrity inspect-duplicates --json-dir data/work --format json
+    """
+    if format not in ("markdown", "json"):
+        typer.echo(f"❌ Unknown format: {format} (use markdown or json)", err=True)
+        raise typer.Exit(1)
+
+    try:
+        if format != "json":
+            typer.echo("🔍 Running duplicate inspection...")
+
+        checker = IntegrityChecker(db_path)
+        report = checker.run_duplicate_inspection(json_dir=json_dir, pattern=json_pattern)
+
+        if format == "json":
+            output_data = {
+                "timestamp": report.timestamp.isoformat(),
+                "total_checks": report.total_checks,
+                "total_issues": len(report.issues_found),
+                "records_affected": report.total_records_affected,
+                "summary": report.summary_by_type,
+                "issues": [
+                    {
+                        "type": issue.issue_type,
+                        "severity": issue.severity,
+                        "table": issue.table,
+                        "record_id": issue.record_id,
+                        "details": issue.details,
+                        "action": issue.suggested_action,
+                    }
+                    for issue in report.issues_found
+                ],
+                "recommendations": report.purge_recommendations,
+            }
+            output_text = json.dumps(output_data, indent=2, default=str)
+        else:
+            output_text = _generate_duplicate_inspection_markdown(report)
+
+        if output:
+            output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(output_text, encoding="utf-8")
+            typer.echo(f"✅ Report saved to {output}")
+        else:
+            typer.echo(output_text)
+
+        if format != "json":
+            typer.echo("")
+            typer.echo("📊 Scan Results:")
+            typer.echo(f"   Total issues: {len(report.issues_found)}")
+            typer.echo(f"   Records affected: {report.total_records_affected}")
+            typer.echo(f"   Errors: {report.error_count}")
+            typer.echo(f"   Warnings: {report.warning_count}")
+
+        logger.info(f"Duplicate inspection complete: {len(report.issues_found)} issues found")
+
+    except Exception as e:
+        logger.error(f"Duplicate inspection failed: {e}", exc_info=True)
+        typer.echo(f"❌ Inspection failed: {e}", err=True)
+        raise typer.Exit(1) from None
+
+
 # ============================================================================
 # INTEGRITY PURGE HELPERS
 # ============================================================================
@@ -3802,6 +3899,36 @@ def _generate_integrity_markdown(report: Any) -> str:
         for rec in report.purge_recommendations:
             lines.append(f"- {rec}")
 
+    return "\n".join(lines)
+
+
+def _duplicate_issue_lines(issues: List[Any]) -> List[str]:
+    """Render issues as markdown bullets, or a placeholder when empty."""
+    if not issues:
+        return ["No issues found."]
+    lines: List[str] = []
+    for issue in issues:
+        lines.append(
+            f"- **{issue.issue_type}** ({issue.severity}) `{issue.table}` id `{issue.record_id}`: {issue.details}"
+        )
+        lines.append(f"  - Action: {issue.suggested_action}")
+    return lines
+
+
+def _generate_duplicate_inspection_markdown(report: Any) -> str:
+    """Generate markdown for inspect-duplicates, split by scan section."""
+    json_issues = [i for i in report.issues_found if i.issue_type == "duplicate_id_json"]
+    db_issues = [i for i in report.issues_found if i.issue_type in ("duplicate_id_db", "custom_portal_row")]
+    lines = [
+        "# Duplicate Inspection Report",
+        f"Generated: {report.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        "",
+        "## JSON duplicate-id scan",
+        *_duplicate_issue_lines(json_issues),
+        "",
+        "## DB custom-portal rows",
+        *_duplicate_issue_lines(db_issues),
+    ]
     return "\n".join(lines)
 
 
