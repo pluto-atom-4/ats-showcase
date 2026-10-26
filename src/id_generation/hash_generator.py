@@ -72,15 +72,11 @@ def generate_job_id(
     # Anchor priority (#768): custom jobId > extracted portal id > cleaned URL > company
     if custom_anchor is not None:
         anchor = custom_anchor
-    elif anchor:
-        pass  # keep extracted portal id (gh_jid or 8-15 digit path id)
-    elif url:
+    elif not anchor:
         from src.id_generation.url_utils import clean_canonical_url
 
-        anchor = clean_canonical_url(url)
-    else:
         # Fallback if no URL provided
-        anchor = norm_company
+        anchor = clean_canonical_url(url) if url else norm_company
 
     # Create payload for hashing
     payload = f"{norm_company}|{norm_title}|{norm_location}|{anchor}"

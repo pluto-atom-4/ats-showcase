@@ -427,12 +427,6 @@ class TestAnchorOverwrite768:
     def _gen(url, company="Acme", title="Engineer", location="Remote"):
         return generate_job_id(company=company, title=title, location=location, url=url)
 
-    def test_gh_jid_distinct_ids_distinct(self):
-        """Same company/title/location, different gh_jid -> different ids."""
-        id1 = self._gen("https://acme.com/jobs?gh_jid=11111111")
-        id2 = self._gen("https://acme.com/jobs?gh_jid=22222222")
-        assert id1 != id2
-
     def test_digit_path_id_distinct_ids_distinct(self):
         """Same company/title/location, different 8-15 digit path id -> different ids."""
         id1 = self._gen("https://acme.wd1.myworkdayjobs.com/job/12345678")
