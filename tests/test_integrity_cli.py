@@ -229,3 +229,61 @@ def test_integrity_repair_requires_force(test_db):
     result = runner.invoke(app, ["integrity", "repair", "--no-dry-run", "--db", test_db])
     # Should still work with no repairs, or fail if force required
     assert result.exit_code in [0, 1]
+
+
+def _write_dupe_fixture(json_dir: Path) -> None:
+    """Write synthetic work JSON with one same-id/different-url pair."""
+    json_dir.mkdir(parents=True, exist_ok=True)
+    rows = [
+        {"id": "dup1", "url": "https://x.example/jobs/1"},
+        {"id": "dup1", "url": "https://x.example/jobs/2"},
+    ]
+    (json_dir / "synthetic_jobs.json").write_text(json.dumps(rows), encoding="utf-8")
+
+
+def test_integrity_inspect_duplicates_markdown(tmp_path):
+    """inspect-duplicates exits 0 and prints both section headers plus summary."""
+    json_dir = tmp_path / "work"
+    _write_dupe_fixture(json_dir)
+    db_path = str(tmp_path / "empty.db")
+    _create_test_db(db_path)
+
+    result = runner.invoke(
+        app,
+        ["integrity", "inspect-duplicates", "--json-dir", str(json_dir), "--db", db_path],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "JSON duplicate-id scan" in result.stdout
+    assert "DB custom-portal rows" in result.stdout
+    assert "Total issues" in result.stdout
+    assert "duplicate_id_json" in result.stdout
+
+
+def test_integrity_inspect_duplicates_json_format(tmp_path):
+    """--format json emits parseable JSON with the same shape as `check --format json`."""
+    json_dir = tmp_path / "work"
+    _write_dupe_fixture(json_dir)
+    db_path = str(tmp_path / "empty.db")
+    _create_test_db(db_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "integrity",
+            "inspect-duplicates",
+            "--json-dir",
+            str(json_dir),
+            "--db",
+            db_path,
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    data = json.loads(result.stdout)
+    assert data["total_checks"] == 2
+    assert data["total_issues"] == 1
+    assert data["issues"][0]["type"] == "duplicate_id_json"
+    assert set(data) >= {"timestamp", "summary", "issues", "recommendations", "records_affected"}
