@@ -718,15 +718,16 @@ def test_scan_db_duplicate_custom_job_id_flagged(tmp_path):
     """Duplicate custom:% job_id -> duplicate_id_db warning; singles -> custom_portal_row info.
 
     job_id is PRIMARY KEY in the real schema, so duplicates cannot be seeded there.
-    This test recreates job_assessments and job_reviews WITHOUT the PK constraint
+    This test recreates job_assessments WITHOUT the PK constraint
     (same columns, empty copy) to simulate legacy rows that predate the PK.
+    job_reviews is not created by AssessmentStore, so it is absent here and
+    exercises the missing-table path.
     """
     checker = _fresh_checker(tmp_path)
     conn = checker.conn
-    for table in ("job_assessments", "job_reviews"):
-        conn.execute(f"CREATE TABLE {table}_nopk AS SELECT * FROM {table} WHERE 0")
-        conn.execute(f"DROP TABLE {table}")
-        conn.execute(f"ALTER TABLE {table}_nopk RENAME TO {table}")
+    conn.execute("CREATE TABLE job_assessments_nopk AS SELECT * FROM job_assessments WHERE 0")
+    conn.execute("DROP TABLE job_assessments")
+    conn.execute("ALTER TABLE job_assessments_nopk RENAME TO job_assessments")
     _insert_assessment(conn, "custom:dup")
     _insert_assessment(conn, "custom:dup")
     _insert_assessment(conn, "custom:solo")
@@ -750,7 +751,6 @@ def test_scan_db_empty_or_missing_tables_returns_empty(tmp_path):
     assert checker.scan_db_custom_portal_rows() == []
 
     checker.conn.execute("DROP TABLE job_assessments")
-    checker.conn.execute("DROP TABLE job_reviews")
     checker.conn.commit()
     assert checker.scan_db_custom_portal_rows() == []
 
