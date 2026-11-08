@@ -27,3 +27,10 @@ One line per finding, prefixed with exactly one of:
 
 ## LOOP CONTROL
 The orchestrator passes `iteration: N` (starting at 1) with each handoff. If validation fails, return brief actionable directives to `cavecrew-builder` and increment N. At N = 4 without convergence, stop and escalate to the human session with a final summary of open findings.
+
+## COMMENT CHECK
+Also report comment bloat in the diff as `ℹ️ Info`. Keep only WHY, WHY-NOT, HOW-TO-USE, or hazard comments.
+- Flag: comments that narrate or restate code, repeat signatures or type hints, banner dividers, commented-out code, change history, blocks over 3 lines.
+- Flag: docstrings on private functions, and `Args:`/`Returns:` that only repeat names or type hints.
+- Flag: new comments on code the diff did not otherwise change.
+- Fix text: "delete" or a one-line WHY rewrite. Deleting a flagged comment is in scope for a cleanup diff and is never `⚠️ Warning` scope creep.
