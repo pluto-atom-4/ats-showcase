@@ -185,23 +185,5 @@
   "costControls": {
     "dailyTokenLimit": 2000000,
     "autoFailover": true
-  },
-  "mcpServers": {
-    "playwright": {
-      "type": "local",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@playwright/mcp@latest"
-      ],
-      "env": {
-        "NODE_ENV": "production"
-      }
-    },
-    "graphify": {
-      "type": "stdio",
-      "command": "graphify-mcp",
-      "args": []
-    }
   }
 }
