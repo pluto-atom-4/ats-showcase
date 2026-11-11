@@ -100,10 +100,11 @@ def test_comment_only_untouched_blank_lines_preserved():
     assert strip(src) == src
 
 
-def test_ast_equal_ignores_docstrings():
-    a = 'def f():\n    """doc one"""\n    return 1\n'
-    b = 'def f():\n    """doc one"""\n    return 1\n'
-    assert sc.ast_equal(a, b)
+def test_ast_equal_detects_code_and_docstring_changes():
+    doc = 'def f():\n    """doc one"""\n    return 1\n'
+    assert sc.ast_equal(doc, doc)
+    assert not sc.ast_equal(doc, doc.replace("doc one", "doc two"))
+    assert not sc.ast_equal(doc, doc.replace("return 1", "return 2"))
     assert not sc.ast_equal("x = 1\n", "x = 2\n")
 
 
@@ -228,6 +229,43 @@ def test_write_error_recorded(tmp_path, monkeypatch):
 
     monkeypatch.setattr(sc.os, "replace", fail)
     report = sc.run([f], apply=True)
-    assert report["files"][0]["ast_ok"] is False
+    assert report["files"][0]["write_failed"] is True
+    assert report["files"][0]["ast_ok"] is True
     assert f.read_text() == "# note\nx = 1\n"
     assert not list(tmp_path.glob(".*strip-tmp"))
+
+
+def test_prose_not_mistaken_for_directive():
+    assert strip("# pragmatic approach\nx = 1\n") == "x = 1\n"
+    assert strip("# Type: job title\nx = 1\n") == "x = 1\n"
+    assert strip("# see noqa docs\nx = 1\n") == "x = 1\n"
+
+
+def test_header_word_boundary_and_full_line_only():
+    assert strip("# licensed stuff\nx = 1\n") == "x = 1\n"
+    assert strip("x = 1  # copyright\n") == "x = 1\n"
+
+
+def test_write_failure_exit_code(tmp_path, monkeypatch, capsys):
+    f = tmp_path / "m.py"
+    f.write_text("# note\nx = 1\n")
+    monkeypatch.setattr(sc.os, "replace", lambda *a, **k: (_ for _ in ()).throw(OSError("x")))
+    assert sc.main([str(f), "--apply"]) == 1
+    assert "write_failed" in capsys.readouterr().err
+
+
+def test_recursion_error_skips_file_and_continues(tmp_path, monkeypatch):
+    bad, good = tmp_path / "a.py", tmp_path / "b.py"
+    bad.write_text("x = 1\n")
+    good.write_text("# note\ny = 1\n")
+    real = sc.process_source
+
+    def maybe(src):
+        if src == "x = 1\n":
+            raise RecursionError
+        return real(src)
+
+    monkeypatch.setattr(sc, "process_source", maybe)
+    report = sc.run([bad, good], apply=True)
+    assert good.read_text() == "y = 1\n"
+    assert report["files"][0]["ast_ok"] is False

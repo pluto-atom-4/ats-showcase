@@ -17,12 +17,11 @@ from typing import Any
 MAX_KEPT_BLOCK = 3
 
 DIRECTIVE_RE = re.compile(
-    r"\b(?:noqa|type:|pragma|fmt:\s*(?:on|off|skip)"
+    r"(?:^|#)\s*(?:type:|(?i:noqa(?=[:\s\[]|$)|pragma(?=[:\s\[]|$)|fmt:\s*(?:on|off|skip)"
     r"|isort:\s*(?:skip|split|on|off)|mypy:|pylint:|pyright:|pyre-ignore|pyre-fixme"
-    r"|nosec|noinspection|codespell:\s*ignore)",
-    re.IGNORECASE,
+    r"|nosec|noinspection|codespell:\s*ignore))"
 )
-HEADER_RE = re.compile(r"\b(?:spdx|copyright|license)", re.IGNORECASE)
+HEADER_RE = re.compile(r"\b(?:spdx|copyright|license)\b", re.IGNORECASE)
 ENCODING_RE = re.compile(r"coding[:=]\s*[-\w.]+")
 WHY_RE = re.compile(
     r"\b(?:why|because|hazard|do not|don't|workaround|units?|ordering|order matters"
@@ -54,13 +53,13 @@ def _looks_like_code(text: str) -> bool:
     return not all(isinstance(n, ast.Expr) and isinstance(n.value, plain) for n in tree.body)
 
 
-def _classify(text: str, line_no: int) -> str:
+def _classify(text: str, line_no: int, full_line: bool) -> str:
     if line_no == 1 and text.startswith("#!"):
         return "directive"
     body = text.lstrip("#").strip()
     if line_no <= 2 and ENCODING_RE.search(body):
         return "directive"
-    if line_no <= 3 and HEADER_RE.search(body):
+    if full_line and line_no <= 3 and HEADER_RE.search(body):
         return "directive"
     if DIRECTIVE_RE.search(body):
         return "directive"
@@ -129,7 +128,7 @@ def process_source(source: str) -> FileResult:
 
     for line_no, col, text in comments:
         full_line = lines[line_no - 1][:col].strip() == ""
-        kind = _classify(text, line_no)
+        kind = _classify(text, line_no, full_line)
         if kind == "directive":
             result.directive_count += 1
             continue
@@ -224,6 +223,7 @@ def run(paths: list[Path], apply: bool = False, report: dict | None = None) -> d
             "kept_why_count": 0,
             "manual_review": [],
             "ast_ok": True,
+            "write_failed": False,
         }
         report["files"].append(entry)
         try:
@@ -240,7 +240,7 @@ def run(paths: list[Path], apply: bool = False, report: dict | None = None) -> d
                     {"line": 0, "text": "AST mismatch, file left unchanged", "tag": "ast_mismatch"}
                 )
                 continue
-        except (SyntaxError, tokenize.TokenError, UnicodeDecodeError, OSError) as exc:
+        except (SyntaxError, tokenize.TokenError, ValueError, RecursionError, OSError) as exc:
             entry["ast_ok"] = False
             entry["manual_review"].append({"line": 0, "text": str(exc), "tag": "ast_mismatch"})
             continue
@@ -252,7 +252,7 @@ def run(paths: list[Path], apply: bool = False, report: dict | None = None) -> d
             except OSError as exc:
                 entry["removed_count"] = 0
                 report["removed_total"] -= res.removed_count
-                entry["ast_ok"] = False
+                entry["write_failed"] = True
                 entry["manual_review"].append({"line": 0, "text": f"write failed: {exc}", "tag": "write_error"})
     return report
 
@@ -283,7 +283,10 @@ def main(argv: list[str] | None = None) -> int:
     mismatches = [f["file"] for f in report["files"] if not f["ast_ok"]]
     for name in mismatches:
         print(f"ast_mismatch: {name}", file=sys.stderr)
-    if mismatches:
+    write_failures = [f["file"] for f in report["files"] if f["write_failed"]]
+    for name in write_failures:
+        print(f"write_failed: {name}", file=sys.stderr)
+    if mismatches or write_failures:
         return 1
     if args.strict_manual and any(f["manual_review"] for f in report["files"]):
         return 1
