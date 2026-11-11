@@ -17,10 +17,12 @@ from typing import Any
 MAX_KEPT_BLOCK = 3
 
 DIRECTIVE_RE = re.compile(
-    r"(?:^|#)\s*(?:type:|(?i:noqa(?=[:\s\[]|$)|pragma(?=[:\s\[]|$)|fmt:\s*(?:on|off|skip)"
+    r"(?:^|#)\s*(?:(?:(?:ruff|flake8)\s*:\s*)?(?i:noqa)(?=[:\s\[]|$)"
+    r"|type:\s*ignore\b|type:\s*\(|pragma(?=[:\s\[]|$)|fmt:\s*(?:on|off|skip)"
     r"|isort:\s*(?:skip|split|on|off)|mypy:|pylint:|pyright:|pyre-ignore|pyre-fixme"
-    r"|nosec|noinspection|codespell:\s*ignore))"
+    r"|nosec\b|noinspection\b|codespell:\s*ignore)"
 )
+TYPE_ANNOTATION_RE = re.compile(r"^type:\s*\S")
 HEADER_RE = re.compile(r"\b(?:spdx|copyright|license)\b", re.IGNORECASE)
 ENCODING_RE = re.compile(r"coding[:=]\s*[-\w.]+")
 WHY_RE = re.compile(
@@ -62,6 +64,8 @@ def _classify(text: str, line_no: int, full_line: bool) -> str:
     if full_line and line_no <= 3 and HEADER_RE.search(body):
         return "directive"
     if DIRECTIVE_RE.search(body):
+        return "directive"
+    if not full_line and TYPE_ANNOTATION_RE.match(body):
         return "directive"
     if TODO_RE.search(body):
         return "why" if TRACKED_REF_RE.search(body) else "remove"

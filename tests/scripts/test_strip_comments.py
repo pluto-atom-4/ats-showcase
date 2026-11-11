@@ -269,3 +269,30 @@ def test_recursion_error_skips_file_and_continues(tmp_path, monkeypatch):
     report = sc.run([bad, good], apply=True)
     assert good.read_text() == "y = 1\n"
     assert report["files"][0]["ast_ok"] is False
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["# ruff: noqa\n", "# ruff: noqa: E501\n", "# flake8: noqa\n", "x = 1  # NOQA\n"],
+)
+def test_file_level_linter_directives_kept(line):
+    assert strip(line) == line
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        "# Pragma is used here",
+        "# Mypy: is slow",
+        "# nosecurity note",
+        "# type: the job title",
+        "# type: str of the value",
+    ],
+)
+def test_prose_lookalikes_removed(comment):
+    assert strip(f"{comment}\nx = 1\n") == "x = 1\n"
+
+
+def test_trailing_type_annotation_kept_full_line_prose_removed():
+    assert strip("x = []  # type: list[int]\n") == "x = []  # type: list[int]\n"
+    assert strip("def f(a):\n    # type: (int) -> str\n    return a\n").count("type:") == 1
