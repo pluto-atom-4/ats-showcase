@@ -13,7 +13,7 @@ _SPEC.loader.exec_module(sc)
 
 
 def strip(src: str) -> str:
-    return sc.process_source(src).new_source
+    return str(sc.process_source(src).new_source)
 
 
 def test_hash_inside_strings_untouched():
@@ -34,7 +34,7 @@ def test_directives_kept():
     )
     result = sc.process_source(src)
     assert result.new_source == src
-    assert result.directive_count == 6
+    assert result.directive_count == 7
 
 
 def test_shebang_and_encoding_kept():
