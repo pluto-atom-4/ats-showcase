@@ -1,27 +1,28 @@
 #!/usr/bin/env python3
-"""Strip redundant comments from Python files using tokenize (never regex on source).
-
-Dry-run by default. Keeps directives and WHY-candidates, aborts a file if the
-docstring-free AST changes. Lives in scripts/ because builders cannot write .claude/.
-"""
+"""Strip redundant comments from Python files via tokenize; dry-run unless --apply."""
 
 import argparse
 import ast
 import io
 import json
+import os
 import re
+import shutil
 import sys
 import tokenize
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 MAX_KEPT_BLOCK = 3
 
 DIRECTIVE_RE = re.compile(
-    r"\b(?:noqa|type:\s*ignore|pragma|fmt:\s*(?:on|off|skip)"
-    r"|isort:\s*(?:skip|split|on|off)|mypy:|pylint:)",
+    r"\b(?:noqa|type:|pragma|fmt:\s*(?:on|off|skip)"
+    r"|isort:\s*(?:skip|split|on|off)|mypy:|pylint:|pyright:|pyre-ignore|pyre-fixme"
+    r"|nosec|noinspection|codespell:\s*ignore)",
     re.IGNORECASE,
 )
+HEADER_RE = re.compile(r"\b(?:spdx|copyright|license)", re.IGNORECASE)
 ENCODING_RE = re.compile(r"coding[:=]\s*[-\w.]+")
 WHY_RE = re.compile(
     r"\b(?:why|because|hazard|do not|don't|workaround|units?|ordering|order matters"
@@ -31,7 +32,6 @@ WHY_RE = re.compile(
 )
 TODO_RE = re.compile(r"\b(?:todo|fixme)\b", re.IGNORECASE)
 TRACKED_REF_RE = re.compile(r"#\d+|https?://|issue\s+\d+", re.IGNORECASE)
-BANNER_RE = re.compile(r"^[-=#*~_\s]*$")
 
 
 @dataclass
@@ -59,6 +59,8 @@ def _classify(text: str, line_no: int) -> str:
         return "directive"
     body = text.lstrip("#").strip()
     if line_no <= 2 and ENCODING_RE.search(body):
+        return "directive"
+    if line_no <= 3 and HEADER_RE.search(body):
         return "directive"
     if DIRECTIVE_RE.search(body):
         return "directive"
@@ -99,6 +101,19 @@ def _collapse_blank_runs(items: list[tuple[str, bool]]) -> list[str]:
     return out
 
 
+def _trim_long_blocks(kept_full: list[int], lines: list[str], removed_full: set[int], result: FileResult) -> None:
+    run = 0
+    prev = -2
+    for line_no in kept_full:
+        run = run + 1 if line_no == prev + 1 else 1
+        prev = line_no
+        if run > MAX_KEPT_BLOCK:
+            removed_full.add(line_no)
+            result.kept_why_count -= 1
+            result.removed_count += 1
+            result.manual_review.append({"line": line_no, "text": lines[line_no - 1].strip(), "tag": "trimmed_why"})
+
+
 def process_source(source: str) -> FileResult:
     lines = source.split("\n")
     result = FileResult(new_source=source)
@@ -131,18 +146,7 @@ def process_source(source: str) -> FileResult:
         else:
             inline_cuts[line_no] = col
 
-    run = 0
-    prev = -2
-    for line_no in kept_full:
-        run = run + 1 if line_no == prev + 1 else 1
-        prev = line_no
-        if run > MAX_KEPT_BLOCK:
-            removed_full.add(line_no)
-            result.kept_why_count -= 1
-            result.removed_count += 1
-            result.manual_review.append(
-                {"line": line_no, "text": lines[line_no - 1].strip(), "tag": "trimmed_why"}
-            )
+    _trim_long_blocks(kept_full, lines, removed_full, result)
 
     items: list[tuple[str, bool]] = []
     for idx, line in enumerate(lines, start=1):
@@ -175,10 +179,31 @@ def _strip_docstrings(tree: ast.AST) -> ast.AST:
     return tree
 
 
+def _docstrings(tree: ast.AST) -> list[str | None]:
+    return [
+        ast.get_docstring(n, clean=False)
+        for n in ast.walk(tree)
+        if isinstance(n, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    ]
+
+
 def ast_equal(original: str, transformed: str) -> bool:
-    a = _strip_docstrings(ast.parse(original))
-    b = _strip_docstrings(ast.parse(transformed))
+    ta, tb = ast.parse(original), ast.parse(transformed)
+    if _docstrings(ta) != _docstrings(tb):
+        return False
+    a, b = _strip_docstrings(ta), _strip_docstrings(tb)
     return ast.dump(a, include_attributes=False) == ast.dump(b, include_attributes=False)
+
+
+def _write_atomic(path: Path, text: str) -> None:
+    tmp = path.with_name(f".{path.name}.strip-tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8", newline="") as fh:
+            fh.write(text)
+        shutil.copymode(path, tmp)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def collect_files(paths: list[Path]) -> list[Path]:
@@ -188,10 +213,11 @@ def collect_files(paths: list[Path]) -> list[Path]:
     return files
 
 
-def run(paths: list[Path], apply: bool = False) -> dict:
-    report: dict = {"files": [], "directive_total": 0, "removed_total": 0}
+def run(paths: list[Path], apply: bool = False, report: dict | None = None) -> dict:
+    if report is None:
+        report = {"files": [], "directive_total": 0, "removed_total": 0}
     for path in collect_files(paths):
-        entry = {
+        entry: dict[str, Any] = {
             "file": str(path),
             "directive_count": 0,
             "removed_count": 0,
@@ -201,7 +227,8 @@ def run(paths: list[Path], apply: bool = False) -> dict:
         }
         report["files"].append(entry)
         try:
-            original = path.read_text(encoding="utf-8")
+            with open(path, encoding="utf-8", newline="") as fh:
+                original = fh.read()
             res = process_source(original)
             entry["directive_count"] = res.directive_count
             entry["kept_why_count"] = res.kept_why_count
@@ -213,19 +240,25 @@ def run(paths: list[Path], apply: bool = False) -> dict:
                     {"line": 0, "text": "AST mismatch, file left unchanged", "tag": "ast_mismatch"}
                 )
                 continue
-        except (SyntaxError, tokenize.TokenError, UnicodeDecodeError) as exc:
+        except (SyntaxError, tokenize.TokenError, UnicodeDecodeError, OSError) as exc:
             entry["ast_ok"] = False
             entry["manual_review"].append({"line": 0, "text": str(exc), "tag": "ast_mismatch"})
             continue
         entry["removed_count"] = res.removed_count
         report["removed_total"] += res.removed_count
         if apply and res.new_source != original:
-            path.write_text(res.new_source, encoding="utf-8")
+            try:
+                _write_atomic(path, res.new_source)
+            except OSError as exc:
+                entry["removed_count"] = 0
+                report["removed_total"] -= res.removed_count
+                entry["ast_ok"] = False
+                entry["manual_review"].append({"line": 0, "text": f"write failed: {exc}", "tag": "write_error"})
     return report
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="+", type=Path)
     parser.add_argument("--apply", action="store_true", help="write changes (default: dry-run)")
     parser.add_argument("--dry-run", action="store_true", help="explicit no-write mode (default)")
@@ -235,9 +268,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.apply and args.dry_run:
         parser.error("--apply and --dry-run are mutually exclusive")
 
-    report = run(args.paths, apply=args.apply)
-    if args.report:
-        args.report.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    report: dict = {"files": [], "directive_total": 0, "removed_total": 0}
+    try:
+        run(args.paths, apply=args.apply, report=report)
+    finally:
+        if args.report:
+            args.report.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     mode = "applied" if args.apply else "dry-run"
     print(

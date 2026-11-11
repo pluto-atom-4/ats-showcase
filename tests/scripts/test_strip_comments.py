@@ -102,7 +102,7 @@ def test_comment_only_untouched_blank_lines_preserved():
 
 def test_ast_equal_ignores_docstrings():
     a = 'def f():\n    """doc one"""\n    return 1\n'
-    b = 'def f():\n    """doc two"""\n    return 1\n'
+    b = 'def f():\n    """doc one"""\n    return 1\n'
     assert sc.ast_equal(a, b)
     assert not sc.ast_equal("x = 1\n", "x = 2\n")
 
@@ -155,4 +155,79 @@ def test_directory_walk(tmp_path, name):
     f = tmp_path / name
     f.parent.mkdir(exist_ok=True)
     f.write_text("x = 1\n")
-    assert sc.collect_files([tmp_path]) != []
+    assert sc.collect_files([tmp_path]) == [f]
+
+
+def test_crlf_preserved(tmp_path):
+    f = tmp_path / "m.py"
+    f.write_bytes(b"# note\r\nx = 1  # set\r\n\r\n\r\ny = 2\r\n")
+    sc.run([f], apply=True)
+    assert f.read_bytes() == b"x = 1\r\n\r\n\r\ny = 2\r\n"
+
+
+def test_no_trailing_newline():
+    assert strip("# note\nx = 1") == "x = 1"
+    assert strip("x = 1  # set") == "x = 1"
+
+
+def test_comments_inside_brackets():
+    src = "x = [\n    1,  # one\n    # between\n    2,\n]\n"
+    assert strip(src) == "x = [\n    1,\n    2,\n]\n"
+
+
+def test_backslash_continuation():
+    src = "x = 1 + \\\n    2  # total\n"
+    assert strip(src) == "x = 1 + \\\n    2\n"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "x = []  # type: list[int]\n",
+        "x = f()  # pyright: ignore\n",
+        "# fmt: off\n",
+        "x = f()  # nosec\n",
+        "x = f()  # pyre-ignore\n",
+        "# SPDX-License-Identifier: MIT\n",
+        "# Copyright 2026\n",
+    ],
+)
+def test_extra_directives_kept(line):
+    assert strip(line) == line
+
+
+def test_copyright_only_protected_in_header():
+    src = "x = 1\ny = 2\nz = 3\n# copyright note\nw = 4\n"
+    assert strip(src) == "x = 1\ny = 2\nz = 3\nw = 4\n"
+
+
+def test_docstring_change_detected_by_ast_guard():
+    assert not sc.ast_equal('"""a"""\nx = 1\n', '"""b"""\nx = 1\n')
+
+
+def test_report_written_when_run_raises(tmp_path, monkeypatch):
+    f = tmp_path / "m.py"
+    f.write_text("x = 1\n")
+    out = tmp_path / "r.json"
+
+    def boom(*a, **k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(sc, "process_source", boom)
+    with pytest.raises(RuntimeError):
+        sc.main([str(f), "--report", str(out)])
+    assert out.exists()
+
+
+def test_write_error_recorded(tmp_path, monkeypatch):
+    f = tmp_path / "m.py"
+    f.write_text("# note\nx = 1\n")
+
+    def fail(*a, **k):
+        raise OSError("disk")
+
+    monkeypatch.setattr(sc.os, "replace", fail)
+    report = sc.run([f], apply=True)
+    assert report["files"][0]["ast_ok"] is False
+    assert f.read_text() == "# note\nx = 1\n"
+    assert not list(tmp_path.glob(".*strip-tmp"))
