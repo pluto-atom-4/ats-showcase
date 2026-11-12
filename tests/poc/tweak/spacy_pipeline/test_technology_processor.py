@@ -18,7 +18,6 @@ from spacy.tokens import Doc
 
 from src.poc.tweak.markdown_section_classifier import SectionClassification, SectionType, TypeClassification
 from src.poc.tweak.multi_line_paragraph import MarkdownSection
-
 from src.poc.tweak.spacy_pipeline import TechnologyProcessor, registry  # noqa: F401
 
 

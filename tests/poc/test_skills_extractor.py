@@ -303,6 +303,7 @@ class TestSkillExtractorPerformance:
         skills = extractor.extract(fixture_what_you_ll_do)
         elapsed = time.perf_counter() - start
 
+        # Coarse sanity bound only (5s), not a perf assertion; avoids CI flake.
         assert elapsed < 5.0
         assert len(skills) > 0
 
@@ -1076,6 +1077,7 @@ class TestSkillExtractorResidualsWave604:
                 "You will design fast, reliable services and secure platforms.",
                 ["design fast, reliable services and secure platforms"],
             ),
+            # 1c. A skill verb after 'and' is its own span, whatever spaCy tags it (#604).
             ("You will design systems and mentor engineers.", ["design systems", "mentor engineers"]),
             ("You will design systems and build tools.", ["build tools", "design systems"]),
             (
@@ -1095,10 +1097,14 @@ class TestSkillExtractorResidualsWave604:
     @pytest.mark.parametrize(
         "text,expected",
         [
+            # #509: a noun before the comma keeps the span at the noun.
             ("You will design systems, platforms, and develop tools.", ["design systems", "develop tools"]),
+            # #599: a skill-verb segment after a comma breaks the list; no merged span.
             ("You will design systems, lead teams.", ["design systems", "lead teams"]),
+            # #599 guard: 'design fast, lead teams' never merges into one span.
             ("You will design fast, lead teams.", ["lead teams"]),
             ("You will lead agile, platform teams.", ["lead agile"]),
+            # Neighbour shape: a noun list after a non-skill verb produces nothing (#604).
             ("Experience with APIs, model training.", []),
             ("You will design fault-tolerant, data services.", ["design fault-tolerant"]),
         ],

@@ -23,7 +23,6 @@ import pytest
 
 from src.poc.tweak.markdown_section_classifier import SectionClassification, SectionType, TypeClassification
 from src.poc.tweak.multi_line_paragraph import MarkdownSection
-
 from src.poc.tweak.spacy_pipeline import RequirementProcessor, registry  # noqa: F401
 
 
@@ -72,6 +71,9 @@ def _make_classification(confidence: float) -> SectionClassification:
     return SectionClassification.from_type_classifications(
         [TypeClassification(SectionType.QUALIFICATIONS, confidence, ("required",))],
     )
+
+
+# Confidence Threshold Tests (Issue #346)
 
 
 class TestRequirementProcessorConfidenceThreshold:
@@ -126,6 +128,9 @@ class TestRequirementProcessorConfidenceThreshold:
         doc = processor(doc)
 
         assert len(doc._.requirements) >= 1
+
+
+# Multi-Line Sentence Splitting Tests (Issue #353)
 
 
 class TestRequirementProcessorMultiLineSplitting:
@@ -223,6 +228,9 @@ class TestRequirementProcessorMultiLineSplitting:
         doc = processor(doc)
 
         assert len(doc._.requirements) >= 2
+
+
+# Heading Exclusion Tests (Issue #375)
 
 
 class TestRequirementProcessorHeadingExclusion:

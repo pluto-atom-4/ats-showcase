@@ -382,6 +382,8 @@ class TestGracefulDegradation:
         assert result["extra_field"] == "custom_value"
 
 
+# WORKSOURCE API INTERCEPT + SHELL DETECTION (Issue #765)
+
 WS_JOB_URL = "https://worksource.my.site.com/worksourcewa/job-search?keyword=engineer&jobId=J988117"
 WS_DETAIL_URL = "https://worksource.my.site.com/worksourcewa/job-search/job-details?jobId=J988117"
 WS_API_URL = (

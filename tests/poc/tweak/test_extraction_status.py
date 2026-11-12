@@ -165,6 +165,7 @@ class TestClassifyNeedsHumanReview:
         assert outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW
 
     def test_walmart_job_9_zero_yield_needs_review(self):
+        # Reference: Walmart job 9 has 7 sections, desc_len 31591 (design doc 1.1/1.3), zero yield.
         result = make_job_result(7)
         outcome = classify_extraction_outcome(result, WALMART_JOB9_DESC_CHARS)
         assert outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW

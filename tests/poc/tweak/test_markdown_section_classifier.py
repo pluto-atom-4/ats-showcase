@@ -781,6 +781,9 @@ class TestConsistencyAndRegression:
         assert result.labels == all_types_set
 
 
+# Test: Word-Boundary Keyword Matching (Issue #365)
+
+
 class TestWordBoundaryKeywordMatching:
     """Test leading-only word boundary keyword matching prevents mid-word hits."""
 

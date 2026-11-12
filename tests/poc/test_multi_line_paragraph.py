@@ -424,6 +424,9 @@ class TestEdgeCases:
         assert sections[0].has_list is True
 
 
+# Phase 4 Tests: Preamble Handling (Issue #373)
+
+
 class TestPreambleHandling:
     """Test preamble text before first header."""
 

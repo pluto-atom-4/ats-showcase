@@ -222,6 +222,7 @@ class TestRunBatch:
                 assert isinstance(tech["tech"], str), "Tech value should be string"
                 assert isinstance(tech["confidence"], float), "Confidence should be float"
                 if tech.get("extraction_tier") == TIER2_TAG:
+                    # Tier 2 taxonomy recovery on complete-gap jobs (#757 B) carries its own cap
                     assert tech["confidence"] == TIER2_CONFIDENCE, (
                         "Tier 2 technology confidence must be TIER2_CONFIDENCE"
                     )
@@ -1757,6 +1758,8 @@ class TestHeadingOnlySectionContent:
         for sec in body_sections:
             assert sec.content.strip() != "", f"Section {sec.heading!r} content blanked"
 
+
+# Issue #738 (Part of #735): wire extraction_outcome into JobResult / print_summary / CLI
 
 _SHELL_DESCRIPTION = "<h1>Software Engineer</h1><h2>Apply</h2><p>Apply now.</p>"
 

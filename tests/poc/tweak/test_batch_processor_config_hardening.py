@@ -26,6 +26,7 @@ class TestConfigHardeningMainPath:
         Config: {"companies": {"AlphaCo": "x"}} (malformed, non-dict value).
         Expected: main() returns 1, stderr has "Error:", no "Traceback".
         """
+        # SYNTHETIC: malformed config with string company value instead of dict
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         config_file = config_dir / "test.json"
@@ -37,9 +38,9 @@ class TestConfigHardeningMainPath:
                 [
                     {
                         "id": "job1",
-                        "title": "Developer",
-                        "company": "TechCorp",
-                        "description": "<p>placeholder</p>",
+                        "title": "Developer",  # SYNTHETIC: generic placeholder
+                        "company": "TechCorp",  # SYNTHETIC: placeholder
+                        "description": "<p>placeholder</p>",  # SYNTHETIC: minimal HTML
                     }
                 ]
             )
@@ -80,9 +81,9 @@ class TestConfigHardeningMainPath:
                 [
                     {
                         "id": "job1",
-                        "title": "Developer",
-                        "company": "TechCorp",
-                        "description": "<p>placeholder</p>",
+                        "title": "Developer",  # SYNTHETIC: placeholder
+                        "company": "TechCorp",  # SYNTHETIC: placeholder
+                        "description": "<p>placeholder</p>",  # SYNTHETIC: minimal
                     }
                 ]
             )
@@ -122,6 +123,7 @@ class TestResolveDescriptionSelectorHardening:
         Config: {"companies": {"AlphaCo": {"name": "...", "selectors": {"description_selector": ["a", "b"]}}}}
         Expected: ValueError mentioning "non-string".
         """
+        # SYNTHETIC: config with list instead of string for description_selector
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         config_file = config_dir / "test.json"
@@ -132,6 +134,7 @@ class TestResolveDescriptionSelectorHardening:
                         "AlphaCo": {
                             "name": "Alpha Co",
                             "selectors": {
+                                # SYNTHETIC: list instead of CSS selector string
                                 "description_selector": ["a", "b"],
                                 "title": "h1",
                             },
@@ -158,6 +161,7 @@ class TestLoadAllCompanyConfigsBOM:
 
         Expected: returns companies dict without raising, BOM is transparently handled.
         """
+        # SYNTHETIC: JSON config with UTF-8 BOM prefix
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         config_file = config_dir / "bom_test.json"
@@ -190,9 +194,10 @@ class TestResolveCompanySelectorsSafety:
         Config has a company with "name": 5 (non-string), plus valid "AlphaCo".
         Expected: lookup by "Alpha Co" returns AlphaCo's selectors, no crash.
         """
+        # SYNTHETIC: merged config with non-string name entry
         merged_config = {
             "Zeta": {
-                "name": 5,
+                "name": 5,  # SYNTHETIC: int instead of string
                 "selectors": {"description_selector": ".zeta"},
             },
             "AlphaCo": {
@@ -211,6 +216,7 @@ class TestResolveCompanySelectorsSafety:
         Input: job_company_name=" AlphaCo " (surrounding whitespace).
         Expected: matches key "AlphaCo" after stripping.
         """
+        # SYNTHETIC: config with whitespace-sensitive lookup
         merged_config = {
             "AlphaCo": {
                 "name": "Alpha Co",
@@ -228,6 +234,7 @@ class TestResolveCompanySelectorsSafety:
         Config: {"AlphaCo": "x"} (string value, not dict).
         Expected: resolve_company_selectors("AlphaCo", config) returns {} without raise.
         """
+        # SYNTHETIC: config with non-dict company value (string instead of selector dict)
         merged_config = {"AlphaCo": "x"}
 
         selectors = resolve_company_selectors("AlphaCo", merged_config)
@@ -244,6 +251,7 @@ class TestSourceConfigWhitespaceScoping:
         Job has source_config=" AlphaCo " (with spaces).
         Expected: matches config key "AlphaCo" after stripping, selector applied.
         """
+        # SYNTHETIC: job record with whitespace in source_config
         from src.poc.tweak import batch_processor as bp
 
         calls = []
@@ -277,10 +285,10 @@ class TestSourceConfigWhitespaceScoping:
                 [
                     {
                         "id": "alpha-ws",
-                        "title": "Developer",
-                        "company": "X",
-                        "description": "<p>placeholder</p>",
-                        "source_config": " AlphaCo ",
+                        "title": "Developer",  # SYNTHETIC: placeholder
+                        "company": "X",  # SYNTHETIC: placeholder
+                        "description": "<p>placeholder</p>",  # SYNTHETIC: minimal
+                        "source_config": " AlphaCo ",  # SYNTHETIC: whitespace-padded
                     }
                 ]
             )

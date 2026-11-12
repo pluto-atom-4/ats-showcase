@@ -219,11 +219,7 @@ class TestSkillProcessorLineSegmentation:
         """Deduplication (seen_skills) still works across multiple lines."""
         processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
 
-        multiline_content = (
-            "Building scalable systems\n"
-            "Building scalable systems\n"
-            "Leading distributed teams"
-        )
+        multiline_content = "Building scalable systems\nBuilding scalable systems\nLeading distributed teams"
         section = _make_section(content=multiline_content)
         tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
         classification = SectionClassification.from_type_classifications([tc])
@@ -352,15 +348,7 @@ class TestSkillProcessorNounLedBullets:
         """
         processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
 
-        content = (
-            "Technical Skills\n"
-            "* Python required\n"
-            "* Python preferred\n"
-            "* C++ required\n"
-            "\n"
-            "- \n"
-            "*\n"
-        )
+        content = "Technical Skills\n* Python required\n* Python preferred\n* C++ required\n\n- \n*\n"
         section = _make_section(title="Technical Skills", content=content)
         tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
         classification = SectionClassification.from_type_classifications([tc])

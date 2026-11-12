@@ -127,6 +127,7 @@ class TestIsHeadingOnly:
 
     def test_boilerplate_not_in_known_heading_phrases(self) -> None:
         assert BOILERPLATE_SENTENCE not in KNOWN_HEADING_PHRASES
+        # Matched by the boilerplate regex path, not by set membership.
         assert is_heading_only(BOILERPLATE_SENTENCE) is True
 
     @pytest.mark.parametrize(
@@ -228,6 +229,7 @@ class TestIsHeadingOnly:
         assert is_heading_only("**Python experience**.", "Team Overview") is False
 
     def test_bare_csharp_not_dropped_as_heading(self) -> None:
+        # Trailing '#' attached to a word is content, not an ATX closer.
         assert is_heading_only("C#", "C") is False
         assert is_heading_only("C#") is False
 

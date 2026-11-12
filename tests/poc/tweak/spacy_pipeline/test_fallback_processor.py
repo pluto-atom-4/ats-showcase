@@ -395,6 +395,9 @@ def test_dedicated_pipeline_is_separate_and_built_once(shared_nlp: Language) -> 
     assert len(dedicated.nlp.get_pipe("entity_ruler").patterns) == count  # type: ignore[attr-defined]
 
 
+# min_section_confidence parameter (Issue #756, part 1/2)
+
+
 def test_default_min_section_confidence_matches_module_constant(shared_nlp: Language) -> None:
     """Omitting the parameter and passing the constant explicitly give identical output."""
     implicit = apply_fallback(_uw_walmart_job(), UW_WALMART_MD, shared_nlp=shared_nlp)
@@ -434,6 +437,9 @@ def test_min_section_confidence_lowering_recovers_below_default(shared_nlp: Lang
     assert not [s for s in default.skills if s.get("extraction_tier") == TIER1_TAG]
     assert _texts(lowered.skills, "skill") == ["build scalable data pipelines using spark"]
     assert all(s["extraction_tier"] == TIER1_TAG for s in lowered.skills)
+
+
+# Complete-gap gate (Issue #757 B)
 
 
 def _complete_job(

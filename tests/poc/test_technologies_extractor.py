@@ -299,11 +299,15 @@ class TestTechExtractorNegation:
             ("Kubernetes is required; no Java needed.", ["kubernetes"]),
             ("Kubernetes and Docker are not required.", []),
             ("Kubernetes is required but not Docker.", ["kubernetes"]),
+            # 17-18: "not only" / "not just" are affirmative idioms, not negation (#516)
+            # "not only" / "not just" are affirmative idioms, not negation (#516).
             ("We run Kubernetes not only in prod but also in staging.", ["kubernetes"]),
             ("Not only Kubernetes but also Docker is needed.", ["docker", "kubernetes"]),
             ("We use Kubernetes not just in staging.", ["kubernetes"]),
+            # 19-20: a negated trailing item does not pull in a preceding comma-joined item (#516)
             ("Python, Kubernetes is not required.", ["python"]),
             ("We need Docker, no Kubernetes, and Redis experience.", ["docker", "redis"]),
+            # 21-22: propagation still covers conjunction lists and cue-first comma lists (#516 guard)
             ("Kubernetes, Docker, and Redis are not required.", []),
             ("No Java, Kubernetes, and Docker experience required.", []),
             ("Kubernetes, no Docker, and Redis experience.", ["kubernetes", "redis"]),
@@ -319,7 +323,6 @@ class TestTechExtractorNegation:
         extractor = TechExtractor(blank)
         doc = blank("No experience with Kubernetes required.")
         assert extractor.extract(doc) == []
-        # Positive control: the fallback path still extracts non-negated terms, not a silent [] from the except.
         assert extractor.extract(blank("We use Kubernetes daily.")) == ["kubernetes"]
 
 
@@ -380,6 +383,7 @@ class TestTechExtractorPerformance:
         techs = extractor.extract(doc)
         elapsed = time.perf_counter() - start
 
+        # Coarse sanity bound only (5s), not a perf assertion; avoids CI flake.
         assert elapsed < 5.0
         assert len(techs) > 0
 
@@ -405,6 +409,7 @@ class TestTechExtractorPerformance:
         techs = extractor.extract(doc)
         elapsed = time.perf_counter() - start
 
+        # Coarse sanity bound only (5s), not a perf assertion; avoids CI flake.
         assert elapsed < 5.0
         assert len(techs) > 0
 
@@ -683,7 +688,7 @@ class TestTechExtractorHyphenSuffix553:
     @pytest.mark.parametrize("suffix", sorted(HYPHEN_TECH_SUFFIXES))
     def test_each_hyphen_tech_suffix_extracted(self, extractor, nlp, suffix):
         """Per-entry guard: every HYPHEN_TECH_SUFFIXES member keeps 'Go' via the suffix rule."""
-        text = f"We build Go-{suffix} services."
+        text = f"We build Go-{suffix} services."  # SYNTHETIC: mechanics test, not real JD text
         assert "go" in extractor.extract(nlp(text))
 
     # The check compares after.lower_, so an uppercase entry would silently never match.

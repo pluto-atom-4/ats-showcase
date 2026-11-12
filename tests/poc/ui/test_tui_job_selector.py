@@ -686,6 +686,7 @@ class TestJobSelectorUIInteraction:
 
         app = JobSelectorApp(jobs=jobs, warnings=[])
 
+        # select() takes values (job_id), not indices.
         selected_job_ids: set[str] = {"job_1"}
         selected_jobs = [j for j in app.all_jobs if j["id"] in selected_job_ids]
 

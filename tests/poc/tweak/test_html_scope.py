@@ -235,6 +235,7 @@ class TestScopeToSelectorStrategies:
 
         assert result.match_count == 2
         assert result.fragment is not None
+        # Both fragments are equal length after stripping, so the first one wins.
         assert "Match A ABC" in result.fragment
         assert "Match B XYZ" not in result.fragment
 

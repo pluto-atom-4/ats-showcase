@@ -65,6 +65,7 @@ class TestPatternModularity:
         """Verify load_spacy_model uses default patterns."""
         nlp = load_spacy_model("en_core_web_md")
         assert "span_ruler" in nlp.pipe_names
+        # Exact pipe count depends on the spaCy version; only verify the model loaded.
         assert len(nlp.pipe_names) > 0
 
     def test_load_spacy_model_with_custom_patterns(self):

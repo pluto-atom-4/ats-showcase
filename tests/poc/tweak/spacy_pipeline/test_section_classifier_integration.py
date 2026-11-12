@@ -25,7 +25,6 @@ import pytest
 from src.parsers.html_to_markdown import html_to_markdown
 from src.poc.tweak.markdown_section_classifier import SectionClassifier, SectionType
 from src.poc.tweak.multi_line_paragraph import MarkdownSection, MarkdownSpanRuler
-
 from src.poc.tweak.spacy_pipeline import SectionClassifierComponent, registry  # noqa: F401
 from src.poc.tweak.spacy_pipeline.heading_promoter import HeadingPromoter
 
@@ -582,6 +581,9 @@ class TestSectionClassifierConsistency:
         assert results[0] == results[1] == results[2]
 
 
+# Phase 10: HeadingPromoter -> SectionClassifier EEO Integration (Issue #520)
+
+
 class TestHeadingPromoterSectionClassifierEEOIntegration:
     """EEO isolation (Issue #520) carried through MarkdownSpanRuler and SectionClassifier.
 
@@ -639,6 +641,7 @@ class TestHeadingPromoterSectionClassifierEEOIntegration:
     @pytest.mark.parametrize(
         ("offset", "expect_isolated"),
         [
+            # Trigger ends at index 199, the last index inside [:200].
             (174, True),
             (190, False),
             (199, False),
