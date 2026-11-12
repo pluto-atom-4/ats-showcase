@@ -49,6 +49,11 @@ def test_why_comment_kept():
     assert strip(src) == "# keep because ordering matters here\nx = 1\ny = 2\n"
 
 
+def test_issue_ref_and_synthetic_marker_kept():
+    src = "# pinned in #523\na = 1\n# SYNTHETIC: placeholder\nb = 2\n# plain\nc = 3\n"
+    assert strip(src) == "# pinned in #523\na = 1\n# SYNTHETIC: placeholder\nb = 2\nc = 3\n"
+
+
 def test_tracked_todo_kept_bare_todo_removed():
     src = "# TODO: fix (#12)\na = 1\n# TODO: fix later\nb = 2\n"
     assert strip(src) == "# TODO: fix (#12)\na = 1\nb = 2\n"

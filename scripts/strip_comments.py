@@ -28,7 +28,7 @@ ENCODING_RE = re.compile(r"coding[:=]\s*[-\w.]+")
 WHY_RE = re.compile(
     r"\b(?:why|because|hazard|do not|don't|workaround|units?|ordering|order matters"
     r"|race|deadlock|thread-unsafe|timezone|utc|axis|sign convention|rad|deg)\b"
-    r"|https?://",
+    r"|https?://|#\d+|\bSYNTHETIC\b",
     re.IGNORECASE,
 )
 TODO_RE = re.compile(r"\b(?:todo|fixme)\b", re.IGNORECASE)
