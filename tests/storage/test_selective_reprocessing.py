@@ -26,7 +26,6 @@ class TestJobStoreSelectiveFiltering:
         """Test basic version filtering returns only v1.0 jobs."""
         store = JobStore(temp_db)
 
-        # Add v1.0 and v2.0 jobs
         store.add_job(
             job_id="job_v1_1",
             title="Job V1",
@@ -42,7 +41,6 @@ class TestJobStoreSelectiveFiltering:
             tokens=300,
         )
 
-        # Query for v1.0 jobs
         jobs = store.get_jobs_for_reprocessing(version="v1.0")
 
         assert len(jobs) == 1
@@ -62,9 +60,7 @@ class TestJobStoreSelectiveFiltering:
             tokens=500,
         )
 
-        # Query with 'v1.0'
         jobs_v = store.get_jobs_for_reprocessing(version="v1.0")
-        # Query with '1.0'
         jobs_plain = store.get_jobs_for_reprocessing(version="1.0")
 
         assert len(jobs_v) == 1
@@ -86,7 +82,6 @@ class TestJobStoreSelectiveFiltering:
         """Test that v3.0 version is now valid (Issue #281 S5)."""
         store = JobStore(temp_db)
 
-        # Add some test jobs
         store.add_job("job1", "Job 1", "Co1", "Remote", preprocessing_version="v3.0", tokens=500)
         store.add_job("job2", "Job 2", "Co2", "Remote", preprocessing_version="v2.0", tokens=400)
 
@@ -122,7 +117,6 @@ class TestJobStoreSelectiveFiltering:
         )
         store.conn.commit()
 
-        # Filter for jobs at least 30 days old
         jobs = store.get_jobs_for_reprocessing(version="v1.0", min_age_days=30)
 
         assert len(jobs) == 1
@@ -134,13 +128,11 @@ class TestJobStoreSelectiveFiltering:
         """Test token filtering returns only high-token jobs."""
         store = JobStore(temp_db)
 
-        # Add jobs with varying token counts
         store.add_job("job_100", "Title 1", tokens=100, preprocessing_version="v1.0")
         store.add_job("job_500", "Title 2", tokens=500, preprocessing_version="v1.0")
         store.add_job("job_1000", "Title 3", tokens=1000, preprocessing_version="v1.0")
         store.add_job("job_1500", "Title 4", tokens=1500, preprocessing_version="v1.0")
 
-        # Filter for jobs with 1000+ tokens (most savings potential)
         jobs = store.get_jobs_for_reprocessing(version="v1.0", min_tokens=1000)
 
         assert len(jobs) == 2
@@ -153,13 +145,11 @@ class TestJobStoreSelectiveFiltering:
         """Test company filtering restricts to specific companies."""
         store = JobStore(temp_db)
 
-        # Add jobs from different companies
         store.add_job("amazon_1", "Job 1", company="Amazon", preprocessing_version="v1.0", tokens=500)
         store.add_job("google_1", "Job 2", company="Google", preprocessing_version="v1.0", tokens=500)
         store.add_job("meta_1", "Job 3", company="Meta", preprocessing_version="v1.0", tokens=500)
         store.add_job("amazon_2", "Job 4", company="Amazon", preprocessing_version="v1.0", tokens=500)
 
-        # Filter for Amazon and Google only
         jobs = store.get_jobs_for_reprocessing(version="v1.0", company_names=["Amazon", "Google"])
 
         assert len(jobs) == 3
@@ -172,7 +162,6 @@ class TestJobStoreSelectiveFiltering:
         """Test combining multiple filters (age + token + company)."""
         store = JobStore(temp_db)
 
-        # Setup: old jobs with high token count from Amazon
         assert store.conn is not None
         cursor = store.conn.cursor()
         old_time = (datetime.now() - timedelta(days=35)).isoformat()
@@ -207,7 +196,6 @@ class TestJobStoreSelectiveFiltering:
 
         store.conn.commit()
 
-        # Filter: v1.0, 30+ days old, 1000+ tokens, Amazon only
         jobs = store.get_jobs_for_reprocessing(
             version="v1.0",
             min_age_days=30,
@@ -224,11 +212,9 @@ class TestJobStoreSelectiveFiltering:
         """Test that limit parameter restricts batch size."""
         store = JobStore(temp_db)
 
-        # Add 10 v1.0 jobs
         for i in range(10):
             store.add_job(f"job_{i}", f"Title {i}", preprocessing_version="v1.0", tokens=500)
 
-        # Query with limit=5
         jobs = store.get_jobs_for_reprocessing(version="v1.0", limit=5)
 
         assert len(jobs) == 5
@@ -243,7 +229,7 @@ class TestJobStoreSelectiveFiltering:
         cursor = store.conn.cursor()
         now = datetime.now()
 
-        # Insert jobs in reverse chronological order
+        # Insert out of order so the ORDER BY is actually exercised.
         for days_ago in [5, 15, 10, 20, 1]:
             timestamp = (now - timedelta(days=days_ago)).isoformat()
             cursor.execute(
@@ -254,7 +240,6 @@ class TestJobStoreSelectiveFiltering:
             )
         store.conn.commit()
 
-        # Get all jobs
         jobs = store.get_jobs_for_reprocessing(version="v1.0")
 
         # Should be ordered oldest first (20, 15, 10, 5, 1)
@@ -269,7 +254,6 @@ class TestJobStoreSelectiveFiltering:
 
         store.add_job("job_1", "Title", company="Amazon", preprocessing_version="v1.0", tokens=500)
 
-        # Filter for non-existent company
         jobs = store.get_jobs_for_reprocessing(version="v1.0", company_names=["Google"])
 
         assert len(jobs) == 0
@@ -279,7 +263,7 @@ class TestJobStoreSelectiveFiltering:
     def test_get_jobs_for_reprocessing_no_connection(self) -> None:
         """Test that filtering without database connection returns empty list."""
         store = JobStore(":memory:")
-        store.conn = None  # Simulate closed connection
+        store.conn = None
 
         jobs = store.get_jobs_for_reprocessing(version="v1.0")
 
@@ -299,7 +283,6 @@ class TestJobStoreSelectiveFiltering:
         )
         store.conn.commit()
 
-        # Should not error on NULL tokens
         jobs = store.get_jobs_for_reprocessing(version="v1.0")
 
         assert len(jobs) == 1
@@ -342,7 +325,6 @@ class TestJobStoreSelectiveFiltering:
         store.add_job("job_1", "Job", company="Amazon", preprocessing_version="v1.0", tokens=500)
         store.add_job("job_2", "Job", company="AMAZON", preprocessing_version="v1.0", tokens=500)
 
-        # Filter for exact case "Amazon"
         jobs = store.get_jobs_for_reprocessing(version="v1.0", company_names=["Amazon"])
 
         assert len(jobs) == 1
@@ -358,13 +340,13 @@ class TestSelectiveFilteringIntegration:
         """Test realistic gradual migration: old v1.0 jobs in batches."""
         store = JobStore(temp_db)
 
-        # Simulate 100 v1.0 jobs from varied dates
         assert store.conn is not None
         cursor = store.conn.cursor()
         now = datetime.now()
 
         for i in range(100):
-            days_ago = 1 + (i % 60)  # 1-60 days old
+            # Jobs are 1 to 60 days old.
+            days_ago = 1 + (i % 60)
             timestamp = (now - timedelta(days=days_ago)).isoformat()
             cursor.execute(
                 """INSERT INTO job_reviews
@@ -381,16 +363,13 @@ class TestSelectiveFilteringIntegration:
             )
         store.conn.commit()
 
-        # Batch 1: Process oldest 50 jobs from 30+ days ago
         batch_1 = store.get_jobs_for_reprocessing(version="v1.0", min_age_days=30, limit=50)
         assert len(batch_1) <= 50
 
-        # Batch 2: Process next 50 jobs from 20+ days ago
         batch_2 = store.get_jobs_for_reprocessing(version="v1.0", min_age_days=20, limit=50)
         assert len(batch_2) <= 50
 
-        # Verify batches were retrieved successfully
-        assert batch_1 or batch_2  # At least one batch should have results
+        assert batch_1 or batch_2
 
         store.close()
 
@@ -398,7 +377,6 @@ class TestSelectiveFilteringIntegration:
         """Test A/B testing: select high-token jobs from specific companies."""
         store = JobStore(temp_db)
 
-        # Create jobs with varied tokens and companies
         for company in ["Amazon", "Google", "Meta"]:
             for tokens in [300, 600, 1200, 2000]:
                 store.add_job(
@@ -409,7 +387,6 @@ class TestSelectiveFilteringIntegration:
                     tokens=tokens,
                 )
 
-        # Select for A/B test: high-value jobs from Amazon and Google only
         ab_test_jobs = store.get_jobs_for_reprocessing(
             version="v1.0",
             min_tokens=1200,
@@ -417,7 +394,8 @@ class TestSelectiveFilteringIntegration:
             limit=10,
         )
 
-        assert len(ab_test_jobs) == 4  # 2 companies × 2 high-token jobs
+        # 2 companies x 2 high-token jobs.
+        assert len(ab_test_jobs) == 4
         for job in ab_test_jobs:
             assert job["company"] in ["Amazon", "Google"]
             assert job["tokens"] >= 1200
@@ -428,7 +406,6 @@ class TestSelectiveFilteringIntegration:
         """Test identifying jobs with maximum token savings potential."""
         store = JobStore(temp_db)
 
-        # Create jobs with varied token counts
         for i, tokens in enumerate([100, 500, 800, 1200, 1500, 2000, 2500]):
             store.add_job(
                 f"job_{i}",
@@ -437,7 +414,6 @@ class TestSelectiveFilteringIntegration:
                 tokens=tokens,
             )
 
-        # Get jobs with highest savings potential (1500+ tokens)
         high_value = store.get_jobs_for_reprocessing(version="v1.0", min_tokens=1500, limit=5)
 
         assert len(high_value) == 3

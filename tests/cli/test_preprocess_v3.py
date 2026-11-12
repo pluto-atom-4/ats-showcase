@@ -20,11 +20,9 @@ class TestPreprocessVersionValidation:
 
     def test_preprocess_invalid_version_exits_with_error(self) -> None:
         """Invalid preprocessing version exits with code 1."""
-        # Create minimal test data
         extracted_dir = Path("data/extracted_jobs")
         extracted_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create a minimal jobs file
         jobs_file = extracted_dir / "test_jobs.json"
         jobs_file.write_text('[{"title": "Test", "company": "TestCo", "description": "Test desc"}]')
 
@@ -36,7 +34,6 @@ class TestPreprocessVersionValidation:
             # Invalid version should cause exit code 1
             assert result.exit_code == 1
         finally:
-            # Cleanup
             if jobs_file.exists():
                 jobs_file.unlink()
 
@@ -127,11 +124,9 @@ class TestBuildSectionedRequirements:
         # Monkeypatch to skip spaCy model loading
         monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
 
-        # Create real detector and preprocessor
         detector = SectionDetector()
         preprocessor = Preprocessor(extract_requirements=False, section_engine=detector)
 
-        # Test text with Requirements section and Benefits section
         clean_text = """## Requirements
 - 5+ years Python experience required
 - Must know SQL
@@ -140,10 +135,8 @@ class TestBuildSectionedRequirements:
 - Health insurance
 - 401k matching"""
 
-        # Call the helper
         result = _build_sectioned_requirements(preprocessor, clean_text)
 
-        # Assert exact values based on real output
         assert result is not None
         assert result["schema_version"] == "3.0"
         assert [r["text"] for r in result["requirements"]] == ["5+ years Python experience required", "Must know SQL"]
@@ -154,7 +147,7 @@ class TestBuildSectionedRequirements:
         """Preprocessor without section_engine returns None (v2.0 path)."""
         monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
 
-        # Create preprocessor WITHOUT section_engine (v2.0 behavior)
+        # Without section_engine this is v2.0 behavior.
         preprocessor = Preprocessor(extract_requirements=False, section_engine=None)
 
         clean_text = """## Requirements
@@ -177,7 +170,6 @@ class TestPreprocessSingleJobV3:
         preprocessor.nlp = MagicMock()
         preprocessor.extract_entities = MagicMock(return_value=([], [], []))
         preprocessor.extract_sectioned_requirements = MagicMock(return_value=None)
-        # Mock the doc object
         doc = MagicMock()
         doc._ = MagicMock()
         doc._.requirements = None
@@ -254,9 +246,10 @@ class TestPreprocessSingleJobV3:
             "2026-09-24",
             show_estimates=False,
             job_index=1,
-            preprocessing_version="3.0",  # Without v-prefix
+            # Without the "v" prefix; the job must normalize it to "v3.0".
+            preprocessing_version="3.0",
         )
 
         assert result is not None
         prep_job, tokens, cost, reqs = result
-        assert prep_job.preprocessing_version == "v3.0"  # Normalized
+        assert prep_job.preprocessing_version == "v3.0"

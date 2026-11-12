@@ -34,7 +34,6 @@ class TestPreprocessingVersionSchema:
 
         cursor = reviewer.conn.cursor()
 
-        # Insert job without specifying preprocessing_version
         cursor.execute(
             """INSERT INTO job_reviews
                (job_id, title, location, company, status, crawled_at)
@@ -43,7 +42,6 @@ class TestPreprocessingVersionSchema:
         )
         reviewer.conn.commit()
 
-        # Retrieve and check default
         cursor.execute("SELECT preprocessing_version FROM job_reviews WHERE job_id = ?", ("test_job_1",))
         row = cursor.fetchone()
         assert row is not None
@@ -55,7 +53,6 @@ class TestPreprocessingVersionSchema:
 
         cursor = reviewer.conn.cursor()
 
-        # Insert job with v1.0
         cursor.execute(
             """INSERT INTO job_reviews
                (job_id, title, location, company, status, preprocessing_version, crawled_at)
@@ -64,7 +61,6 @@ class TestPreprocessingVersionSchema:
         )
         reviewer.conn.commit()
 
-        # Retrieve and verify
         cursor.execute("SELECT preprocessing_version FROM job_reviews WHERE job_id = ?", ("test_job_v1",))
         row = cursor.fetchone()
         assert row is not None
@@ -76,7 +72,6 @@ class TestPreprocessingVersionSchema:
 
         cursor = reviewer.conn.cursor()
 
-        # Insert job with v2.0
         cursor.execute(
             """INSERT INTO job_reviews
                (job_id, title, location, company, status, preprocessing_version, crawled_at)
@@ -85,7 +80,6 @@ class TestPreprocessingVersionSchema:
         )
         reviewer.conn.commit()
 
-        # Retrieve and verify
         cursor.execute("SELECT preprocessing_version FROM job_reviews WHERE job_id = ?", ("test_job_v2",))
         row = cursor.fetchone()
         assert row is not None
@@ -97,7 +91,6 @@ class TestPreprocessingVersionSchema:
 
         cursor = reviewer.conn.cursor()
 
-        # Insert v1.0 job
         cursor.execute(
             """INSERT INTO job_reviews
                (job_id, title, location, company, status, preprocessing_version, crawled_at)
@@ -105,7 +98,6 @@ class TestPreprocessingVersionSchema:
             ("job_v1_1", "Title1", "Remote", "Co1", "pending", "v1.0"),
         )
 
-        # Insert v2.0 job
         cursor.execute(
             """INSERT INTO job_reviews
                (job_id, title, location, company, status, preprocessing_version, crawled_at)
@@ -115,7 +107,6 @@ class TestPreprocessingVersionSchema:
 
         reviewer.conn.commit()
 
-        # Query both
         cursor.execute("SELECT COUNT(*) as count FROM job_reviews WHERE preprocessing_version = ?", ("v1.0",))
         v1_count = cursor.fetchone()["count"]
 

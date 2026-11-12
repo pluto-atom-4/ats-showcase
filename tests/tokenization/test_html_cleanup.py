@@ -99,10 +99,8 @@ class TestIsBoilerplatePhrase:
 
     def test_category_specific_check(self):
         """Check boilerplate by specific category."""
-        # Should match legal_compliance category
         assert is_boilerplate_phrase("Equal Opportunity", category="legal_compliance")
 
-        # Should not match other categories
         assert not is_boilerplate_phrase("Equal Opportunity", category="salary_benefits")
 
     def test_invalid_category(self):
@@ -132,7 +130,6 @@ class TestRemoveBoilerplate:
         """Remove section header artifacts."""
         text = "Job Description: We need a developer. Requirements: Python skills needed."
         cleaned = remove_boilerplate(text)
-        # Headers should be removed
         assert "Job Description:" not in cleaned
         assert "Requirements:" not in cleaned
 
@@ -155,7 +152,6 @@ class TestRemoveBoilerplate:
         """Remove HTML entity artifacts."""
         text = "Requirements&nbsp;&nbsp;Position Details&nbsp;We are looking."
         cleaned = remove_boilerplate(text)
-        # Extra spaces should be cleaned up
         assert "  " not in cleaned
 
     def test_empty_result_handling(self):
@@ -245,13 +241,11 @@ class TestIntegrationBoilerplateRemoval:
 
         cleaned = remove_boilerplate(text)
 
-        # Boilerplate should be removed
         assert "Equal Opportunity" not in cleaned
         assert "Job Description:" not in cleaned
         assert "Apply Now" not in cleaned
         assert "Competitive salary" not in cleaned.lower()
 
-        # Content should be preserved
         assert "Python" in cleaned
         assert "5+" in cleaned or "5" in cleaned
 
@@ -268,6 +262,4 @@ class TestIntegrationBoilerplateRemoval:
 
         cleaned = remove_boilerplate(text)
 
-        # All categories should be partially cleaned
-        # (some patterns may be partial matches)
         assert len(cleaned) < len(text)

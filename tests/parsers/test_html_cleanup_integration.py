@@ -23,7 +23,6 @@ class TestCleanHtmlFullPipeline:
         html = "<h1>Senior Developer</h1><p>Equal Opportunity Employer.</p>"
         result = clean_html(html)
 
-        # Headers preserved, boilerplate removed
         assert "Senior" in result
         assert "Equal Opportunity" not in result
         assert isinstance(result, str)
@@ -41,7 +40,6 @@ class TestCleanHtmlFullPipeline:
         html = "<p>Skills&nbsp;&nbsp;&amp;&nbsp;Experience: C++ &lt;-&gt; Python</p>"
         result = clean_html(html)
 
-        # Entities should be removed/normalized
         assert "&nbsp;" not in result
         assert "&amp;" not in result
         assert "Skills" in result
@@ -52,10 +50,8 @@ class TestCleanHtmlFullPipeline:
         result_with_headers = clean_html(html, include_section_headers=True)
         result_without_headers = clean_html(html, include_section_headers=False)
 
-        # Both should be valid strings
         assert isinstance(result_with_headers, str)
         assert isinstance(result_without_headers, str)
-        # Content should be preserved in both cases
         assert "Python" in result_with_headers
         assert "Python" in result_without_headers
 
@@ -63,11 +59,11 @@ class TestCleanHtmlFullPipeline:
         """Boilerplate categories can be skipped."""
         html = "<p>Salary: $100K. We are committed to diversity.</p>"
 
-        # Skip salary_benefits - should preserve "$100K"
+        # Skipping salary_benefits must preserve "$100K".
         result = clean_html(html, skip_boilerplate_categories={"salary_benefits"})
         assert "$" in result or "100" in result
 
-        # Skip company_boilerplate - should preserve "committed"
+        # Skipping company_boilerplate must preserve "committed".
         result = clean_html(html, skip_boilerplate_categories={"company_boilerplate"})
         assert "committed" in result.lower()
 
@@ -76,9 +72,7 @@ class TestCleanHtmlFullPipeline:
         html = "<p>Senior   Developer   with   experience.</p>"
         result = clean_html(html)
 
-        # Should not have double spaces
         assert "   " not in result
-        # Content should be present
         assert "Senior" in result or "Developer" in result
 
     def test_html_to_markdown_beautifulsoup_fallback_explicit(self) -> None:
@@ -108,7 +102,6 @@ class TestCleanHtmlFullPipeline:
 
         html = "<p>content</p>"
 
-        # Mock both to fail
         with (
             patch("src.parsers.html_to_markdown.MarkItDown") as mock_markitdown,
             patch("src.parsers.html_to_markdown._html_to_markdown_via_beautifulsoup") as mock_bs,
@@ -126,12 +119,10 @@ class TestCleanHtmlFullPipeline:
 
         html = "<h1>Senior Developer</h1><p>Equal Opportunity Employer.</p>"
 
-        # Force BeautifulSoup path by failing MarkItDown
         with patch("src.parsers.html_to_markdown.MarkItDown") as mock_markitdown:
             mock_markitdown.return_value.convert.side_effect = RuntimeError("MarkItDown unavailable")
             result = clean_html(html)
 
-        # Should clean via BeautifulSoup and apply full pipeline
         assert "Senior" in result or "Developer" in result, "Should extract content via BeautifulSoup"
         assert "Equal Opportunity" not in result, "Should remove boilerplate even via BS path"
         assert isinstance(result, str)
@@ -163,11 +154,8 @@ class TestBoilerplateRemovalCategories:
         )
         result = clean_html(html)
 
-        # Headers should be removed (or at least content extracted)
         assert "Senior Python Developer" in result or "Python" in result
-        # "JD:" pattern should be removed
         assert "JD:" not in result
-        # "Job Description:" should be removed
         assert "Job Description:" not in result
 
     def test_company_boilerplate_removal(self) -> None:
@@ -184,7 +172,6 @@ class TestBoilerplateRemovalCategories:
         html = "<p>Full-time position</p><p>Part-time contract</p><p>Temporary role</p>"
         result = clean_html(html)
 
-        # Full-time should be removed
         assert "Full-time" not in result
         assert "Part-time" not in result
         assert "Temporary" not in result
@@ -202,7 +189,6 @@ class TestBoilerplateRemovalCategories:
         html = "<p>Competitive salary: $100K-$150K</p><p>Health benefits included</p><p>401(k) retirement plan</p>"
         result = clean_html(html)
 
-        # Salary patterns should be mostly removed
         assert "Competitive salary" not in result.lower()
         assert "401(k)" not in result
         assert "Health benefits" not in result.lower()
@@ -274,7 +260,6 @@ class TestEdgeCases:
         large_html = "<p>Content here.</p>" * 5000
         result = clean_html(large_html)
 
-        # Should return valid string (may be compressed)
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -298,12 +283,10 @@ class TestEdgeCases:
         )
         result = clean_html(html)
 
-        # Content should be preserved
         assert "Python" in result
         assert "backend" in result
         assert "5+" in result or "5" in result
 
-        # Boilerplate should be removed
         assert "Equal Opportunity" not in result
         assert "committed" not in result.lower()
         assert "Apply Now" not in result
@@ -351,12 +334,9 @@ class TestCategorySkipping:
         """Skip one boilerplate category."""
         html = "<p>Competitive salary: $100K-$150K</p>"
 
-        # Without skip
         result_normal = clean_html(html)
-        # With skip
         result_skip = clean_html(html, skip_boilerplate_categories={"salary_benefits"})
 
-        # Skip should preserve more content
         assert len(result_skip) >= len(result_normal)
 
     def test_skip_multiple_categories(self) -> None:
@@ -365,7 +345,6 @@ class TestCategorySkipping:
 
         result = clean_html(html, skip_boilerplate_categories={"salary_benefits", "time_references"})
 
-        # Should preserve salary and time reference info
         assert "$" in result or "100" in result
         assert "Full-time" in result or "Full" in result
 
@@ -373,7 +352,6 @@ class TestCategorySkipping:
         """Invalid category name doesn't crash."""
         html = "<p>Test content</p>"
 
-        # Should not crash, just ignore invalid category
         result = clean_html(html, skip_boilerplate_categories={"nonexistent_category"})
 
         assert "Test" in result
@@ -387,8 +365,7 @@ class TestSectionHeaderSynthesis:
         html = "<p>Qualifications</p><p>- Python 5+ years</p><p>Requirements</p><p>- AWS experience</p>"
         result = clean_html(html, include_section_headers=True)
 
-        # Headers should be synthesized
-        # (may show as "##" or just be structured differently)
+        # Header format varies (## or structured); assert content only.
         assert "Python" in result
         assert "AWS" in result
 
@@ -398,7 +375,6 @@ class TestSectionHeaderSynthesis:
 
         result = clean_html(html, include_section_headers=False)
 
-        # Should still process content
         assert "Python" in result
 
 
@@ -410,7 +386,6 @@ class TestPerformance:
         """Cleaning 100 job descriptions completes in reasonable time."""
         import time
 
-        # Generate 100 realistic job descriptions
         job_html = (
             "<h1>Senior Python Developer</h1>"
             "<p>Equal Opportunity Employer.</p>"
@@ -444,7 +419,6 @@ class TestNormalizationAndSpacing:
         html = "<p>Line 1</p>\n\n\n<p>Line 2</p>"
         result = clean_html(html)
 
-        # Should not have triple+ newlines
         assert "\n\n\n" not in result
         assert isinstance(result, str)
 
@@ -476,11 +450,9 @@ class TestRealWorldExamples:
         )
         result = clean_html(html)
 
-        # Content preserved
         assert "JavaScript" in result or "Python" in result
         assert "AWS" in result or "Docker" in result
 
-        # Boilerplate removed
         assert "equal opportunity" not in result.lower()
         assert "Apply Now" not in result
 
@@ -510,12 +482,10 @@ class TestRealWorldExamples:
         )
         result = clean_html(html)
 
-        # Core content preserved
         assert "Engineering Manager" in result or "Manager" in result
         assert "lead" in result.lower() or "architect" in result.lower()
         assert "10+" in result or "10" in result
 
-        # Boilerplate removed
         assert "committed" not in result.lower()
         assert "Equal Opportunity" not in result
         assert "Apply Now" not in result

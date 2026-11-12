@@ -209,11 +209,9 @@ class TestJobTableFilterLogic:
             },
         ]
 
-        # Search for Python
         result = self._filter_by_search(jobs, "python")
         assert len(result) == 2
 
-        # Then filter by confirmed
         result = self._filter_by_status(result, "confirmed")
         assert len(result) == 1
         assert "Python" in result[0]["title"]
@@ -235,13 +233,11 @@ class TestJobTableFilterLogic:
             },
         ]
 
-        # Apply both search and filter
         result = self._filter_by_search(jobs, "python")
         result = self._filter_by_status(result, "confirmed")
         assert len(result) == 1
 
-        # Reset search (empty string)
-        jobs_all = jobs  # Start from original
+        jobs_all = jobs
         result = self._filter_by_search(jobs_all, "")
         result = self._filter_by_status(result, "confirmed")
-        assert len(result) == 2  # Both confirmed
+        assert len(result) == 2

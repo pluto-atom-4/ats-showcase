@@ -98,7 +98,6 @@ class TestExtractV3Metrics:
         try:
             count, sections, req_by_section, avg_conf, result = parity_check._extract_v3_metrics(text)
 
-            # Exact assertions for parity_benefits_heavy.md
             assert count == 5
             assert sections == ["SECTION_REQUIREMENTS"]
             assert avg_conf == pytest.approx(1.0, abs=0.01)
@@ -109,7 +108,6 @@ class TestExtractV3Metrics:
             assert "benefits" not in req_by_section
             assert "compensation" not in req_by_section
 
-            # Result should be valid SectionedResult
             assert result is not None
             assert result.schema_version == "3.0"
 
@@ -133,7 +131,6 @@ class TestExtractV3Metrics:
         try:
             count, sections, req_by_section, avg_conf, result = parity_check._extract_v3_metrics(text)
 
-            # Exact assertions for parity_no_headers.md
             assert count == 0
             assert sections == []
             assert req_by_section == {}
@@ -171,7 +168,6 @@ class TestExtractV3Metrics:
         try:
             count, sections, req_by_section, avg_conf, result = parity_check._extract_v3_metrics(text)
 
-            # Exact assertions (same as monkeypatched test)
             assert count == 5
             assert sections == ["SECTION_REQUIREMENTS"]
             assert avg_conf == pytest.approx(1.0, abs=0.01)
@@ -232,16 +228,14 @@ class TestValidateSchemaResult:
 
             _, _, _, _, result = parity_check._extract_v3_metrics(text)
             assert result is not None
-            # Real result should pass validation
             assert parity_check._validate_schema_result(result) is True
         finally:
             prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
 
     def test_invalid_schema_version(self) -> None:
         """Invalid schema_version fails validation."""
-        # Create mock result with wrong version
         mock_result = MagicMock()
-        mock_result.schema_version = "2.0"  # Wrong version
+        mock_result.schema_version = "2.0"
         mock_result.requirements = []
         mock_result.requirements_by_section = {}
 
@@ -251,7 +245,7 @@ class TestValidateSchemaResult:
         """Confidence > 1.0 fails validation."""
         mock_req = MagicMock()
         mock_req.text = "5+ years Python"
-        mock_req.final_confidence = 1.5  # Out of range
+        mock_req.final_confidence = 1.5
 
         mock_result = MagicMock()
         mock_result.schema_version = "3.0"
@@ -264,7 +258,7 @@ class TestValidateSchemaResult:
         """Confidence < 0.0 fails validation."""
         mock_req = MagicMock()
         mock_req.text = "5+ years Python"
-        mock_req.final_confidence = -0.1  # Out of range
+        mock_req.final_confidence = -0.1
 
         mock_result = MagicMock()
         mock_result.schema_version = "3.0"
@@ -285,7 +279,8 @@ class TestValidateSchemaResult:
         mock_result = MagicMock()
         mock_result.schema_version = "3.0"
         mock_result.requirements = [mock_req1, mock_req2]
-        mock_result.requirements_by_section = {"SECTION_REQUIREMENTS": 1}  # Should be 2
+        # Deliberate mismatch: 2 requirements are expected.
+        mock_result.requirements_by_section = {"SECTION_REQUIREMENTS": 1}
 
         assert parity_check._validate_schema_result(mock_result) is False
 
@@ -344,7 +339,6 @@ class TestComputeTextDiff:
         v3_texts = ["5+ Years PYTHON", "Experience with Django"]
         legacy_texts = ["5+ years python", "EXPERIENCE WITH DJANGO"]
         v3_only, legacy_only = parity_check._compute_text_diff(v3_texts, legacy_texts)
-        # After normalization, they're identical
         assert v3_only == 0
         assert legacy_only == 0
 
@@ -364,11 +358,9 @@ class TestGenerateParityReport:
         prep_module.Preprocessor._load_model = mock_load_model  # type: ignore[method-assign]
 
         try:
-            # Monkeypatch model check to return False
             with patch.object(parity_check, "_check_model_available", return_value=False):
                 report, exit_code = parity_check._generate_parity_report([parity_benefits_heavy_fixture])
 
-            # Exact assertions on report content
             assert "# Parity Report: v3 vs Legacy Preprocessing\n" in report
             expected_row = (
                 "| parity_benefits_heavy.md | model-unavailable | 5 | SECTION_REQUIREMENTS | "
@@ -395,9 +387,7 @@ class TestGenerateParityReport:
             with patch.object(parity_check, "_check_model_available", return_value=False):
                 report, _ = parity_check._generate_parity_report([parity_benefits_heavy_fixture])
 
-            # Check markdown table structure
             lines = report.split("\n")
-            # Find the table header and separator
             table_start = -1
             for i, line in enumerate(lines):
                 if line.startswith("| Fixture | Status | v3 Count"):
@@ -405,7 +395,6 @@ class TestGenerateParityReport:
                     break
 
             assert table_start >= 0, "Table header not found"
-            # Next line should be separator (|---|---|...)
             separator_line = lines[table_start + 1]
             expected_sep = "|---------|--------|----------|-------------|----------------|--------------|-------|"
             assert separator_line == expected_sep
@@ -427,12 +416,10 @@ class TestGenerateParityReport:
             with patch.object(parity_check, "_check_model_available", return_value=False):
                 report, exit_code = parity_check._generate_parity_report([parity_benefits_heavy_fixture])
 
-            # Write to temp file
             output_file = tmp_path / "test_report.md"
             output_file.write_text(report, encoding="utf-8")
 
             assert output_file.exists()
-            # Exact check: file content matches report exactly
             assert output_file.read_text(encoding="utf-8") == report
         finally:
             prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
@@ -452,7 +439,6 @@ class TestGenerateParityReport:
             text = parity_check._load_fixture(parity_benefits_heavy_fixture)
             assert text is not None
 
-            # Monkeypatch _validate_schema_result to return False (schema violation)
             with patch.object(parity_check, "_validate_schema_result", return_value=False):
                 with patch.object(parity_check, "_check_model_available", return_value=False):
                     report, exit_code = parity_check._generate_parity_report([parity_benefits_heavy_fixture])
@@ -464,7 +450,6 @@ class TestGenerateParityReport:
 
     def test_report_v3_extraction_exception_exit_code_0(self, tmp_path: Path) -> None:
         """v3 extraction exception sets status=error but exit code stays 0."""
-        # Create temporary fixture that will cause extraction to fail
         temp_fixture = tmp_path / "bad_fixture.md"
         temp_fixture.write_text("Some text", encoding="utf-8")
 
@@ -478,7 +463,7 @@ class TestGenerateParityReport:
         prep_module.Preprocessor._load_model = mock_load_model  # type: ignore[method-assign]
 
         try:
-            # Monkeypatch _extract_v3_metrics to raise exception
+
             def mock_extract_v3(*args: Any, **kwargs: Any) -> Any:
                 raise RuntimeError("Extraction failed")
 
@@ -488,7 +473,6 @@ class TestGenerateParityReport:
 
             # Exception should NOT set exit code to 1; exit code should be 0
             assert exit_code == 0
-            # Report should mention error
             assert "| error | Error |" in report
             assert "Extraction failed" in report
         finally:
@@ -496,12 +480,10 @@ class TestGenerateParityReport:
 
     def test_report_v3_only_legacy_only_count(self, parity_benefits_heavy_fixture: Path) -> None:
         """Report includes v3-only/legacy-only text counts when legacy runs."""
-        # Mock v3 and legacy to return controlled texts for diff testing
         v3_texts = ["Python", "SQL", "Spark", "Docker", "v3-unique"]
         legacy_texts = ["Python", "SQL", "Spark", "Docker", "legacy-unique"]
 
         def mock_v3_extract(text: str) -> tuple[int, list[str], dict[str, int], float, Any]:
-            # Return real SectionedResult mock with v3_texts
             result = MagicMock()
             result.schema_version = "3.0"
             result.requirements = [MagicMock(text=t, final_confidence=0.9) for t in v3_texts]
@@ -516,7 +498,6 @@ class TestGenerateParityReport:
                 with patch.object(parity_check, "_check_model_available", return_value=True):
                     report, exit_code = parity_check._generate_parity_report([parity_benefits_heavy_fixture])
 
-        # Report should mention text diff counts
         assert "v3-only: 1" in report
         assert "legacy-only: 1" in report
         assert exit_code == 0
@@ -549,16 +530,12 @@ class TestMain:
                     ]
                 )
 
-            # Check exit code
             assert exit_code == 0
 
-            # Check output file was created
             assert output_file.exists()
             content = output_file.read_text(encoding="utf-8")
-            # Exact check: file starts with exact report header
             assert content.startswith("# Parity Report: v3 vs Legacy Preprocessing\n")
 
-            # Check stderr message exactly
             captured = capsys.readouterr()
             assert f"Report written to {output_file}" in captured.err
         finally:
@@ -580,7 +557,6 @@ class TestMain:
                 exit_code = parity_check.main(["--fixtures", str(parity_benefits_heavy_fixture)])
 
             captured = capsys.readouterr()
-            # Report should start with exact header in stdout
             assert captured.out.startswith("# Parity Report: v3 vs Legacy Preprocessing\n")
             assert exit_code == 0
         finally:

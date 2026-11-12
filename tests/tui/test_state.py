@@ -95,7 +95,7 @@ class TestPhaseMetrics:
         start = fake_clock.current
         fake_clock.advance(2)
         metrics = PhaseMetrics(start_time=start, processed_items=10)
-        assert metrics.items_per_second == pytest.approx(5.0)  # 10 items / 2s
+        assert metrics.items_per_second == pytest.approx(5.0)
 
     def test_eta_seconds_no_speed(self):
         """ETA is 0 when speed is 0."""
@@ -248,7 +248,6 @@ class TestStateManager:
     def test_update_job_nonexistent(self, state_manager):
         """update_job silently ignores nonexistent job."""
         state_manager.update_job("nonexistent", status="confirmed")
-        # Should not raise, just do nothing
 
     def test_update_top_matches_empty(self, state_manager):
         """update_top_matches handles empty list."""
@@ -264,7 +263,6 @@ class TestStateManager:
         ]
         state_manager.update_top_matches(matches)
 
-        # Should be sorted: 100, 75, 50
         assert state_manager.top_matches[0]["overall_score"] == 100
         assert state_manager.top_matches[1]["overall_score"] == 75
         assert state_manager.top_matches[2]["overall_score"] == 50
@@ -275,7 +273,6 @@ class TestStateManager:
         state_manager.update_top_matches(matches)
 
         assert len(state_manager.top_matches) == 5
-        # Top 5 should have scores 100, 99, 98, 97, 96
         for i, match in enumerate(state_manager.top_matches):
             assert match["overall_score"] == 100 - i
 
@@ -304,20 +301,17 @@ class TestStateManager:
 
     def test_workflow_scenario(self, state_manager):
         """Full workflow: crawl → preprocess → assess → export."""
-        # Crawl phase
         state_manager.start_phase("crawl", total_items=3)
         for i in range(3):
             state_manager.add_job(f"job{i}", f"Title {i}", f"Company {i}")
             state_manager.increment_phase_progress("crawl", tokens=100)
         state_manager.complete_phase("crawl")
 
-        # Preprocess phase
         state_manager.start_phase("preprocess", total_items=3)
         for _ in range(3):
             state_manager.increment_phase_progress("preprocess", tokens=200)
         state_manager.complete_phase("preprocess")
 
-        # Assess phase with top matches
         state_manager.start_phase("assess", total_items=3)
         matches = [
             {"id": "job0", "overall_score": 95},
@@ -329,7 +323,6 @@ class TestStateManager:
             state_manager.increment_phase_progress("assess", tokens=300, cost=0.0009)
         state_manager.complete_phase("assess")
 
-        # Verify final state
         assert state_manager.phase_status["crawl"] == PhaseStatus.COMPLETED
         assert state_manager.phase_status["preprocess"] == PhaseStatus.COMPLETED
         assert state_manager.phase_status["assess"] == PhaseStatus.COMPLETED

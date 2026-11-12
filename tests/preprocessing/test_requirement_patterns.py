@@ -84,14 +84,12 @@ class TestPatternStructure:
     def test_specific_patterns_present(self) -> None:
         """Verify critical patterns from POC are present."""
         triggers = {p["trigger"] for p in REQUIREMENT_PATTERNS}
-        # Representative patterns from each tier
         assert "required" in triggers
         assert "must" in triggers
         assert "essential" in triggers
         assert "should" in triggers
         assert "prefer" in triggers
         assert "nice to have" in triggers
-        # Phase C patterns
         assert "degree abbreviation" in triggers
         assert "communication skills" in triggers
 
@@ -158,7 +156,6 @@ class TestClassifySentence:
     def test_negation_no_experience_returns_none(self) -> None:
         """'no experience' with negation context returns None."""
         result = classify_sentence("No experience with Docker is required, but helpful.")
-        # "required" is in sentence but "no" is nearby, should negate
         assert result is None
 
     def test_negation_without_returns_none(self) -> None:
@@ -173,7 +170,6 @@ class TestClassifySentence:
 
         assert no_paren is not None
         assert with_paren is not None
-        # Both match "must", but paren reduces confidence
         assert with_paren.confidence == pytest.approx(no_paren.confidence - 0.10)
 
     def test_conditional_if_lowers_confidence(self) -> None:
@@ -183,7 +179,6 @@ class TestClassifySentence:
 
         assert no_if is not None
         assert with_if is not None
-        # Both match "must", but "if" reduces confidence
         assert with_if.confidence == pytest.approx(no_if.confidence - 0.15)
 
     def test_nice_to_have_lowers_confidence(self) -> None:
@@ -203,21 +198,17 @@ class TestClassifySentence:
 
         assert no_caps is not None
         assert with_caps is not None
-        # Both match "must", but all-caps boosts confidence
         assert with_caps.confidence == pytest.approx(no_caps.confidence + 0.05)
 
     def test_confidence_clamped_to_lower_bound(self) -> None:
         """Confidence must not go below 0.0."""
-        # Find a low-confidence pattern and apply heavy adjustments
         sentence = "Nice to have (preferred) experience if you have some background knowledge."
         result = classify_sentence(sentence)
-        # If result is not None, confidence must be >= 0.0
         if result is not None:
             assert result.confidence >= 0.0
 
     def test_confidence_clamped_to_upper_bound(self) -> None:
         """Confidence must not exceed 1.0."""
-        # Create sentence that might boost beyond 1.0 (unlikely but safe)
         sentence = "Must have PYTHON SKILLS KNOWLEDGE WITH LANGUAGE EXPERIENCE."
         result = classify_sentence(sentence)
         assert result is not None
@@ -245,21 +236,18 @@ class TestClassifySentence:
 
     def test_best_match_by_priority(self) -> None:
         """When multiple patterns match, lower priority wins."""
-        # "required" (priority 1, conf 0.95) and "prefer" (priority 2, conf 0.65)
+        # "required" (priority 1, conf 0.95) beats "prefer" (priority 2, conf 0.65): lower priority number wins.
         sentence = "Preferred but required skill."
         result = classify_sentence(sentence)
-        # Should match both, but "required" has lower priority number
         assert result is not None
         assert result.trigger_word == "required"
         assert result.priority == 1
 
     def test_best_match_by_confidence_same_priority(self) -> None:
         """When priorities match, higher confidence wins."""
-        # "must" (priority 1, conf 0.93) and "ability_in_bullet" (priority 1,
-        # conf 0.90)
+        # "must" and "ability_in_bullet" tie on priority 1; "must" wins on confidence (0.93 vs 0.90).
         sentence = "Must have ability to code."
         result = classify_sentence(sentence)
-        # Both should match, but "must" has higher confidence
         assert result is not None
         assert result.trigger_word == "must"
         assert result.confidence == pytest.approx(0.93)

@@ -108,19 +108,15 @@ class TestRequirementExtractionIntegration:
         job = sample_jobs[0]
         description = job["description"]
 
-        # Extract trigger-based requirements
         trigger_reqs_json = preprocessor.extract_trigger_requirements(description)
 
-        # Verify extraction was successful
         assert trigger_reqs_json is not None, "No requirements extracted"
         assert isinstance(trigger_reqs_json, str), "Requirements should be JSON string"
 
-        # Parse JSON and validate structure
         requirements = json.loads(trigger_reqs_json)
         assert isinstance(requirements, list), "Requirements should be JSON array"
         assert len(requirements) > 0, "Should extract at least one requirement"
 
-        # Validate requirement dict structure
         for req in requirements:
             assert "text" in req
             assert "trigger_word" in req
@@ -138,14 +134,12 @@ class TestRequirementExtractionIntegration:
             trigger_reqs_json = preprocessor.extract_trigger_requirements(job["description"])
             extraction_results.append((job["job_id"], trigger_reqs_json))
 
-        # Verify all jobs had requirements extracted
         for job_id, reqs_json in extraction_results:
             assert reqs_json is not None, f"No requirements extracted for {job_id}"
 
             requirements = json.loads(reqs_json)
             assert len(requirements) > 0, f"Empty requirements for {job_id}"
 
-            # Log extraction summary
             print(f"{job_id}: {len(requirements)} requirements extracted")
 
     def test_requirement_trigger_word_variety(self, preprocessor, sample_jobs):
@@ -159,7 +153,6 @@ class TestRequirementExtractionIntegration:
                 for req in requirements:
                     all_trigger_words.add(req["trigger_word"])
 
-        # Should capture multiple trigger words from tier 1-3
         assert len(all_trigger_words) > 0, "Should capture multiple trigger words"
         print(f"Captured trigger words: {sorted(all_trigger_words)}")
 
@@ -197,7 +190,7 @@ class TestRequirementExtractionIntegration:
                         confidence_by_trigger[trigger] = []
                     confidence_by_trigger[trigger].append(confidence)
 
-        # Verify Tier 1 triggers have higher confidence on average than Tier 3
+        # Tier 1 triggers must average higher confidence than Tier 3.
         tier1_triggers = {"required", "must", "essential", "ability to", "experience in"}
         tier3_triggers = {"nice to have", "ideal", "bonus"}
 
@@ -226,7 +219,6 @@ class TestRequirementExtractionIntegration:
 
         job = sample_jobs[0]
 
-        # Should return None when extraction is disabled
         result = preprocessor_disabled.extract_trigger_requirements(job["description"])
         assert result is None, "Should return None when extraction is disabled"
 
@@ -237,14 +229,11 @@ class TestRequirementExtractionIntegration:
         trigger_reqs_json = preprocessor.extract_trigger_requirements(job["description"])
         assert trigger_reqs_json is not None
 
-        # Should be able to deserialize without error
         requirements = json.loads(trigger_reqs_json)
 
-        # Should be able to serialize back to JSON without error
         reserialized = json.dumps(requirements, ensure_ascii=False)
         assert isinstance(reserialized, str)
 
-        # Reserialized should match original (lossy comparison)
         requirements_2 = json.loads(reserialized)
         assert len(requirements_2) == len(requirements)
 
@@ -260,5 +249,4 @@ class TestRequirementExtractionIntegration:
 
         result = preprocessor.extract_trigger_requirements(no_triggers_text)
 
-        # Should return None or empty JSON
         assert result is None or json.loads(result) == []

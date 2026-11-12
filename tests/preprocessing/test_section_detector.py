@@ -100,7 +100,8 @@ class TestSectionDetectorBasicDetection:
         assert first.label == SectionLabel.REQUIREMENTS
         assert first.display_name == "Requirements"
         assert first.header_text == "Requirements"
-        assert first.header_start == 3  # after "## "
+        # header_start is the offset after "## ".
+        assert first.header_start == 3
         assert first.header_end == 15
         assert "5 years Python" in first.content_text
 
@@ -118,10 +119,8 @@ class TestSectionDetectorBasicDetection:
         sections = detector.detect(text)
         req_section = next(s for s in sections if s.label == SectionLabel.REQUIREMENTS)
         ben_section = next(s for s in sections if s.label == SectionLabel.BENEFITS)
-        # content_end of req should be at or near the start of "## Benefits"
         assert req_section.content_end == ben_section.header_start
         assert ben_section.content_end == len(text)
-        # Sections ordered by start
         assert req_section.header_start < ben_section.header_start
 
     def test_section_ordering_by_start(self) -> None:
@@ -184,7 +183,6 @@ class TestSectionDetectorCustomPatterns:
         text = "## Schooling\nBachelor's degree required"
         detector = SectionDetector(patterns=custom_pattern)
         sections = detector.detect(text)
-        # Should find the custom pattern
         assert len(sections) == 1
         schooling_matches = [s for s in sections if s.label == SectionLabel.EDUCATION]
         assert len(schooling_matches) == 1
@@ -193,8 +191,7 @@ class TestSectionDetectorCustomPatterns:
     def test_default_patterns_not_mutated(self) -> None:
         """detect does not mutate the original SECTION_RULER_PATTERNS."""
         original_patterns = copy.deepcopy(SECTION_RULER_PATTERNS)
-        _detector = SectionDetector()  # Uses default patterns internally
-        # Verify patterns are unchanged
+        _detector = SectionDetector()
         assert SECTION_RULER_PATTERNS == original_patterns
 
 
@@ -235,7 +232,6 @@ class TestSectionDetectorTargetSections:
         sections = detector.detect(text)
         targeted = detector.target_sections(sections)
         labels = [s.label for s in targeted]
-        # Should be in order of appearance
         assert labels == sorted(labels, key=lambda lbl: [s.header_start for s in sections if s.label == lbl][0])
 
     def test_target_sections_with_custom_target_set(self) -> None:
@@ -245,7 +241,6 @@ class TestSectionDetectorTargetSections:
         text = "## Requirements\nPython\n\n## Qualifications\nBS"
         sections = detector.detect(text)
         targeted = detector.target_sections(sections)
-        # Should only have REQUIREMENTS, not QUALIFICATIONS
         labels = {s.label for s in targeted}
         assert SectionLabel.REQUIREMENTS in labels
         assert SectionLabel.QUALIFICATIONS not in labels
@@ -281,7 +276,6 @@ class TestSectionDetectorInputTruncation:
         assert len(text) == MAX_INPUT_CHARS
         detector = SectionDetector()
         sections = detector.detect(text)
-        # Should work without truncation warning
         assert len(sections) == 1
         assert sections[0].content_end == MAX_INPUT_CHARS
 
@@ -330,17 +324,15 @@ class TestSectionDetectorSpaCyIntegration:
     def test_blank_nlp_created_on_init(self) -> None:
         """SectionDetector initializes blank spaCy pipeline on __init__."""
         detector = SectionDetector()
-        # Verify internal nlp exists and is blank (no model)
         assert detector._nlp is not None
         assert "span_ruler" in detector._nlp.pipe_names
-        assert "tagger" not in detector._nlp.pipe_names  # blank pipeline has no tagger
+        # The pipeline is blank, so it has no tagger.
+        assert "tagger" not in detector._nlp.pipe_names
 
     def test_spans_key_configuration(self) -> None:
         """SectionDetector configures span_ruler with SPANS_KEY."""
         detector = SectionDetector()
-        # The span_ruler should be configured with SPANS_KEY="sections"
         assert detector._nlp is not None
-        # We can verify by checking that SPANS_KEY is used
         assert SPANS_KEY == "sections"
 
 
@@ -353,9 +345,7 @@ class TestSectionDetectorContentText:
         detector = SectionDetector()
         sections = detector.detect(text)
         req = next(s for s in sections if s.label == SectionLabel.REQUIREMENTS)
-        # content_text should not have leading/trailing whitespace
         assert req.content_text == req.content_text.strip()
-        # Should include the actual requirements
         assert req.content_text == "- Must know Python  \n  - Team player"
 
     def test_content_text_multiline(self) -> None:
@@ -364,7 +354,6 @@ class TestSectionDetectorContentText:
         detector = SectionDetector()
         sections = detector.detect(text)
         req = next(s for s in sections if s.label == SectionLabel.REQUIREMENTS)
-        # Should contain all three lines
         assert "Line 1" in req.content_text
         assert "Line 2" in req.content_text
         assert "Line 3" in req.content_text

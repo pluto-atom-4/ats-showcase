@@ -16,9 +16,9 @@ class TestHtmlToMarkdown:
         html = "<p>Range 2020–2024 — the “best” years</p>"
         result = html_to_markdown(html)
 
-        assert "–" in result  # en-dash
-        assert "—" in result  # em-dash
-        assert "“" in result and "”" in result  # curly quotes
+        assert "–" in result
+        assert "—" in result
+        assert "“" in result and "”" in result
 
     def test_basic_heading_conversion(self) -> None:
         """A simple heading + paragraph converts to markdown structure."""
@@ -49,7 +49,7 @@ class TestHtmlToMarkdown:
             mock_markitdown.return_value.convert.side_effect = RuntimeError("boom")
             result = html_to_markdown(html)
 
-        # With BeautifulSoup fallback, text is extracted (not raw HTML returned)
+        # With the BeautifulSoup fallback, text is extracted rather than raw HTML returned.
         assert result != html, "Should use BeautifulSoup fallback, not return raw HTML"
         assert "content that should survive on failure" in result
         assert "<p>" not in result, "Should extract text, not return raw HTML"
@@ -110,7 +110,6 @@ class TestHtmlCleanerMarkItDownIntegration:
 class TestWorkdayHtmlFixtures:
     """Tests for Workday-specific HTML malformations (Issue #230, Phase 1-3)."""
 
-    # Fixture: Workday dt/dd pairs
     WORKDAY_DT_DD_HTML = """
     <dl>
       <dt>Remote Type</dt><dd>Hybrid</dd>
@@ -119,19 +118,16 @@ class TestWorkdayHtmlFixtures:
     </dl>
     """
 
-    # Fixture: Workday with em-dashes concatenating lines
     WORKDAY_WITH_EMDASH = """
     <p>Responsibilities:</p>
     <ul><li>Lead design—architecture work</li></ul>
     """
 
-    # Fixture: Workday with Workday refs (:R\d+ pattern)
     WORKDAY_WITH_REFS = """
     <dl><dt>ID</dt><dd>:R69380</dd></dl>
     <p>Application Close Date: August 20</p>
     """
 
-    # Fixture: Complex Workday job with dividers embedded
     WORKDAY_COMPLEX_JOB = """
     <h2>Senior Python Developer</h2>
     <dl>
@@ -157,7 +153,6 @@ class TestWorkdayHtmlFixtures:
             mock_markitdown.return_value.convert.side_effect = RuntimeError("force fallback")
             result = html_to_markdown(self.WORKDAY_DT_DD_HTML)
 
-        # Should extract text without HTML tags
         assert "<dl>" not in result
         assert "<dt>" not in result
         assert "<dd>" not in result
@@ -178,12 +173,9 @@ class TestWorkdayHtmlFixtures:
         # At minimum, they should not be mixed with other text
         lines = result.split("\n")
         for line in lines:
-            # If :R pattern exists, it should be isolated (not mixed with other content)
             if ":R" in line:
-                # This is acceptable; means it was on its own line
                 pass
             else:
-                # Lines without :R should not have been concatenated
                 assert True
 
     def test_emdash_normalization(self) -> None:
@@ -194,11 +186,10 @@ class TestWorkdayHtmlFixtures:
             mock_markitdown.return_value.convert.side_effect = RuntimeError("force fallback")
             result = html_to_markdown(self.WORKDAY_WITH_EMDASH)
 
-        # Text should not be concatenated at the em-dash
-        # "design—architecture" could stay as-is or be normalized
         assert "Responsibilities" in result
+        # "design—architecture" could stay as-is or be normalized.
         assert "Lead design" in result or "Lead design—architecture" in result
-        # But it should not be "LeaddesignarchitectureNotWork"
+        # Regression guard: must not become "LeaddesignarchitectureNotWork".
         assert "Leaddesign" not in result
 
     def test_divider_isolation_after_synthesis(self) -> None:
@@ -207,14 +198,10 @@ class TestWorkdayHtmlFixtures:
 
         result = normalize_description(self.WORKDAY_COMPLEX_JOB)
 
-        # Check that dividers (---) are on isolated lines
         lines = result.split("\n")
         for line in lines:
             stripped = line.strip()
-            # If line is a divider, it should be ONLY dashes (no other text)
             if "---" in stripped:
-                # This line should be exactly "---" or close to it
-                # Not "text---" or ":R69380---"
                 assert stripped == "---", f"Divider not isolated: '{stripped}'"
 
     def test_extract_sections_with_clean_dividers(self) -> None:
@@ -244,14 +231,11 @@ Lead design and architecture work
         """Full pipeline: Workday HTML -> clean sections -> correct entity routing."""
         from src.parsers.html_to_markdown import clean_html
 
-        # Clean the complex job
         cleaned = clean_html(self.WORKDAY_COMPLEX_JOB, include_section_headers=True)
 
-        # Verify boilerplate is removed but structure is preserved
         assert "Senior Python Developer" in cleaned
         assert "<" not in cleaned and ">" not in cleaned, "No HTML tags should remain"
 
-        # Verify dividers are clean (on isolated lines)
         lines = cleaned.split("\n")
         for line in lines:
             stripped = line.strip()
@@ -269,7 +253,6 @@ class TestDividerNormalization:
         lines = ["content---"]
         result = _normalize_divider_lines(lines)
 
-        # Should split into content and single divider
         assert "content" in result
         assert result.count("---") == 1, f"Expected 1 divider, got {result.count('---')} in {result}"
 
@@ -280,7 +263,7 @@ class TestDividerNormalization:
         lines = ["---Some Content"]
         result = _normalize_divider_lines(lines)
 
-        # Leading divider creates empty first part which is skipped, leaving only the content
+        # A leading divider yields an empty first part, which is skipped, leaving only the content.
         assert "Some Content" in result
         # No divider because the part after --- was not empty, so no final divider is added
         assert "---" not in result or result.count("---") == 0
@@ -300,10 +283,9 @@ class TestDividerNormalization:
         """Test that embedded consecutive dividers are handled correctly."""
         from src.parsers.html_to_markdown import _normalize_divider_lines
 
-        lines = ["text---"]  # This is "text" followed by a divider
+        lines = ["text---"]
         result = _normalize_divider_lines(lines)
 
-        # Should not produce duplicate dividers
         assert result.count("---") == 1, f"Expected 1 divider, got {result.count('---')} in {result}"
 
     def test_normalize_divider_lines_orphaned_refs(self) -> None:
@@ -321,10 +303,10 @@ class TestDividerNormalization:
         """Test that table rows (starting with |) are not processed."""
         from src.parsers.html_to_markdown import _normalize_divider_lines
 
-        lines = ["|---|---|"]  # Markdown table separator (should be unchanged)
+        lines = ["|---|---|"]
         result = _normalize_divider_lines(lines)
 
-        # Table row should be left unchanged (contains --- but not split as content divider)
+        # A table row contains --- but is not a content divider, so it stays unchanged.
         assert result == lines, f"Table row was modified: {result}"
 
 
@@ -342,7 +324,6 @@ class TestBoldHeaderSynthesis:
         ]
         _synthesize_bold_subsection_headers(lines)
 
-        # Bold header should be converted to ### header
         assert lines[1] == "### Responsibilities"
 
     def test_synthesize_bold_subsection_headers_with_trailing_text(self) -> None:
@@ -356,7 +337,6 @@ class TestBoldHeaderSynthesis:
         ]
         _synthesize_bold_subsection_headers(lines)
 
-        # Bold header with trailing text should still be converted
         assert lines[1] == "### Responsibilities"
 
     def test_synthesize_bold_subsection_headers_with_em_dash(self) -> None:
@@ -370,7 +350,6 @@ class TestBoldHeaderSynthesis:
         ]
         _synthesize_bold_subsection_headers(lines)
 
-        # Bold header with em-dash should be converted
         assert lines[1] == "### Qualifications"
 
     def test_synthesize_bold_subsection_headers_no_header_if_no_content(self) -> None:
@@ -382,10 +361,6 @@ class TestBoldHeaderSynthesis:
             "# End of document",
         ]
         _synthesize_bold_subsection_headers(lines)
-
-        # Bold without content after (header or end) should not convert
-        # This is correct behavior - avoid converting if there's no actual content
-        # to follow the header
 
     def test_synthesize_bold_subsection_headers_skip_existing_headers(self) -> None:
         """Test that existing headers are not re-converted."""
@@ -399,9 +374,7 @@ class TestBoldHeaderSynthesis:
         ]
         _synthesize_bold_subsection_headers(lines)
 
-        # Existing ## header should remain unchanged
         assert lines[0] == "## Section Header"
-        # Bold line followed by content should be converted to ###
         assert lines[2] == "### Bold Line"
 
     def test_synthesize_bold_subsection_headers_multiple_sections(self) -> None:
@@ -418,7 +391,6 @@ class TestBoldHeaderSynthesis:
         ]
         _synthesize_bold_subsection_headers(lines)
 
-        # All bold headers should be converted to ###
         assert lines[0] == "### Responsibilities"
         assert lines[2] == "### Skills"
         assert lines[4] == "### Qualifications"

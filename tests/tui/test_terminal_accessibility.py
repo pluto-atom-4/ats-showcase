@@ -35,13 +35,11 @@ class TestTerminalDimensions:
         """Widgets adjust size based on content."""
         state_manager.start_phase("crawl", total_items=100)
 
-        # Simulate adding jobs
         for i in range(10):
             state_manager.add_job(f"job_{i}", f"Title {i}", f"Company {i}")
 
         metrics = state_manager.phase_metrics["crawl"]
         assert metrics.total_items == 100
-        # Widget should be able to handle this data volume
 
 
 class TestColorSchemeSupport:
@@ -52,7 +50,6 @@ class TestColorSchemeSupport:
         panel = BasePanelWidget(StateManager(), phase="crawl")
         css = panel.DEFAULT_CSS
 
-        # Should use semantic tokens like $primary, $accent, $boost
         assert "$primary" in css or "$accent" in css or "$boost" in css, "CSS must use semantic color tokens"
 
     def test_dashboard_color_support(self) -> None:
@@ -60,7 +57,6 @@ class TestColorSchemeSupport:
         dashboard = ATPDashboard(StateManager())
         css = dashboard.CSS
 
-        # Check for color token usage
         semantic_colors = ["$primary", "$accent", "$boost", "$error", "$success"]
         has_colors = any(color in css for color in semantic_colors)
         assert has_colors, "Dashboard should use semantic color tokens"
@@ -87,7 +83,6 @@ class TestAccessibility:
         pb = TUIProgressBar(state_manager, "crawl")
         render = pb.render()
 
-        # Should have clear percentage display
         assert "%" in render, "Progress should show percentage"
         assert re.search(r"\d+%", render), "Should show numeric percentage"
 
@@ -111,7 +106,6 @@ class TestAccessibility:
         ct = CostTracker(state_manager, "assess")
         render = ct.render()
 
-        # Should show formatted tokens and cost
         assert "Token" in render or "token" in render, "Should label tokens"
         assert "$" in render, "Should show cost with currency symbol"
 
@@ -145,7 +139,8 @@ class TestContentOverflow:
 
         assert "job_long" in state_manager.jobs
         job = state_manager.jobs["job_long"]
-        assert job["title"] == long_title  # Stored intact, UI truncates on display
+        # Stored intact; the UI truncates on display.
+        assert job["title"] == long_title
 
     def test_many_top_matches_limited(self, state_manager: StateManager) -> None:
         """Top matches capped at 5 regardless of input."""
@@ -169,7 +164,6 @@ class TestContentOverflow:
     def test_wide_cost_values_formatted(self, state_manager: StateManager) -> None:
         """Large cost values are formatted readably."""
         state_manager.start_phase("assess", total_items=1)
-        # Simulate very large job (unusual case)
         state_manager.increment_phase_progress("assess", tokens=50000, cost=0.15)
 
         cost = state_manager.phase_metrics["assess"].total_cost_usd
@@ -208,11 +202,9 @@ class TestDataIntegrity:
         original_items = state_manager.phase_metrics["crawl"].processed_items
         original_tokens = state_manager.phase_metrics["crawl"].total_tokens
 
-        # Render widgets (in real app context)
         pb = TUIProgressBar(state_manager, "crawl")
         _ = pb.render()
 
-        # State should be unchanged
         assert state_manager.phase_metrics["crawl"].processed_items == original_items
         assert state_manager.phase_metrics["crawl"].total_tokens == original_tokens
 
@@ -224,4 +216,4 @@ class TestDataIntegrity:
         state_manager.update_job("j1", score=90)
 
         assert state_manager.jobs["j1"]["score"] == 90
-        assert state_manager.jobs["j2"]["score"] == 75  # Unchanged
+        assert state_manager.jobs["j2"]["score"] == 75

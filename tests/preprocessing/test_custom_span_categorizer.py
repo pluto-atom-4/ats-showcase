@@ -283,16 +283,11 @@ class TestCustomSpanCategorizer:
 
     def test_zero_length_match_skipped(self) -> None:
         """Zero-length matches should be skipped."""
-        # Pattern that can match zero chars: a*
         patterns = [SpanPattern(category="test", pattern=r"a*")]
         cat = CustomSpanCategorizer(patterns)
 
-        # The pattern a* will match at every position including zero-length
-        # We should skip those and only get matches with actual length
+        # a* also matches zero-length at the end; those matches are skipped, leaving one span for "aaa".
         spans = cat.categorize("aaa")
-        # Should only have 1 span (the full "aaa"), not multiple zero-length
-        # Actually, a* matches "aaa" once at position 0, then zero-length
-        # at position 3. We skip the zero-length, so should be 1.
         assert all(s.start_char != s.end_char for s in spans)
 
     def test_metadata_copied_per_match(self) -> None:
@@ -310,10 +305,8 @@ class TestCustomSpanCategorizer:
         spans = cat.categorize("Python and Java")
         assert len(spans) == 2
 
-        # Modify first span's metadata
         spans[0].metadata["confidence"] = 0.50
 
-        # Second span should still have original value
         assert spans[1].metadata["confidence"] == 0.95
 
     def test_metadata_isolated_from_pattern(self) -> None:
@@ -330,7 +323,6 @@ class TestCustomSpanCategorizer:
         spans = cat.categorize("test test")
         spans[0].metadata["v"] = 999
 
-        # Original pattern metadata unchanged
         assert pattern.metadata["v"] == 1
 
     def test_text_exceeds_max_length_raises(self) -> None:
@@ -444,7 +436,6 @@ class TestLoadPatterns:
 
         patterns = load_patterns(pattern_file)
         assert patterns[0].boundary_rules.hard_stops == frozenset({".", "!"})
-        # soft_stops and stop_words should use DEFAULT_RULES
         assert patterns[0].boundary_rules.soft_stops == DEFAULT_RULES.soft_stops
         assert patterns[0].boundary_rules.stop_words == DEFAULT_RULES.stop_words
 
@@ -664,7 +655,6 @@ class TestEdgeCases:
         cat = CustomSpanCategorizer(patterns)
 
         spans = cat.categorize("Python 파이썬 Java")
-        # Should match word boundaries correctly
         assert len(spans) >= 2
 
     def test_newlines_in_text(self) -> None:
@@ -812,6 +802,5 @@ class TestCustomSpanCategorizerFactory:
             doc = nlp("we use python daily")
             assert len(doc._.custom_spans) >= 1
         finally:
-            # Restore names bound at import time so other tests keep
-            # referring to the same classes they were written against.
+            # Rebind names so other tests keep referring to the classes they were written against.
             importlib.reload(custom_module)

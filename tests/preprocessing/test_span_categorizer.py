@@ -68,7 +68,6 @@ class TestExtractSpanBoundaries:
         text = "Required: 5+ years Python experience"
         doc = nlp(text)
 
-        # Find a valid span in the text
         char_start = text.find("5+")
         char_end = char_start + len("5+ years Python")
 
@@ -123,7 +122,6 @@ class TestExtractSpanBoundaries:
         text = "Python experience required"
         doc = nlp(text)
 
-        # Single word "Python"
         char_start = text.find("Python")
         char_end = char_start + len("Python")
 
@@ -131,7 +129,7 @@ class TestExtractSpanBoundaries:
 
         assert start_idx is not None
         assert end_idx is not None
-        assert start_idx == end_idx  # Single token
+        assert start_idx == end_idx
 
     def test_valid_multi_token(self, nlp: Language) -> None:
         """Offset spanning multiple tokens returns valid range."""
@@ -145,7 +143,7 @@ class TestExtractSpanBoundaries:
 
         assert start_idx is not None
         assert end_idx is not None
-        assert start_idx < end_idx  # Multiple tokens
+        assert start_idx < end_idx
 
 
 class TestBoundaryHelpers:
@@ -210,13 +208,12 @@ class TestExpandSpan:
         text = "Required: 5+ years Python experience. Knowledge of Docker."
         doc = nlp(text)
 
-        # Initial span before period
-        start_idx = 2  # "5"
-        end_idx = 5  # "experience"
+        # Tokens: 2 is "5", 5 is "Python"; the period comes after "experience".
+        start_idx = 2
+        end_idx = 5
 
         expanded_start, expanded_end = _expand_span(doc, start_idx, end_idx)
 
-        # Should not include period
         expanded_span = doc[expanded_start : expanded_end + 1]
         assert "." not in expanded_span.text
 
@@ -225,13 +222,13 @@ class TestExpandSpan:
         text = "Required: Python and Java"
         doc = nlp(text)
 
-        start_idx = 2  # "Python"
+        # Token 2 is "Python".
+        start_idx = 2
         end_idx = 2
 
         expanded_start, expanded_end = _expand_span(doc, start_idx, end_idx)
 
         expanded_span = doc[expanded_start : expanded_end + 1]
-        # Should include "and Java"
         assert "and" in expanded_span.text or "Java" in expanded_span.text
 
     def test_expand_includes_hyphenated_compound(self, nlp: Language) -> None:
@@ -239,13 +236,13 @@ class TestExpandSpan:
         text = "cross-functional team management"
         doc = nlp(text)
 
-        start_idx = 0  # "cross"
+        # Token 0 is "cross"; "-" and "functional" follow.
+        start_idx = 0
         end_idx = 0
 
         expanded_start, expanded_end = _expand_span(doc, start_idx, end_idx)
 
         expanded_span = doc[expanded_start : expanded_end + 1]
-        # Should preserve hyphenated compound or include both parts
         assert expanded_span.text
 
     def test_expand_bounds_respect_start_end(self, nlp: Language) -> None:
@@ -267,13 +264,10 @@ class TestSpanCategorizerComponent:
         text = "Required: 5+ years Python experience"
         doc = spacy_model(text)
 
-        # Phase 8a populates requirements
         assert doc._.requirements is not None
 
-        # Phase 8b populates spans
         assert doc._.requirement_spans is not None
         if len(doc._.requirements) > 0:
-            # If requirements exist, spans should be created
             assert len(doc._.requirement_spans) > 0
 
     def test_component_skips_invalid_boundaries(self, spacy_model: Language) -> None:
@@ -281,7 +275,6 @@ class TestSpanCategorizerComponent:
         text = "Required: Python"
         doc = spacy_model(text)
 
-        # Component should not crash even with edge cases
         assert hasattr(doc._, "requirement_spans")
 
 

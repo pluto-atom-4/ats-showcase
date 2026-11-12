@@ -62,7 +62,8 @@ def invalid_patterns_json_file(tmp_path: Path) -> Generator[Path, None, None]:
     """
     patterns_file = tmp_path / "invalid.json"
     with open(patterns_file, "w") as f:
-        f.write('{"category": "test"}')  # Object, not array
+        # An object, not an array.
+        f.write('{"category": "test"}')
     yield patterns_file
 
 
@@ -198,9 +199,7 @@ class TestPreprocessCategorizerValidation:
         Validates that file and strategy checks pass; command fails with no-jobs error
         to prove validation succeeded before the jobs check.
         """
-        # Stub Preprocessor so the spaCy model is not loaded; chdir to tmp_path
-        # and create empty extracted_jobs dir so preprocess reaches the jobs-check
-        # phase (validation occurs before that)
+        # Keep the CLI off the real data/extracted_jobs.
         monkeypatch.chdir(tmp_path)
         (tmp_path / "data" / "extracted_jobs").mkdir(parents=True, exist_ok=True)
 
@@ -215,14 +214,9 @@ class TestPreprocessCategorizerValidation:
             ],
         )
         output_lower = strip_ansi(result.output).lower()
-        # File validation should succeed (file exists and is valid)
-        # Command may fail for other reasons (no jobs in DB, etc), but not for patterns
-        # Assert the span-patterns validation did NOT fail
         assert "span patterns file not found" not in output_lower
         assert "invalid span patterns file" not in output_lower
-        # Verify we got past the categorizer strategy validation (nlp is valid)
         assert "invalid categorizer strategy" not in output_lower
-        # Prove validation passed by checking exit code and jobs-check message
         assert result.exit_code == 1
         assert "no extracted jobs found" in output_lower
 
@@ -235,19 +229,15 @@ class TestPreprocessCategorizerValidation:
         triggering validation errors. Command fails at jobs-check (no jobs found),
         proving validation passed.
         """
-        # Hermetic setup: stub Preprocessor so the spaCy model is not loaded;
-        # chdir to tmp_path, create empty extracted_jobs dir
+        # Keep the CLI off the real data/extracted_jobs.
         monkeypatch.chdir(tmp_path)
         (tmp_path / "data" / "extracted_jobs").mkdir(parents=True, exist_ok=True)
 
-        # Invoke preprocess without any categorizer strategy or span-patterns flags
         result = runner.invoke(app, ["preprocess"])
         output_lower = strip_ansi(result.output).lower()
 
-        # Should fail at jobs-check, not at validation
         assert result.exit_code == 1
         assert "no extracted jobs found" in output_lower
-        # Validation error messages must NOT appear
         assert "invalid categorizer strategy" not in output_lower
         assert "--span-patterns" not in output_lower
         assert "span patterns file not found" not in output_lower

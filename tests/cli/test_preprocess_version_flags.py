@@ -31,29 +31,22 @@ class TestPreprocessVersionFlags:
         """Help text should show --preprocessing-version flag."""
         result = runner.invoke(app, ["preprocess", "--help"])
         assert result.exit_code == 0
-        # Strip ANSI codes from help output (Rich/Click formatting)
         clean_output = strip_ansi(result.stdout)
         # Check for flag prefix (handles truncation in narrow terminals)
         assert "--preprocessing" in clean_output
-        # Verify help text is present
         assert "Version:" in clean_output and "legacy" in clean_output
 
     def test_preprocess_help_shows_re_preprocess_only_v1_flag(self) -> None:
         """Help text should show --re-preprocess-only-v1 flag."""
         result = runner.invoke(app, ["preprocess", "--help"])
         assert result.exit_code == 0
-        # Strip ANSI codes from help output (Rich/Click formatting)
         clean_output = strip_ansi(result.stdout)
-        # Check for flag prefix (handles truncation in narrow terminals)
         assert "--re-preprocess" in clean_output
-        # Verify help text is present
         assert "re-preprocess" in clean_output and "v1.0" in clean_output
 
     def test_preprocess_version_default_is_v2(self) -> None:
         """Default preprocessing version should be 2.0."""
         result = runner.invoke(app, ["preprocess", "--help"])
         assert result.exit_code == 0
-        # Strip ANSI codes from help output (Rich/Click formatting)
         help_text = strip_ansi(result.stdout).lower()
-        # Help text should mention default
         assert "2.0" in help_text or "default" in help_text

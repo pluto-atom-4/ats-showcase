@@ -55,7 +55,6 @@ class TestPreprocessorSectionEngineExecution:
         detector = SectionDetector()
         preprocessor = Preprocessor(section_engine=detector)
 
-        # Real job description text with sections
         text = """## Requirements
 - 5+ years of Python experience required
 - Must have strong SQL skills
@@ -68,22 +67,17 @@ class TestPreprocessorSectionEngineExecution:
 
         result = preprocessor.extract_sectioned_requirements(text)
 
-        # Should return SectionedResult, not None
         assert result is not None
         assert isinstance(result, SectionedResult)
 
-        # Should have extracted exactly 3 requirements from Requirements section
         assert len(result.requirements) == 3
 
-        # Verify first requirement text and source_section
         assert result.requirements[0].text == "5+ years of Python experience required"
         assert result.requirements[0].source_section == SectionLabel.REQUIREMENTS
 
-        # Verify second requirement text and source_section
         assert result.requirements[1].text == "Experience with distributed systems"
         assert result.requirements[1].source_section == SectionLabel.REQUIREMENTS
 
-        # Verify third requirement text and source_section
         assert result.requirements[2].text == "Must have strong SQL skills"
         assert result.requirements[2].source_section == SectionLabel.REQUIREMENTS
 
@@ -104,8 +98,7 @@ Health insurance"""
         result = preprocessor.extract_sectioned_requirements(text)
 
         assert result is not None
-        # sections_detected should contain exactly SECTION_REQUIREMENTS
-        # (Benefits section is present but its bullets don't match trigger patterns)
+        # The Benefits section is present but its bullets match no trigger pattern.
         assert result.sections_detected == ("SECTION_REQUIREMENTS",)
 
     def test_extract_sectioned_requirements_empty_text_returns_sectioned_result(self, monkeypatch: Any) -> None:
@@ -115,7 +108,6 @@ Health insurance"""
         detector = SectionDetector()
         preprocessor = Preprocessor(section_engine=detector)
 
-        # extract_sectioned returns SectionedResult even for empty text
         result = preprocessor.extract_sectioned_requirements("")
         assert result is not None
         assert isinstance(result, SectionedResult)
@@ -133,12 +125,10 @@ Health insurance"""
         detector = SectionDetector()
         preprocessor = Preprocessor(section_engine=detector)
 
-        # Plain text with no section headers
         text = "This is just some random text without any section headers."
 
         result = preprocessor.extract_sectioned_requirements(text)
 
-        # Should return SectionedResult with empty requirements and no sections detected
         assert result is not None
         assert isinstance(result, SectionedResult)
         assert result.sections_detected == ()
@@ -152,11 +142,9 @@ class TestPreprocessorSectionEngineSignature:
         """extract_entities should have unchanged signature."""
         monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
 
-        # Get type hints using get_type_hints
         hints = get_type_hints(Preprocessor.extract_entities)
         return_type = hints.get("return")
 
-        # Return type should be Tuple[List[str], List[str], List[str]]
         assert return_type is not None
         assert hasattr(return_type, "__origin__")
         assert return_type.__origin__ is tuple
@@ -170,11 +158,9 @@ class TestPreprocessorSectionEngineCustomDetector:
         """Passed detector should be used in extract_sectioned_requirements."""
         monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
 
-        # Create a real detector
         real_detector = SectionDetector()
         preprocessor = Preprocessor(section_engine=real_detector)
 
-        # Track which detector was passed
         call_tracker: list[Any] = []
 
         def mock_extract_sectioned(text: str, *, detector: Any = None, **kwargs: Any) -> SectionedResult:
@@ -190,10 +176,8 @@ class TestPreprocessorSectionEngineCustomDetector:
             text = "## Requirements\nSome requirement"
             result = preprocessor.extract_sectioned_requirements(text)
 
-            # Verify result is from our mock
             assert isinstance(result, SectionedResult)
             assert len(result.requirements) == 0
-            # Verify detector was passed with identity check
             assert len(call_tracker) == 1
             assert call_tracker[0] is real_detector
 
@@ -208,7 +192,6 @@ class TestPreprocessorSectionEngineEdgeCases:
         detector = SectionDetector()
         preprocessor = Preprocessor(section_engine=detector)
 
-        # Patch extract_sectioned to raise an error at module level
         with patch("src.tokenization.preprocessor.extract_sectioned", side_effect=RuntimeError("Test error")):
             with pytest.raises(RuntimeError, match="Test error"):
                 preprocessor.extract_sectioned_requirements("test text")
@@ -246,10 +229,9 @@ class TestPreprocessorSectionEngineIntegration:
         preprocessor2 = Preprocessor(section_engine=SectionDetector())
         preprocessor2.nlp = None
 
-        # Both should have the same extract_entities behavior (return empty with nlp=None)
+        # Both return ([], [], []) because nlp is None.
         result1 = preprocessor1.extract_entities("test text")
         result2 = preprocessor2.extract_entities("test text")
 
-        # Both should be ([], [], []) since nlp is None
         assert result1 == ([], [], [])
         assert result2 == ([], [], [])
