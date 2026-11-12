@@ -721,7 +721,6 @@ class TestExtractJobFromContainer:
         crawled_at = result["crawled_at"]
         dt = datetime.fromisoformat(crawled_at)
         assert dt is not None
-        # Should have timezone suffix (aware UTC with +00:00)
         assert crawled_at.endswith("+00:00")
         assert not crawled_at.endswith("Z")
 

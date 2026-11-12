@@ -737,7 +737,6 @@ class TestOnMountLoadsFromInputDir:
                 )
             )
 
-            # Create app with custom input_dir (but don't mount)
             app = JobSelectorApp(input_dir=tmppath)
 
             assert app.input_dir == tmppath

@@ -221,7 +221,7 @@ class TestHeadingPromoterConsistency:
         """
         classifier = SectionClassifier()
 
-        # nice to have were promoted by Issue #733 and are removed from this set)
+        # duties, education, nice to have were promoted by #733 and are removed from this set.
         other_phrases = {
             "eeo statement",
             "equal employment opportunity",
@@ -390,7 +390,6 @@ Excellence is never an accident."""
 
         assert "## Role Description" in result
 
-        # (they are in KNOWN_PLAIN_HEADINGS with new keywords from Issue #365)
         assert "## In this role you will" in result
         assert "## What will make you succeed" in result
 
@@ -792,7 +791,6 @@ class TestHeadingPromoterDefectFixes:
         """EEO followed by real '## Benefits' section: no synthetic heading."""
         promoter = HeadingPromoter()
         input_text = "Acme is an equal opportunity employer.\n\nBenefits\n\nDental coverage."
-        # "Benefits" will be promoted to ##, not EEO synthetic heading
         result = promoter.process(input_text)
         assert result.count("## Equal Opportunity Employer") == 0
         assert "## Benefits" in result

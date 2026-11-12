@@ -72,9 +72,6 @@ def carbon_robotics_expected() -> dict[str, Any]:
         return cast(dict[str, Any], json.load(f))
 
 
-# Unit Tests (39)
-
-
 class TestRequirementExtractorInitialization:
     """Test extractor initialization and configuration."""
 
@@ -223,6 +220,7 @@ class TestSpanExtraction:
         md = "Nice to have optional knowledge of Rust."
         extractor_strict = RequirementExtractor(min_confidence=0.80)
         spans = extractor_strict.extract_spans(md)
+        # Nice to have scores 0.40, below min_confidence 0.80, so it should be filtered.
         assert isinstance(spans, list)
 
     def test_extract_spans_includes_metadata(self, extractor):

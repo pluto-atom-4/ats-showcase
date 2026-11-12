@@ -211,6 +211,7 @@ class TestDeduplicateRequirementsSemanticD:
         ]
         result = _deduplicate_requirements_semantic(requirements, threshold=0.8)
         assert len(result) == 1
+        # Dedup keeps the longest by sorting length desc, so the (Preferred) version wins.
         assert "ARINC 429" in result[0]["text"]
 
     def test_dedup_removes_semantic_duplicates_verbose(self):

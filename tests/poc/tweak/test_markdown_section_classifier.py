@@ -781,7 +781,7 @@ class TestConsistencyAndRegression:
         assert result.labels == all_types_set
 
 
-# Test: Word-Boundary Keyword Matching (Issue #365)
+# Issue #365
 
 
 class TestWordBoundaryKeywordMatching:

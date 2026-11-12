@@ -1097,11 +1097,8 @@ class TestSkillExtractorResidualsWave604:
     @pytest.mark.parametrize(
         "text,expected",
         [
-            # #509: a noun before the comma keeps the span at the noun.
             ("You will design systems, platforms, and develop tools.", ["design systems", "develop tools"]),
-            # #599: a skill-verb segment after a comma breaks the list; no merged span.
             ("You will design systems, lead teams.", ["design systems", "lead teams"]),
-            # #599 guard: 'design fast, lead teams' never merges into one span.
             ("You will design fast, lead teams.", ["lead teams"]),
             ("You will lead agile, platform teams.", ["lead agile"]),
             # Neighbour shape: a noun list after a non-skill verb produces nothing (#604).

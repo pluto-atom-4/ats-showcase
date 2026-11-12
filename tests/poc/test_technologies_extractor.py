@@ -289,18 +289,19 @@ class TestTechExtractorNegation:
             ("We have never used Kubernetes in production.", []),
             ("Kubernetes experience is lacking on the current team.", []),
             ("No Java, Kubernetes, or Docker experience required.", []),
+            # "nice to have" is not a negation cue.
             ("Kubernetes experience is nice to have.", ["kubernetes"]),
             ("No prior experience needed, but Kubernetes is required.", ["kubernetes"]),
             ("No Java experience. Kubernetes is required for this role.", ["kubernetes"]),
             ("No experience required. Strong Python skills are a must.", ["python"]),
             ("Not a Kubernetes shop, but we do use Docker and Python.", ["docker", "python"]),
+            # Contracted negation: spaCy tokenizes "Don't" as "Do" + "n't".
             ("Don't need Kubernetes experience for this role.", []),
             ("No. Kubernetes experience is valued in this role.", ["kubernetes"]),
             ("Kubernetes is required; no Java needed.", ["kubernetes"]),
             ("Kubernetes and Docker are not required.", []),
             ("Kubernetes is required but not Docker.", ["kubernetes"]),
             # 17-18: "not only" / "not just" are affirmative idioms, not negation (#516)
-            # "not only" / "not just" are affirmative idioms, not negation (#516).
             ("We run Kubernetes not only in prod but also in staging.", ["kubernetes"]),
             ("Not only Kubernetes but also Docker is needed.", ["docker", "kubernetes"]),
             ("We use Kubernetes not just in staging.", ["kubernetes"]),
@@ -323,6 +324,7 @@ class TestTechExtractorNegation:
         extractor = TechExtractor(blank)
         doc = blank("No experience with Kubernetes required.")
         assert extractor.extract(doc) == []
+        # Positive control: the fallback path still extracts non-negated terms, not a silent [] from the except.
         assert extractor.extract(blank("We use Kubernetes daily.")) == ["kubernetes"]
 
 

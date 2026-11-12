@@ -131,12 +131,13 @@ class TestClassifyLikelyUnparseable:
         assert outcome is ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT
 
     def test_walmart_shell_row_is_unparseable(self):
+        # Walmart rows 6,7,8,10,11 share the same shell capture: sections=4, zero yield.
         result = make_job_result(4)
         outcome = classify_extraction_outcome(result, 459)
         assert outcome is ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT
 
     def test_short_stripped_text_alone_is_unparseable(self):
-        # is healthy. Do not relax this to require both signals.
+        # Product decision (design doc jd-zero-extraction-fallback.md 2.1/2.4): do not require both signals.
         result = make_job_result(10)
         outcome = classify_extraction_outcome(result, MIN_DESCRIPTION_CHARS - 1)
         assert outcome is ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT

@@ -489,7 +489,6 @@ class TestSkillProcessorNounLedJunkFiltering:
 
         doc = processor(doc)
 
-        # Should extract "algorithm design" because it has NOUN tokens
         skill_texts = {s["skill"] for s in doc._.skills}
         assert "algorithm design" in skill_texts
 

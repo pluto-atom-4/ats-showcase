@@ -1122,6 +1122,7 @@ class TestPerJobSourceConfigScoping:
         run_batch(str(input_file), config_dir=str(config_dir))
 
         assert resolver_keys == ["AlphaCo"]
+        # Resolver loads config twice (selector + match) on the single cache miss.
         assert len(loader_calls) == 2
         assert len(recorded_calls) == 3
         assert all(c["description_selector"] == ".alpha-desc" for c in recorded_calls)

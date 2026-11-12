@@ -283,7 +283,6 @@ Essential Java knowledge."""
         result = extract_requirements_b(markdown)
 
         if len(result.requirements) > 1:
-            # (this is a rough test since we don't have confidence scores in output)
             assert len(result.requirements) >= 1
 
 
