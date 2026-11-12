@@ -55,10 +55,8 @@ class TestExtractUrlParam:
 
     def test_extract_url_param_workday_format(self):
         """Test extracting 18-char jobId from Workday-style URL."""
-        # Real Workday jobId format is typically 18 characters
         url = "https://mycompany.myworkdayjobs.com/en-US/mycompany-jobs/job/abc123xyz789123456/Senior-Developer"
         result = extract_url_param(url, "jobId")
-        # This URL doesn't have jobId as query param, but test the extraction logic anyway
         assert result is None
 
     def test_extract_url_param_with_fragment(self):
@@ -235,21 +233,17 @@ class TestExtractDetailPageFields:
         """Test successful extraction of all detail page fields."""
         page = AsyncMock()
 
-        # Mock successful navigation
         with patch("src.poc.tweak.crawl_list.retry_goto", new_callable=AsyncMock) as mock_retry:
             mock_retry.return_value = True
 
-            # Mock description extraction
             description_elem = AsyncMock()
             description_elem.text_content = AsyncMock(return_value="Senior Python role with 5+ years experience")
 
-            # Mock details container
             details_container = AsyncMock()
             details_container.text_content = AsyncMock(
                 return_value="Job types: Contract\nLocation type: Hybrid\nSkills: Python"
             )
 
-            # Mock compensation extraction
             compensation_elem = AsyncMock()
             compensation_elem.text_content = AsyncMock(return_value="$120k - $150k")
 
@@ -273,7 +267,6 @@ class TestExtractDetailPageFields:
 
             result = await extract_detail_page_fields(page, "https://example.com/jobs?jobId=abc123", selectors)
 
-        # Verify all fields extracted
         assert result["description"] == "Senior Python role with 5+ years experience"
         assert result["job_id"] == "abc123"
         assert result["job_type"] == "Contract"
@@ -286,14 +279,13 @@ class TestExtractDetailPageFields:
         page = AsyncMock()
 
         with patch("src.poc.tweak.crawl_list.retry_goto", new_callable=AsyncMock) as mock_retry:
-            mock_retry.return_value = False  # Navigation fails
+            mock_retry.return_value = False
 
             selectors: dict[str, str] = {}
             result = await extract_detail_page_fields(page, "https://example.com/jobs?jobId=abc123", selectors)
 
-        # Should return all None values on navigation failure
         assert result["description"] is None
-        assert result["job_id"] == "abc123"  # Should still extract from URL
+        assert result["job_id"] == "abc123"
         assert result["job_type"] is None
         assert result["location_type"] is None
         assert result["compensation"] is None
@@ -306,7 +298,6 @@ class TestExtractDetailPageFields:
         with patch("src.poc.tweak.crawl_list.retry_goto", new_callable=AsyncMock) as mock_retry:
             mock_retry.return_value = True
 
-            # Mock only description selector (others not provided)
             description_elem = AsyncMock()
             description_elem.text_content = AsyncMock(return_value="Job description text")
 
@@ -315,15 +306,12 @@ class TestExtractDetailPageFields:
 
             selectors = {
                 "detail_page_description": ".description",
-                # No details_container, compensation, or job_id selectors
             }
 
             result = await extract_detail_page_fields(page, "https://example.com/jobs?jobId=xyz789", selectors)
 
-        # Should have description from selector and job_id from URL
         assert result["description"] == "Job description text"
         assert result["job_id"] == "xyz789"
-        # Others should be None
         assert result["job_type"] is None
         assert result["location_type"] is None
         assert result["compensation"] is None
@@ -344,10 +332,9 @@ class TestExtractDetailPageFields:
             result = await extract_detail_page_fields(
                 page,
                 "https://example.com/jobs/senior-role",
-                selectors,  # No jobId param
+                selectors,
             )
 
-        # job_id should be None when not in URL and no selector provided
         assert result["job_id"] is None
 
     @pytest.mark.asyncio
@@ -358,7 +345,6 @@ class TestExtractDetailPageFields:
         with patch("src.poc.tweak.crawl_list.retry_goto", new_callable=AsyncMock) as mock_retry:
             mock_retry.return_value = True
 
-            # Mock job_id selector
             job_id_elem = AsyncMock()
             job_id_elem.text_content = AsyncMock(return_value="job-abc-123")
 
@@ -371,7 +357,6 @@ class TestExtractDetailPageFields:
 
             result = await extract_detail_page_fields(page, "https://example.com/jobs/senior-role", selectors)
 
-        # Should extract job_id from selector
         assert result["job_id"] == "job-abc-123"
 
     @pytest.mark.asyncio
@@ -385,7 +370,6 @@ class TestExtractDetailPageFields:
             selectors: dict[str, str] = {}
             result = await extract_detail_page_fields(page, "https://example.com/jobs?jobId=abc123", selectors)
 
-        # Should handle exception gracefully and return default dict
         assert result["description"] is None
         assert result["job_type"] is None
         assert result["location_type"] is None
@@ -398,11 +382,9 @@ class TestExtractJobFromContainer:
     @pytest.mark.asyncio
     async def test_extract_job_from_container_full_schema(self):
         """Test that extract_job_from_container returns all 13 required fields."""
-        # Mock page and container
         page = AsyncMock()
         container = AsyncMock()
 
-        # Mock element queries
         title_elem = AsyncMock()
         title_elem.text_content = AsyncMock(return_value="Senior Python Developer")
 
@@ -412,7 +394,6 @@ class TestExtractJobFromContainer:
         link_elem = AsyncMock()
         link_elem.get_attribute = AsyncMock(return_value="https://example.com/jobs/123")
 
-        # Setup container.query_selector to return mocked elements
         async def query_selector_side_effect(selector):
             if selector == "title":
                 return title_elem
@@ -423,9 +404,8 @@ class TestExtractJobFromContainer:
             return None
 
         container.query_selector = AsyncMock(side_effect=query_selector_side_effect)
-        container.evaluate = AsyncMock(return_value=None)  # No shadow DOM
+        container.evaluate = AsyncMock(return_value=None)
 
-        # Call function
         result = await extract_job_from_container(
             page=page,
             container=container,
@@ -434,7 +414,6 @@ class TestExtractJobFromContainer:
             base_url="https://example.com/",
         )
 
-        # Verify all 13 fields are present
         assert result is not None
         expected_fields = {
             "id",
@@ -456,11 +435,9 @@ class TestExtractJobFromContainer:
     @pytest.mark.asyncio
     async def test_extract_job_from_container_id_deterministic(self):
         """Test that same inputs produce identical job IDs (deterministic hashing)."""
-        # Mock page and container
         page = AsyncMock()
         container = AsyncMock()
 
-        # Mock element queries
         title_elem = AsyncMock()
         title_elem.text_content = AsyncMock(return_value="Python Engineer")
 
@@ -480,9 +457,8 @@ class TestExtractJobFromContainer:
             return None
 
         container.query_selector = AsyncMock(side_effect=query_selector_side_effect)
-        container.evaluate = AsyncMock(return_value=None)  # No shadow DOM
+        container.evaluate = AsyncMock(return_value=None)
 
-        # Call function twice with same inputs
         result1 = await extract_job_from_container(
             page=page,
             container=container,
@@ -499,11 +475,10 @@ class TestExtractJobFromContainer:
             base_url="https://example.com/",
         )
 
-        # IDs should be identical
         assert result1 is not None
         assert result2 is not None
         assert result1["id"] == result2["id"]
-        assert result1["id"].startswith("workday:") or ":" in result1["id"]  # Should have portal:hash format
+        assert result1["id"].startswith("workday:") or ":" in result1["id"]
 
     @pytest.mark.asyncio
     async def test_extract_job_from_container_no_title_returns_none(self):
@@ -511,7 +486,6 @@ class TestExtractJobFromContainer:
         page = AsyncMock()
         container = AsyncMock()
 
-        # No title element
         container.query_selector = AsyncMock(return_value=None)
         container.evaluate = AsyncMock(return_value=None)
 
@@ -543,7 +517,7 @@ class TestExtractJobFromContainer:
             elif selector == "location":
                 return location_elem
             elif selector == "link":
-                return None  # No URL
+                return None
             return None
 
         container.query_selector = AsyncMock(side_effect=query_selector_side_effect)
@@ -557,11 +531,10 @@ class TestExtractJobFromContainer:
             base_url="",
         )
 
-        # Should still have an ID
         assert result is not None
         assert result["id"] is not None
-        assert ":" in result["id"]  # Should have portal:hash format
-        assert result["url"] == ""  # URL should be empty string
+        assert ":" in result["id"]
+        assert result["url"] == ""
 
     @pytest.mark.asyncio
     async def test_extract_job_from_container_defaults(self):
@@ -575,7 +548,7 @@ class TestExtractJobFromContainer:
         async def query_selector_side_effect(selector):
             if selector == "title":
                 return title_elem
-            return None  # All other fields None
+            return None
 
         container.query_selector = AsyncMock(side_effect=query_selector_side_effect)
         container.evaluate = AsyncMock(return_value=None)
@@ -627,8 +600,7 @@ class TestExtractJobFromContainer:
 
         assert result is not None
         assert result["posted_date"] is not None
-        # Verify it's a valid ISO date string
-        assert len(result["posted_date"]) == 10  # YYYY-MM-DD format
+        assert len(result["posted_date"]) == 10
         assert result["posted_date"].count("-") == 2
 
     @pytest.mark.asyncio
@@ -652,7 +624,7 @@ class TestExtractJobFromContainer:
             page=page,
             container=container,
             company_name="CloudCorp",
-            selectors={"title": "title"},  # No posted_on selector
+            selectors={"title": "title"},
             base_url="",
         )
 
@@ -747,10 +719,8 @@ class TestExtractJobFromContainer:
 
         assert result is not None
         crawled_at = result["crawled_at"]
-        # Should be parseable as ISO format
         dt = datetime.fromisoformat(crawled_at)
         assert dt is not None
-        # Should have timezone suffix (aware UTC with +00:00)
         assert crawled_at.endswith("+00:00")
         assert not crawled_at.endswith("Z")
 
@@ -806,18 +776,16 @@ class TestExtractJobFromContainer:
         page = AsyncMock()
         container = AsyncMock()
 
-        # Mock title element
         title_elem = AsyncMock()
         title_elem.text_content = AsyncMock(return_value="Senior Engineer")
 
-        # Mock company element
         company_elem = AsyncMock()
         company_elem.text_content = AsyncMock(return_value="Microsoft")
 
         async def query_selector_side_effect(selector):
             if selector == "title":
                 return title_elem
-            elif selector == ".company":  # company selector
+            elif selector == ".company":
                 return company_elem
             return None
 
@@ -833,7 +801,6 @@ class TestExtractJobFromContainer:
         )
 
         assert result is not None
-        # Should use extracted company name, not fallback
         assert result["company"] == "Microsoft"
 
     @pytest.mark.asyncio
@@ -842,7 +809,6 @@ class TestExtractJobFromContainer:
         page = AsyncMock()
         container = AsyncMock()
 
-        # Mock title element
         title_elem = AsyncMock()
         title_elem.text_content = AsyncMock(return_value="Senior Engineer")
 
@@ -850,12 +816,10 @@ class TestExtractJobFromContainer:
             if selector == "title":
                 return title_elem
             elif selector == "p.company-name":
-                return None  # Direct selector fails
+                return None
             return None
 
-        # Mock evaluate to return company from shadow DOM
         async def evaluate_side_effect(js_code, *args):
-            # args[0] is the selector passed as parameter
             if args and args[0] == "p.company-name":
                 return "Apple"
             return None
@@ -874,7 +838,6 @@ class TestExtractJobFromContainer:
         )
 
         assert result is not None
-        # Should use extracted company from shadow DOM
         assert result["company"] == "Apple"
 
     @pytest.mark.asyncio
@@ -883,14 +846,12 @@ class TestExtractJobFromContainer:
         page = AsyncMock()
         container = AsyncMock()
 
-        # Mock title element
         title_elem = AsyncMock()
         title_elem.text_content = AsyncMock(return_value="Senior Engineer")
 
         async def query_selector_side_effect(selector):
             if selector == "title":
                 return title_elem
-            # No company selector provided
             return None
 
         container.query_selector = AsyncMock(side_effect=query_selector_side_effect)
@@ -905,7 +866,6 @@ class TestExtractJobFromContainer:
         )
 
         assert result is not None
-        # Should use config display name as fallback
         assert result["company"] == "Google"
 
     @pytest.mark.asyncio
@@ -914,11 +874,9 @@ class TestExtractJobFromContainer:
         page = AsyncMock()
         container = AsyncMock()
 
-        # Mock title element (required)
         title_elem = AsyncMock()
         title_elem.text_content = AsyncMock(return_value="Senior Python Developer")
 
-        # Mock description element
         desc_elem = AsyncMock()
         desc_elem.text_content = AsyncMock(
             return_value="We are looking for an experienced Python developer with 5+ years of experience."
@@ -954,7 +912,6 @@ class TestExtractJobFromContainer:
         page = AsyncMock()
         container = AsyncMock()
 
-        # Mock title element
         title_elem = AsyncMock()
         title_elem.text_content = AsyncMock(return_value="Senior Engineer")
 
@@ -962,12 +919,10 @@ class TestExtractJobFromContainer:
             if selector == "title":
                 return title_elem
             elif selector == "div.description":
-                return None  # Direct selector fails
+                return None
             return None
 
-        # Mock evaluate to return description from shadow DOM
         async def evaluate_side_effect(js_code, *args):
-            # args[0] is the selector passed as parameter
             if args and args[0] == "div.description":
                 return "This is a job description from shadow DOM"
             return None
@@ -992,7 +947,6 @@ class TestExtractJobFromContainer:
         page = AsyncMock()
         page.wait_for_timeout = AsyncMock()
         page.go_back = AsyncMock()
-        # Simulate page.url changing after click
         page.url = "https://careers.worksource.com/en-US/jobs/job/abc123xyz789/?jobId=abc123xyz789"
         container = AsyncMock()
 
@@ -1000,9 +954,7 @@ class TestExtractJobFromContainer:
         title_elem.text_content = AsyncMock(return_value="Senior Developer")
 
         link_elem = AsyncMock()
-        # Link without jobId parameter
         link_elem.get_attribute = AsyncMock(return_value="/en-US/jobs/job/abc123xyz789/")
-        # Mock click to simulate navigation
         link_elem.click = AsyncMock()
 
         async def query_selector_side_effect(selector):
@@ -1025,9 +977,7 @@ class TestExtractJobFromContainer:
         )
 
         assert result is not None
-        # Should have extracted jobId from page.url after click
         assert "jobId=abc123xyz789" in result["url"]
-        # Link SHOULD have been clicked (WorkSource behavior)
         link_elem.click.assert_called()
 
     @pytest.mark.asyncio
@@ -1042,7 +992,6 @@ class TestExtractJobFromContainer:
 
         link_elem = AsyncMock()
         link_elem.get_attribute = AsyncMock(return_value="/jobs/aircraft-systems-engineer")
-        # Should NOT be called for non-WorkSource companies
         link_elem.click = AsyncMock()
 
         async def query_selector_side_effect(selector):
@@ -1061,17 +1010,14 @@ class TestExtractJobFromContainer:
         result = await extract_job_from_container(
             page=page,
             container=container,
-            company_name="Boeing",  # Not WorkSource
+            company_name="Boeing",
             selectors={"title": "title", "link": "a.job-link"},
             base_url="https://careers.boeing.com/jobs/search",
         )
 
         assert result is not None
-        # Should use simple URL join, not jobId extraction
         assert result["url"] == "https://careers.boeing.com/jobs/aircraft-systems-engineer"
-        # Link should NOT have been clicked (no jobId extraction for non-WorkSource)
         link_elem.click.assert_not_called()
-        # page.wait_for_timeout should NOT have been called
         page.wait_for_timeout.assert_not_called()
 
     @pytest.mark.asyncio
@@ -1203,10 +1149,9 @@ class TestCrawlCompanyJobs:
     async def test_crawl_company_jobs_uses_display_name(self):
         """Test that company display name from config is used in extracted jobs (fallback path)."""
         browser = AsyncMock()
-        page = MagicMock()  # Use MagicMock for sync methods like set_default_timeout
+        page = MagicMock()
         browser.new_page = AsyncMock(return_value=page)
 
-        # Mock container
         container = AsyncMock()
         title_elem = AsyncMock()
         title_elem.text_content = AsyncMock(return_value="Backend Developer")
@@ -1234,7 +1179,7 @@ class TestCrawlCompanyJobs:
 
         company_config = {
             "enabled": True,
-            "name": "Carbon Robotics",  # Display name
+            "name": "Carbon Robotics",
             "url": "https://example.com/careers",
             "selectors": {
                 "job_container": "job_container",
@@ -1249,13 +1194,12 @@ class TestCrawlCompanyJobs:
             mock_retry.return_value = True
             jobs = await crawl_company_jobs(
                 browser=browser,
-                company_key="CarbonRobotics",  # Key
+                company_key="CarbonRobotics",
                 company_config=company_config,
                 timeout_ms=30000,
             )
 
         assert len(jobs) > 0
-        # Company field should be display name (fallback), not key
         assert jobs[0]["company"] == "Carbon Robotics"
 
     @pytest.mark.asyncio
@@ -1264,7 +1208,7 @@ class TestCrawlCompanyJobs:
         browser = AsyncMock()
 
         company_config = {
-            "enabled": False,  # Disabled
+            "enabled": False,
             "name": "Test Company",
             "url": "https://example.com/careers",
         }
@@ -1287,7 +1231,6 @@ class TestCrawlCompanyJobs:
         company_config = {
             "enabled": True,
             "name": "Test Company",
-            # No URL
         }
 
         jobs = await crawl_company_jobs(
@@ -1311,10 +1254,9 @@ class TestCrawlCompanyJobs:
         - Properly parses selector-based field extraction
         """
         browser = AsyncMock()
-        page = MagicMock()  # Use MagicMock for sync methods like set_default_timeout
+        page = MagicMock()
         browser.new_page = AsyncMock(return_value=page)
 
-        # Create 3 job containers with distinct data
         containers = []
         job_data = [
             ("Senior Python Developer", "San Francisco, CA"),
@@ -1325,7 +1267,6 @@ class TestCrawlCompanyJobs:
         for title, location in job_data:
             container = AsyncMock()
 
-            # Create element mocks
             title_elem = AsyncMock()
             title_elem.text_content = AsyncMock(return_value=title)
 
@@ -1340,7 +1281,6 @@ class TestCrawlCompanyJobs:
             posted_elem = AsyncMock()
             posted_elem.text_content = AsyncMock(return_value="Posted 2 Days Ago")
 
-            # Store in container with direct dict lookup
             element_map = {
                 ".job-title": title_elem,
                 ".job-location": location_elem,
@@ -1357,17 +1297,15 @@ class TestCrawlCompanyJobs:
             container.query_selector = AsyncMock(side_effect=await make_side_effect(element_map))
             containers.append(container)
 
-        # Setup page mocks
         page.query_selector_all = AsyncMock(return_value=containers)
         page.wait_for_selector = AsyncMock()
         page.wait_for_timeout = AsyncMock()
         page.close = AsyncMock()
-        page.set_default_timeout = MagicMock()  # Sync mock
-        page.go_back = AsyncMock()  # Mock go_back() as async method
-        page.url = "https://careers.worksource.com/jobs"  # Mock url property
-        page.goto = AsyncMock()  # Mock goto() as async method
+        page.set_default_timeout = MagicMock()
+        page.go_back = AsyncMock()
+        page.url = "https://careers.worksource.com/jobs"
+        page.goto = AsyncMock()
 
-        # WorkSource config
         company_config = {
             "enabled": True,
             "name": "WorkSource",
@@ -1395,10 +1333,8 @@ class TestCrawlCompanyJobs:
                 timeout_ms=30000,
             )
 
-        # Assertions
         assert len(jobs) == 3, f"Expected 3 jobs, got {len(jobs)}"
 
-        # Verify schema
         for job in jobs:
             expected_fields = {
                 "id",
@@ -1417,23 +1353,19 @@ class TestCrawlCompanyJobs:
             }
             assert set(job.keys()) == expected_fields
 
-        # Verify titles
         titles = [job["title"] for job in jobs]
         assert "Senior Python Developer" in titles
         assert "DevOps Engineer" in titles
         assert "Data Scientist" in titles
 
-        # Verify locations
         locations = [job["location"] for job in jobs]
         assert "San Francisco, CA" in locations
         assert "Remote" in locations
         assert "New York, NY" in locations
 
-        # Verify company name from config
         for job in jobs:
             assert job["company"] == "WorkSource"
 
-        # Verify posted dates are parsed
         for job in jobs:
             assert job["posted_date"] is not None
             assert len(job["posted_date"]) == 10
@@ -1447,7 +1379,6 @@ class TestExtractDetailPageDirectSelectors:
         """Test extraction of all detail page fields using direct selectors (WorkSource config format)."""
         page = AsyncMock()
 
-        # Mock all direct selector elements
         description_elem = AsyncMock()
         description_elem.text_content = AsyncMock(return_value="Senior Python developer with 5+ years")
 
@@ -1474,7 +1405,6 @@ class TestExtractDetailPageDirectSelectors:
         page.query_selector = AsyncMock(side_effect=query_selector_side_effect)
         page.wait_for_timeout = AsyncMock()
 
-        # Use WorkSource config selectors
         selectors = {
             "detail_page_description": "div.common-jobdetails-job-description",
             "detail_page_job_id": "p.wswa-h5:nth-child(5)",
@@ -1487,12 +1417,11 @@ class TestExtractDetailPageDirectSelectors:
             result = await extract_detail_page_fields(
                 page,
                 "https://example.com/jobs",
-                selectors,  # No jobId in URL - should use selector
+                selectors,
             )
 
-        # Verify all fields extracted via direct selectors
         assert result["description"] == "Senior Python developer with 5+ years"
-        assert result["job_id"] == "abc123xyz789"  # From selector (URL has no jobId)
+        assert result["job_id"] == "abc123xyz789"
         assert result["job_type"] == "Full-Time"
         assert result["compensation"] == "$120,000 - $150,000"
 
@@ -1515,7 +1444,6 @@ class TestExtractDetailPageDirectSelectors:
             mock_retry.return_value = True
             result = await extract_detail_page_fields(page, "https://example.com/jobs?jobId=test", selectors)
 
-        # Should extract job_type from direct selector
         assert result["job_type"] == "Contract"
 
     @pytest.mark.asyncio
@@ -1523,7 +1451,6 @@ class TestExtractDetailPageDirectSelectors:
         """Test that job_type falls back to text parsing if direct selector not configured."""
         page = AsyncMock()
 
-        # Mock details container for text parsing fallback
         details_container = AsyncMock()
         details_container.text_content = AsyncMock(
             return_value="Job types: Part-Time\nLocation type: Remote\nSkills: Python"
@@ -1539,14 +1466,12 @@ class TestExtractDetailPageDirectSelectors:
 
         selectors = {
             "detail_page_details_container": "div.job-details",
-            # No detail_page_job_type selector - should fall back to text parsing
         }
 
         with patch("src.poc.tweak.crawl_list.retry_goto", new_callable=AsyncMock) as mock_retry:
             mock_retry.return_value = True
             result = await extract_detail_page_fields(page, "https://example.com/jobs?jobId=test", selectors)
 
-        # Should fall back to text parsing
         assert result["job_type"] == "Part-Time"
         assert result["location_type"] == "Remote"
 
@@ -1555,11 +1480,9 @@ class TestExtractDetailPageDirectSelectors:
         """Test that direct selector takes precedence over text parsing."""
         page = AsyncMock()
 
-        # Mock direct selector
         job_type_elem = AsyncMock()
         job_type_elem.text_content = AsyncMock(return_value="Full-Time")
 
-        # Mock details container (should not be used)
         details_container = AsyncMock()
         details_container.text_content = AsyncMock(return_value="Job types: Contract\nLocation type: Hybrid")
 
@@ -1582,7 +1505,6 @@ class TestExtractDetailPageDirectSelectors:
             mock_retry.return_value = True
             result = await extract_detail_page_fields(page, "https://example.com/jobs?jobId=test", selectors)
 
-        # Should use direct selector result, not text parsing result
         assert result["job_type"] == "Full-Time"
 
     @pytest.mark.asyncio
@@ -1604,5 +1526,4 @@ class TestExtractDetailPageDirectSelectors:
             mock_retry.return_value = True
             result = await extract_detail_page_fields(page, "https://example.com/jobs?jobId=test", selectors)
 
-        # Should extract location_type from direct selector
         assert result["location_type"] == "Hybrid"

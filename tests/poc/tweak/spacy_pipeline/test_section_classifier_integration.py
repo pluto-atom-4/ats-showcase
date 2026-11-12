@@ -25,14 +25,8 @@ import pytest
 from src.parsers.html_to_markdown import html_to_markdown
 from src.poc.tweak.markdown_section_classifier import SectionClassifier, SectionType
 from src.poc.tweak.multi_line_paragraph import MarkdownSection, MarkdownSpanRuler
-
-# Import to trigger factory registration
 from src.poc.tweak.spacy_pipeline import SectionClassifierComponent, registry  # noqa: F401
 from src.poc.tweak.spacy_pipeline.heading_promoter import HeadingPromoter
-
-# ============================================================================
-# Fixtures
-# ============================================================================
 
 
 @pytest.fixture
@@ -51,10 +45,9 @@ def nlp(spacy_module: Any) -> Any:
     """Load spaCy model (skip if not available)."""
     try:
         nlp = spacy_module.load("en_core_web_md")
-        # Ensure extensions are registered
         from src.poc.tweak.multi_line_paragraph import MarkdownSpanRuler
 
-        MarkdownSpanRuler(nlp)  # Initializes Doc extensions
+        MarkdownSpanRuler(nlp)
         return nlp
     except OSError:
         pytest.skip("en_core_web_md model not installed")
@@ -147,11 +140,6 @@ def edge_case_sections() -> List[MarkdownSection]:
     return sections
 
 
-# ============================================================================
-# Phase 1: Factory Registration Tests
-# ============================================================================
-
-
 class TestSectionClassifierFactoryRegistration:
     """Test spaCy factory registration of SectionClassifierComponent."""
 
@@ -169,11 +157,6 @@ class TestSectionClassifierFactoryRegistration:
         """Verify component appears in nlp.pipe_names after addition."""
         nlp.add_pipe("section_classifier", last=True)
         assert nlp.pipe_names[-1] == "section_classifier"
-
-
-# ============================================================================
-# Phase 2: Component Properties and Naming
-# ============================================================================
 
 
 class TestSectionClassifierComponentProperties:
@@ -202,11 +185,6 @@ class TestSectionClassifierComponentProperties:
             SectionClassifierComponent(nlp, None)  # type: ignore
 
 
-# ============================================================================
-# Phase 3: Pipeline Execution and Doc Extension
-# ============================================================================
-
-
 class TestSectionClassifierDocExtensions:
     """Test doc._ extensions and pipeline execution."""
 
@@ -223,7 +201,6 @@ class TestSectionClassifierDocExtensions:
 
         doc = nlp("Test document")
 
-        # Pre-populate sections
         section = MarkdownSection(
             title="Requirements",
             content="5+ years experience",
@@ -236,10 +213,8 @@ class TestSectionClassifierDocExtensions:
         )
         doc._.sections = [section]
 
-        # Process
         doc = classifier(doc)
 
-        # Verify classified_sections is populated
         assert len(doc._.classified_sections) == 1
         classified_section, classification = doc._.classified_sections[0]
         assert classified_section.title == "Requirements"
@@ -268,11 +243,6 @@ class TestSectionClassifierDocExtensions:
         assert doc._.classified_sections == []
 
 
-# ============================================================================
-# Phase 4: Fixture-Based Integration Tests
-# ============================================================================
-
-
 class TestSectionClassifierWithFixtures:
     """Test component with fixture data."""
 
@@ -286,15 +256,12 @@ class TestSectionClassifierWithFixtures:
 
         assert len(doc._.classified_sections) == 3
 
-        # First section: "Introduction" -> DESCRIPTION
         _, clf1 = doc._.classified_sections[0]
         assert clf1.all_types[0].section_type == SectionType.DESCRIPTION
 
-        # Second section: "Requirements" -> QUALIFICATIONS
         _, clf2 = doc._.classified_sections[1]
         assert clf2.all_types[0].section_type == SectionType.QUALIFICATIONS
 
-        # Third section: "Details" -> OTHER (no keyword match)
         _, clf3 = doc._.classified_sections[2]
         assert clf3.all_types[0].section_type == SectionType.OTHER
 
@@ -308,25 +275,18 @@ class TestSectionClassifierWithFixtures:
 
         assert len(doc._.classified_sections) == 6
 
-        # Find classifications by title
         classifications = {section.title: clf for section, clf in doc._.classified_sections}
 
-        # "Senior Python Developer" -> OTHER (no keywords matched in title)
         assert classifications["Senior Python Developer"].all_types[0].section_type == SectionType.OTHER
 
-        # "About Us" -> DESCRIPTION (company information/description, not job requirements)
         assert classifications["About Us"].all_types[0].section_type == SectionType.DESCRIPTION
 
-        # "Qualifications" -> QUALIFICATIONS
         assert classifications["Qualifications"].all_types[0].section_type == SectionType.QUALIFICATIONS
 
-        # "Preferred Skills" -> SKILLS
         assert classifications["Preferred Skills"].all_types[0].section_type == SectionType.SKILLS
 
-        # "Benefits" -> SKIP
         assert classifications["Benefits"].all_types[0].section_type == SectionType.SKIP
 
-        # "How to Apply" -> SKIP (contains "apply" in skip keywords)
         assert classifications["How to Apply"].all_types[0].section_type == SectionType.SKIP
 
     def test_classify_edge_case_fixture_sections(self, nlp, edge_case_sections) -> None:
@@ -337,13 +297,7 @@ class TestSectionClassifierWithFixtures:
         doc._.sections = edge_case_sections
         doc = classifier(doc)
 
-        # Should have classified all edge case sections without errors
         assert len(doc._.classified_sections) == len(edge_case_sections)
-
-
-# ============================================================================
-# Phase 5: Pipeline Integration Tests
-# ============================================================================
 
 
 class TestSectionClassifierPipelineIntegration:
@@ -351,7 +305,6 @@ class TestSectionClassifierPipelineIntegration:
 
     def test_component_works_in_pipeline_chain(self, nlp) -> None:
         """Verify component can be chained in pipeline."""
-        # Add multiple components
         nlp.add_pipe("section_classifier", last=True)
 
         doc = nlp("Test document")
@@ -367,11 +320,9 @@ class TestSectionClassifierPipelineIntegration:
         )
         doc._.sections = [section]
 
-        # Pipeline should process without error
         doc = nlp("Test document")
         doc._.sections = [section]
 
-        # Manually get component and process
         classifier = nlp.get_pipe("section_classifier")
         doc = classifier(doc)
 
@@ -394,24 +345,17 @@ class TestSectionClassifierPipelineIntegration:
         )
         doc._.sections = [section]
 
-        # Process twice
         doc = classifier(doc)
         result1 = doc._.classified_sections
 
         doc = classifier(doc)
         result2 = doc._.classified_sections
 
-        # Results should be identical
         assert len(result1) == len(result2)
         for (s1, c1), (s2, c2) in zip(result1, result2, strict=False):
             assert s1.title == s2.title
             assert c1.all_types[0].section_type == c2.all_types[0].section_type
             assert c1.all_types[0].confidence == c2.all_types[0].confidence
-
-
-# ============================================================================
-# Phase 6: End-to-End Workflow Tests
-# ============================================================================
 
 
 class TestSectionClassifierEndToEnd:
@@ -421,10 +365,8 @@ class TestSectionClassifierEndToEnd:
         """Test complete workflow with single section."""
         classifier = nlp.create_pipe("section_classifier")
 
-        # Create doc
         doc = nlp("Job description document")
 
-        # Create and set sections
         section = MarkdownSection(
             title="Requirements",
             content="5+ years Python experience",
@@ -437,10 +379,8 @@ class TestSectionClassifierEndToEnd:
         )
         doc._.sections = [section]
 
-        # Process
         doc = classifier(doc)
 
-        # Verify result
         assert len(doc._.classified_sections) == 1
         section_out, classification = doc._.classified_sections[0]
 
@@ -500,11 +440,6 @@ class TestSectionClassifierEndToEnd:
         assert types[2] == SectionType.SKIP
 
 
-# ============================================================================
-# Phase 7: Return Value and Type Tests
-# ============================================================================
-
-
 class TestSectionClassifierReturnValues:
     """Test return values and types."""
 
@@ -550,11 +485,6 @@ class TestSectionClassifierReturnValues:
             assert isinstance(classification, SectionClassification)
 
 
-# ============================================================================
-# Phase 8: Error Handling Tests
-# ============================================================================
-
-
 class TestSectionClassifierErrorHandling:
     """Test error handling and edge cases."""
 
@@ -563,7 +493,6 @@ class TestSectionClassifierErrorHandling:
         classifier = nlp.create_pipe("section_classifier")
 
         doc = nlp("Test")
-        # Create section with minimal data
         section = MarkdownSection(
             title="Test",
             content="",
@@ -576,7 +505,6 @@ class TestSectionClassifierErrorHandling:
         )
         doc._.sections = [section]
 
-        # Should process without error
         doc = classifier(doc)
         assert len(doc._.classified_sections) == 1
 
@@ -597,7 +525,6 @@ class TestSectionClassifierErrorHandling:
         )
         doc._.sections = [section]
 
-        # Should process without error
         doc = classifier(doc)
         assert len(doc._.classified_sections) == 1
 
@@ -606,7 +533,7 @@ class TestSectionClassifierErrorHandling:
         classifier = nlp.create_pipe("section_classifier")
 
         doc = nlp("Test")
-        long_content = "This is a long section. " * 1000  # ~4000 words
+        long_content = "This is a long section. " * 1000
         section = MarkdownSection(
             title="Long Section",
             content=long_content,
@@ -619,14 +546,8 @@ class TestSectionClassifierErrorHandling:
         )
         doc._.sections = [section]
 
-        # Should process without error
         doc = classifier(doc)
         assert len(doc._.classified_sections) == 1
-
-
-# ============================================================================
-# Phase 9: Consistency Tests
-# ============================================================================
 
 
 class TestSectionClassifierConsistency:
@@ -648,7 +569,6 @@ class TestSectionClassifierConsistency:
             has_list=False,
         )
 
-        # Process multiple times
         results = []
         for _ in range(3):
             doc._.sections = [section]
@@ -658,13 +578,10 @@ class TestSectionClassifierConsistency:
                 (clf.all_types[0].section_type, clf.all_types[0].confidence, clf.all_types[0].matched_keywords)
             )
 
-        # All results should be identical
         assert results[0] == results[1] == results[2]
 
 
-# ============================================================================
 # Phase 10: HeadingPromoter -> SectionClassifier EEO Integration (Issue #520)
-# ============================================================================
 
 
 class TestHeadingPromoterSectionClassifierEEOIntegration:
@@ -724,13 +641,10 @@ class TestHeadingPromoterSectionClassifierEEOIntegration:
     @pytest.mark.parametrize(
         ("offset", "expect_isolated"),
         [
-            # Added control (not requested): trigger ends at index 199, the last index inside [:200].
+            # Trigger ends at index 199, the last index inside [:200].
             (174, True),
-            # Trigger starts at 190: only "equal oppo" falls inside first_sentence[:200].
             (190, False),
-            # Only "e" falls inside first_sentence[:200].
             (199, False),
-            # Trigger starts beyond the 200-char window.
             (210, False),
         ],
     )
@@ -805,14 +719,8 @@ class TestHeadingPromoterSectionClassifierEEOIntegration:
         if description is None:
             pytest.skip("no local description contains an EEO marker")
 
-        # clean_html strips legal boilerplate (incl. EEO) before the promoter ever runs, so use the
-        # raw conversion to exercise promoter -> classifier on real EEO text.
+        # clean_html strips legal boilerplate (incl. EEO) before the promoter runs, so use the raw conversion.
         text = html_to_markdown(description) or ""
         pairs = self._classify_sections(text, blank_nlp)
         skipped = [section for section, clf in pairs if clf.is_skip]
         assert any(any(marker in section.content.casefold() for marker in eeo_markers) for section in skipped)
-
-
-# ============================================================================
-# Run with: uv run pytest tests/poc/tweak/spacy_pipeline/test_section_classifier_integration.py -v
-# ============================================================================

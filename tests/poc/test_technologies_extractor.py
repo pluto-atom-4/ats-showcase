@@ -55,7 +55,6 @@ class TestTechExtractorBasics:
         doc = nlp(text)
         techs = extractor.extract(doc)
         assert len(techs) > 0
-        # Should find Python (case-insensitive)
         tech_lower = [t.lower() for t in techs]
         assert "python" in tech_lower
 
@@ -80,9 +79,7 @@ class TestTechExtractorBasics:
         text = "python PYTHON Python PyThOn"
         doc = nlp(text)
         techs = extractor.extract(doc)
-        # Should deduplicate case variations
         python_matches = [t for t in techs if t.lower() == "python"]
-        # May be 1 or more depending on how extraction works
         assert len(python_matches) >= 1
 
     def test_extract_no_duplicates(self, extractor, nlp):
@@ -90,7 +87,6 @@ class TestTechExtractorBasics:
         text = "Python is great. Python is powerful. Python rocks."
         doc = nlp(text)
         techs = extractor.extract(doc)
-        # Count Python occurrences
         python_count = sum(1 for t in techs if t.lower() == "python")
         assert python_count == 1
 
@@ -116,7 +112,6 @@ class TestTechExtractorMultiWordPhrases:
         text = "Experience with computer vision systems."
         doc = nlp(text)
         techs = extractor.extract(doc)
-        # Should find "computer vision"
         tech_lower = [t.lower() for t in techs]
         assert "computer vision" in tech_lower
 
@@ -126,7 +121,6 @@ class TestTechExtractorMultiWordPhrases:
         doc = nlp(text)
         techs = extractor.extract(doc)
         tech_lower = [t.lower() for t in techs]
-        # Should find vision transformers
         assert any("vision" in t and "transformer" in t for t in tech_lower)
 
     def test_multi_word_phrase_case_insensitive(self, extractor, nlp):
@@ -142,9 +136,7 @@ class TestTechExtractorMultiWordPhrases:
         text = "Computer graphics and vision software."
         doc = nlp(text)
         techs = extractor.extract(doc)
-        # Should find "computer vision" if both words adjacent
         tech_lower = [t.lower() for t in techs]
-        # Behavior depends on implementation
         assert all("computer vision" not in t for t in tech_lower)
 
 
@@ -159,8 +151,6 @@ class TestTechExtractorFixtures:
         doc = nlp(fixture_what_you_ll_do)
         techs = extractor.extract(doc)
 
-        # May or may not find techs in this section (it's action-oriented)
-        # Just verify it doesn't crash
         assert isinstance(techs, list)
 
     def test_extract_from_knowledge_skills(self, extractor, nlp, fixture_knowledge_skills):
@@ -172,7 +162,6 @@ class TestTechExtractorFixtures:
         techs = extractor.extract(doc)
         assert len(techs) > 0
 
-        # Check for expected technologies
         text_lower = fixture_knowledge_skills.lower()
         tech_lower = [t.lower() for t in techs]
 
@@ -189,13 +178,9 @@ class TestTechExtractorFixtures:
         doc = nlp(combined_text)
         techs = extractor.extract(doc)
 
-        # Should extract technologies from combined text
         assert len(techs) > 0
-        # All results should be strings
         assert all(isinstance(t, str) for t in techs)
-        # No empty strings
         assert all(t.strip() for t in techs)
-        # Results should be sorted
         assert techs == sorted(techs)
 
     def test_fixture_extraction_coverage(self, extractor, nlp, fixture_knowledge_skills):
@@ -206,7 +191,6 @@ class TestTechExtractorFixtures:
         doc = nlp(fixture_knowledge_skills)
         techs = extractor.extract(doc)
 
-        # Expected technologies in this fixture
         expected_techs = [
             "pytorch",
             "c++",
@@ -222,7 +206,6 @@ class TestTechExtractorFixtures:
         ]
         found_techs = {t.lower() for t in techs}
 
-        # Should find at least 40% of expected techs (some may not be in fixture)
         matches = sum(1 for exp in expected_techs if any(exp in f for f in found_techs))
         assert matches >= len(expected_techs) * 0.4, f"Found {matches}/{len(expected_techs)} expected techs"
 
@@ -256,7 +239,6 @@ class TestTechExtractorEdgeCases:
         text = "Modern anchor-free detectors for object detection."
         doc = nlp(text)
         techs = extractor.extract(doc)
-        # May or may not extract depending on pattern
         assert isinstance(techs, list)
 
     def test_technology_with_numbers(self, extractor, nlp):
@@ -264,7 +246,6 @@ class TestTechExtractorEdgeCases:
         text = "Use Python 3.9 and Java 11."
         doc = nlp(text)
         techs = extractor.extract(doc)
-        # Should find at least Python and Java
         tech_lower = [t.lower() for t in techs]
         assert any("python" in t for t in tech_lower) or len(techs) > 0
 
@@ -273,7 +254,6 @@ class TestTechExtractorEdgeCases:
         text = "Experience with ADAS systems and Large Plant Model technology."
         doc = nlp(text)
         techs = extractor.extract(doc)
-        # May extract acronym or full phrase depending on patterns
         assert isinstance(techs, list)
 
     def test_vendor_specific_terms(self, extractor, nlp):
@@ -289,7 +269,6 @@ class TestTechExtractorEdgeCases:
         text = "Use JavaScript and TypeScript together."
         doc = nlp(text)
         techs = extractor.extract(doc)
-        # JavaScript may or may not be in TECH_TERMS
         assert isinstance(techs, list)
 
     def test_negated_known_term_not_extracted(self, extractor, nlp):
@@ -304,29 +283,21 @@ class TestTechExtractorNegation:
     @pytest.mark.parametrize(
         "text,expected",
         [
-            # 1-5: cue types (no, not, without, never, lacking)
             ("No experience with Kubernetes required.", []),
             ("Experience with Kubernetes is not required.", []),
             ("Without Kubernetes experience, you can still apply.", []),
             ("We have never used Kubernetes in production.", []),
             ("Kubernetes experience is lacking on the current team.", []),
-            # 6: list-joiner propagation
             ("No Java, Kubernetes, or Docker experience required.", []),
-            # 7: positive control, "nice to have" is not a negation cue
+            # "nice to have" is not a negation cue.
             ("Kubernetes experience is nice to have.", ["kubernetes"]),
-            # 8: contrast word resets negation (false-negative guard)
             ("No prior experience needed, but Kubernetes is required.", ["kubernetes"]),
-            # 9: cue in a previous sentence does not suppress the next one
             ("No Java experience. Kubernetes is required for this role.", ["kubernetes"]),
-            # 10: the reproduced eval s4 sentence
             ("No experience required. Strong Python skills are a must.", ["python"]),
-            # 11: contrast word stops negation from reaching affirmed entities
             ("Not a Kubernetes shop, but we do use Docker and Python.", ["docker", "python"]),
-            # 12: contracted negation (spaCy tokenizes as "do" + "n't")
+            # Contracted negation: spaCy tokenizes "Don't" as "Do" + "n't".
             ("Don't need Kubernetes experience for this role.", []),
-            # 13: cue sentence "No." followed by an affirmed mention
             ("No. Kubernetes experience is valued in this role.", ["kubernetes"]),
-            # extra guards: clause separator, contrast after a negated list, joined affirmed term
             ("Kubernetes is required; no Java needed.", ["kubernetes"]),
             ("Kubernetes and Docker are not required.", []),
             ("Kubernetes is required but not Docker.", ["kubernetes"]),
@@ -353,7 +324,7 @@ class TestTechExtractorNegation:
         extractor = TechExtractor(blank)
         doc = blank("No experience with Kubernetes required.")
         assert extractor.extract(doc) == []
-        # Positive control: the fallback path still extracts non-negated terms (not a silent [] from the except).
+        # Positive control: the fallback path still extracts non-negated terms, not a silent [] from the except.
         assert extractor.extract(blank("We use Kubernetes daily.")) == ["kubernetes"]
 
 
@@ -396,7 +367,6 @@ class TestTechExtractorWithPreprocessing:
         text = "Use AWS and Azure cloud services."
         doc = nlp(text)
         techs = extractor.extract(doc)
-        # Should find cloud services (AWS, Azure)
         assert len(techs) > 0
 
 
@@ -415,7 +385,7 @@ class TestTechExtractorPerformance:
         techs = extractor.extract(doc)
         elapsed = time.perf_counter() - start
 
-        # Coarse sanity bound only (5s), not a perf assertion; avoids CI flake
+        # Coarse sanity bound only (5s), not a perf assertion; avoids CI flake.
         assert elapsed < 5.0
         assert len(techs) > 0
 
@@ -432,7 +402,6 @@ class TestTechExtractorPerformance:
         if not fixture_knowledge_skills:
             pytest.skip("Fixture file not found")
 
-        # Repeat fixture to create larger text
         large_text = fixture_knowledge_skills * 3
         doc = nlp(large_text)
 
@@ -442,7 +411,7 @@ class TestTechExtractorPerformance:
         techs = extractor.extract(doc)
         elapsed = time.perf_counter() - start
 
-        # Coarse sanity bound only (5s), not a perf assertion; avoids CI flake
+        # Coarse sanity bound only (5s), not a perf assertion; avoids CI flake.
         assert elapsed < 5.0
         assert len(techs) > 0
 
@@ -496,14 +465,12 @@ class TestTechExtractorPatternGeneration:
     def test_patterns_generated_for_all_terms(self):
         """Patterns generated for all terms in TECH_TERMS."""
         assert len(TECH_TERMS) > 0
-        # TECH_TERMS should be a set or list
         assert isinstance(TECH_TERMS, (set, list, tuple))
 
     def test_single_word_terms_in_patterns(self):
         """Single-word terms like 'Python', 'Java' in TECH_TERMS."""
         single_word_terms = [t for t in TECH_TERMS if " " not in t]
         assert len(single_word_terms) > 0
-        # Should include languages
         term_lower = [t.lower() for t in single_word_terms]
         assert any("python" in t or "java" in t for t in term_lower)
 
@@ -511,7 +478,6 @@ class TestTechExtractorPatternGeneration:
         """Multi-word terms like 'computer vision' in TECH_TERMS."""
         multi_word_terms = [t for t in TECH_TERMS if " " in t]
         assert len(multi_word_terms) > 0
-        # Should include phrases
         assert any("vision" in t.lower() for t in multi_word_terms)
 
 
@@ -721,7 +687,6 @@ class TestTechExtractorHyphenSuffix553:
         techs = extractor.extract(nlp("Experience with Go and Spring-based services."))
         assert {"go", "spring"} <= set(techs)
 
-    # Parametrized over the set so any suffix added later is covered automatically.
     @pytest.mark.parametrize("suffix", sorted(HYPHEN_TECH_SUFFIXES))
     def test_each_hyphen_tech_suffix_extracted(self, extractor, nlp, suffix):
         """Per-entry guard: every HYPHEN_TECH_SUFFIXES member keeps 'Go' via the suffix rule."""
@@ -734,7 +699,6 @@ class TestTechExtractorHyphenSuffix553:
         assert isinstance(HYPHEN_TECH_SUFFIXES, frozenset)
         assert all(isinstance(s, str) and s and s == s.lower() for s in HYPHEN_TECH_SUFFIXES)
 
-    # Hardcoded on purpose: removing an entry fails this test (the parametrized test only covers entries that exist).
     def test_hyphen_tech_suffixes_exact_set(self):
         """Pin the exact suffix set so deleting an entry cannot pass silently."""
         assert HYPHEN_TECH_SUFFIXES == frozenset({"based", "native", "lang", "like"})

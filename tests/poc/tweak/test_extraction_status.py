@@ -19,7 +19,7 @@ from src.poc.tweak.extraction_status import (
 
 SHELL_STRIPPED_CHARS = 460
 REAL_CONTENT_CHARS = 2400
-WALMART_JOB9_DESC_CHARS = 31591  # Reference desc_len for Walmart job 9 (design doc 1.1/1.3).
+WALMART_JOB9_DESC_CHARS = 31591
 
 
 def make_job_result(
@@ -118,7 +118,6 @@ class TestClassifyComplete:
         assert classify_extraction_outcome(result, REAL_CONTENT_CHARS) is ExtractionOutcome.COMPLETE
 
     def test_partial_yield_on_shell_like_input_is_complete(self):
-        # Yield wins: if anything was extracted, the input is not treated as unparseable.
         result = make_job_result(4, skills=2)
         assert classify_extraction_outcome(result, SHELL_STRIPPED_CHARS) is ExtractionOutcome.COMPLETE
 
@@ -127,7 +126,6 @@ class TestClassifyLikelyUnparseable:
     """Zero yield with a shell-like input (few sections or short stripped text)."""
 
     def test_blue_origin_shell_row_is_unparseable(self):
-        # Reference: sections=4, stripped ~460 chars, zero yield.
         result = make_job_result(4)
         outcome = classify_extraction_outcome(result, SHELL_STRIPPED_CHARS)
         assert outcome is ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT
@@ -139,9 +137,7 @@ class TestClassifyLikelyUnparseable:
         assert outcome is ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT
 
     def test_short_stripped_text_alone_is_unparseable(self):
-        # Intended product decision (design doc jd-zero-extraction-fallback.md 2.1/2.4):
-        # short stripped text alone marks the input as unparseable, even when section count
-        # is healthy. Do not relax this to require both signals.
+        # Product decision (design doc jd-zero-extraction-fallback.md 2.1/2.4): do not require both signals.
         result = make_job_result(10)
         outcome = classify_extraction_outcome(result, MIN_DESCRIPTION_CHARS - 1)
         assert outcome is ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT
@@ -160,7 +156,6 @@ class TestClassifyNeedsHumanReview:
     """Zero yield with real content (enough sections and stripped text)."""
 
     def test_uw_job_zero_yield_needs_review(self):
-        # Reference: UW jobs 1/2 have 24/20 sections and real content, zero skills/tech yield.
         result = make_job_result(24)
         outcome = classify_extraction_outcome(result, REAL_CONTENT_CHARS)
         assert outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW
@@ -205,7 +200,6 @@ class TestKeywordOverrides:
     """min_sections and min_description_chars are keyword-only overrides."""
 
     def test_min_sections_override_makes_shell_row_real(self):
-        # With min_sections lowered to 4, a sections=4 row with long text is real content.
         result = make_job_result(4)
         outcome = classify_extraction_outcome(result, REAL_CONTENT_CHARS, min_sections=4)
         assert outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW
@@ -216,7 +210,6 @@ class TestKeywordOverrides:
         assert outcome is ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT
 
     def test_min_description_chars_override_makes_shell_row_real(self):
-        # Lowering the char threshold below 460 turns the shell row into real content.
         result = make_job_result(4)
         outcome = classify_extraction_outcome(result, SHELL_STRIPPED_CHARS, min_sections=4, min_description_chars=400)
         assert outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW

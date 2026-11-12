@@ -23,13 +23,7 @@ import pytest
 
 from src.poc.tweak.markdown_section_classifier import SectionClassification, SectionType, TypeClassification
 from src.poc.tweak.multi_line_paragraph import MarkdownSection
-
-# Import to trigger factory registration
 from src.poc.tweak.spacy_pipeline import RequirementProcessor, registry  # noqa: F401
-
-# ============================================================================
-# Fixtures
-# ============================================================================
 
 
 @pytest.fixture(scope="session")
@@ -48,8 +42,6 @@ def nlp(spacy_module: Any) -> Any:
     """Load spaCy model (skip if not available)."""
     try:
         nlp = spacy_module.load("en_core_web_md")
-        # Ensure classified_sections extension exists (normally registered by
-        # SectionClassifierComponent.__init__, not instantiated in these tests).
         from spacy.tokens import Doc
 
         if not Doc.has_extension("classified_sections"):
@@ -81,9 +73,7 @@ def _make_classification(confidence: float) -> SectionClassification:
     )
 
 
-# ============================================================================
 # Confidence Threshold Tests (Issue #346)
-# ============================================================================
 
 
 class TestRequirementProcessorConfidenceThreshold:
@@ -132,7 +122,6 @@ class TestRequirementProcessorConfidenceThreshold:
         processor = RequirementProcessor(nlp, "requirement_processor")
 
         doc = nlp("Test")
-        # all_types intentionally empty/absent (default); labels-only behavior applies.
         classification = SectionClassification(all_types=(), labels=frozenset({SectionType.QUALIFICATIONS}))
         doc._.classified_sections = [(qualifications_section, classification)]
 
@@ -141,9 +130,7 @@ class TestRequirementProcessorConfidenceThreshold:
         assert len(doc._.requirements) >= 1
 
 
-# ============================================================================
 # Multi-Line Sentence Splitting Tests (Issue #353)
-# ============================================================================
 
 
 class TestRequirementProcessorMultiLineSplitting:
@@ -169,7 +156,6 @@ class TestRequirementProcessorMultiLineSplitting:
 
         doc = processor(doc)
 
-        # Should extract 3 separate requirements, one per line
         assert len(doc._.requirements) >= 3
 
     def test_mixed_line_endings_carriage_return_linefeed(self, nlp) -> None:
@@ -192,7 +178,6 @@ class TestRequirementProcessorMultiLineSplitting:
 
         doc = processor(doc)
 
-        # Should extract at least 3 requirements despite mixed line endings
         assert len(doc._.requirements) >= 3
 
     def test_periods_and_newlines_both_split(self, nlp) -> None:
@@ -215,7 +200,6 @@ class TestRequirementProcessorMultiLineSplitting:
 
         doc = processor(doc)
 
-        # Should extract at least 4 requirements: split on both . and \n
         assert len(doc._.requirements) >= 4
 
     def test_multiline_content_also_splits(self, nlp) -> None:
@@ -243,13 +227,10 @@ class TestRequirementProcessorMultiLineSplitting:
 
         doc = processor(doc)
 
-        # Each content line is classified separately
         assert len(doc._.requirements) >= 2
 
 
-# ============================================================================
 # Heading Exclusion Tests (Issue #375)
-# ============================================================================
 
 
 class TestRequirementProcessorHeadingExclusion:
@@ -477,8 +458,3 @@ class TestRequirementProcessorHeadingExclusion:
         assert all("Also required" not in t for t in texts)
         assert any("5+ years of experience" in t for t in texts)
         assert any("Must have experience with the following:" in t for t in texts)
-
-
-# ============================================================================
-# Run with: uv run pytest tests/poc/tweak/spacy_pipeline/test_requirement_processor.py -v
-# ============================================================================

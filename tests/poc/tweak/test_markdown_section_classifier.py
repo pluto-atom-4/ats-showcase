@@ -42,10 +42,6 @@ from src.poc.tweak.patterns import (
     SKIP_SECTIONS,
 )
 
-# ============================================================================
-# Test 1: TypeClassification Construction & Validation
-# ============================================================================
-
 
 class TestTypeClassificationConstruction:
     """Test TypeClassification dataclass construction and validation."""
@@ -76,11 +72,9 @@ class TestTypeClassificationConstruction:
 
     def test_type_classification_confidence_at_boundaries(self) -> None:
         """Test TypeClassification with boundary confidence values."""
-        # Confidence = 0.0 (valid)
         tc_min = TypeClassification(SectionType.SKILLS, 0.0, ())
         assert tc_min.confidence == 0.0
 
-        # Confidence = 1.0 (valid)
         tc_max = TypeClassification(SectionType.SKILLS, 1.0, ())
         assert tc_max.confidence == 1.0
 
@@ -105,11 +99,6 @@ class TestTypeClassificationConstruction:
         tc = TypeClassification(SectionType.SKILLS, 0.9, keywords)
         assert len(tc.matched_keywords) == 4
         assert "expertise" in tc.matched_keywords
-
-
-# ============================================================================
-# Test 2: KeywordMatch Construction & Position Tracking
-# ============================================================================
 
 
 class TestKeywordMatchConstruction:
@@ -147,11 +136,6 @@ class TestKeywordMatchConstruction:
         """Test KeywordMatch with position=-1 (keyword not found sentinel)."""
         km = KeywordMatch("missing", SectionType.SKILLS, "title", -1)
         assert km.position == -1
-
-
-# ============================================================================
-# Test 3: calculate_confidence() Tiers
-# ============================================================================
 
 
 class TestCalculateConfidence:
@@ -204,11 +188,6 @@ class TestCalculateConfidence:
         assert conf <= 1.0
 
 
-# ============================================================================
-# Test 4: fallback_confidence() Tiers
-# ============================================================================
-
-
 class TestFallbackConfidence:
     """Test fallback_confidence() function for no-match scenarios."""
 
@@ -237,11 +216,6 @@ class TestFallbackConfidence:
         assert conf == 0.0
 
 
-# ============================================================================
-# Test 5: calculate_position() Correctness
-# ============================================================================
-
-
 class TestCalculatePosition:
     """Test calculate_position() for keyword position tracking."""
 
@@ -263,23 +237,17 @@ class TestCalculatePosition:
     def test_position_first_occurrence_only(self) -> None:
         """Test that only first occurrence position is returned."""
         pos = calculate_position("the", "the quick the brown the fox")
-        assert pos == 0  # First occurrence
+        assert pos == 0
 
     def test_position_case_sensitive_on_normalized_text(self) -> None:
         """Test position calculation is case-sensitive on normalized (lowercase) text."""
-        # Both keyword and text are already lowercase
         pos = calculate_position("cafe", "expertise in cafe management")
-        assert pos == 13  # "cafe" starts at index 13 in string
+        assert pos == 13
 
     def test_position_single_character_keyword(self) -> None:
         """Test position with single-character keyword."""
         pos = calculate_position("a", "this is a test")
         assert pos == 8
-
-
-# ============================================================================
-# Test 6: SectionClassification.from_type_classifications() Factory
-# ============================================================================
 
 
 class TestSectionClassificationFactory:
@@ -299,7 +267,7 @@ class TestSectionClassificationFactory:
         tc2 = TypeClassification(SectionType.RESPONSIBILITIES, 0.75, ("responsibility",))
         tc3 = TypeClassification(SectionType.QUALIFICATIONS, 0.9, ("requirement",))
         result = SectionClassification.from_type_classifications([tc1, tc2, tc3])
-        assert result.all_types[0].confidence == 0.9  # Highest first
+        assert result.all_types[0].confidence == 0.9
         assert result.all_types[1].confidence == 0.85
         assert result.all_types[2].confidence == 0.75
 
@@ -331,11 +299,6 @@ class TestSectionClassificationFactory:
         tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
         result = SectionClassification.from_type_classifications([tc], is_skip=False)
         assert result.is_skip is False
-
-
-# ============================================================================
-# Test 7: SectionClassifier.classify() Multi-Type Behavior
-# ============================================================================
 
 
 class TestSectionClassifierMultiType:
@@ -372,7 +335,6 @@ class TestSectionClassifierMultiType:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Should contain both SKILLS and RESPONSIBILITIES (multi-type)
         assert SectionType.SKILLS in result.labels
         assert SectionType.RESPONSIBILITIES in result.labels
 
@@ -390,7 +352,6 @@ class TestSectionClassifierMultiType:
             has_list=False,
         )
         result = classifier.classify(section)
-        # All types should be sorted by confidence descending
         if len(result.all_types) > 1:
             for i in range(len(result.all_types) - 1):
                 assert result.all_types[i].confidence >= result.all_types[i + 1].confidence
@@ -409,7 +370,6 @@ class TestSectionClassifierMultiType:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Should have keyword matches with position information
         assert len(result.keyword_matches) >= 2
         km = result.keyword_matches[0]
         assert km.keyword in ("technical", "skill")
@@ -435,11 +395,6 @@ class TestSectionClassifierMultiType:
         assert SectionType.QUALIFICATIONS in result.labels
 
 
-# ============================================================================
-# Test 8: Title-Based vs Content-Based Classification
-# ============================================================================
-
-
 class TestClassifyFromTitleVsContent:
     """Test _classify_from_title() vs _classify_from_content() behavior."""
 
@@ -457,14 +412,13 @@ class TestClassifyFromTitleVsContent:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Should classify from title
         assert len(result.all_types) >= 1
 
     def test_classify_from_content_without_title(self) -> None:
         """Test classify falls back to content when no title."""
         classifier = SectionClassifier()
         section = MarkdownSection(
-            title="",  # Empty title
+            title="",
             content="Requires 5+ years Python experience",
             level=2,
             start_line=0,
@@ -474,16 +428,15 @@ class TestClassifyFromTitleVsContent:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Should classify from content
         assert len(result.all_types) >= 1
 
     def test_classify_from_content_level_minus_two(self) -> None:
         """Test classify uses content when level == -2 (untitled section)."""
         classifier = SectionClassifier()
         section = MarkdownSection(
-            title="Some Title",  # Title present but ignored
+            title="Some Title",
             content="Requires 5+ years Python",
-            level=-2,  # Untitled marker
+            level=-2,
             start_line=0,
             end_line=1,
             word_count=5,
@@ -491,7 +444,6 @@ class TestClassifyFromTitleVsContent:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Should classify from content despite title presence
         assert len(result.all_types) >= 1
 
     def test_classify_empty_content_returns_fallback(self) -> None:
@@ -508,15 +460,9 @@ class TestClassifyFromTitleVsContent:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Should return fallback (UNLABELED with 0.0 confidence)
         assert len(result.all_types) == 1
         assert result.all_types[0].section_type == SectionType.UNLABELED
         assert result.all_types[0].confidence == 0.0
-
-
-# ============================================================================
-# Test 9: Ruler Pattern Matching (_match_ruler_patterns, _calculate_ruler_confidence)
-# ============================================================================
 
 
 class TestRulerPatternMatching:
@@ -525,29 +471,24 @@ class TestRulerPatternMatching:
     def test_calculate_ruler_confidence_base_only(self) -> None:
         """Test _calculate_ruler_confidence with base confidence only."""
         classifier = SectionClassifier()
-        # Pattern with no adjustment in CONFIDENCE_ADJUSTMENT_BY_SECTION
         conf = classifier._calculate_ruler_confidence("SECTION_UNKNOWN")
-        # Should use base confidence (0.70) with no adjustment
         assert conf == 0.70
 
     def test_calculate_ruler_confidence_with_positive_adjustment(self) -> None:
         """Test _calculate_ruler_confidence with positive section adjustment."""
         classifier = SectionClassifier()
-        # SECTION_REQUIREMENTS has +0.15 adjustment: 0.70 + 0.15 = 0.85
         conf = classifier._calculate_ruler_confidence("SECTION_REQUIREMENTS")
         assert conf == 0.85
 
     def test_calculate_ruler_confidence_with_negative_adjustment(self) -> None:
         """Test _calculate_ruler_confidence with negative section adjustment."""
         classifier = SectionClassifier()
-        # SECTION_BENEFITS has -0.50 adjustment: 0.70 - 0.50 = 0.20
         conf = classifier._calculate_ruler_confidence("SECTION_BENEFITS")
-        assert conf == pytest.approx(0.20)  # Allow floating-point tolerance
+        assert conf == pytest.approx(0.20)
 
     def test_calculate_ruler_confidence_clamped_to_zero(self) -> None:
         """Test _calculate_ruler_confidence clamps to minimum 0.0."""
         classifier = SectionClassifier()
-        # SECTION_COMPENSATION has -0.50: 0.70 - 0.50 = 0.20 (no clamp needed)
         conf = classifier._calculate_ruler_confidence("SECTION_COMPENSATION")
         assert conf >= 0.0
         assert conf <= 1.0
@@ -555,7 +496,6 @@ class TestRulerPatternMatching:
     def test_match_ruler_patterns_returns_dict(self) -> None:
         """Test _match_ruler_patterns returns dict of SectionType -> pattern_label."""
         classifier = SectionClassifier()
-        # Without spaCy model loaded, should return empty dict (graceful degradation)
         result = classifier._match_ruler_patterns("requirements section", "title")
         assert isinstance(result, dict)
 
@@ -572,11 +512,6 @@ class TestRulerPatternMatching:
     def test_clamp_confidence_above_one(self) -> None:
         """Test _clamp_confidence clamps values > 1.0 to 1.0."""
         assert _clamp_confidence(1.5) == 1.0
-
-
-# ============================================================================
-# Test 10: classify_section() Module-Level Convenience Function
-# ============================================================================
 
 
 class TestClassifySectionFunction:
@@ -629,18 +564,12 @@ class TestClassifySectionFunction:
             has_list=False,
         )
         result = classify_section(section, classifier)
-        # Should recognize "benefits" as skip keyword
         assert len(result.all_types) >= 1
 
     def test_classify_section_none_raises_error(self) -> None:
         """Test classify_section raises ValueError for None section."""
         with pytest.raises(ValueError, match="section cannot be None"):
             classify_section(None)  # type: ignore[arg-type]
-
-
-# ============================================================================
-# Test 11: Edge Cases - Empty, No Matches, Skip Patterns
-# ============================================================================
 
 
 class TestEdgeCases:
@@ -669,7 +598,7 @@ class TestEdgeCases:
         """Test section with title but no keyword matches uses fallback."""
         classifier = SectionClassifier()
         section = MarkdownSection(
-            title="Random Title",  # No recognized keywords
+            title="Random Title",
             content="",
             level=2,
             start_line=0,
@@ -679,7 +608,6 @@ class TestEdgeCases:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Should fall back to OTHER with 0.3 confidence
         assert result.all_types[0].section_type == SectionType.OTHER
         assert result.all_types[0].confidence == 0.3
 
@@ -697,7 +625,6 @@ class TestEdgeCases:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Should fall back to DESCRIPTION with 0.2 confidence
         assert result.all_types[0].section_type == SectionType.DESCRIPTION
         assert result.all_types[0].confidence == 0.2
 
@@ -715,7 +642,6 @@ class TestEdgeCases:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Should have SKIP type and is_skip=True
         types = {tc.section_type for tc in result.all_types}
         assert SectionType.SKIP in types
         assert result.is_skip is True
@@ -734,7 +660,6 @@ class TestEdgeCases:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Whitespace is stripped, so behaves like empty
         assert result.all_types[0].section_type == SectionType.UNLABELED
         assert result.all_types[0].confidence == 0.0
 
@@ -752,13 +677,7 @@ class TestEdgeCases:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Should have multiple matches
         assert len(result.keyword_matches) >= 2
-
-
-# ============================================================================
-# Test 12: Initialization & Configuration
-# ============================================================================
 
 
 class TestSectionClassifierInitialization:
@@ -785,13 +704,7 @@ class TestSectionClassifierInitialization:
         """Test _get_nlp returns Optional[Language]."""
         classifier = SectionClassifier()
         nlp = classifier._get_nlp()
-        # May be None if spaCy model not installed, or a Language object
         assert nlp is None or hasattr(nlp, "pipe")
-
-
-# ============================================================================
-# Test 13: Consistency & Regression Tests
-# ============================================================================
 
 
 class TestConsistencyAndRegression:
@@ -812,7 +725,6 @@ class TestConsistencyAndRegression:
         )
         result1 = classifier.classify(section)
         result2 = classifier.classify(section)
-        # Results should be identical
         assert len(result1.all_types) == len(result2.all_types)
         assert result1.labels == result2.labels
 
@@ -869,9 +781,7 @@ class TestConsistencyAndRegression:
         assert result.labels == all_types_set
 
 
-# ============================================================================
-# Test: Word-Boundary Keyword Matching (Issue #365)
-# ============================================================================
+# Issue #365
 
 
 class TestWordBoundaryKeywordMatching:
@@ -891,7 +801,6 @@ class TestWordBoundaryKeywordMatching:
             has_list=False,
         )
         result = classifier.classify(section)
-        # 'our' is a skip keyword, but should NOT match in 'your' (mid-word)
         assert not result.is_skip
 
     def test_our_in_worksource_metadata_not_matched(self) -> None:
@@ -902,7 +811,7 @@ class TestWordBoundaryKeywordMatching:
         """
         classifier = SectionClassifier()
         section = MarkdownSection(
-            title="",  # Untitled
+            title="",
             content=("COMPENSATION: $70-$80 HOURLY. Location: Remote. Job Desc: Manage projects."),
             level=-2,
             start_line=0,
@@ -912,10 +821,8 @@ class TestWordBoundaryKeywordMatching:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Assert 'our' is NOT in matched keywords
         matched_kw_set = {km.keyword for km in result.keyword_matches}
         assert "our" not in matched_kw_set, f"'our' should not match in content, but found in: {matched_kw_set}"
-        # Assert 'hourly' is not matched as skip (hourly removed from SKIP_SECTIONS)
         assert "hourly" not in matched_kw_set, (
             f"'hourly' should not be a skip keyword after removal, but found in: {matched_kw_set}"
         )
@@ -934,7 +841,6 @@ class TestWordBoundaryKeywordMatching:
             has_list=False,
         )
         result = classifier.classify(section)
-        # 'our' is a skip keyword at word start, should match
         assert result.is_skip
 
     def test_stem_qualif_still_matches(self) -> None:
@@ -951,7 +857,6 @@ class TestWordBoundaryKeywordMatching:
             has_list=False,
         )
         result = classifier.classify(section)
-        # 'qualif' is a QUALIFICATIONS keyword and should match
         assert SectionType.QUALIFICATIONS in result.labels
 
     def test_stem_requirements_still_matches(self) -> None:
@@ -968,7 +873,6 @@ class TestWordBoundaryKeywordMatching:
             has_list=False,
         )
         result = classifier.classify(section)
-        # 'requirement' is a QUALIFICATIONS keyword and should match
         assert SectionType.QUALIFICATIONS in result.labels
 
     def test_relocation_still_skip(self) -> None:
@@ -985,7 +889,6 @@ class TestWordBoundaryKeywordMatching:
             has_list=False,
         )
         result = classifier.classify(section)
-        # 'relocation' remains as skip keyword after hourly removal
         assert result.is_skip
 
     def test_hourly_not_skip_after_removal(self) -> None:
@@ -1006,8 +909,6 @@ class TestWordBoundaryKeywordMatching:
             has_list=False,
         )
         result = classifier.classify(section)
-        # After review fix, 'hourly' is no longer in SKIP_SECTIONS
-        # So this should NOT classify as SKIP based on hourly keyword
         matched_kw_set = {km.keyword for km in result.keyword_matches}
         assert "hourly" not in matched_kw_set, "'hourly' should not be a skip keyword after removal"
 
@@ -1023,7 +924,7 @@ class TestSkipPrecedenceContentPath:
         """
         classifier = SectionClassifier()
         section = MarkdownSection(
-            title="",  # Untitled (level -2)
+            title="",
             content=(
                 "Description: Manage projects. Overview of role and responsibilities. "
                 "Location: Remote. Compensation package."
@@ -1036,13 +937,11 @@ class TestSkipPrecedenceContentPath:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Unconditional assertion: description text should outrank skip keywords
         assert len(result.all_types) > 0, "Result should have at least one type"
         assert result.all_types[0].section_type is SectionType.DESCRIPTION, (
             f"Expected top-ranked type=DESCRIPTION, got {result.all_types[0].section_type}"
         )
         assert not result.is_skip, "Expected is_skip=False when DESCRIPTION is top-ranked"
-        # Verify skip keywords NOT in matched keywords (hourly removed in review fix)
         matched_kw_set = {km.keyword for km in result.keyword_matches}
         assert "our" not in matched_kw_set, "'our' should not be matched (word boundary)"
         assert "hourly" not in matched_kw_set, "'hourly' was removed from SKIP_SECTIONS"
@@ -1055,7 +954,7 @@ class TestSkipPrecedenceContentPath:
         """
         classifier = SectionClassifier()
         section = MarkdownSection(
-            title="",  # Untitled
+            title="",
             content=(
                 "Description: Develop Python applications. Summary: Lead technical projects. "
                 "Location: Remote. Compensation details."
@@ -1068,7 +967,6 @@ class TestSkipPrecedenceContentPath:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Unconditional assertion: explicit "Job Description" + description text should outrank skip keywords
         assert len(result.all_types) > 0
         assert result.all_types[0].section_type is SectionType.DESCRIPTION, (
             f"Expected top-ranked type=DESCRIPTION, got {result.all_types[0].section_type}"
@@ -1083,7 +981,7 @@ class TestSkipPrecedenceContentPath:
         """
         classifier = SectionClassifier()
         section = MarkdownSection(
-            title="",  # Untitled
+            title="",
             content="Equal opportunity employer. E-verify and right to work requirements. Union position.",
             level=-2,
             start_line=0,
@@ -1093,7 +991,6 @@ class TestSkipPrecedenceContentPath:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Unconditional assertion: only skip keywords, no description text -> SKIP should rank highest
         assert len(result.all_types) > 0
         assert result.all_types[0].section_type is SectionType.SKIP, (
             f"Expected top-ranked type=SKIP, got {result.all_types[0].section_type}"
@@ -1106,7 +1003,6 @@ class TestSkipPrecedenceContentPath:
         Title path: is_skip=True if ANY matched type is SKIP, regardless of confidence ranking.
         """
         classifier = SectionClassifier()
-        # Title with 'our' (SKIP) and 'skills' (SKILLS)
         section = MarkdownSection(
             title="Our Technical Skills",
             content="Python, Java, SQL",
@@ -1118,7 +1014,6 @@ class TestSkipPrecedenceContentPath:
             has_list=False,
         )
         result = classifier.classify(section)
-        # Title path: "any skip hit" rule, so is_skip=True if SKIP in any matched type
         if SectionType.SKIP in result.labels:
             assert result.is_skip, "Title path: is_skip should be True if any matched type is SKIP"
         else:

@@ -32,7 +32,6 @@ class TestConfigHardeningMainPath:
         config_file = config_dir / "test.json"
         config_file.write_text(json.dumps({"companies": {"AlphaCo": "x"}}))
 
-        # Create a test input file
         input_file = tmp_path / "jobs.json"
         input_file.write_text(
             json.dumps(
@@ -47,7 +46,6 @@ class TestConfigHardeningMainPath:
             )
         )
 
-        # Act
         import sys
 
         from src.poc.tweak.batch_processor import main
@@ -65,7 +63,6 @@ class TestConfigHardeningMainPath:
             ]
             exit_code = main()
 
-            # Assert
             assert exit_code == 1, "main() should return 1 on malformed config"
             captured = capsys.readouterr()
             assert "Error:" in captured.err, "stderr should have 'Error:' prefix"
@@ -78,7 +75,6 @@ class TestConfigHardeningMainPath:
 
         Expected: main() returns 1, stderr has "Error:", no "Traceback".
         """
-        # Create a test input file
         input_file = tmp_path / "jobs.json"
         input_file.write_text(
             json.dumps(
@@ -93,7 +89,6 @@ class TestConfigHardeningMainPath:
             )
         )
 
-        # Act
         import sys
 
         from src.poc.tweak.batch_processor import main
@@ -111,7 +106,6 @@ class TestConfigHardeningMainPath:
             ]
             exit_code = main()
 
-            # Assert
             assert exit_code == 1, "main() should return 1 on missing config dir"
             captured = capsys.readouterr()
             assert "Error:" in captured.err, "stderr should have 'Error:' prefix"
@@ -150,7 +144,6 @@ class TestResolveDescriptionSelectorHardening:
             )
         )
 
-        # Act & Assert
         from src.poc.tweak.batch_processor import _resolve_description_selector
 
         with pytest.raises(ValueError) as exc_info:
@@ -173,7 +166,6 @@ class TestLoadAllCompanyConfigsBOM:
         config_dir.mkdir()
         config_file = config_dir / "bom_test.json"
 
-        # Write with UTF-8 BOM prefix
         bom_json = json.dumps(
             {
                 "companies": {
@@ -185,13 +177,10 @@ class TestLoadAllCompanyConfigsBOM:
             }
         )
         with open(config_file, "wb") as f:
-            # UTF-8 BOM: U+FEFF
             f.write(b"\xef\xbb\xbf" + bom_json.encode("utf-8"))
 
-        # Act
         companies = load_all_company_configs(str(config_dir))
 
-        # Assert
         assert "AlphaCo" in companies, "BOM file should load companies successfully"
         assert companies["AlphaCo"]["name"] == "Alpha Co"
 
@@ -217,10 +206,8 @@ class TestResolveCompanySelectorsSafety:
             },
         }
 
-        # Act
         selectors = resolve_company_selectors("Alpha Co", merged_config)
 
-        # Assert
         assert selectors["description_selector"] == ".alpha"
 
     def test_resolve_company_selectors_strips_whitespace_from_input(self):
@@ -237,10 +224,8 @@ class TestResolveCompanySelectorsSafety:
             }
         }
 
-        # Act
         selectors = resolve_company_selectors(" AlphaCo ", merged_config)
 
-        # Assert
         assert selectors["description_selector"] == ".alpha"
 
     def test_resolve_company_selectors_with_non_dict_company_value_returns_empty(self):
@@ -252,10 +237,8 @@ class TestResolveCompanySelectorsSafety:
         # SYNTHETIC: config with non-dict company value (string instead of selector dict)
         merged_config = {"AlphaCo": "x"}
 
-        # Act
         selectors = resolve_company_selectors("AlphaCo", merged_config)
 
-        # Assert - should safely return empty dict, no AttributeError
         assert selectors == {}
 
 
@@ -271,7 +254,6 @@ class TestSourceConfigWhitespaceScoping:
         # SYNTHETIC: job record with whitespace in source_config
         from src.poc.tweak import batch_processor as bp
 
-        # Track calls to _resolve_job_scoping to verify stripping
         calls = []
         original_resolver = bp._resolve_job_scoping
 
@@ -281,7 +263,6 @@ class TestSourceConfigWhitespaceScoping:
 
         monkeypatch.setattr(bp, "_resolve_job_scoping", tracking_resolver)
 
-        # Create config with AlphaCo
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         config_file = config_dir / "test.json"
@@ -298,7 +279,6 @@ class TestSourceConfigWhitespaceScoping:
             )
         )
 
-        # Create jobs with whitespace-padded source_config
         input_file = tmp_path / "jobs.json"
         input_file.write_text(
             json.dumps(
@@ -314,10 +294,8 @@ class TestSourceConfigWhitespaceScoping:
             )
         )
 
-        # Act
         results = bp.run_batch(str(input_file), config_dir=str(config_dir))
 
-        # Assert - resolver should have been called with "AlphaCo" after stripping
         assert len(calls) > 0, "resolver should be called for source_config"
         assert "AlphaCo" in calls, f"resolver should be called with stripped key, got {calls}"
         assert len(results) == 1

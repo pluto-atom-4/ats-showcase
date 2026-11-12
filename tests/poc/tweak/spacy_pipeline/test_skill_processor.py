@@ -41,7 +41,7 @@ def nlp(spacy_module: Any) -> Any:
 
         from src.poc.tweak.multi_line_paragraph import MarkdownSpanRuler
 
-        MarkdownSpanRuler(loaded)  # Initializes Doc extensions
+        MarkdownSpanRuler(loaded)
 
         if not Doc.has_extension("classified_sections"):
             Doc.set_extension("classified_sections", default=[])
@@ -154,7 +154,6 @@ class TestSkillProcessorConfidenceThreshold:
 
         doc = processor(doc)
 
-        # No confidence data available: extraction proceeds purely on labels membership.
         assert len(doc._.skills) > 0
 
 
@@ -165,7 +164,6 @@ class TestSkillProcessorLineSegmentation:
         """Multi-line skill list (3 lines) -> 3 separate skills, not merged."""
         processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
 
-        # Three skills on separate lines
         multiline_content = "Building scalable systems\nLeading distributed teams\nDesigning scalable architectures"
         section = _make_section(content=multiline_content)
         tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
@@ -176,9 +174,7 @@ class TestSkillProcessorLineSegmentation:
 
         doc = processor(doc)
 
-        # Should extract at least 3 distinct skills (one per line)
         assert len(doc._.skills) >= 3
-        # Verify skills are distinct (not merged into one)
         skill_texts = [s["skill"] for s in doc._.skills]
         assert "building scalable systems" in skill_texts or "building scalable" in skill_texts
         assert any("leading" in s for s in skill_texts)
@@ -188,7 +184,6 @@ class TestSkillProcessorLineSegmentation:
         """Mixed line endings (\\r\\n + \\n) -> correct per-line segmentation."""
         processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
 
-        # Mix Windows (\\r\\n) and Unix (\\n) line endings
         multiline_content = "Building scalable systems\r\nLeading distributed teams\nDesigning architectures"
         section = _make_section(content=multiline_content)
         tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
@@ -199,10 +194,8 @@ class TestSkillProcessorLineSegmentation:
 
         doc = processor(doc)
 
-        # Should extract multiple skills despite mixed line endings
         assert len(doc._.skills) >= 2
         skill_texts = [s["skill"] for s in doc._.skills]
-        # Verify no skills contain raw line ending markers
         for skill in skill_texts:
             assert "\r" not in skill
             assert "\n" not in skill
@@ -220,19 +213,13 @@ class TestSkillProcessorLineSegmentation:
 
         doc = processor(doc)
 
-        # Should extract skills normally
         assert len(doc._.skills) > 0
 
     def test_seen_skills_deduplication_across_lines(self, nlp) -> None:
         """Deduplication (seen_skills) still works across multiple lines."""
         processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
 
-        # Repeated skill on different lines
-        multiline_content = (
-            "Building scalable systems\n"
-            "Building scalable systems\n"  # Duplicate
-            "Leading distributed teams"
-        )
+        multiline_content = "Building scalable systems\nBuilding scalable systems\nLeading distributed teams"
         section = _make_section(content=multiline_content)
         tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
         classification = SectionClassification.from_type_classifications([tc])
@@ -242,9 +229,7 @@ class TestSkillProcessorLineSegmentation:
 
         doc = processor(doc)
 
-        # Duplicates should be deduplicated
         skill_texts = [s["skill"] for s in doc._.skills]
-        # "building scalable systems" or similar should appear exactly once
         building_count = sum(1 for s in skill_texts if "building" in s and "scalable" in s)
         assert building_count == 1
 
@@ -312,8 +297,6 @@ class TestSkillProcessorNounLedBullets:
         doc = processor(doc)
 
         skill_texts = {s["skill"] for s in doc._.skills}
-        # Should contain both verb-led skills (like "building scalable systems")
-        # and noun-led skills (like "python")
         assert "python" in skill_texts
         assert any("building" in s for s in skill_texts)
 
@@ -365,15 +348,7 @@ class TestSkillProcessorNounLedBullets:
         """
         processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
 
-        content = (
-            "Technical Skills\n"  # Title echo - should be skipped
-            "* Python required\n"
-            "* Python preferred\n"  # Duplicate of above
-            "* C++ required\n"
-            "\n"  # Blank line
-            "- \n"  # Marker-only line
-            "*\n"  # Another marker-only
-        )
+        content = "Technical Skills\n* Python required\n* Python preferred\n* C++ required\n\n- \n*\n"
         section = _make_section(title="Technical Skills", content=content)
         tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
         classification = SectionClassification.from_type_classifications([tc])
@@ -384,9 +359,7 @@ class TestSkillProcessorNounLedBullets:
         doc = processor(doc)
 
         skill_texts = {s["skill"] for s in doc._.skills}
-        # Should have exactly python and c++, no duplicates, no title echo
         assert skill_texts == {"python", "c++"}
-        # Verify "technical skills" was not extracted
         assert "technical skills" not in skill_texts
 
     def test_worksource_shaped_e2e(self, nlp) -> None:
@@ -400,7 +373,6 @@ class TestSkillProcessorNounLedBullets:
         """
         processor = SkillProcessor(nlp, "skill_processor", min_confidence=0.70)
 
-        # WorkSource-shaped text for Technical Skills section
         content = "* Python experience required\n* C++ preferred"
         section = _make_section(title="Technical Skills", content=content)
         tc = TypeClassification(SectionType.SKILLS, 0.85, ("skill",))
@@ -409,13 +381,10 @@ class TestSkillProcessorNounLedBullets:
         doc = nlp("Test document")
         doc._.classified_sections = [(section, classification)]
 
-        # Run skill processor
         doc = processor(doc)
 
-        # Extract skills
         skill_texts = {s["skill"] for s in doc._.skills}
 
-        # Should contain python and c++ (order-insensitive)
         assert "python" in skill_texts
         assert "c++" in skill_texts
 
@@ -441,7 +410,6 @@ class TestSkillProcessorNounLedJunkFiltering:
 
         doc = processor(doc)
 
-        # Should extract nothing (not a skill)
         assert doc._.skills == []
 
     def test_results_analysis_rejected(self, nlp) -> None:
@@ -462,7 +430,6 @@ class TestSkillProcessorNounLedJunkFiltering:
 
         doc = processor(doc)
 
-        # Should extract nothing (not a skill)
         assert doc._.skills == []
 
     def test_we_are_a_team_of_experts_rejected(self, nlp) -> None:
@@ -482,7 +449,6 @@ class TestSkillProcessorNounLedJunkFiltering:
 
         doc = processor(doc)
 
-        # Should extract nothing (not a skill)
         assert doc._.skills == []
 
     def test_good_alone_rejected(self, nlp) -> None:
@@ -503,7 +469,6 @@ class TestSkillProcessorNounLedJunkFiltering:
 
         doc = processor(doc)
 
-        # Should extract nothing (not a skill)
         assert doc._.skills == []
 
     def test_algorithm_design_still_passes(self, nlp) -> None:
@@ -524,7 +489,6 @@ class TestSkillProcessorNounLedJunkFiltering:
 
         doc = processor(doc)
 
-        # Should extract "algorithm design" because it has NOUN tokens
         skill_texts = {s["skill"] for s in doc._.skills}
         assert "algorithm design" in skill_texts
 
@@ -547,7 +511,6 @@ class TestSkillProcessorNounLedJunkFiltering:
 
         doc = processor(doc)
 
-        # Should NOT extract anything
         assert doc._.skills == []
 
     def test_going_forward_go_language_rejected(self, nlp) -> None:
@@ -568,7 +531,6 @@ class TestSkillProcessorNounLedJunkFiltering:
 
         doc = processor(doc)
 
-        # Should extract nothing (contains non-tech VERB tokens)
         assert doc._.skills == []
 
     def test_we_use_go_for_services_rejected(self, nlp) -> None:
@@ -589,7 +551,6 @@ class TestSkillProcessorNounLedJunkFiltering:
 
         doc = processor(doc)
 
-        # Should extract nothing (contains non-tech PRON token 'we')
         assert doc._.skills == []
 
     def test_go_language_extracted(self, nlp) -> None:
@@ -610,7 +571,6 @@ class TestSkillProcessorNounLedJunkFiltering:
 
         doc = processor(doc)
 
-        # Should extract "go language"
         skill_texts = {s["skill"] for s in doc._.skills}
         assert "go language" in skill_texts
 

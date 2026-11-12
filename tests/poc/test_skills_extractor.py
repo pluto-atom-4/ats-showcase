@@ -65,7 +65,6 @@ class TestSkillExtractorBasics:
 
     def test_extract_no_duplicates(self, extractor):
         """Results deduplicated."""
-        # Identical matches must collapse to a single entry (sorted(set(...)))
         text = "You will design systems. You will design systems. You will design systems."
         skills = extractor.extract(text)
         assert skills == ["design systems"]
@@ -74,7 +73,6 @@ class TestSkillExtractorBasics:
         """Handles newlines in text."""
         text = "Lead the\ndesign of\narchitectures."
         skills = extractor.extract(text)
-        # Should extract without newline issues
         assert isinstance(skills, list)
 
     def test_extract_empty_text(self, extractor):
@@ -130,8 +128,7 @@ class TestSkillExtractorPatternMatching:
         text2 = "You will lead design efforts."
         skills1 = extractor.extract(text1)
         skills2 = extractor.extract(text2)
-        # Observed: the optional "the/of" connector is kept; "of systems" is not
-        # (ADP is excluded from the noun run), so the span stops at "design".
+        # The optional "the/of" connector is kept; "of systems" is not (ADP excluded from the noun run).
         assert skills1 == ["lead the design"]
         assert skills2 == ["lead design efforts"]
 
@@ -140,7 +137,6 @@ class TestSkillExtractorPatternMatching:
         text = "Lead the design of deep learning architectures."
         skills = extractor.extract(text)
         assert len(skills) > 0
-        # Should capture "deep learning" as part of phrase
 
     def test_coordinated_nouns_full_span(self, extractor):
         """Coordinated object nouns stay in one span (snippet s6, #498)."""
@@ -159,7 +155,6 @@ class TestSkillExtractorPatternMatching:
         """Filters overlapping spans, keeps longest."""
         text = "Design and develop novel deep learning architectures."
         skills = extractor.extract(text)
-        # Should pick longest matches, avoid duplicates
         assert len(skills) > 0
 
 
@@ -174,11 +169,9 @@ class TestSkillExtractorFixtures:
         skills = extractor.extract(fixture_what_you_ll_do)
         assert len(skills) > 0
 
-        # Verify results are properly formatted
         assert all(isinstance(s, str) for s in skills)
         assert all(s.islower() for s in skills)
 
-        # At least one skill should be extracted
         assert len(skills) >= 1
 
     def test_extract_from_knowledge_skills(self, extractor, fixture_knowledge_skills):
@@ -189,10 +182,8 @@ class TestSkillExtractorFixtures:
         skills = extractor.extract(fixture_knowledge_skills)
         assert len(skills) > 0
 
-        # Verify results are properly formatted
         assert all(isinstance(s, str) for s in skills)
         assert all(s.islower() for s in skills)
-        # All skills should be non-empty after stripping
         assert all(s.strip() for s in skills)
 
     def test_fixture_combined_extraction(self, extractor, fixture_what_you_ll_do, fixture_knowledge_skills):
@@ -200,13 +191,9 @@ class TestSkillExtractorFixtures:
         combined_text = fixture_what_you_ll_do + "\n" + fixture_knowledge_skills
         skills = extractor.extract(combined_text)
 
-        # Should extract from both sections
         assert len(skills) > 3
-        # All results should be lowercase
         assert all(s.islower() for s in skills)
-        # All results should be strings
         assert all(isinstance(s, str) for s in skills)
-        # No empty strings
         assert all(s.strip() for s in skills)
 
     def test_fixture_extraction_accuracy(self, extractor, fixture_what_you_ll_do):
@@ -216,7 +203,6 @@ class TestSkillExtractorFixtures:
 
         skills = extractor.extract(fixture_what_you_ll_do)
 
-        # Expected verbs to find
         expected_verbs = ["lead", "design", "develop", "own", "drive", "define", "partner", "mentor", "communicate"]
         found_verbs = set()
         for skill in skills:
@@ -224,7 +210,6 @@ class TestSkillExtractorFixtures:
                 if verb in skill.split():
                     found_verbs.add(verb)
 
-        # Should find at least 50% of expected verbs
         hit_rate = len(found_verbs) / len(expected_verbs)
         assert hit_rate >= 0.5, f"Hit rate {hit_rate:.0%} below 50%"
 
@@ -266,22 +251,19 @@ class TestSkillExtractorEdgeCases:
         """Keeps the full hyphenated span (#508); no truncation at the hyphen."""
         text = "You will design high-performance distributed systems."
         skills = extractor.extract(text)
-        # Deliberate #508 pin updated in #523: "distributed" is tagged VERB (amod) by the
-        # parser; it now joins the run, so the full span is kept.
+        # Deliberate #508 pin updated in #523: the parser tags "distributed" VERB (amod), so it joins the run.
         assert skills == ["design high-performance distributed systems"]
 
     def test_parenthetical_context(self, extractor):
         """Handles skill in parenthetical context."""
         text = "Lead the design and development of novel architectures (state-of-the-art)."
         skills = extractor.extract(text)
-        # Should handle parentheses without crashing
         assert isinstance(skills, list)
 
     def test_special_characters_in_text(self, extractor):
         """Handles special characters."""
         text = "Design & develop → production systems."
         skills = extractor.extract(text)
-        # Should not crash
         assert isinstance(skills, list)
 
     def test_very_long_skill_phrase(self, extractor):
@@ -321,7 +303,7 @@ class TestSkillExtractorPerformance:
         skills = extractor.extract(fixture_what_you_ll_do)
         elapsed = time.perf_counter() - start
 
-        # Coarse sanity bound only (5s), not a perf assertion; avoids CI flake
+        # Coarse sanity bound only (5s), not a perf assertion; avoids CI flake.
         assert elapsed < 5.0
         assert len(skills) > 0
 
@@ -1073,27 +1055,21 @@ class TestSkillExtractorResidualsWave604:
     @pytest.mark.parametrize(
         "text,expected",
         [
-            # 1. A skill verb after 'and' starts its own span; no merge across the conjunction.
             ("You will design systems and lead teams.", ["design systems", "lead teams"]),
             (
                 "You will design fast, reliable services and lead teams.",
                 ["design fast, reliable services", "lead teams"],
             ),
-            # 2. 'Go' is a tech term tagged VERB; the language list stays one span.
             ("You will design Python, Java, and Go services.", ["design python, java, and go services"]),
-            # 3. A comma list of verbs, then an adjective-list object: one span.
             (
                 "You will design, build, and maintain fault-tolerant, low-latency services.",
                 ["design, build, and maintain fault-tolerant, low-latency services"],
             ),
-            # 4. A skill verb after an ADV-led comma is its own span.
             ("You will design fast, lead teams.", ["lead teams"]),
-            # 5. An adjective pair before a noun head closes an ADV-led list.
             (
                 "You will develop quickly, secure and reliable APIs.",
                 ["develop quickly, secure and reliable apis"],
             ),
-            # 1b. An adjective-only conjunct does not end the span; a noun-headed conjunct does.
             ("You will design fast, reliable services and secure.", ["design fast, reliable services"]),
             ("You will design systems and secure.", ["design systems"]),
             ("You will design systems and secure platforms.", ["design systems and secure platforms"]),
@@ -1104,7 +1080,6 @@ class TestSkillExtractorResidualsWave604:
             # 1c. A skill verb after 'and' is its own span, whatever spaCy tags it (#604).
             ("You will design systems and mentor engineers.", ["design systems", "mentor engineers"]),
             ("You will design systems and build tools.", ["build tools", "design systems"]),
-            # 6. Hyphenated adjectives after an adverb continue the list.
             (
                 "You will design fast, self-healing, data-driven platforms.",
                 ["design fast, self-healing, data-driven platforms"],
@@ -1122,13 +1097,9 @@ class TestSkillExtractorResidualsWave604:
     @pytest.mark.parametrize(
         "text,expected",
         [
-            # #509: a noun before the comma keeps the span at the noun.
             ("You will design systems, platforms, and develop tools.", ["design systems", "develop tools"]),
-            # #599: a skill-verb segment after a comma breaks the list; no merged span.
             ("You will design systems, lead teams.", ["design systems", "lead teams"]),
-            # #599 guard: 'design fast, lead teams' never merges into one span.
             ("You will design fast, lead teams.", ["lead teams"]),
-            # Adjective-list heads unchanged.
             ("You will lead agile, platform teams.", ["lead agile"]),
             # Neighbour shape: a noun list after a non-skill verb produces nothing (#604).
             ("Experience with APIs, model training.", []),

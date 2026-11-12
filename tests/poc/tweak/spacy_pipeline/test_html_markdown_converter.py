@@ -29,16 +29,13 @@ class TestHTMLMarkdownConverterBasic:
         """Convert simple HTML paragraph to Markdown."""
         html = "<div><p>Hello World</p></div>"
         result = converter.process(html)
-        # Result should contain the text (exact markdown format may vary by MarkItDown)
         assert "Hello" in result and "World" in result
-        # Should return string
         assert isinstance(result, str)
 
     def test_converts_html_with_bold(self, converter):
         """Convert HTML with bold text."""
         html = "<p>This is <strong>bold</strong> text.</p>"
         result = converter.process(html)
-        # Markdown bold is **text**
         assert "bold" in result
         assert isinstance(result, str)
 
@@ -53,11 +50,9 @@ class TestHTMLMarkdownConverterBasic:
         """Convert HTML unordered list to Markdown."""
         html = "<ul><li>Item 1</li><li>Item 2</li><li>Item 3</li></ul>"
         result = converter.process(html)
-        # Markdown lists use -, *, or +
         assert "Item 1" in result
         assert "Item 2" in result
         assert "Item 3" in result
-        # Should have some list markers
         assert any(marker in result for marker in ["-", "*", "+"])
 
     def test_converts_html_with_headers(self, converter):
@@ -67,7 +62,6 @@ class TestHTMLMarkdownConverterBasic:
         assert "Main Title" in result
         assert "Subtitle" in result
         assert "Content" in result
-        # Markdown headers use #
         assert "#" in result
 
     def test_converts_html_with_links(self, converter):
@@ -75,8 +69,6 @@ class TestHTMLMarkdownConverterBasic:
         html = '<p>Visit <a href="https://example.com">example site</a>.</p>'
         result = converter.process(html)
         assert "example" in result
-        # Markdown links use [text](url)
-        # Result should contain either link text or URL
         assert "example" in result.lower() or "http" in result.lower()
 
     def test_preserves_structure(self, converter):
@@ -94,7 +86,6 @@ class TestHTMLMarkdownConverterBasic:
         </div>
         """
         result = converter.process(html)
-        # All text should be present
         assert "Section 1" in result
         assert "Paragraph 1" in result
         assert "Bullet 1" in result
@@ -112,8 +103,6 @@ class TestHTMLMarkdownConverterBasic:
         """Remove non-breaking spaces during conversion."""
         html = "<p>Text\xa0with\xa0nbsp</p>"
         result = converter.process(html)
-        # Non-breaking spaces should be converted or removed
-        # Result should contain the text
         assert "Text" in result or "text" in result.lower()
 
 
@@ -141,37 +130,29 @@ class TestHTMLMarkdownConverterTempFileCleanup:
         """Temp files should be removed after successful conversion."""
         html = "<p>Test content</p>"
 
-        # Get temp directory to count files before/after
         temp_dir = str(isolated_tempdir)
         html_files_before = {f for f in os.listdir(temp_dir) if f.endswith(".html")}
 
-        # Process HTML
         result = converter.process(html)
         assert isinstance(result, str)
 
-        # Check temp files after
         html_files_after = {f for f in os.listdir(temp_dir) if f.endswith(".html")}
 
-        # No new temp files should remain
         new_files = html_files_after - html_files_before
         assert len(new_files) == 0, f"Temp files not cleaned up: {new_files}"
 
     def test_temp_file_cleanup_on_exception_fallback_html(self, converter, isolated_tempdir):
         """Temp files should be cleaned up even when conversion fails (fallback to HTML)."""
-        # Create HTML that might cause issues
         html = "<p>Test content</p>"
 
         temp_dir = str(isolated_tempdir)
         html_files_before = {f for f in os.listdir(temp_dir) if f.endswith(".html")}
 
-        # Process HTML - even if conversion fails, should fallback to HTML
         result = converter.process(html)
         assert isinstance(result, str)
 
-        # Check temp files after
         html_files_after = {f for f in os.listdir(temp_dir) if f.endswith(".html")}
 
-        # No new temp files should remain
         new_files = html_files_after - html_files_before
         assert len(new_files) == 0, f"Temp files not cleaned up: {new_files}"
 
@@ -183,14 +164,11 @@ class TestHTMLMarkdownConverterTempFileCleanup:
         temp_dir = str(isolated_tempdir)
         html_files_before = {f for f in os.listdir(temp_dir) if f.endswith(".html")}
 
-        # Process HTML
         result = converter.process(html)
         assert isinstance(result, str)
 
-        # Check temp files after
         html_files_after = {f for f in os.listdir(temp_dir) if f.endswith(".html")}
 
-        # No new temp files should remain
         new_files = html_files_after - html_files_before
         assert len(new_files) == 0, f"Temp files not cleaned up: {new_files}"
 
@@ -205,15 +183,12 @@ class TestHTMLMarkdownConverterTempFileCleanup:
         temp_dir = str(isolated_tempdir)
         html_files_before = {f for f in os.listdir(temp_dir) if f.endswith(".html")}
 
-        # Process all documents
         for html in htmls:
             result = converter.process(html)
             assert isinstance(result, str)
 
-        # Check temp files after all conversions
         html_files_after = {f for f in os.listdir(temp_dir) if f.endswith(".html")}
 
-        # No new temp files should remain
         new_files = html_files_after - html_files_before
         assert len(new_files) == 0, f"Orphaned temp files after multiple conversions: {new_files}"
 
@@ -231,7 +206,6 @@ class TestHTMLMarkdownConverterFallbackModes:
         converter = HTMLMarkdownConverter(fallback_mode="html")
         html = "<p>Test content</p>"
         result = converter.process(html)
-        # Should return markdown if successful, or original HTML if it fails
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -239,14 +213,12 @@ class TestHTMLMarkdownConverterFallbackModes:
         """With fallback_mode='raise', should raise on severe failure."""
         converter = HTMLMarkdownConverter(fallback_mode="raise")
         html = "<p>Test content</p>"
-        # Normal HTML should work fine
         result = converter.process(html)
         assert isinstance(result, str)
 
     def test_invalid_fallback_mode_raises_error(self):
         """Invalid fallback_mode should raise ValueError on init."""
         with pytest.raises(ValueError, match="fallback_mode must be 'html' or 'raise'"):
-            # Intentionally invalid value to exercise validation
             HTMLMarkdownConverter(fallback_mode="invalid")  # type: ignore[arg-type]
 
     def test_fallback_mode_parameter_stored(self):
@@ -270,7 +242,6 @@ class TestHTMLMarkdownConverterMalformedHTML:
         """Gracefully handle malformed HTML with fallback."""
         html = "<div><p>Unclosed paragraph<div>Nested</div>"
         result = converter.process(html)
-        # Should return some result (markdown or fallback HTML)
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -285,7 +256,6 @@ class TestHTMLMarkdownConverterMalformedHTML:
         """Handle HTML containing script tags."""
         html = "<p>Text</p><script>alert('test')</script><p>More text</p>"
         result = converter.process(html)
-        # Should process gracefully, script content may be included or removed
         assert isinstance(result, str)
 
     def test_html_with_style_tags(self, converter):
@@ -312,7 +282,6 @@ class TestHTMLMarkdownConverterMalformedHTML:
         html = "<p>Price: &dollar;100 &amp; quantity: 5 &lt; 10</p>"
         result = converter.process(html)
         assert isinstance(result, str)
-        # Should contain some content
         assert len(result) > 0
 
 
@@ -326,12 +295,10 @@ class TestHTMLMarkdownConverterEdgeCases:
 
     def test_very_large_html(self, converter):
         """Handle very large HTML document."""
-        # Create a large HTML document
         items = "\n".join([f"<li>Item {i}</li>" for i in range(1000)])
         html = f"<ul>{items}</ul>"
         result = converter.process(html)
         assert isinstance(result, str)
-        # Should contain at least some items
         assert "Item" in result
 
     def test_html_with_unicode_characters(self, converter):
@@ -368,7 +335,6 @@ class TestHTMLMarkdownConverterEdgeCases:
         """
         result = converter.process(html)
         assert isinstance(result, str)
-        # Should preserve structure
         assert "Senior Software Engineer" in result
         assert "Responsibilities" in result or "responsibilities" in result.lower()
         assert "Requirements" in result or "requirements" in result.lower()
@@ -405,7 +371,7 @@ class TestHTMLMarkdownConverterCallable:
     def test_callable_via_call_method(self, converter):
         """Component should be callable via __call__()."""
         html = "<p>Test content</p>"
-        result = converter(html)  # Using __call__
+        result = converter(html)
         assert isinstance(result, str)
 
     def test_process_and_call_equivalent(self, converter):

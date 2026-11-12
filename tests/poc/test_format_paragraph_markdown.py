@@ -11,41 +11,34 @@ from src.poc.tweak.format_paragraph_from_json import clean_and_convert
 
 def test_list_regex_no_blanks_between_items():
     """Verify Step D regex doesn't add blank lines between consecutive list items."""
-    # Direct regex test
     text = "* Item A\n* Item B\n* Item C"
     pattern = r"(^[^*\n][^\n]*[^\n\s])\n(\* )"
     result = re.sub(pattern, r"\1\n\n\2", text, flags=re.MULTILINE)
 
-    # Should NOT add blank lines between items
     assert "* Item A\n\n* Item B" not in result, "Blank line should not be added between list items"
     assert result == text, "Text should remain unchanged"
 
 
 def test_list_regex_adds_blank_before_list():
     """Verify Step D regex adds blank line before first list item after text."""
-    # Direct regex test
     text = "Some text\n* Item A\n* Item B"
     pattern = r"(^[^*\n][^\n]*[^\n\s])\n(\* )"
     result = re.sub(pattern, r"\1\n\n\2", text, flags=re.MULTILINE)
 
-    # SHOULD add blank line after text before first item
     assert "Some text\n\n* Item A" in result, "Blank line should be added before first list item"
 
 
 def test_list_regex_adds_blank_after_header():
     """Verify Step D regex adds blank line before list items after headers."""
-    # Direct regex test
     text = "## Header\n* Item A\n* Item B"
     pattern = r"(^[^*\n][^\n]*[^\n\s])\n(\* )"
     result = re.sub(pattern, r"\1\n\n\2", text, flags=re.MULTILINE)
 
-    # SHOULD add blank line after header before first item
     assert "## Header\n\n* Item A" in result, "Blank line should be added before first list item after header"
 
 
 def test_output_no_blank_lines_between_consecutive_items():
     """Test actual output from clean_and_convert doesn't have blank lines between list items."""
-    # Load fixture
     with open("tests/poc/fixtures/raw_html_description.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -54,8 +47,6 @@ def test_output_no_blank_lines_between_consecutive_items():
 
     lines = result.split("\n")
 
-    # Check for problematic blank lines between consecutive list items
-    # Note: List items start with "* " (single star), not "**" (double star for headers)
     for i in range(len(lines) - 2):
         is_list_item_i = lines[i].strip().startswith("* ")
         is_list_item_i2 = lines[i + 2].strip().startswith("* ")
@@ -69,7 +60,6 @@ def test_output_no_blank_lines_between_consecutive_items():
 
 def test_output_has_proper_spacing_before_lists():
     """Test that output has blank lines before lists after text/headers."""
-    # Load fixture
     with open("tests/poc/fixtures/raw_html_description.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -78,25 +68,21 @@ def test_output_has_proper_spacing_before_lists():
 
     lines = result.split("\n")
 
-    # Check for correct blank lines before lists
-    # Should have blank line after headers/text and before first list item
     correct_blanks_count = 0
     for i in range(len(lines) - 2):
         if (
             lines[i].strip() != ""
-            and not lines[i].strip().startswith("* ")  # Not a list item
+            and not lines[i].strip().startswith("* ")
             and lines[i + 1].strip() == ""
             and lines[i + 2].strip().startswith("* ")
-        ):  # List item (not header)
+        ):
             correct_blanks_count += 1
 
-    # Should have at least some proper blank lines before list sections
     assert correct_blanks_count > 0, "Should have blank lines before list sections"
 
 
 def test_strong_text_spacing():
     """Test that strong-formatted (bold) text has proper spacing."""
-    # Test simple case
     text = "Normal text\n**Bold Header**\n* List item"
     pattern_before = r"(?<=.)\n(\*\*.*?\*\*)"
     pattern_after = r"(\*\*.*?\*\*)\n(?=.)"
@@ -105,12 +91,10 @@ def test_strong_text_spacing():
     result = re.sub(pattern_before, r"\n\n\1", result)
     result = re.sub(pattern_after, r"\1\n\n", result)
 
-    # Should have blank lines around bold text
     assert "\n\n**Bold Header**\n\n" in result, "Bold text should have blank lines around it"
 
 
 if __name__ == "__main__":
-    # Run tests manually
     print("Running test_list_regex_no_blanks_between_items...")
     test_list_regex_no_blanks_between_items()
     print("✓ PASS\n")

@@ -29,7 +29,6 @@ class TestHeadingPromoterBasic:
         text = "Role Overview:\nFocus areas below."
         result = promoter.process(text)
         assert "## Role Overview" in result
-        # Colon removed in output
         assert "## Role Overview:" not in result
 
     def test_uppercase_variant_matches(self) -> None:
@@ -49,10 +48,8 @@ class TestHeadingPromoterBasic:
     def test_unicode_apostrophe_normalized(self) -> None:
         """Unicode apostrophes (smart quotes) match straight apostrophes."""
         promoter = HeadingPromoter()
-        # Test with straight apostrophe; the phrase should exist if defined
         text = "Roles and Responsibilities\nMore info."
         result = promoter.process(text)
-        # "Roles and Responsibilities" not in KNOWN_PLAIN_HEADINGS, stays as-is
         assert "## Roles and Responsibilities" not in result
 
 
@@ -121,7 +118,7 @@ class TestHeadingPromoterStructuralRules:
         text = "Some text\nJob Description\nContent."
         result = promoter.process(text)
         assert "## Job Description" not in result
-        assert "Job Description" in result  # Original preserved
+        assert "Job Description" in result
 
     def test_promoted_first_line(self) -> None:
         """First line of document CAN be promoted even without blank line before."""
@@ -142,7 +139,6 @@ class TestHeadingPromoterStructuralRules:
         promoter = HeadingPromoter()
         text = "Some text\n\n\n\nContent."
         result = promoter.process(text)
-        # Line count should be preserved
         assert result.count("\n") == text.count("\n")
 
     def test_not_promoted_whitespace_only_line(self) -> None:
@@ -150,7 +146,6 @@ class TestHeadingPromoterStructuralRules:
         promoter = HeadingPromoter()
         text = "Some text\n   \nContent."
         result = promoter.process(text)
-        # Whitespace-only line stays as-is
         assert "##    " not in result
 
 
@@ -168,7 +163,6 @@ class TestHeadingPromoterIdempotence:
     def test_idempotent_multiple_passes(self) -> None:
         """Processing many times yields same result (with blank-line separation)."""
         promoter = HeadingPromoter()
-        # Multiple blank lines separate headings for promotion eligibility
         text = "Technical Skills\n\nRequired Qualifications\n\nContent."
         result = text
         for _ in range(5):
@@ -205,7 +199,6 @@ class TestHeadingPromoterEdgeCases:
         promoter = HeadingPromoter()
         text = "Job Description\r\nContent below.\r\n"
         result = promoter.process(text)
-        # The split('\n') will handle CRLF; verify promotion happened
         assert "## Job Description" in result
 
     def test_line_count_preserved(self) -> None:
@@ -228,8 +221,7 @@ class TestHeadingPromoterConsistency:
         """
         classifier = SectionClassifier()
 
-        # The 7 'other' phrases that should NOT be in KNOWN_PLAIN_HEADINGS (duties, education,
-        # nice to have were promoted by Issue #733 and are removed from this set)
+        # duties, education, nice to have were promoted by #733 and are removed from this set.
         other_phrases = {
             "eeo statement",
             "equal employment opportunity",
@@ -240,11 +232,9 @@ class TestHeadingPromoterConsistency:
             "who you are",
         }
 
-        # Check that no 'other' phrases are in the known headings
         for phrase in KNOWN_PLAIN_HEADINGS:
             assert phrase not in other_phrases, f"Phrase '{phrase}' is marked as 'other' and should not be promoted"
 
-        # Sample check: a few known phrases should classify as non-'other'
         test_phrases = [
             "job description",
             "role overview",
@@ -255,9 +245,8 @@ class TestHeadingPromoterConsistency:
 
         for phrase in test_phrases:
             if phrase in KNOWN_PLAIN_HEADINGS:
-                # Classify as title to get the type
                 section = MarkdownSection(
-                    title=phrase.upper(),  # titles are uppercase
+                    title=phrase.upper(),
                     content="",
                     level=1,
                     start_line=0,
@@ -268,10 +257,8 @@ class TestHeadingPromoterConsistency:
                 )
                 classification = classifier.classify(section)
 
-                # Should have at least one type
                 assert len(classification.all_types) > 0, f"Phrase '{phrase}' classified with 0 types"
 
-                # Primary type should NOT be OTHER
                 primary_type = classification.all_types[0]
                 assert primary_type.section_type != SectionType.OTHER, (
                     f"Phrase '{phrase}' classified as OTHER; should promote non-'other' phrases only"
@@ -358,14 +345,12 @@ Technical Skills
 """
         result = promoter.process(text)
 
-        # Verify key sections promoted
         assert "## Job Description" in result
         assert "## Role Overview" in result
         assert "## Key Responsibilities" in result
         assert "## Required Qualifications" in result
         assert "## Technical Skills" in result
 
-        # Line count preserved
         assert result.count("\n") == text.count("\n")
 
     def test_perf_marketing_manager_shaped_text(self) -> None:
@@ -403,20 +388,15 @@ Excellence is never an accident."""
 
         result = promoter.process(text)
 
-        # "Role Description" should be promoted (in vocabulary)
         assert "## Role Description" in result
 
-        # "In this role you will" and "What will make you succeed" should now be promoted
-        # (they are in KNOWN_PLAIN_HEADINGS with new keywords from Issue #365)
         assert "## In this role you will" in result
         assert "## What will make you succeed" in result
 
-        # These are still NOT in vocabulary, so they stay as-is
         assert "## Why work at Medbridge?" not in result
         assert "## Tools" not in result
         assert "## Our Values:" not in result
 
-        # Line count preserved
         assert text.count("\n") == result.count("\n")
 
 
@@ -431,7 +411,6 @@ class TestHeadingPromoterErrorHandling:
         """
         promoter = HeadingPromoter()
 
-        # Trigger exception by monkey-patching _should_promote to raise
         def bad_should_promote(*args, **kwargs):
             raise ValueError("Intentional test error")
 
@@ -441,10 +420,8 @@ class TestHeadingPromoterErrorHandling:
         text = "Job Description\nContent."
         result = promoter.process(text)
 
-        # Should return original text unchanged
         assert result == text
 
-        # Restore original method
         promoter._should_promote = original_should_promote  # type: ignore[method-assign]
 
 
@@ -610,7 +587,6 @@ class TestHeadingPromoterEEOIsolation:
     def test_eeo_in_first_200_chars(self) -> None:
         """EEO trigger must be in first ~200 chars of paragraph."""
         promoter = HeadingPromoter()
-        # Long paragraph with EEO trigger far into it
         long_content = "This paragraph contains a lot of content. " * 10
         text = f"""Role Overview
 
@@ -622,7 +598,6 @@ Paragraph With EEO Late
 
         result = promoter.process(text)
 
-        # Should not detect (EEO is beyond ~200 chars)
         assert result.count("## Equal Opportunity Employer") == 0
 
 
@@ -673,7 +648,6 @@ XYZ Corporation is an equal opportunity employer and is committed to creating a 
         expected = expected.replace(eeo_sentence, f"## Equal Opportunity Employer\n\n{eeo_sentence}", 1)
         assert result == expected
 
-        # Section bodies are exact and unpolluted by the EEO text
         required_body = result.split("## Required Qualifications\n", 1)[1].split("\n## ", 1)[0]
         assert required_body == (
             "\nBachelor's degree in Computer Science or equivalent experience.\n"
@@ -817,11 +791,9 @@ class TestHeadingPromoterDefectFixes:
         """EEO followed by real '## Benefits' section: no synthetic heading."""
         promoter = HeadingPromoter()
         input_text = "Acme is an equal opportunity employer.\n\nBenefits\n\nDental coverage."
-        # "Benefits" will be promoted to ##, not EEO synthetic heading
         result = promoter.process(input_text)
         assert result.count("## Equal Opportunity Employer") == 0
         assert "## Benefits" in result
-        # But the EEO paragraph itself should be promoted if "Acme..." line is a known heading (it's not)
         assert "Acme is an equal opportunity employer." in result
 
     def test_idempotent_eeo_second_pass_equals_first(self) -> None:
@@ -957,7 +929,7 @@ class TestProtectedClassPatternBound:
     def test_protected_class_term_within_60_chars_is_eeo(self) -> None:
         """A protected-class term 54 chars after 'without regard to' is EEO and isolated."""
         promoter = HeadingPromoter()
-        gap = "alpha " * 9  # 54 chars of neutral filler
+        gap = "alpha " * 9
         text = f"More text.\n\nAcme hires without regard to {gap}race."
         expected = f"More text.\n\n## Equal Opportunity Employer\n\nAcme hires without regard to {gap}race."
         result = promoter.process(text)
@@ -976,7 +948,7 @@ class TestProtectedClassPatternBound:
     def test_protected_class_term_beyond_60_chars_not_eeo(self) -> None:
         """A protected-class term 66 chars after 'without regard to' is not EEO; text unchanged."""
         promoter = HeadingPromoter()
-        gap = "alpha " * 11  # 66 chars of neutral filler, beyond the bound
+        gap = "alpha " * 11
         text = f"More text.\n\nAcme hires without regard to {gap}race."
         result = promoter.process(text)
         assert result == text
@@ -1751,11 +1723,9 @@ class TestEEOWhoRequireAccommodationsScope:
     def test_engineers_who_require_accommodations_job_wording_not_boilerplate(self, job_line: str) -> None:
         """Negative: 'Engineers who require accommodations for travel.' is job content; EEO is not isolated."""
         promoter = HeadingPromoter()
-        # Shape 1: job sentence in its own paragraph after the EEO paragraph.
         separate = f"More text.\n\nAcme is an equal opportunity employer.\n\n{job_line}"
         assert promoter.process(separate) == separate
         assert promoter.process(promoter.process(separate)) == separate
-        # Shape 2: job sentence in the same paragraph as the EEO sentence.
         same = f"More text.\n\nAcme is an equal opportunity employer. {job_line}"
         assert promoter.process(same) == same
         assert promoter.process(promoter.process(same)) == same

@@ -18,13 +18,7 @@ from spacy.tokens import Doc
 
 from src.poc.tweak.markdown_section_classifier import SectionClassification, SectionType, TypeClassification
 from src.poc.tweak.multi_line_paragraph import MarkdownSection
-
-# Import to trigger factory registration
 from src.poc.tweak.spacy_pipeline import TechnologyProcessor, registry  # noqa: F401
-
-# ============================================================================
-# Fixtures
-# ============================================================================
 
 
 @pytest.fixture(scope="session")
@@ -46,7 +40,6 @@ def nlp(spacy_module: Any) -> Any:
     except OSError:
         pytest.skip("en_core_web_md model not installed")
 
-    # Ensure classified_sections/sections/technologies extensions are registered
     from src.poc.tweak.multi_line_paragraph import MarkdownSpanRuler
 
     MarkdownSpanRuler(loaded)
@@ -54,7 +47,6 @@ def nlp(spacy_module: Any) -> Any:
     if not Doc.has_extension("classified_sections"):
         Doc.set_extension("classified_sections", default=[])
 
-    # Register entity_ruler with tech patterns (D5 decision, see batch_processor.py)
     if "entity_ruler" not in loaded.pipe_names:
         loaded.add_pipe("entity_ruler", before="ner")
     ruler = loaded.get_pipe("entity_ruler")
@@ -81,11 +73,6 @@ def _make_section(title: str = "Skills", content: str = "Experience with Python 
 def _classification(all_types: tuple = (), labels: frozenset = frozenset()) -> SectionClassification:
     """Build a SectionClassification with given all_types/labels."""
     return SectionClassification(all_types=all_types, labels=labels, is_skip=False, keyword_matches=())
-
-
-# ============================================================================
-# Tests
-# ============================================================================
 
 
 class TestTechnologyProcessorConfidenceGate:

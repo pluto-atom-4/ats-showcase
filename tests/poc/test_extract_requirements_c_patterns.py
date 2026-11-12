@@ -65,8 +65,7 @@ class TestPatternModularity:
         """Verify load_spacy_model uses default patterns."""
         nlp = load_spacy_model("en_core_web_md")
         assert "span_ruler" in nlp.pipe_names
-        # Pattern count should match default
-        # (Note: exact count depends on spaCy version, just verify it loaded)
+        # Exact pipe count depends on the spaCy version; only verify the model loaded.
         assert len(nlp.pipe_names) > 0
 
     def test_load_spacy_model_with_custom_patterns(self):
@@ -84,9 +83,7 @@ class TestPatternModularity:
         """Verify detect_sections uses default display names."""
         nlp = default_nlp
         doc = detect_sections(nlp, raw_job_description)
-        # Should have detected at least some sections
         assert doc._.section_labels or len(doc._.section_labels) == 0
-        # Display names should be strings
         for section in doc._.detected_sections:
             assert isinstance(section["display_name"], str)
 
@@ -98,7 +95,6 @@ class TestPatternModularity:
         }
         nlp = default_nlp
         doc = detect_sections(nlp, raw_job_description, display_names=custom_names)
-        # Any detected sections should use custom names
         for section in doc._.detected_sections:
             if section["label"] in custom_names:
                 assert section["display_name"] == custom_names[section["label"]]
@@ -109,13 +105,12 @@ class TestPatternModularity:
         sentence = "Required: 5+ years of Python experience"
         result = classify_sentence_with_section_boost(sentence, "SECTION_REQUIREMENTS", nlp)
         if result:
-            # Should have positive section boost for REQUIREMENTS
             assert result["section_boost"] == DEFAULT_ADJUSTMENTS["SECTION_REQUIREMENTS"]
 
     def test_classify_sentence_with_custom_adjustments(self, default_nlp):
         """Verify classify_sentence_with_section_boost accepts custom adjustments."""
         nlp = default_nlp
-        custom_adjustments = {"SECTION_REQUIREMENTS": 0.50}  # Higher boost
+        custom_adjustments = {"SECTION_REQUIREMENTS": 0.50}
         sentence = "Required: 5+ years of Python experience"
         result = classify_sentence_with_section_boost(
             sentence, "SECTION_REQUIREMENTS", nlp, adjustments=custom_adjustments
@@ -132,9 +127,6 @@ class TestRegexPatterns:
         nlp = default_nlp
         doc = detect_sections(nlp, raw_job_description)
         labels = doc._.section_labels
-        # Should detect SECTION_KNOWLEDGE_SKILLS if header exists in text
-        # (Text inspection shows "Knowledge, Skills & Abilities" is present)
-        # This is a soft assertion - pattern should match or no match is OK for now
         assert isinstance(labels, set)
 
     def test_regex_pattern_in_office(self, raw_job_description, default_nlp):
@@ -142,8 +134,6 @@ class TestRegexPatterns:
         nlp = default_nlp
         doc = detect_sections(nlp, raw_job_description)
         labels = doc._.section_labels
-        # Should detect SECTION_IN_OFFICE if header exists in text
-        # (Text inspection shows "In Office Requirements" is present)
         assert isinstance(labels, set)
 
     def test_regex_pattern_what_you_do(self, raw_job_description, default_nlp):
@@ -151,8 +141,6 @@ class TestRegexPatterns:
         nlp = default_nlp
         doc = detect_sections(nlp, raw_job_description)
         labels = doc._.section_labels
-        # Should detect SECTION_WHAT_YOU_DO if header exists in text
-        # (Text inspection shows "What You'll Do" is present)
         assert isinstance(labels, set)
 
 
@@ -164,18 +152,15 @@ class TestSectionInOffice:
         nlp = default_nlp
         doc = detect_sections(nlp, raw_job_description)
 
-        # Check that SECTION_IN_OFFICE was detected
         labels = doc._.section_labels
         assert "SECTION_IN_OFFICE" in labels, (
             f"SECTION_IN_OFFICE not detected in {sorted(labels)}. "
             f"Raw text contains 'In Office Requirements' on lines 47-49."
         )
 
-        # Verify it's in detected_sections list with proper metadata
         in_office_sections = [s for s in doc._.detected_sections if s["label"] == "SECTION_IN_OFFICE"]
         assert len(in_office_sections) > 0, "SECTION_IN_OFFICE should appear in detected_sections"
 
-        # Check display name
         section_dict = in_office_sections[0]
         assert section_dict["display_name"] == "In Office Requirements"
 
@@ -186,10 +171,8 @@ class TestSectionInOffice:
         nlp = default_nlp
         doc = detect_sections(nlp, raw_job_description)
 
-        # Extract from target sections (should include SECTION_IN_OFFICE by default)
         extracted = extract_target_section_content(doc, target_sections=None, split_by_bullets=True)
 
-        # Find SECTION_IN_OFFICE content
         in_office_content = [content for content, label, _ in extracted if label == "SECTION_IN_OFFICE"]
 
         assert len(in_office_content) > 0, (
@@ -197,7 +180,6 @@ class TestSectionInOffice:
             f"{sorted({label for _, label, _ in extracted})}"
         )
 
-        # Verify it contains the expected text
         full_content = " ".join(in_office_content)
         has_keywords = (
             "collaborative" in full_content.lower()
@@ -210,7 +192,6 @@ class TestSectionInOffice:
         """Verify classify_sentence_with_section_boost() applies correct boost for SECTION_IN_OFFICE."""
         nlp = default_nlp
 
-        # Test with a realistic in-office requirement
         sentence = "This role is based in our Seattle office with at least 4 days per week on-site"
 
         result = classify_sentence_with_section_boost(
@@ -222,13 +203,11 @@ class TestSectionInOffice:
         )
 
         if result is not None:
-            # Verify SECTION_IN_OFFICE section boost is applied
             expected_boost = DEFAULT_ADJUSTMENTS["SECTION_IN_OFFICE"]
             assert result["section_boost"] == expected_boost, (
                 f"Expected section boost {expected_boost}, got {result['section_boost']}"
             )
 
-            # Verify final confidence reflects the boost
             assert result["final_confidence"] >= 0.0 and result["final_confidence"] <= 1.0
             assert result["source_section"] == "SECTION_IN_OFFICE"
             assert result["section_display_name"] == "In Office Requirements"
@@ -247,7 +226,6 @@ class TestSectionInOffice:
             f"SECTION_IN_OFFICE not in CONFIDENCE_ADJUSTMENT_BY_SECTION: {DEFAULT_ADJUSTMENTS.keys()}"
         )
 
-        # Verify it has a positive boost (medium priority)
         boost = DEFAULT_ADJUSTMENTS["SECTION_IN_OFFICE"]
         assert 0.0 < boost <= 0.15, f"Expected SECTION_IN_OFFICE boost between 0.0 and 0.15, got {boost}"
 
@@ -264,7 +242,6 @@ class TestSectionInOffice:
         """Integration test: verify SECTION_IN_OFFICE content extracted in full pipeline."""
         result = extract_requirements_c(raw_job_description, min_confidence=0.50)
 
-        # Check that at least one requirement came from SECTION_IN_OFFICE
         in_office_reqs = [r for r in result.requirements_detailed if r.source_section == "SECTION_IN_OFFICE"]
 
         assert len(in_office_reqs) > 0, (
@@ -272,11 +249,9 @@ class TestSectionInOffice:
             f"Requirements by section: {result.metadata.get('requirements_by_section', {})}"
         )
 
-        # Verify extracted content matches expected pattern
         in_office_texts = [r.text for r in in_office_reqs]
         full_text = " ".join(in_office_texts).lower()
 
-        # Should mention on-site, office, or location requirement
         has_location_mention = any(
             keyword in full_text for keyword in ["office", "on-site", "on site", "seattle", "location"]
         )
@@ -286,19 +261,16 @@ class TestSectionInOffice:
         """Verify SECTION_IN_OFFICE requirements have section_boost applied."""
         result = extract_requirements_c(raw_job_description, min_confidence=0.50)
 
-        # Get requirements from SECTION_IN_OFFICE
         in_office_reqs = [r for r in result.requirements_detailed if r.source_section == "SECTION_IN_OFFICE"]
 
         assert len(in_office_reqs) > 0
 
         for req in in_office_reqs:
-            # Verify section boost is applied
             expected_boost = DEFAULT_ADJUSTMENTS["SECTION_IN_OFFICE"]
             assert req.section_boost == expected_boost, (
                 f"Expected section boost {expected_boost}, got {req.section_boost}"
             )
 
-            # Verify final confidence is base + boost
             expected_final = min(1.0, max(0.0, req.base_confidence + req.section_boost))
             assert req.final_confidence == expected_final, (
                 f"Final confidence should be {expected_final}, got {req.final_confidence}"
@@ -311,31 +283,27 @@ class TestFullPipeline:
     def test_extract_requirements_c_with_default_params(self, raw_job_description):
         """Extract requirements using default parameters."""
         result = extract_requirements_c(raw_job_description)
-        # Should have company name
         assert result.company is not None
-        # Should have some requirements
         assert len(result.requirements) > 0 or len(result.requirements_detailed) >= 0
 
     def test_extract_requirements_c_with_custom_patterns(self, raw_job_description):
         """Extract requirements with custom patterns parameter."""
         result = extract_requirements_c(
             raw_job_description,
-            patterns=DEFAULT_PATTERNS,  # Explicitly pass defaults
+            patterns=DEFAULT_PATTERNS,
         )
-        # Should work the same as default
         assert result.company is not None
 
     def test_extract_requirements_c_with_custom_adjustments(self, raw_job_description):
         """Extract requirements with custom confidence adjustments."""
         custom_adjustments = {
             **DEFAULT_ADJUSTMENTS,
-            "SECTION_KNOWLEDGE_SKILLS": 0.20,  # Boost even more
+            "SECTION_KNOWLEDGE_SKILLS": 0.20,
         }
         result = extract_requirements_c(
             raw_job_description,
             adjustments=custom_adjustments,
         )
-        # Should still extract requirements
         assert len(result.requirements_detailed) >= 0
 
     def test_extract_requirements_c_all_params(self, raw_job_description):
@@ -348,20 +316,17 @@ class TestFullPipeline:
             adjustments=DEFAULT_ADJUSTMENTS,
             display_names=DEFAULT_DISPLAY_NAMES,
         )
-        # Should work with all parameters specified
         assert result.company is not None
 
     def test_extract_requirements_matches_expected(self, raw_job_description, expected_output):
         """Verify extraction matches expected output."""
         result = extract_requirements_c(raw_job_description, min_confidence=0.50)
 
-        # Check company name (soft assertion - should contain expected company)
         if expected_output.get("company"):
             assert result.company and expected_output["company"].lower() in result.company.lower(), (
                 f"Expected company containing '{expected_output['company']}', got '{result.company}'"
             )
 
-        # Check requirement count (soft assertion - at least 1/5 should be extracted)
         expected_reqs = expected_output.get("expected_requirements", [])
         if expected_reqs:
             assert len(result.requirements) > 0 or len(result.requirements_detailed) > 0, (
@@ -376,7 +341,6 @@ class TestBackwardCompatibility:
     def test_extract_requirements_c_no_params(self, raw_job_description):
         """Verify function works without any parameters."""
         result = extract_requirements_c(raw_job_description)
-        # Should use all defaults
         assert result is not None
         assert hasattr(result, "requirements")
         assert hasattr(result, "requirements_detailed")
@@ -386,7 +350,6 @@ class TestBackwardCompatibility:
         """Verify detect_sections works without display_names parameter."""
         nlp = default_nlp
         doc = detect_sections(nlp, raw_job_description)
-        # Should use defaults
         assert doc._.detected_sections is not None
         assert isinstance(doc._.section_labels, set)
 
@@ -395,7 +358,6 @@ class TestBackwardCompatibility:
         nlp = default_nlp
         sentence = "Required: 5+ years of Python"
         result = classify_sentence_with_section_boost(sentence, "SECTION_REQUIREMENTS", nlp)
-        # Should use defaults
         if result:
             assert "final_confidence" in result
             assert "section_boost" in result

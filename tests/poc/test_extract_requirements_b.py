@@ -84,7 +84,6 @@ class TestCompanyExtraction:
         """Test when company name is not found."""
         markdown = "Generic job description without company info..."
         company = extract_company_name_enhanced(markdown)
-        # May return None or a fuzzy match, but should handle gracefully
         assert company is None or isinstance(company, str)
 
 
@@ -123,18 +122,15 @@ class TestCarbonRoboticsExtraction:
         result = extract_requirements_b(carbon_robotics_job, min_confidence=0.50)
 
         assert len(result.requirements) > 0
-        # Verify all requirements are above min_confidence (implicit through extraction)
         assert len(result.requirements) >= 1
 
     def test_carbon_robotics_output_is_serializable(self, carbon_robotics_job):
         """Test that output is JSON serializable."""
         result = extract_requirements_b(carbon_robotics_job)
 
-        # Should not raise
         json_str = result.model_dump_json()
         assert isinstance(json_str, str)
 
-        # Should be valid JSON
         parsed = json.loads(json_str)
         assert "company" in parsed
         assert "requirements" in parsed
@@ -180,7 +176,6 @@ class TestRawJobDescriptionExtraction:
         """Test that extraction handles special formatting in raw description."""
         result = extract_requirements_b(raw_job_description)
 
-        # Raw description has various formatting issues, should still extract requirements
         assert len(result.requirements) > 0
         assert all(isinstance(req, str) for req in result.requirements)
 
@@ -198,7 +193,6 @@ class TestBulletPointIntegration:
         result = extract_requirements_b(markdown)
 
         assert len(result.requirements) >= 2
-        # Should have normalized bullets to sentences
         for req in result.requirements:
             assert req.endswith((".", "!", "?"))
 
@@ -240,7 +234,6 @@ class TestBulletPointIntegration:
         markdown = "* 5+ years of Python development"
         result = extract_requirements_b(markdown)
 
-        # Content should be preserved in requirements
         assert any("5+" in req or "years" in req for req in result.requirements)
 
 
@@ -253,7 +246,6 @@ class TestExtractionQuality:
         result_low = extract_requirements_b(carbon_robotics_job, min_confidence=0.50)
         result_high = extract_requirements_b(carbon_robotics_job, min_confidence=0.80)
 
-        # Higher confidence should result in fewer or equal requirements
         assert len(result_high.requirements) <= len(result_low.requirements)
 
     def test_extraction_respects_max_requirements(self, carbon_robotics_job):
@@ -280,7 +272,6 @@ Must have Python experience.
 Must have Python experience."""
         result = extract_requirements_b(markdown)
 
-        # Should deduplicate the repeated requirement
         assert len(result.requirements) == 1
 
     def test_extraction_sorts_by_confidence(self):
@@ -292,8 +283,6 @@ Essential Java knowledge."""
         result = extract_requirements_b(markdown)
 
         if len(result.requirements) > 1:
-            # First requirement should be higher confidence than later ones
-            # (this is a rough test since we don't have confidence scores in output)
             assert len(result.requirements) >= 1
 
 
@@ -314,7 +303,6 @@ class TestErrorHandling:
         result = extract_requirements_b(markdown)
 
         assert isinstance(result, SimpleRequirementExtractionOutput)
-        # May have zero requirements or fuzzy matches
         assert len(result.requirements) >= 0
 
     def test_very_long_input(self):
@@ -332,5 +320,4 @@ class TestErrorHandling:
 * Strong C# and .NET skills"""
         result = extract_requirements_b(markdown)
 
-        # Should handle special characters without errors
         assert len(result.requirements) > 0

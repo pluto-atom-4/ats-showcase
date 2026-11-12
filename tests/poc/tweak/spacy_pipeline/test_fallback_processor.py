@@ -44,10 +44,6 @@ from src.poc.tweak.spacy_pipeline.fallback_processor import (
 
 NEEDS = ExtractionOutcome.NEEDS_HUMAN_REVIEW
 
-# ============================================================================
-# Fixtures and builders
-# ============================================================================
-
 
 @pytest.fixture(scope="session")
 def shared_nlp() -> Language:
@@ -108,8 +104,6 @@ def _job(
     )
 
 
-# UW / Walmart shape: qualifications and skills sections sit in the relaxed band (0.45 - 0.70),
-# below the normal 0.70 gate; a description section carries the rest of the text.
 UW_WALMART_MD = """## Qualifications
 
 Must have 5+ years of Python experience.
@@ -142,11 +136,6 @@ def _uw_walmart_job() -> JobResult:
 
 def _texts(entries: List[Dict[str, Any]], key: str) -> List[str]:
     return [entry[key] for entry in entries]
-
-
-# ============================================================================
-# Gating and outcome
-# ============================================================================
 
 
 @pytest.mark.parametrize(
@@ -184,11 +173,6 @@ def test_nothing_recovered_keeps_needs_human_review(shared_nlp: Language) -> Non
     assert result.requirements == []
     assert result.skills == []
     assert result.technologies == []
-
-
-# ============================================================================
-# Sub-pass A: relaxed section confidence (tier1_relaxed_section)
-# ============================================================================
 
 
 def test_tier1_recovers_skills_and_technologies_walmart_shape(shared_nlp: Language) -> None:
@@ -234,10 +218,6 @@ def test_tier1_recovers_at_relaxed_floor_boundary(shared_nlp: Language) -> None:
 
     assert _texts(result.skills, "skill") == ["build scalable data pipelines using spark"]
 
-
-# ============================================================================
-# Sub-pass B: whole-text taxonomy reuse (tier2_taxonomy)
-# ============================================================================
 
 TAXONOMY_MD = (
     "## About the role\n\n"
@@ -289,11 +269,6 @@ def test_tier2_skills_skipped_when_skills_already_present(shared_nlp: Language) 
 
     assert result.skills == [normal_skill]
     assert "python" in _texts(result.technologies, "tech")
-
-
-# ============================================================================
-# De-duplication guard
-# ============================================================================
 
 
 def test_complete_job_skips_fallback_outcome_gate(shared_nlp: Language) -> None:
@@ -352,7 +327,7 @@ def test_fallback_does_not_reappend_case_variant_of_normal_entry(shared_nlp: Lan
         technologies=normal_tech,
     )
 
-    # Precondition: the relaxed pass really does produce 'python', so the guard is what is tested.
+    # Precondition: the relaxed pass really produces 'python', so the guard is what is tested.
     relaxed = fp._relaxed_section_pass(job, shared_nlp)
     assert "python" in [text.lower() for text, _ in relaxed["technologies"]]
 
@@ -390,11 +365,6 @@ def test_guard_is_case_and_whitespace_insensitive() -> None:
     assert target[1]["extraction_tier"] == TIER1_TAG
 
 
-# ============================================================================
-# Pipeline isolation
-# ============================================================================
-
-
 def test_shared_entity_ruler_patterns_unchanged_after_fallback(shared_nlp: Language) -> None:
     """A fallback run that exercises TechExtractor must not touch the shared batch pipeline.
 
@@ -405,7 +375,6 @@ def test_shared_entity_ruler_patterns_unchanged_after_fallback(shared_nlp: Langu
     before = copy.deepcopy(ruler.patterns)  # type: ignore[attr-defined]
     assert before, "shared pipeline should carry the batch TECH patterns"
 
-    # Tier 2 runs TechExtractor (no classified tech yield), so this is the path under test.
     job = _job([_section(0, "About the role", TAXONOMY_MD, [("description", 0.90)])])
     apply_fallback(job, TAXONOMY_MD, shared_nlp=shared_nlp)
     apply_fallback(_uw_walmart_job(), UW_WALMART_MD, shared_nlp=shared_nlp)
@@ -426,9 +395,7 @@ def test_dedicated_pipeline_is_separate_and_built_once(shared_nlp: Language) -> 
     assert len(dedicated.nlp.get_pipe("entity_ruler").patterns) == count  # type: ignore[attr-defined]
 
 
-# ============================================================================
 # min_section_confidence parameter (Issue #756, part 1/2)
-# ============================================================================
 
 
 def test_default_min_section_confidence_matches_module_constant(shared_nlp: Language) -> None:
@@ -472,12 +439,7 @@ def test_min_section_confidence_lowering_recovers_below_default(shared_nlp: Lang
     assert all(s["extraction_tier"] == TIER1_TAG for s in lowered.skills)
 
 
-# ============================================================================
 # Complete-gap gate (Issue #757 B)
-# ============================================================================
-#
-# A COMPLETE job is admitted when technologies are empty AND (requirements are empty OR
-# skills are empty). Only Tier 2 runs on this path; requirements are never modified.
 
 
 def _complete_job(

@@ -112,7 +112,6 @@ def test_module_does_not_split_on_newline() -> None:
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
             if node.func.attr == "split":
-                # Skip if called on a regex pattern (e.g., _SENTENCE_BOUNDARY_RE.split)
                 if isinstance(node.func.value, ast.Name):
                     if node.func.value.id.startswith("_"):
                         continue

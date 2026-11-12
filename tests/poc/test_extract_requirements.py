@@ -30,7 +30,6 @@ def extractor() -> RequirementExtractor:
         )
     except RuntimeError as e:
         pytest.skip(f"spaCy model not available: {e}")
-        # This line is never reached, but satisfies mypy
         raise  # pragma: no cover
 
 
@@ -73,11 +72,6 @@ def carbon_robotics_expected() -> dict[str, Any]:
         return cast(dict[str, Any], json.load(f))
 
 
-# ============================================================================
-# Unit Tests (39)
-# ============================================================================
-
-
 class TestRequirementExtractorInitialization:
     """Test extractor initialization and configuration."""
 
@@ -115,7 +109,6 @@ class TestRequirementExtractorInitialization:
             RequirementExtractor(spacy_model="invalid_model_xyz")
 
 
-# Phase 1: Markdown Parsing Tests
 class TestMarkdownParsing:
     """Test company extraction from markdown."""
 
@@ -162,7 +155,6 @@ class TestMarkdownParsing:
         assert company == "Extra Spaces Corp"
 
 
-# Phase 2: Sentence Classification Tests
 class TestSentenceClassification:
     """Test sentence classification and requirement detection."""
 
@@ -188,7 +180,6 @@ class TestSentenceClassification:
         extractor_strict = RequirementExtractor(min_confidence=0.90)
         md = "Nice to have experience with optional tools."
         sentences = extractor_strict.classify_sentences(md)
-        # Nice to have has low confidence (0.40), so it may not appear
         assert isinstance(sentences, list)
 
     def test_classify_empty_text(self, extractor):
@@ -200,11 +191,9 @@ class TestSentenceClassification:
         """Test text with no requirements."""
         md = "This is a generic job description without any requirements."
         sentences = extractor.classify_sentences(md)
-        # Should return empty or very few sentences
         assert isinstance(sentences, list)
 
 
-# Phase 3: Span Extraction Tests
 class TestSpanExtraction:
     """Test span extraction using Phase 8b."""
 
@@ -231,7 +220,7 @@ class TestSpanExtraction:
         md = "Nice to have optional knowledge of Rust."
         extractor_strict = RequirementExtractor(min_confidence=0.80)
         spans = extractor_strict.extract_spans(md)
-        # Confidence check: nice to have is 0.40, should be filtered
+        # Nice to have scores 0.40, below min_confidence 0.80, so it should be filtered.
         assert isinstance(spans, list)
 
     def test_extract_spans_includes_metadata(self, extractor):
@@ -250,7 +239,6 @@ class TestSpanExtraction:
         assert isinstance(spans, list)
 
 
-# Phase 4: Normalization Tests
 class TestNormalization:
     """Test deduplication and normalization."""
 
@@ -373,7 +361,6 @@ class TestNormalization:
         assert len(normalized) == 1
 
 
-# Phase 5: JSON Output Tests
 class TestJSONOutput:
     """Test JSON schema and output formatting."""
 
@@ -442,19 +429,12 @@ class TestJSONOutput:
 
         output = extractor.to_json(normalized, sample_job_md, sentence_count)
 
-        # Should not raise
         json_str = output.model_dump_json()
         assert isinstance(json_str, str)
 
-        # Should be valid JSON
         parsed = json.loads(json_str)
         assert parsed["company"] is not None or parsed["company"] is None
         assert "requirements" in parsed
-
-
-# ============================================================================
-# Integration Tests (9)
-# ============================================================================
 
 
 class TestFullPipeline:
@@ -465,7 +445,7 @@ class TestFullPipeline:
         output = extractor.extract(sample_job_md)
 
         assert isinstance(output, RequirementExtractionOutput)
-        assert output.company is not None  # Company should be extracted (title or company name)
+        assert output.company is not None
         assert output.requirements_count > 0
         assert len(output.requirements) > 0
         assert output.metadata["sentences_analyzed"] > 0
@@ -506,7 +486,6 @@ class TestFullPipeline:
 
     def test_extract_long_job_description(self, extractor):
         """Test extraction with longer job description."""
-        # Simulate a longer, more realistic job description
         md = """# Senior Backend Engineer
 
 ## Requirements
@@ -558,11 +537,6 @@ class TestFullPipeline:
         assert "metadata" in parsed
 
 
-# ============================================================================
-# Additional Edge Case Tests (5 more to reach 48)
-# ============================================================================
-
-
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
@@ -584,7 +558,6 @@ Also considering Company B applicants.
 Required: 5+ years experience.
 """
         output = extractor.extract(md)
-        # Should extract the first company found
         assert output.company == "Company A"
 
     def test_normalize_with_trailing_whitespace(self, extractor):
@@ -604,7 +577,6 @@ Required: 5+ years experience.
             },
         ]
         normalized = extractor.normalize(spans)
-        # Should deduplicate despite whitespace
         assert len(normalized) == 1
 
     def test_extract_with_very_high_confidence_threshold(self):
@@ -613,17 +585,14 @@ Required: 5+ years experience.
             extractor = RequirementExtractor(min_confidence=0.99)
             md = "Required: Python. Must have Java. Nice to have Rust."
             output = extractor.extract(md)
-            # Very few requirements should match (only highest confidence ones)
             assert output.requirements_count >= 0
         except RuntimeError:
             pytest.skip("spaCy model not available")
 
     def test_extract_empty_after_normalization(self, extractor):
         """Test when all requirements are filtered out during normalization."""
-        # Create an extractor with high confidence threshold
         extractor_strict = RequirementExtractor(min_confidence=0.95)
         md = "Nice to have some optional skills."
         output = extractor_strict.extract(md)
-        # Should handle gracefully even with no matching requirements
         assert output.requirements_count >= 0
         assert isinstance(output.requirements, list)
