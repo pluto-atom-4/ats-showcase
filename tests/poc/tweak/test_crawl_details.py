@@ -20,10 +20,6 @@ from src.poc.tweak.crawl_details import (
     selector_present,
 )
 
-# ============================================================================
-# TESTS: selector_present()
-# ============================================================================
-
 
 class TestSelectorPresent:
     """Tests for selector_present() helper function."""
@@ -70,11 +66,6 @@ class TestSelectorPresent:
         assert result is False
 
 
-# ============================================================================
-# TESTS: fetch_job_details() - Adaptive Retry Loop
-# ============================================================================
-
-
 class TestFetchJobDetailsRetryLogic:
     """Tests for adaptive retry loop (3 attempts with increasing timeouts)."""
 
@@ -93,15 +84,12 @@ class TestFetchJobDetailsRetryLogic:
         mock_page.set_default_timeout = MagicMock()
         mock_browser.new_page = AsyncMock(return_value=mock_page)
 
-        # Mock retry_goto to succeed
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock) as mock_retry:
             mock_retry.return_value = True
 
-            # Mock selector_present to find selector
             with patch("src.poc.tweak.crawl_details.selector_present", new_callable=AsyncMock) as mock_sel:
                 mock_sel.return_value = True
 
-                # Mock extraction to return description
                 with patch(
                     "src.poc.tweak.crawl_details.extract_description_from_detail_page",
                     new_callable=AsyncMock,
@@ -134,8 +122,6 @@ class TestFetchJobDetailsRetryLogic:
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock) as mock_retry:
             mock_retry.return_value = True
 
-            # First two attempts: selector not found
-            # Third attempt: selector found
             with patch("src.poc.tweak.crawl_details.selector_present", new_callable=AsyncMock) as mock_sel:
                 mock_sel.side_effect = [False, False, True]
 
@@ -151,7 +137,6 @@ class TestFetchJobDetailsRetryLogic:
                         result = await fetch_job_details(mock_browser, job, {"Acme": {}})
 
         assert result["description"] == "<p>Description</p>"
-        # selector_present called 3 times for 3 attempts
         assert mock_sel.call_count == 3
 
     @pytest.mark.asyncio
@@ -172,7 +157,6 @@ class TestFetchJobDetailsRetryLogic:
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock) as mock_retry:
             mock_retry.return_value = True
 
-            # All attempts: selector not found
             with patch("src.poc.tweak.crawl_details.selector_present", new_callable=AsyncMock) as mock_sel:
                 mock_sel.return_value = False
 
@@ -210,13 +194,11 @@ class TestFetchJobDetailsRetryLogic:
 
                     _ = await fetch_job_details(mock_browser, job, {"Acme": {}})
 
-            # Extract timeout values from calls using positional args
-            # selector_present(page, selector, timeout_ms)
             calls = mock_sel.call_args_list
             assert len(calls) == 3
-            assert calls[0][0][2] == 500  # args[2]
-            assert calls[1][0][2] == 1000  # args[2]
-            assert calls[2][0][2] == 2000  # args[2]
+            assert calls[0][0][2] == 500
+            assert calls[1][0][2] == 1000
+            assert calls[2][0][2] == 2000
 
     @pytest.mark.asyncio
     async def test_fetch_job_details_navigation_fails(self):
@@ -234,11 +216,10 @@ class TestFetchJobDetailsRetryLogic:
         mock_browser.new_page = AsyncMock(return_value=mock_page)
 
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock) as mock_retry:
-            mock_retry.return_value = False  # Navigation fails
+            mock_retry.return_value = False
 
             result = await fetch_job_details(mock_browser, job, {"Acme": {}})
 
-        # Should return job with no description added
         assert "description" not in result or result.get("description") == ""
         mock_page.close.assert_called_once()
 
@@ -259,11 +240,6 @@ class TestFetchJobDetailsRetryLogic:
         mock_browser.new_page.assert_not_called()
 
 
-# ============================================================================
-# TESTS: extract_description_from_detail_page()
-# ============================================================================
-
-
 class TestExtractDescriptionFromDetailPage:
     """Tests for description extraction logic."""
 
@@ -272,7 +248,7 @@ class TestExtractDescriptionFromDetailPage:
         """Extracts description from direct DOM (non-iframe) element."""
         mock_page = AsyncMock()
         mock_elem = AsyncMock()
-        mock_elem.evaluate = AsyncMock(return_value="div")  # tag_name
+        mock_elem.evaluate = AsyncMock(return_value="div")
         mock_elem.inner_html = AsyncMock(return_value="<p>Direct DOM content</p>")
         mock_page.query_selector = AsyncMock(return_value=mock_elem)
 
@@ -287,7 +263,7 @@ class TestExtractDescriptionFromDetailPage:
         """Extracts description from iframe element."""
         mock_page = AsyncMock()
         mock_elem = AsyncMock()
-        mock_elem.evaluate = AsyncMock(return_value="iframe")  # tag_name
+        mock_elem.evaluate = AsyncMock(return_value="iframe")
 
         mock_page.query_selector = AsyncMock(return_value=mock_elem)
 
@@ -308,7 +284,7 @@ class TestExtractDescriptionFromDetailPage:
     async def test_extract_description_no_selector_configured(self):
         """Returns None when no description selector configured."""
         mock_page = AsyncMock()
-        selectors: dict[str, str] = {}  # No description_selector
+        selectors: dict[str, str] = {}
 
         result = await extract_description_from_detail_page(mock_page, "https://example.com/job", selectors)
 
@@ -330,19 +306,12 @@ class TestExtractDescriptionFromDetailPage:
         """GENERIC_FALLBACK_SELECTORS has 'description_selector' key, not 'description'."""
         from src.poc.tweak.common import GENERIC_FALLBACK_SELECTORS
 
-        # Verify key exists and is not "description"
         assert "description_selector" in GENERIC_FALLBACK_SELECTORS
         assert "description" not in GENERIC_FALLBACK_SELECTORS
 
-        # Verify value is a valid selector string
         value = GENERIC_FALLBACK_SELECTORS["description_selector"]
         assert isinstance(value, str)
         assert len(value) > 0
-
-
-# ============================================================================
-# TESTS: Graceful Degradation
-# ============================================================================
 
 
 class TestGracefulDegradation:
@@ -367,14 +336,13 @@ class TestGracefulDegradation:
             mock_retry.return_value = True
 
             with patch("src.poc.tweak.crawl_details.selector_present", new_callable=AsyncMock) as mock_sel:
-                mock_sel.return_value = False  # All attempts fail
+                mock_sel.return_value = False
 
                 with patch("src.poc.tweak.crawl_details.resolve_company_selectors") as mock_resolve:
                     mock_resolve.return_value = {}
 
                     result = await fetch_job_details(mock_browser, job, {"Acme": {}})
 
-        # Job returned with description set to empty string
         assert "id" in result
         assert "title" in result
         assert "description" in result
@@ -408,16 +376,11 @@ class TestGracefulDegradation:
 
                     result = await fetch_job_details(mock_browser, job, {"Acme": {}})
 
-        # All original fields present
         assert result["id"] == "job8"
         assert result["title"] == "QA Engineer"
         assert result["location"] == "Remote"
         assert result["extra_field"] == "custom_value"
 
-
-# ============================================================================
-# WORKSOURCE API INTERCEPT + SHELL DETECTION (Issue #765)
-# ============================================================================
 
 WS_JOB_URL = "https://worksource.my.site.com/worksourcewa/job-search?keyword=engineer&jobId=J988117"
 WS_DETAIL_URL = "https://worksource.my.site.com/worksourcewa/job-search/job-details?jobId=J988117"
@@ -426,8 +389,6 @@ WS_API_URL = (
     "?language=en-US&asGuest=true&htmlEncode=false&classname=9f8e7d6c5b4a&method=ApexActionController.execute"
 )
 
-# Trimmed excerpts of the real captures (.playwright-mcp/worksource_shell_search.json = shell,
-# worksource_real_detail.json = real detail). Only the discriminating markers are kept.
 WS_SHELL_EXCERPT = (
     '<div class="refine-your-job-container"><h2 class="refine-your-search-heading">Refine your search</h2>'
     '<button class="refine-your-job-clear-button">Clear filters</button></div>'
@@ -752,7 +713,7 @@ class TestFetchJobDetailsWorksourceWiring:
         job = {"url": WS_JOB_URL, "company": "WorkSource for Jobs", "title": "Eng", "source_config": "WorkSource"}
         mock_browser = AsyncMock()
         detail_page = AsyncMock()
-        detail_page.set_default_timeout = MagicMock()  # sync Playwright method
+        detail_page.set_default_timeout = MagicMock()
         mock_browser.new_page = AsyncMock(return_value=detail_page)
 
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock, return_value=True):
@@ -776,7 +737,7 @@ class TestFetchJobDetailsWorksourceWiring:
         job = {"url": "https://example.com/job", "company": "Acme", "title": "Eng", "source_config": "Acme"}
         mock_browser = AsyncMock()
         detail_page = AsyncMock()
-        detail_page.set_default_timeout = MagicMock()  # sync Playwright method
+        detail_page.set_default_timeout = MagicMock()
         mock_browser.new_page = AsyncMock(return_value=detail_page)
 
         with patch("src.poc.tweak.crawl_details.retry_goto", new_callable=AsyncMock, return_value=True):

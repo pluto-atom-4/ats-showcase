@@ -127,7 +127,6 @@ class TestIsHeadingOnly:
 
     def test_boilerplate_not_in_known_heading_phrases(self) -> None:
         assert BOILERPLATE_SENTENCE not in KNOWN_HEADING_PHRASES
-        # Matched by the boilerplate regex path, not by set membership.
         assert is_heading_only(BOILERPLATE_SENTENCE) is True
 
     @pytest.mark.parametrize(
@@ -173,8 +172,6 @@ class TestIsHeadingOnly:
         assert is_heading_only(".", ".") is False
 
     def test_generic_title_equal_to_heading_is_dropped(self) -> None:
-        # Accepted trade-off: a real one-word requirement equal to its section
-        # title is dropped. Pinned so any change to this behavior is deliberate.
         assert is_heading_only("Python", "Python") is True
 
     @pytest.mark.parametrize("phrase", sorted(KNOWN_HEADING_PHRASES))
@@ -231,7 +228,6 @@ class TestIsHeadingOnly:
         assert is_heading_only("**Python experience**.", "Team Overview") is False
 
     def test_bare_csharp_not_dropped_as_heading(self) -> None:
-        # Trailing '#' attached to a word is content, not an ATX closer.
         assert is_heading_only("C#", "C") is False
         assert is_heading_only("C#") is False
 
@@ -296,7 +292,6 @@ class TestIsHeadingOnlyStructuralLevel:
         assert is_heading_only("__Also required:__ ", "Requirements", level=-1) is True
 
     def test_level_bold_real_requirement_kept(self) -> None:
-        # Regression guard: bold real requirement under its heading must survive.
         assert is_heading_only("**5+ years of experience**", "Required Qualifications", level=-1) is False
         assert is_heading_only("**5+ years of experience**", None, level=-1) is False
 

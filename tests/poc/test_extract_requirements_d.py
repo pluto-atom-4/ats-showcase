@@ -139,10 +139,10 @@ class TestFindMatchingRequirement:
         match, score = _find_matching_requirement(
             "Experience with HDF5",
             candidates,
-            threshold=0.4,  # Lower threshold for partial substring match
+            threshold=0.4,
         )
         assert match is not None
-        assert score >= 0.3  # Expect some score due to substring overlap
+        assert score >= 0.3
 
     def test_no_match_below_threshold(self):
         """Unrelated requirements don't match."""
@@ -155,7 +155,6 @@ class TestFindMatchingRequirement:
             candidates,
             threshold=0.8,
         )
-        # Either no match or very low score
         if match is not None:
             assert score < 0.8
 
@@ -164,22 +163,19 @@ class TestFindMatchingRequirement:
         candidates = [
             "Knowledge of Python, Java, and Go",
         ]
-        # "Python" is substring of candidate, should boost
         match, score = _find_matching_requirement(
             "Python",
             candidates,
-            threshold=0.2,  # Lower threshold for single-word substring
+            threshold=0.2,
         )
-        # Should have some score due to substring boost
         assert match is not None
-        assert score >= 0.15  # Expect substring boost to provide score
+        assert score >= 0.15
 
     def test_threshold_parameter_respected(self):
         """Threshold parameter controls minimum score."""
         candidates = [
             "Experience with Python",
         ]
-        # Loose threshold should match
         match, score = _find_matching_requirement(
             "Python",
             candidates,
@@ -187,14 +183,11 @@ class TestFindMatchingRequirement:
         )
         assert match is not None
 
-        # Strict threshold may not match
         match_strict, score_strict = _find_matching_requirement(
             "Python",
             candidates,
             threshold=0.95,
         )
-        # At strict threshold, "Python" (short) vs "Experience with Python" (long) unlikely to match
-        # This just tests threshold is respected in the logic
 
 
 class TestDeduplicateRequirementsSemanticD:
@@ -208,7 +201,7 @@ class TestDeduplicateRequirementsSemanticD:
         ]
         result = _deduplicate_requirements_semantic(requirements, threshold=0.8)
         assert len(result) == 1
-        assert result[0]["final_confidence"] == 0.9  # Higher confidence kept
+        assert result[0]["final_confidence"] == 0.9
 
     def test_dedup_removes_semantic_duplicates_parenthetical(self):
         """Semantic duplicates with parentheticals are removed."""
@@ -218,8 +211,6 @@ class TestDeduplicateRequirementsSemanticD:
         ]
         result = _deduplicate_requirements_semantic(requirements, threshold=0.8)
         assert len(result) == 1
-        # Dedup keeps longest by sorting by length desc, so it keeps the (Preferred) version
-        # The semantic match detects them as duplicates at 0.8 threshold
         assert "ARINC 429" in result[0]["text"]
 
     def test_dedup_removes_semantic_duplicates_verbose(self):
@@ -233,7 +224,6 @@ class TestDeduplicateRequirementsSemanticD:
         ]
         result = _deduplicate_requirements_semantic(requirements, threshold=0.8)
         assert len(result) == 1
-        # Longer (more verbose) version is kept per sorting by length desc
         assert "working with and/or" in result[0]["text"]
 
     def test_dedup_removes_semantic_duplicates_adjectives(self):
@@ -244,7 +234,6 @@ class TestDeduplicateRequirementsSemanticD:
             {"text": "Experience with Python", "final_confidence": 0.90},
         ]
         result = _deduplicate_requirements_semantic(requirements, threshold=0.8)
-        # Should deduplicate to 1-2 (depending on threshold strictness)
         assert len(result) <= 2
         assert any("Python" in r["text"] for r in result)
 
@@ -285,16 +274,12 @@ class TestDeduplicateRequirementsSemanticD:
         """Threshold parameter controls dedup strictness."""
         requirements = [
             {"text": "Python experience", "final_confidence": 0.9},
-            {"text": "Python skills", "final_confidence": 0.85},  # Similar but not identical
+            {"text": "Python skills", "final_confidence": 0.85},
         ]
 
-        # Loose threshold: likely to dedup
         result_loose = _deduplicate_requirements_semantic(requirements, threshold=0.5)
-        # Strict threshold: less likely to dedup (may keep both)
         result_strict = _deduplicate_requirements_semantic(requirements, threshold=0.95)
 
-        # At very strict threshold, might keep both
-        # At loose threshold, likely to keep just one
         assert len(result_loose) <= len(result_strict)
 
     def test_dedup_boeing_example(self):
@@ -329,19 +314,14 @@ class TestDeduplicateRequirementsSemanticD:
 
         result = _deduplicate_requirements_semantic(requirements, threshold=0.8)
 
-        # Should deduplicate some but keep distinct requirements
-        # Rough expectation: ~5-6 distinct requirements (not 7)
         assert len(result) >= 4
         assert len(result) <= 7
 
-        # Verify highest confidence items are kept
         confidences = [r["final_confidence"] for r in result]
-        assert 0.95 in confidences  # Bachelor's degree (highest)
+        assert 0.95 in confidences
 
     def test_dedup_quality_improvement_over_exact_match(self):
         """POC-D semantic dedup improves over POC-C exact-match."""
-        # These would NOT deduplicate with exact-match (POC-C)
-        # but SHOULD deduplicate with semantic dedup (POC-D)
         requirements = [
             {"text": "Python", "final_confidence": 0.9},
             {"text": "Python (Preferred)", "final_confidence": 0.7},
@@ -351,8 +331,6 @@ class TestDeduplicateRequirementsSemanticD:
 
         result = _deduplicate_requirements_semantic(requirements, threshold=0.8)
 
-        # POC-C exact-match would keep all 4 (different text)
-        # POC-D semantic should reduce to ~1-2 (they're all Python variants)
         assert len(result) < len(requirements), "Semantic dedup should reduce duplicates vs exact-match"
 
 
@@ -369,7 +347,7 @@ class TestExtractRequirementsDIntegration:
 
         simple_job = "Requirements: Python, Java, or Go experience. Strong communication skills required."
 
-        result = extract_requirements_d(simple_job, min_confidence=0.0)  # Low threshold for testing
+        result = extract_requirements_d(simple_job, min_confidence=0.0)
 
         assert "dedup_algorithm" in result.metadata
         assert "semantic_fuzzy" in result.metadata["dedup_algorithm"]
@@ -381,19 +359,16 @@ class TestExtractRequirementsDIntegration:
 
         simple_job = "Required: Python, Java. Must know Python (preferred). Python experience needed."
 
-        # Loose threshold should deduplicate more
         result_loose = extract_requirements_d(
             simple_job,
             min_confidence=0.0,
             dedup_threshold=0.5,
         )
 
-        # Strict threshold should deduplicate less
         result_strict = extract_requirements_d(
             simple_job,
             min_confidence=0.0,
             dedup_threshold=0.95,
         )
 
-        # Loose should have fewer requirements (more aggressively deduplicated)
         assert len(result_loose.requirements) <= len(result_strict.requirements)

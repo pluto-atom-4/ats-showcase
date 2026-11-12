@@ -9,7 +9,6 @@ import pytest
 from src.poc.integration_adapter import CombinedExtractor
 
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "docs" / "dev-note" / "poc" / "expected_output_schema.json"
-# Verb is not sentence-initial: spaCy tags sentence-initial "Design" as NOUN, so the skill pattern would miss it.
 JD_SENTENCE = "You will design deep learning architectures using PyTorch and TensorFlow."
 
 

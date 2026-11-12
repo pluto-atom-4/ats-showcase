@@ -26,28 +26,25 @@ class TestConfigHardeningMainPath:
         Config: {"companies": {"AlphaCo": "x"}} (malformed, non-dict value).
         Expected: main() returns 1, stderr has "Error:", no "Traceback".
         """
-        # SYNTHETIC: malformed config with string company value instead of dict
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         config_file = config_dir / "test.json"
         config_file.write_text(json.dumps({"companies": {"AlphaCo": "x"}}))
 
-        # Create a test input file
         input_file = tmp_path / "jobs.json"
         input_file.write_text(
             json.dumps(
                 [
                     {
                         "id": "job1",
-                        "title": "Developer",  # SYNTHETIC: generic placeholder
-                        "company": "TechCorp",  # SYNTHETIC: placeholder
-                        "description": "<p>placeholder</p>",  # SYNTHETIC: minimal HTML
+                        "title": "Developer",
+                        "company": "TechCorp",
+                        "description": "<p>placeholder</p>",
                     }
                 ]
             )
         )
 
-        # Act
         import sys
 
         from src.poc.tweak.batch_processor import main
@@ -65,7 +62,6 @@ class TestConfigHardeningMainPath:
             ]
             exit_code = main()
 
-            # Assert
             assert exit_code == 1, "main() should return 1 on malformed config"
             captured = capsys.readouterr()
             assert "Error:" in captured.err, "stderr should have 'Error:' prefix"
@@ -78,22 +74,20 @@ class TestConfigHardeningMainPath:
 
         Expected: main() returns 1, stderr has "Error:", no "Traceback".
         """
-        # Create a test input file
         input_file = tmp_path / "jobs.json"
         input_file.write_text(
             json.dumps(
                 [
                     {
                         "id": "job1",
-                        "title": "Developer",  # SYNTHETIC: placeholder
-                        "company": "TechCorp",  # SYNTHETIC: placeholder
-                        "description": "<p>placeholder</p>",  # SYNTHETIC: minimal
+                        "title": "Developer",
+                        "company": "TechCorp",
+                        "description": "<p>placeholder</p>",
                     }
                 ]
             )
         )
 
-        # Act
         import sys
 
         from src.poc.tweak.batch_processor import main
@@ -111,7 +105,6 @@ class TestConfigHardeningMainPath:
             ]
             exit_code = main()
 
-            # Assert
             assert exit_code == 1, "main() should return 1 on missing config dir"
             captured = capsys.readouterr()
             assert "Error:" in captured.err, "stderr should have 'Error:' prefix"
@@ -129,7 +122,6 @@ class TestResolveDescriptionSelectorHardening:
         Config: {"companies": {"AlphaCo": {"name": "...", "selectors": {"description_selector": ["a", "b"]}}}}
         Expected: ValueError mentioning "non-string".
         """
-        # SYNTHETIC: config with list instead of string for description_selector
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         config_file = config_dir / "test.json"
@@ -140,7 +132,6 @@ class TestResolveDescriptionSelectorHardening:
                         "AlphaCo": {
                             "name": "Alpha Co",
                             "selectors": {
-                                # SYNTHETIC: list instead of CSS selector string
                                 "description_selector": ["a", "b"],
                                 "title": "h1",
                             },
@@ -150,7 +141,6 @@ class TestResolveDescriptionSelectorHardening:
             )
         )
 
-        # Act & Assert
         from src.poc.tweak.batch_processor import _resolve_description_selector
 
         with pytest.raises(ValueError) as exc_info:
@@ -168,12 +158,10 @@ class TestLoadAllCompanyConfigsBOM:
 
         Expected: returns companies dict without raising, BOM is transparently handled.
         """
-        # SYNTHETIC: JSON config with UTF-8 BOM prefix
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         config_file = config_dir / "bom_test.json"
 
-        # Write with UTF-8 BOM prefix
         bom_json = json.dumps(
             {
                 "companies": {
@@ -185,13 +173,10 @@ class TestLoadAllCompanyConfigsBOM:
             }
         )
         with open(config_file, "wb") as f:
-            # UTF-8 BOM: U+FEFF
             f.write(b"\xef\xbb\xbf" + bom_json.encode("utf-8"))
 
-        # Act
         companies = load_all_company_configs(str(config_dir))
 
-        # Assert
         assert "AlphaCo" in companies, "BOM file should load companies successfully"
         assert companies["AlphaCo"]["name"] == "Alpha Co"
 
@@ -205,10 +190,9 @@ class TestResolveCompanySelectorsSafety:
         Config has a company with "name": 5 (non-string), plus valid "AlphaCo".
         Expected: lookup by "Alpha Co" returns AlphaCo's selectors, no crash.
         """
-        # SYNTHETIC: merged config with non-string name entry
         merged_config = {
             "Zeta": {
-                "name": 5,  # SYNTHETIC: int instead of string
+                "name": 5,
                 "selectors": {"description_selector": ".zeta"},
             },
             "AlphaCo": {
@@ -217,10 +201,8 @@ class TestResolveCompanySelectorsSafety:
             },
         }
 
-        # Act
         selectors = resolve_company_selectors("Alpha Co", merged_config)
 
-        # Assert
         assert selectors["description_selector"] == ".alpha"
 
     def test_resolve_company_selectors_strips_whitespace_from_input(self):
@@ -229,7 +211,6 @@ class TestResolveCompanySelectorsSafety:
         Input: job_company_name=" AlphaCo " (surrounding whitespace).
         Expected: matches key "AlphaCo" after stripping.
         """
-        # SYNTHETIC: config with whitespace-sensitive lookup
         merged_config = {
             "AlphaCo": {
                 "name": "Alpha Co",
@@ -237,10 +218,8 @@ class TestResolveCompanySelectorsSafety:
             }
         }
 
-        # Act
         selectors = resolve_company_selectors(" AlphaCo ", merged_config)
 
-        # Assert
         assert selectors["description_selector"] == ".alpha"
 
     def test_resolve_company_selectors_with_non_dict_company_value_returns_empty(self):
@@ -249,13 +228,10 @@ class TestResolveCompanySelectorsSafety:
         Config: {"AlphaCo": "x"} (string value, not dict).
         Expected: resolve_company_selectors("AlphaCo", config) returns {} without raise.
         """
-        # SYNTHETIC: config with non-dict company value (string instead of selector dict)
         merged_config = {"AlphaCo": "x"}
 
-        # Act
         selectors = resolve_company_selectors("AlphaCo", merged_config)
 
-        # Assert - should safely return empty dict, no AttributeError
         assert selectors == {}
 
 
@@ -268,10 +244,8 @@ class TestSourceConfigWhitespaceScoping:
         Job has source_config=" AlphaCo " (with spaces).
         Expected: matches config key "AlphaCo" after stripping, selector applied.
         """
-        # SYNTHETIC: job record with whitespace in source_config
         from src.poc.tweak import batch_processor as bp
 
-        # Track calls to _resolve_job_scoping to verify stripping
         calls = []
         original_resolver = bp._resolve_job_scoping
 
@@ -281,7 +255,6 @@ class TestSourceConfigWhitespaceScoping:
 
         monkeypatch.setattr(bp, "_resolve_job_scoping", tracking_resolver)
 
-        # Create config with AlphaCo
         config_dir = tmp_path / "config"
         config_dir.mkdir()
         config_file = config_dir / "test.json"
@@ -298,26 +271,23 @@ class TestSourceConfigWhitespaceScoping:
             )
         )
 
-        # Create jobs with whitespace-padded source_config
         input_file = tmp_path / "jobs.json"
         input_file.write_text(
             json.dumps(
                 [
                     {
                         "id": "alpha-ws",
-                        "title": "Developer",  # SYNTHETIC: placeholder
-                        "company": "X",  # SYNTHETIC: placeholder
-                        "description": "<p>placeholder</p>",  # SYNTHETIC: minimal
-                        "source_config": " AlphaCo ",  # SYNTHETIC: whitespace-padded
+                        "title": "Developer",
+                        "company": "X",
+                        "description": "<p>placeholder</p>",
+                        "source_config": " AlphaCo ",
                     }
                 ]
             )
         )
 
-        # Act
         results = bp.run_batch(str(input_file), config_dir=str(config_dir))
 
-        # Assert - resolver should have been called with "AlphaCo" after stripping
         assert len(calls) > 0, "resolver should be called for source_config"
         assert "AlphaCo" in calls, f"resolver should be called with stripped key, got {calls}"
         assert len(results) == 1

@@ -43,7 +43,7 @@ class TestNormalizeAsteriskBullets:
         """Test asterisk bullet already has period."""
         markdown = "* Python experience."
         result = normalize_asterisk_bullets(markdown)
-        assert result.count(".") == 1  # No double-period
+        assert result.count(".") == 1
 
     def test_asterisk_with_indentation(self):
         """Test asterisk bullet with indentation."""
@@ -81,7 +81,7 @@ class TestNormalizeHyphenBullets:
         """Test hyphen bullet with question mark (no period added)."""
         markdown = "- What skills needed?"
         result = normalize_hyphen_bullets(markdown)
-        assert result.count("?") == 1  # No double-punctuation
+        assert result.count("?") == 1
         assert "What skills needed?" in result
 
     def test_hyphen_with_exclamation(self):
@@ -216,7 +216,6 @@ class TestNormalizeNestedBullets:
         markdown = "* Bullet\n  * Nested"
         result = normalize_nested_bullets(markdown)
         lines = result.split("\n")
-        # Second line should still be indented
         assert lines[1].startswith("  ")
 
 
@@ -328,7 +327,6 @@ class TestNormalizeBulletPoints:
         """Test that result has no embedded newlines in requirements."""
         markdown = "* Long requirement that spans\nmultiple lines"
         result = normalize_bullet_points(markdown)
-        # After normalization, should not have embedded newlines within bullets
         lines = result.split("\n")
         assert all(line for line in lines if line.strip())
 

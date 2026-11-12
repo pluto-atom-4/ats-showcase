@@ -181,7 +181,7 @@ class TestLoadSingleFile:
                     "location": "Seattle",
                     "status": "pending_review",
                 },
-                {"id": "job-002", "title": "Manager"},  # Missing required fields
+                {"id": "job-002", "title": "Manager"},
                 {
                     "id": "job-003",
                     "title": "Dev",
@@ -288,7 +288,6 @@ class TestLoadJobs:
         assert isinstance(result, LoadResult)
         assert len(result.jobs) > 0
         assert all(isinstance(job, dict) for job in result.jobs)
-        # valid_jobs.json has 3 jobs, missing_required.json has 0 valid jobs
         assert len(result.jobs) >= 3
 
     def test_load_jobs_includes_all_required_fields(self) -> None:
@@ -307,7 +306,6 @@ class TestLoadJobs:
 
         result = load_jobs(fixture_dir)
 
-        # malformed.json and missing_required.json should produce warnings
         assert len(result.warnings) > 0
 
     def test_load_jobs_nonexistent_dir(self) -> None:
@@ -344,7 +342,6 @@ class TestLoadJobs:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
 
-            # Create a valid file
             valid_file = tmppath / "valid_jobs.json"
             valid_file.write_text(
                 json.dumps(
@@ -360,13 +357,11 @@ class TestLoadJobs:
                 )
             )
 
-            # Create a malformed file
             bad_file = tmppath / "bad_jobs.json"
             bad_file.write_text("{ invalid }")
 
             result = load_jobs(tmppath)
 
-            # Should load the valid file and skip the bad one
             assert len(result.jobs) == 1
             assert len(result.warnings) > 0
 
@@ -375,7 +370,6 @@ class TestLoadJobs:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
 
-            # Create fixture file with valid jobs
             fixture_file = tmppath / "test_jobs.json"
             fixture_file.write_text(
                 json.dumps(
@@ -399,16 +393,13 @@ class TestLoadJobs:
                 )
             )
 
-            # Load from temp directory
             result = load_jobs(base_dir=tmppath)
 
-            # Verify
             assert len(result.jobs) == 2
             assert result.jobs[0]["id"] == "fixture_1"
             assert result.jobs[1]["id"] == "fixture_2"
             assert len(result.warnings) == 0
 
-            # Verify all required fields present
             for job in result.jobs:
                 assert "id" in job
                 assert "title" in job

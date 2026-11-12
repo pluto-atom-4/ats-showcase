@@ -70,14 +70,14 @@ class TestLoaderValidation:
     @pytest.mark.parametrize(
         "payload",
         [
-            {"id": "x1"},  # top level not a list
+            {"id": "x1"},
             ["not an object"],
-            [_entry(text="")],  # empty text
-            [_entry(id="  ")],  # blank id
-            [_entry(expected_skills="write python")],  # not a list
-            [_entry(expected_technologies=[1])],  # non-string element
-            [_entry(expected_skills=[""])],  # blank element
-            [_entry(source_note=None)],  # wrong type
+            [_entry(text="")],
+            [_entry(id="  ")],
+            [_entry(expected_skills="write python")],
+            [_entry(expected_technologies=[1])],
+            [_entry(expected_skills=[""])],
+            [_entry(source_note=None)],
         ],
     )
     def test_rejects_malformed_entries(self, ev: ModuleType, tmp_path: Path, payload: object) -> None:

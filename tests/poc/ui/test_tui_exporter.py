@@ -30,7 +30,6 @@ class TestEnsureWorkDir:
             output_path = tmppath / "selected.json"
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Should not raise
             ensure_work_dir(output_path)
 
             assert output_path.parent.exists()
@@ -142,7 +141,6 @@ class TestExportJobs:
             output_path = tmppath / "selected.json"
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Create initial file
             initial_job: Job = {
                 "id": "old",
                 "title": "Old",
@@ -153,7 +151,6 @@ class TestExportJobs:
             with open(output_path, "w") as f:
                 json.dump([initial_job], f)
 
-            # Export new content
             new_jobs: list[Job] = [
                 {
                     "id": "new",
@@ -165,7 +162,6 @@ class TestExportJobs:
             ]
             export_jobs(new_jobs, output_path)
 
-            # Verify it was overwritten
             with open(output_path) as f:
                 loaded = json.load(f)
 
@@ -254,7 +250,6 @@ class TestExportJobs:
 
             export_jobs(jobs, output_path)
 
-            # Verify we can read it back with UTF-8
             with open(output_path, encoding="utf-8") as f:
                 loaded = json.load(f)
 
@@ -281,6 +276,5 @@ class TestExportJobs:
 
             content = output_path.read_text()
 
-            # Check for indentation (spaces/newlines indicating pretty-print)
             assert "\n" in content
-            assert "  " in content  # 2-space indent
+            assert "  " in content

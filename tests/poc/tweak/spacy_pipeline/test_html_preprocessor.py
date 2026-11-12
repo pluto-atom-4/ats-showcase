@@ -63,7 +63,6 @@ class TestHTMLPreprocessorBasic:
         """Verify extra whitespace is handled appropriately."""
         html = "<p>Text   with   multiple   spaces</p>"
         result = preprocessor.process(html)
-        # BeautifulSoup normalizes the HTML structure
         assert "Text" in result
         assert "multiple" in result
         assert "spaces" in result
@@ -72,7 +71,6 @@ class TestHTMLPreprocessorBasic:
         """Gracefully handle malformed HTML."""
         html = "<div><p>Unclosed paragraph<div>Nested</div>"
         result = preprocessor.process(html)
-        # BeautifulSoup should handle this gracefully
         assert "Unclosed paragraph" in result
         assert "Nested" in result
 
@@ -103,7 +101,6 @@ class TestHTMLPreprocessorNbsp:
         """Remove nbsp from simple text nodes."""
         html = "Hello\xa0World"
         result = preprocessor.process(html)
-        # BeautifulSoup returns plain text as-is (with nbsp replaced)
         assert "\xa0" not in result
         assert result == "Hello World"
 
@@ -167,7 +164,6 @@ class TestHTMLPreprocessorIntegration:
         html = '<a href="test.html" class="link">Link\xa0Text</a>'
         result = preprocessor.process(html)
         assert "\xa0" not in result
-        # href or class might be removed by BeautifulSoup depending on parser
         assert "Link" in result or "Text" in result
 
 
@@ -182,7 +178,7 @@ class TestHTMLPreprocessorCallable:
     def test_callable_via_call_method(self, preprocessor):
         """Component should be callable via __call__()."""
         html = "Text\xa0with\xa0nbsp"
-        result = preprocessor(html)  # Using __call__
+        result = preprocessor(html)
         assert "\xa0" not in result
         assert "Text with nbsp" in result
 

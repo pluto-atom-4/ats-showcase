@@ -28,10 +28,6 @@ from src.poc.tweak.multi_line_paragraph import (
     get_header_level,
 )
 
-# ============================================================================
-# Fixtures
-# ============================================================================
-
 
 @pytest.fixture(scope="session")
 def nlp():
@@ -46,11 +42,6 @@ def nlp():
 def ruler(nlp):
     """Create MarkdownSpanRuler instance."""
     return MarkdownSpanRuler(nlp)
-
-
-# ============================================================================
-# Phase 1 Tests: Helper Functions
-# ============================================================================
 
 
 class TestExtractTitle:
@@ -191,11 +182,6 @@ class TestDetectHasList:
         assert detect_has_list("") is False
 
 
-# ============================================================================
-# Phase 2 Tests: MarkdownSpanRuler Core
-# ============================================================================
-
-
 class TestMarkdownSpanRulerInit:
     """Test MarkdownSpanRuler initialization."""
 
@@ -252,15 +238,12 @@ class TestMarkdownSpanRulerParse:
         """Parse text with no headers creates single section."""
         text = "Just plain text\nNo headers here"
         sections = ruler.parse(text)
-        # Text with no headers should be treated as content-only section
-        # depending on implementation
         assert len(sections) >= 1
 
     def test_parse_preserves_content_exactly(self, ruler):
         """Content is preserved exactly (no transformation)."""
         text = "## Section\n\n* Item 1  \n* Item 2\n\nParagraph."
         sections = ruler.parse(text)
-        # Content should be stripped at section level but preserve internal formatting
         assert "* Item 1" in sections[0].content
         assert "* Item 2" in sections[0].content
 
@@ -283,13 +266,12 @@ class TestMarkdownSectionMetadata:
         """Section metadata includes word count."""
         text = "# Title\n\none two three four five"
         sections = ruler.parse(text)
-        assert sections[0].word_count == 7  # Title + 5 words
+        assert sections[0].word_count == 7
 
     def test_section_line_count(self, ruler):
         """Section metadata includes line count."""
         text = "# Title\n\nLine 1\nLine 2\nLine 3"
         sections = ruler.parse(text)
-        # Non-empty lines
         assert sections[0].line_count >= 3
 
     def test_section_has_list_true(self, ruler):
@@ -310,11 +292,6 @@ class TestMarkdownSectionMetadata:
         sections = ruler.parse(text)
         assert sections[0].start_line == 0
         assert sections[1].start_line > sections[0].end_line
-
-
-# ============================================================================
-# Phase 3 Tests: Export Methods
-# ============================================================================
 
 
 class TestMarkdownSpanRulerExport:
@@ -356,7 +333,6 @@ class TestMarkdownSpanRulerExport:
         text = "# Title\n\nContent"
         sections = ruler.parse(text)
         json_str = ruler.to_json(sections)
-        # Should not raise
         parsed = json.loads(json_str)
         assert "sections" in parsed
 
@@ -365,7 +341,6 @@ class TestMarkdownSpanRulerExport:
         text = "# Title\n\nContent"
         sections = ruler.parse(text)
         json_str = ruler.to_json(sections, indent=4)
-        # With indent=4, should have readable formatting
         assert "\n    " in json_str or len(json_str.split("\n")) > 1
 
     def test_to_json_preserves_unicode(self, ruler):
@@ -385,11 +360,6 @@ class TestMarkdownSpanRulerExport:
         assert len(parsed["sections"]) == 1
 
 
-# ============================================================================
-# Phase 3 Tests: Edge Cases
-# ============================================================================
-
-
 class TestEdgeCases:
     """Test edge cases and special scenarios."""
 
@@ -397,7 +367,6 @@ class TestEdgeCases:
         """Adjacent headers with no content between."""
         text = "# Title 1\n## Title 2\n### Title 3"
         sections = ruler.parse(text)
-        # Should create sections even with minimal content
         assert len(sections) >= 2
 
     def test_trailing_content_after_last_header(self, ruler):
@@ -417,7 +386,6 @@ class TestEdgeCases:
         """Unicode characters in headers."""
         text = "## 中文标题\n\nContent"
         sections = ruler.parse(text)
-        # Should parse without error
         assert len(sections) == 1
 
     def test_unicode_in_content(self, ruler):
@@ -428,11 +396,9 @@ class TestEdgeCases:
 
     def test_large_document(self, ruler):
         """Parse large document efficiently."""
-        # Create a large document
         lines = ["# Section " + str(i) + "\n\nContent " + str(i) for i in range(100)]
         text = "\n\n".join(lines)
         sections = ruler.parse(text)
-        # Should have parsed all sections
         assert len(sections) > 50
 
     def test_mixed_header_styles(self, ruler):
@@ -458,11 +424,6 @@ class TestEdgeCases:
         assert sections[0].has_list is True
 
 
-# ============================================================================
-# Phase 4 Tests: Preamble Handling (Issue #373)
-# ============================================================================
-
-
 class TestPreambleHandling:
     """Test preamble text before first header."""
 
@@ -471,13 +432,11 @@ class TestPreambleHandling:
         text = "This is preamble text.\nMore preamble.\n\n# Heading\n\nHeading content"
         sections = ruler.parse(text)
         assert len(sections) == 2
-        # First section is preamble (title=None, level=-2)
         assert sections[0].title is None
         assert sections[0].level == -2
         assert sections[0].start_line == 0
         assert sections[0].end_line == 2
         assert "This is preamble text" in sections[0].content
-        # Second section is the heading
         assert sections[1].title == "Heading"
         assert sections[1].level == 1
 
@@ -522,7 +481,7 @@ class TestPreambleHandling:
         sections = ruler.parse(text)
         preamble = sections[0]
         assert preamble.start_line == 0
-        assert preamble.end_line == 2  # Line with empty string before heading
+        assert preamble.end_line == 2
 
     def test_preamble_word_count(self, ruler):
         """Preamble word count is calculated correctly."""
@@ -552,11 +511,9 @@ class TestPreambleHandling:
         text = "Preamble\n\n# H1\n\nC1\n\n## H2\n\nC2\n\n### H3\n\nC3"
         sections = ruler.parse(text)
         assert len(sections) == 4
-        # Check all headers are intact
         assert sections[1].title == "H1"
         assert sections[2].title == "H2"
         assert sections[3].title == "H3"
-        # Check header levels and boundaries
         assert sections[1].level == 1
         assert sections[2].level == 2
         assert sections[3].level == 3
@@ -579,11 +536,6 @@ class TestPreambleHandling:
         assert len(parsed["sections"]) == 2
         assert parsed["sections"][0]["title"] is None
         assert parsed["sections"][0]["level"] == -2
-
-
-# ============================================================================
-# Integration Tests
-# ============================================================================
 
 
 class TestIntegration:
@@ -623,15 +575,9 @@ Apply now!"""
         sections = ruler.parse(text)
         json_str = ruler.to_json(sections)
         data = json.loads(json_str)
-        # Should be able to reconstruct
         assert len(data["sections"]) == 1
         assert data["sections"][0]["title"] == "Title"
         assert data["sections"][0]["word_count"] >= 5
-
-
-# ============================================================================
-# Performance Tests
-# ============================================================================
 
 
 class TestPerformance:
@@ -639,19 +585,16 @@ class TestPerformance:
 
     def test_parse_1000_line_document(self, ruler):
         """Parse 1000-line document efficiently."""
-        # Create document with 200 sections
         lines = []
         for i in range(200):
             lines.append(f"## Section {i}\n\nContent for section {i}")
         text = "\n\n".join(lines)
 
         sections = ruler.parse(text)
-        # Should parse successfully
         assert len(sections) > 100
 
     def test_metadata_calculation_efficiency(self, ruler):
         """Metadata calculation is efficient."""
         text = "# Title\n\n" + "\n".join(["Word"] * 10000)
         sections = ruler.parse(text)
-        # Should complete without hanging
         assert sections[0].word_count > 100

@@ -81,7 +81,6 @@ class TestMarkdownPolisherRule2ListTightening:
         """
         text = "\n* Item 1\n\n* Item 2\n\n* Item 3"
         result = polisher.apply_rule(MarkdownPolisher.RULE_LIST_TIGHT, text)
-        # The first blank line between Item 1 and Item 2 gets tightened
         assert "* Item 1\n* Item 2" in result
 
     def test_list_tight_preserves_single_item_lists(self, polisher):
@@ -94,7 +93,6 @@ class TestMarkdownPolisherRule2ListTightening:
         """Handle nested list structures."""
         text = "* Item 1\n  * Nested 1\n\n* Item 2"
         result = polisher.apply_rule(MarkdownPolisher.RULE_LIST_TIGHT, text)
-        # Regex may not match nested items, but main items should tighten
         assert "* Item 1" in result
         assert "* Item 2" in result
 
@@ -109,8 +107,7 @@ class TestMarkdownPolisherRule2ListTightening:
         """Remove multiple consecutive gaps in lists."""
         text = "* A\n\n* B\n\n* C\n\n* D"
         result = polisher.apply_rule(MarkdownPolisher.RULE_LIST_TIGHT, text)
-        # Should tighten all gaps
-        assert result.count("\n* ") >= 3  # At least 3 items with newline before
+        assert result.count("\n* ") >= 3
 
 
 class TestMarkdownPolisherRule3HeaderFormatting:
@@ -137,28 +134,24 @@ class TestMarkdownPolisherRule3HeaderFormatting:
         """Handle multiple consecutive headers."""
         text = "**Header 1**\n**Header 2**\n**Header 3**"
         result = polisher.apply_rule(MarkdownPolisher.RULE_HEADER_FORMAT, text)
-        # Headers should have blank lines between them
         assert "\n\n" in result
 
     def test_header_preserves_blank_when_present(self, polisher):
         """Don't double-add blank lines if already present."""
         text = "Text\n\n**Header**\n\nMore text"
         result = polisher.apply_rule(MarkdownPolisher.RULE_HEADER_FORMAT, text)
-        # Should have exactly 2 newlines (not 3)
         assert "\n\n\n" not in result
 
     def test_header_at_start_no_extra_space_before(self, polisher):
         """Don't add space before header at start of text."""
         text = "**Header**\nContent"
         result = polisher.apply_rule(MarkdownPolisher.RULE_HEADER_FORMAT, text)
-        # Should not start with newlines
         assert not result.startswith("\n")
 
     def test_header_at_end_no_extra_space_after(self, polisher):
         """Don't add space after header at end of text."""
         text = "Content\n**Header**"
         result = polisher.apply_rule(MarkdownPolisher.RULE_HEADER_FORMAT, text)
-        # Should not end with extra newlines beyond the format
         assert result.endswith("**Header**") or result.endswith("**Header**\n")
 
 
@@ -184,14 +177,12 @@ class TestMarkdownPolisherRule4ListBlockSeparation:
         """
         text = "\n* Item 1\nSome text"
         result = polisher.apply_rule(MarkdownPolisher.RULE_LIST_BLOCK, text)
-        # The regex should match and add blank line
         assert "* Item 1\n\nSome text" in result
 
     def test_list_block_preserves_spacing_between_items(self, polisher):
         """Don't affect spacing between list items."""
         text = "* Item 1\n* Item 2\n* Item 3"
         result = polisher.apply_rule(MarkdownPolisher.RULE_LIST_BLOCK, text)
-        # Items should remain consecutive
         assert "* Item 1\n* Item 2" in result
 
     def test_list_block_multiple_lists(self, polisher):
@@ -254,22 +245,18 @@ class TestMarkdownPolisherRuleOrdering:
         """Verify that rule order affects output."""
         text = "Text\n\n* Item 1\n\n* Item 2  \n\n**Header**\nMore"
 
-        # Process with all rules
         polisher = MarkdownPolisher()
         all_rules_result = polisher.process(text)
 
-        # Process with subset - should differ
         polisher_subset = MarkdownPolisher(rules=[MarkdownPolisher.RULE_LIST_TIGHT, MarkdownPolisher.RULE_CLEANUP])
         subset_result = polisher_subset.process(text)
 
-        # Results should be different (all_rules has line norm and header format)
         assert all_rules_result != subset_result
 
     def test_disable_specific_rule(self):
         """Verify rules can be disabled via constructor."""
         text = "Line 1  \nLine 2   \n"
 
-        # With line norm disabled
         polisher = MarkdownPolisher(
             rules=[
                 MarkdownPolisher.RULE_LIST_TIGHT,
@@ -278,7 +265,6 @@ class TestMarkdownPolisherRuleOrdering:
         )
         result = polisher.process(text)
 
-        # Should still have trailing whitespace (line norm disabled)
         assert "  " in result or "   " in result
 
     def test_apply_rule_single(self):
@@ -287,13 +273,11 @@ class TestMarkdownPolisherRuleOrdering:
 
         polisher = MarkdownPolisher()
 
-        # Apply only line norm
         result_line_norm = polisher.apply_rule(MarkdownPolisher.RULE_LINE_NORM, text)
         assert result_line_norm == "Line 1\n* Item 1\n\n* Item 2"
 
-        # Apply only list tight to original
         result_list_tight = polisher.apply_rule(MarkdownPolisher.RULE_LIST_TIGHT, text)
-        assert "  " in result_list_tight  # Trailing space still there
+        assert "  " in result_list_tight
 
 
 class TestMarkdownPolisherBackwardCompat:
@@ -305,9 +289,7 @@ class TestMarkdownPolisherBackwardCompat:
         polisher = MarkdownPolisher()
         result = polisher.process(text)
 
-        # Should have tight list
         assert "* Item 1\n* Item 2" in result
-        # Should have blank line before list
         assert "Text\n\n*" in result
 
     def test_backward_compat_with_headers(self):
@@ -316,9 +298,7 @@ class TestMarkdownPolisherBackwardCompat:
         polisher = MarkdownPolisher()
         result = polisher.process(text)
 
-        # Should have blanks around header
         assert "Description\n\n**Requirements**" in result
-        # Should have blank before list
         assert "**Requirements**\n\n*" in result
 
     def test_backward_compat_cleanup(self):
@@ -327,7 +307,6 @@ class TestMarkdownPolisherBackwardCompat:
         polisher = MarkdownPolisher()
         result = polisher.process(text)
 
-        # Should collapse to double newlines
         assert result == "Line 1\n\nLine 2"
 
     def test_backward_compat_complex(self):
@@ -336,13 +315,9 @@ class TestMarkdownPolisherBackwardCompat:
         polisher = MarkdownPolisher()
         result = polisher.process(text)
 
-        # Normalize: trailing spaces stripped
         assert "Overview" in result and "Overview  " not in result
-        # List tightened
         assert "* Requirement 1\n* Requirement 2" in result
-        # Header formatted
         assert "**Skills**" in result
-        # Cleanup: triple newlines collapsed
         assert "\n\n\n" not in result
 
 
@@ -357,7 +332,7 @@ class TestMarkdownPolisherCallable:
     def test_callable_via_call_method(self, polisher):
         """Component should be callable via __call__()."""
         text = "Text  \n\n* Item"
-        result = polisher(text)  # Using __call__
+        result = polisher(text)
         assert "Text\n\n* Item" in result
 
     def test_process_and_call_equivalent(self, polisher):
@@ -395,10 +370,8 @@ class TestMarkdownPolisherProperties:
         """Modifying rules property shouldn't affect component."""
         polisher = MarkdownPolisher()
         original_rules = polisher.rules
-        # Try to modify the returned list
         rules_copy = polisher.rules
         rules_copy.clear()
-        # Component should still have original rules
         assert polisher.rules == original_rules
 
 
