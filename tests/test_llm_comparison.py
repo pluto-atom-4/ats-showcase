@@ -11,7 +11,6 @@ from typing import Dict, List, Optional
 
 import pytest
 
-# Configure logging to show in pytest output
 logging.basicConfig(level=logging.INFO, format="%(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -20,7 +19,6 @@ logger.setLevel(logging.INFO)
 class LLMComparator:
     """Compare different Claude models on assessment task."""
 
-    # Model configs: (model_id, input_price_per_1m, output_price_per_1m)
     MODELS = {
         "haiku": ("claude-haiku-4-5-20251001", 0.80, 4.0),
         "sonnet": ("claude-sonnet-5", 3.0, 15.0),
@@ -42,7 +40,6 @@ class LLMComparator:
             cv_text: CV text
             job_chunks: List of job description chunks (same format as assess command)
         """
-        # Join chunks same way as provider.py does
         job_text = "\n".join(job_chunks)
         prompt = self._build_prompt(cv_text, job_text)
 
@@ -60,12 +57,9 @@ class LLMComparator:
                 response_text = response.content[0].text
             print(f"[DEBUG] {model_id} raw response: {response_text[:200]}...")
 
-            # Save response to data/prompt-flow
             self._save_response(model_id, response_text, response.usage)
 
-            # Parse response
             try:
-                # Try to extract JSON if wrapped in markdown
                 if "```json" in response_text:
                     response_text = response_text.split("```json")[1].split("```")[0].strip()
                 elif "```" in response_text:
@@ -77,7 +71,6 @@ class LLMComparator:
                 print(f"[ERROR] Response text: {response_text[:500]}")
                 return None
 
-            # Validate required keys
             required_keys = {"overall_score", "tech_score", "seniority_score", "location_score"}
             if not all(k in assessment for k in required_keys):
                 missing = required_keys - set(assessment.keys())
@@ -116,7 +109,6 @@ class LLMComparator:
             else:
                 results[model_name] = None
 
-        # Calculate variance from valid results
         valid_scores = [r["overall_score"] for r in results.values() if r is not None and "overall_score" in r]
 
         if not valid_scores:
@@ -175,7 +167,6 @@ Respond with JSON:
         flow_dir = Path("data/prompt-flow")
         flow_dir.mkdir(parents=True, exist_ok=True)
 
-        # Determine simple model name for filename
         if "haiku" in model_name:
             filename = "haiku-response.json"
         elif "sonnet" in model_name:
@@ -185,7 +176,6 @@ Respond with JSON:
         else:
             filename = f"{model_name.split('-')[1]}-response.json"
 
-        # Build metadata
         data = {
             "timestamp": datetime.now().isoformat(),
             "model_id": model_name,
@@ -196,7 +186,6 @@ Respond with JSON:
             },
         }
 
-        # Save to file
         output_path = flow_dir / filename
         with open(output_path, "w") as f:
             json.dump(data, f, indent=2)
@@ -213,7 +202,6 @@ def load_cv_text() -> str:
     with open(cv_path) as f:
         cv_data = json.load(f)
 
-    # Extract text from CV JSON (jRES format)
     lines = []
     basics = cv_data.get("basics", {})
     lines.append(f"{basics.get('name', 'Unknown')}")
@@ -221,7 +209,6 @@ def load_cv_text() -> str:
     if basics.get("summary"):
         lines.append(f"\n{basics['summary']}")
 
-    # Add work experience
     for job in cv_data.get("work", []):
         lines.append(f"\n{job.get('name', '')}: {job.get('position', '')}")
         if job.get("summary"):
@@ -229,7 +216,6 @@ def load_cv_text() -> str:
         if job.get("technologies"):
             lines.append(f"Tech: {', '.join(job['technologies'])}")
 
-    # Add skills
     if cv_data.get("skills"):
         lines.append("\nSkills:")
         for skill in cv_data["skills"]:
@@ -254,7 +240,6 @@ def load_first_job_chunks() -> list[str]:
         raise ValueError("No jobs found in preprocessed_jobs.json")
 
     job = jobs[0]
-    # Use chunks (same as assess command: preprocessed.get("chunks", [clean_text]))
     chunks: list[str] = job.get("chunks", [])
 
     if not chunks:
@@ -273,7 +258,6 @@ def test_model_comparison(tmp_path):
         pytest.skip("ANTHROPIC_API_KEY not set")
     assert api_key is not None  # narrow str | None for mypy when pytest is untyped (pre-commit env)
 
-    # Load real data
     print("Loading CV and job chunks...")
     try:
         cv_text = load_cv_text()
@@ -288,7 +272,6 @@ def test_model_comparison(tmp_path):
     comparator = LLMComparator(api_key)
     result = comparator.compare_models(cv_text, job_chunks)
 
-    # Save results
     report_path = tmp_path / "model_comparison.json"
     with open(report_path, "w") as f:
         json.dump(result, f, indent=2, default=str)
@@ -297,14 +280,12 @@ def test_model_comparison(tmp_path):
     print("MODEL COMPARISON RESULTS")
     print("=" * 80)
 
-    # Load job info for context
     with open("data/extracted_jobs/preprocessed_jobs.json") as f:
         jobs = json.load(f)
         job = jobs[0]
         print(f"\nJob: {job.get('company', 'Unknown')} (ID: {job.get('job_id', 'N/A')})")
         print(f"Chunks: {len(job_chunks)} | Token count: {job.get('token_count', 'N/A')}")
 
-    # Pricing table
     print("\n" + "-" * 80)
     print("PRICING & COSTS")
     print("-" * 80)
@@ -313,7 +294,6 @@ def test_model_comparison(tmp_path):
         cost_per_10k = (10000 / 1_000_000) * in_price
         print(f"{name:15} ${in_price:7.2f}/1M    ${out_price:7.2f}/1M     ${cost_per_10k:.4f}")
 
-    # Results
     print("\n" + "-" * 80)
     print("ASSESSMENT SCORES")
     print("-" * 80)
@@ -332,7 +312,6 @@ def test_model_comparison(tmp_path):
         )
         print(f"  Tokens:    {scores['input_tokens']:5d} input | {scores['output_tokens']:5d} output")
 
-        # Calculate cost
         in_price = comparator.MODELS[model][1]
         out_price = comparator.MODELS[model][2]
         in_cost = (scores["input_tokens"] / 1_000_000) * in_price
@@ -341,7 +320,6 @@ def test_model_comparison(tmp_path):
         print(f"  Cost:      ${in_cost:.6f} (input) + ${out_cost:.6f} (output) = ${total_cost:.6f}")
         print(f"  Summary:   {scores['summary'][:70]}...")
 
-    # Analysis
     print("\n" + "=" * 80)
     print("ANALYSIS")
     print("=" * 80)
@@ -358,5 +336,4 @@ def test_model_comparison(tmp_path):
 if __name__ == "__main__":
     import sys
 
-    # Run manually: python -m tests.test_llm_comparison
     pytest.main([__file__, "-v", "-s"])

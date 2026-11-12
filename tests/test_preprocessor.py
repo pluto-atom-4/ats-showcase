@@ -37,7 +37,6 @@ def test_semantic_chunker():
     ]
 
     chunks = chunker.chunk("test text", sentences)
-    # Should chunk into semantic groups
     assert isinstance(chunks, list)
 
 
@@ -46,10 +45,9 @@ def test_token_counter():
     """Test token counting."""
     counter = TokenCounter()
 
-    # Test cost estimation
     cost = counter.estimate_cost(input_tokens=1000, output_tokens=100)
     assert cost > 0
-    assert cost < 0.01  # Should be less than a cent for these tokens
+    assert cost < 0.01
 
 
 @pytest.mark.unit
@@ -59,7 +57,6 @@ def test_token_pricing():
 
     counter = TokenCounter()
 
-    # Check pricing is set for the model
     input_price, output_price = get_model_pricing(counter.model)
     assert input_price > 0
     assert output_price > 0
@@ -122,9 +119,8 @@ def test_extract_entities_by_section_skips_technical_assessment_section(monkeypa
         },
     )
 
-    # Wrap (not replace) the real nlp call so we can prove the skip_sections
-    # `continue` fired -- i.e. the section never reached spaCy processing at
-    # all -- rather than merely happening to produce no entities.
+    # Wrap (not replace) nlp to prove the section never reached spaCy, not merely that output was empty.
+    # Same as above: assert nlp was never called rather than relying on empty output.
     original_nlp = preprocessor.nlp
     nlp_calls: list[str] = []
 
@@ -177,10 +173,6 @@ def test_extract_entities_by_section_skips_new_denylist_entries(monkeypatch, sec
         },
     )
 
-    # Same rationale as the dedicated "technical assessment" test above:
-    # prove the section never reached spaCy processing, not just that the
-    # (possibly vacuous, for section names that don't match any routing
-    # keyword either) output happened to be empty.
     original_nlp = preprocessor.nlp
     nlp_calls: list[str] = []
 
@@ -204,7 +196,6 @@ def test_preprocessed_job_company_field():
 
     from models.job import PreprocessedJob
 
-    # Create preprocessed job with company
     job = PreprocessedJob(
         job_id="test_job_1",
         company="Test Company",
@@ -216,12 +207,10 @@ def test_preprocessed_job_company_field():
         processed_date=datetime.now(UTC),
     )
 
-    # Verify company field is preserved
     assert job.company == "Test Company"
     assert job.job_id == "test_job_1"
     assert job.token_count == 50
 
-    # Test with None company
     job_no_company = PreprocessedJob(
         job_id="test_job_2",
         clean_text="Senior Developer position",

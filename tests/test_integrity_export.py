@@ -77,7 +77,6 @@ def test_export_to_csv(exporter, sample_records, tmp_path):
     assert count == 2
     assert Path(output_file).exists()
 
-    # Verify CSV content
     with open(output_file) as f:
         reader = csv.DictReader(f)
         rows = list(reader)
@@ -103,7 +102,6 @@ def test_export_to_json(exporter, sample_records, tmp_path):
     assert count == 2
     assert Path(output_file).exists()
 
-    # Verify JSON content
     with open(output_file) as f:
         data = json.load(f)
         assert len(data) == 2
@@ -128,7 +126,6 @@ def test_export_issues_to_markdown(exporter, sample_issues, tmp_path):
     assert count == 3
     assert Path(output_file).exists()
 
-    # Verify Markdown content
     with open(output_file) as f:
         content = f.read()
         assert "# Integrity Issues Report" in content
@@ -157,7 +154,6 @@ def test_export_report_to_markdown(exporter, sample_issues, tmp_path):
     assert count == 3
     assert Path(output_file).exists()
 
-    # Verify Markdown content
     with open(output_file) as f:
         content = f.read()
         assert "# Database Integrity Report" in content
@@ -180,11 +176,9 @@ def test_generate_backup(exporter, sample_issues, tmp_path):
     assert "invalid_score" in exported
     assert "malformed_json" in exported
 
-    # Verify files exist
     for issue_type, filepath in exported.items():
         assert Path(filepath).exists()
 
-        # Verify CSV format
         with open(filepath) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
@@ -210,7 +204,6 @@ def test_export_report_empty_issues(exporter, tmp_path):
     assert count == 0
     assert Path(output_file).exists()
 
-    # Verify content
     with open(output_file) as f:
         content = f.read()
         assert "# Database Integrity Report" in content
@@ -248,7 +241,6 @@ def test_json_with_special_characters(exporter, tmp_path):
     count = exporter.export_to_json(records, output_file)
     assert count == 1
 
-    # Should parse correctly
     with open(output_file) as f:
         data = json.load(f)
         assert len(data) == 1

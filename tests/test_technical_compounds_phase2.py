@@ -112,7 +112,6 @@ class TestTechnicalCompoundPatterns:
 
     def test_ambiguous_single_words(self):
         """Test ambiguous words that should NOT be compounds."""
-        # These are valid tech terms but shouldn't be flagged as compounds
         ambiguous = [
             "software",
             "system",
@@ -122,12 +121,11 @@ class TestTechnicalCompoundPatterns:
             "service",
             "database",
             "tools",
-            "system",  # "system" alone is not a compound
+            "system",
         ]
 
         for word in ambiguous:
             result = is_technical_compound(word)
-            # Single word alone should not be compound
             if len(word.split()) == 1:
                 assert not result, f"Single word '{word}' should not be compound"
 
@@ -153,12 +151,11 @@ class TestConfidenceScoring:
         keyword_patterns = [
             "custom framework",
             "api platform",
-            "cloud service additional",  # Contains 'service'
+            "cloud service additional",
         ]
 
         for phrase in keyword_patterns:
             score = get_confidence_score(phrase)
-            # Only test if pattern is recognized
             if is_technical_compound(phrase):
                 assert 0.5 <= score <= 0.8, f"Keyword pattern '{phrase}' confidence unexpected: {score}"
 
@@ -331,13 +328,11 @@ class TestReclassifyCompound:
 
     def test_confidence_threshold_parameter(self):
         """Test that confidence_threshold parameter works."""
-        # "software development" has high confidence (0.95)
         assert reclassify_compound("software development", confidence_threshold=0.5)
         assert reclassify_compound("software development", confidence_threshold=0.9)
         assert reclassify_compound("software development", confidence_threshold=0.95)
 
-        # Low confidence phrases
-        phrase_with_keyword = "custom framework"  # ~0.7 confidence
+        phrase_with_keyword = "custom framework"
         if get_confidence_score(phrase_with_keyword) >= 0.5:
             assert reclassify_compound(phrase_with_keyword, confidence_threshold=0.5)
 
@@ -351,7 +346,6 @@ class TestReclassifyCompound:
             "teamwork",
         ]
 
-        # Non-compounds have confidence 0.0, so with threshold=0.5 should fail
         for phrase in non_compounds:
             assert not reclassify_compound(phrase, confidence_threshold=0.5), (
                 f"Should not reclassify non-compound with threshold=0.5: {phrase}"
@@ -395,7 +389,7 @@ class TestEdgeCases:
     def test_compound_with_extra_spaces(self):
         """Test compounds with extra spaces."""
         assert is_technical_compound("  software development  ")
-        assert is_technical_compound("software  development")  # Double space
+        assert is_technical_compound("software  development")
 
     def test_partial_match_in_longer_phrase(self):
         """Test that partial matches work in longer phrases."""
@@ -405,8 +399,6 @@ class TestEdgeCases:
             "microservice architecture patterns",
         ]
 
-        # These should be recognized if they contain known keywords
         for phrase in longer_phrases:
             score = get_confidence_score(phrase)
-            # At least should have some confidence if containing keywords
             print(f"Phrase: '{phrase}' -> confidence: {score}")

@@ -12,10 +12,6 @@ import pytest
 from storage.assessment_store import AssessmentStore
 from storage.export import ExportConfig, MarkdownExporter, parse_date_str
 
-# ============================================================================
-# FIXTURES
-# ============================================================================
-
 
 @pytest.fixture
 def temp_db():
@@ -31,7 +27,6 @@ def store_with_assessments(temp_db):
     """Create store with sample assessments."""
     store = AssessmentStore(temp_db)
 
-    # Create sample assessments
     assessments = [
         {
             "job_id": "job1",
@@ -105,11 +100,6 @@ def store_with_assessments(temp_db):
         )
 
     return store
-
-
-# ============================================================================
-# TestExportConfig
-# ============================================================================
 
 
 class TestExportConfig:
@@ -193,12 +183,7 @@ class TestExportConfig:
     def test_parse_date_str_invalid_date(self):
         """Test parsing invalid date."""
         with pytest.raises(ValueError, match="Invalid date format"):
-            parse_date_str("2026-13-01")  # Invalid month
-
-
-# ============================================================================
-# TestMarkdownExporter
-# ============================================================================
+            parse_date_str("2026-13-01")
 
 
 class TestMarkdownExporter:
@@ -224,7 +209,6 @@ class TestMarkdownExporter:
         exporter = MarkdownExporter(store_with_assessments, config)
         report = exporter.generate_report()
 
-        # Should include job1 (92) and job2 (78), but not job3 (65)
         assert "TechCorp" in report
         assert "DataInc" in report
         assert "WebDev Inc" not in report
@@ -235,7 +219,6 @@ class TestMarkdownExporter:
         exporter = MarkdownExporter(store_with_assessments, config)
         report = exporter.generate_report()
 
-        # Should include job2 (78) and job3 (65), but not job1 (92)
         assert "TechCorp" not in report
         assert "DataInc" in report
         assert "WebDev Inc" in report
@@ -266,9 +249,7 @@ class TestMarkdownExporter:
         exporter = MarkdownExporter(store_with_assessments, config)
         report = exporter.generate_summary()
 
-        # Summary should have top 10 matches section
         assert "## Top 10 Matches" in report
-        # But not full details for all jobs
         assert report.count("### [") <= 10
 
     def test_template_detailed(self, store_with_assessments):
@@ -277,9 +258,7 @@ class TestMarkdownExporter:
         exporter = MarkdownExporter(store_with_assessments, config)
         report = exporter.generate_report()
 
-        # Detailed should have top 5 matches
         assert "## Top 5 Matches" in report
-        # And all jobs in details section
         assert "### [1]" in report
         assert "### [2]" in report
         assert "### [3]" in report
@@ -300,7 +279,7 @@ class TestMarkdownExporter:
 
     def test_empty_results(self, store_with_assessments):
         """Test report with no matching jobs."""
-        config = ExportConfig(min_score=95)  # No jobs above 95
+        config = ExportConfig(min_score=95)
         exporter = MarkdownExporter(store_with_assessments, config)
         report = exporter.generate_report()
 
@@ -312,11 +291,10 @@ class TestMarkdownExporter:
         exporter = MarkdownExporter(store_with_assessments, config)
         report = exporter.generate_report()
 
-        # Basic markdown validation
-        assert report.startswith("# ")  # Has heading
-        assert "##" in report  # Has subheadings
-        assert report.count("```") % 2 == 0  # Code blocks are closed
-        assert "-" * 3 in report  # Has horizontal rule
+        assert report.startswith("# ")
+        assert "##" in report
+        assert report.count("```") % 2 == 0
+        assert "-" * 3 in report
 
     def test_include_recommendations(self, store_with_assessments):
         """Test including/excluding recommendations."""
@@ -328,7 +306,6 @@ class TestMarkdownExporter:
         exporter_without = MarkdownExporter(store_with_assessments, config_without)
         report_without = exporter_without.generate_report()
 
-        # With recommendations should be longer
         assert len(report_with) > len(report_without)
 
     def test_include_stats(self, store_with_assessments):
@@ -341,65 +318,53 @@ class TestMarkdownExporter:
         exporter_without = MarkdownExporter(store_with_assessments, config_without)
         report_without = exporter_without.generate_report()
 
-        # With stats should include analytics section
         assert "## Analytics" in report_with
         assert "## Analytics" not in report_without
 
     def test_filter_by_date_from(self, store_with_assessments):
         """Test filtering by from_date only."""
-        # All test assessments are created with CURRENT_TIMESTAMP in DB
-        # Test with past date - should include all assessments
         date_from = parse_date_str("2020-01-01")
         config = ExportConfig(date_from=date_from)
         exporter = MarkdownExporter(store_with_assessments, config)
         assessments = exporter._get_filtered_assessments()
 
-        # All assessments should be included (they're on or after the date)
         assert len(assessments) == 3
 
     def test_filter_by_date_to(self, store_with_assessments):
         """Test filtering by to_date only."""
-        # Test with future date - should include all assessments
         date_to = parse_date_str("2099-12-31")
         config = ExportConfig(date_to=date_to)
         exporter = MarkdownExporter(store_with_assessments, config)
         assessments = exporter._get_filtered_assessments()
 
-        # All assessments should be included (they're on or before the date)
         assert len(assessments) == 3
 
     def test_filter_by_date_range(self, store_with_assessments):
         """Test filtering by date range."""
-        # Use a wide range that includes today's date
         date_from = parse_date_str("2020-01-01")
         date_to = parse_date_str("2099-12-31")
         config = ExportConfig(date_from=date_from, date_to=date_to)
         exporter = MarkdownExporter(store_with_assessments, config)
         assessments = exporter._get_filtered_assessments()
 
-        # All assessments should be included
         assert len(assessments) == 3
 
     def test_filter_by_date_excludes_before(self, store_with_assessments):
         """Test that date filter excludes assessments before from_date."""
-        # Use a future date that no assessments will meet
         date_from = parse_date_str("2099-12-31")
         config = ExportConfig(date_from=date_from)
         exporter = MarkdownExporter(store_with_assessments, config)
         assessments = exporter._get_filtered_assessments()
 
-        # No assessments should be included (all are in the past)
         assert len(assessments) == 0
 
     def test_filter_by_date_excludes_after(self, store_with_assessments):
         """Test that date filter excludes assessments after to_date."""
-        # Use a past date that no assessments will meet
         date_to = parse_date_str("2020-01-01")
         config = ExportConfig(date_to=date_to)
         exporter = MarkdownExporter(store_with_assessments, config)
         assessments = exporter._get_filtered_assessments()
 
-        # No assessments should be included (all are in the future)
         assert len(assessments) == 0
 
     def test_date_filter_in_report_header(self, store_with_assessments):
@@ -410,7 +375,6 @@ class TestMarkdownExporter:
         exporter = MarkdownExporter(store_with_assessments, config)
         report = exporter.generate_report()
 
-        # Should show date range in header
         assert "Date: 2020-01-01 to 2099-12-31" in report
         assert "**Filters:**" in report
 
@@ -421,15 +385,8 @@ class TestMarkdownExporter:
         exporter = MarkdownExporter(store_with_assessments, config)
         assessments = exporter._get_filtered_assessments()
 
-        # Should include jobs with score >= 75 and date >= 2020-01-01
-        # job1 (92), job2 (78) qualify
         assert len(assessments) == 2
         assert all(a["overall_score"] >= 75 for a in assessments)
-
-
-# ============================================================================
-# TestAssessmentStoreSearch
-# ============================================================================
 
 
 class TestAssessmentStoreSearch:
@@ -463,28 +420,25 @@ class TestAssessmentStoreSearch:
         assert "25-50" in ranges
         assert "50-75" in ranges
         assert "75-100" in ranges
-        assert ranges["75-100"] == 2  # job1 (92) and job2 (78)
-        assert ranges["50-75"] == 1  # job3 (65)
+        assert ranges["75-100"] == 2
+        assert ranges["50-75"] == 1
 
     def test_get_top_keywords(self, store_with_assessments):
         """Test top keywords extraction."""
         keywords = store_with_assessments.get_top_keywords(limit=5)
 
-        # Should return list of tuples
         assert isinstance(keywords, list)
 
     def test_get_recommendations_summary(self, store_with_assessments):
         """Test recommendations aggregation."""
         summary = store_with_assessments.get_recommendations_summary()
 
-        # Should count recommendations
         assert "Learn Kubernetes" in summary
         assert "Improve Docker" in summary
         assert "Study PyTorch" in summary
 
     def test_search_performance(self, store_with_assessments):
         """Test search performance with mock data."""
-        # Add more assessments for performance testing
         for i in range(10):
             store_with_assessments.save_assessment(
                 job_id=f"perf_job_{i}",
@@ -501,15 +455,9 @@ class TestAssessmentStoreSearch:
                 actual_cost=0.002,
             )
 
-        # Search should complete quickly
         results = store_with_assessments.search_by_keyword("Test", limit=5)
 
         assert len(results) <= 5
-
-
-# ============================================================================
-# TestAssessmentStoreEnhancements
-# ============================================================================
 
 
 class TestAssessmentStoreEnhancements:
@@ -533,24 +481,17 @@ class TestAssessmentStoreEnhancements:
         assert stats["avg_score"] == (92 + 78 + 65) / 3
 
 
-# ============================================================================
-# TestIntegration
-# ============================================================================
-
-
 class TestIntegration:
     """Integration tests for Phase 5."""
 
     def test_export_and_search_workflow(self, store_with_assessments):
         """Test complete export and search workflow."""
-        # Generate report
         config = ExportConfig(min_score=75)
         exporter = MarkdownExporter(store_with_assessments, config)
         report = exporter.generate_report()
 
         assert len(report) > 0
 
-        # Search
         results = store_with_assessments.search_by_keyword("Engineer", min_score=75)
 
         assert len(results) > 0
@@ -566,11 +507,9 @@ class TestIntegration:
         exporter = MarkdownExporter(store_with_assessments, config)
         assessments = exporter._get_filtered_assessments()
 
-        # All scores should be in range
         for a in assessments:
             assert 60 <= a["overall_score"] <= 90
 
-        # Should be sorted by company
         if len(assessments) > 1:
             for i in range(len(assessments) - 1):
                 assert assessments[i]["company"].lower() <= assessments[i + 1]["company"].lower()

@@ -280,7 +280,7 @@ class TestIdGeneration:
 
     def test_greenhouse_portal_id_in_hash(self):
         """Greenhouse portal ID is extracted and used in hash."""
-        # Same gh_jid on different hosts -> same ID (portal ID is the anchor).
+        # Same gh_jid on different hosts -> same ID: the portal ID is the anchor.
         same_1 = generate_job_id(
             company="Company",
             title="Engineer",
@@ -294,7 +294,6 @@ class TestIdGeneration:
             url="https://greenhouse.io/jobs?gh_jid=12345678",
         )
         assert same_1 == same_2
-        # Different gh_jid on the same company/title/location -> different IDs.
         diff_1 = generate_job_id(
             company="Company",
             title="Engineer",
@@ -358,7 +357,6 @@ class TestCustomPortalJobIdAnchor:
         """Custom portal without jobId keeps existing query-stripping behavior."""
         url_a = "https://example.com/careers?utm_source=indeed"
         url_b = "https://example.com/careers?utm_source=linkedin"
-        # Existing behavior: query stripped, so the two URLs share an anchor.
         assert self._gen(url_a) == self._gen(url_b)
         # Matches the pre-#763 result: anchor == clean_canonical_url(url).
         expected = generate_job_id(
@@ -387,7 +385,6 @@ class TestCustomPortalJobIdAnchor:
 
     def test_non_custom_portal_ignores_jobid_discriminator(self):
         """Non-custom portals keep query-stripping: jobId does not split ids."""
-        # Greenhouse: anchor is gh_jid, unchanged by jobId.
         g1 = generate_job_id(
             company="Co",
             title="Engineer",
@@ -401,7 +398,6 @@ class TestCustomPortalJobIdAnchor:
             url="https://job-boards.greenhouse.io/co/jobs?gh_jid=12345678&jobId=2",
         )
         assert g1 == g2
-        # Explicit non-custom portal name with jobId: query stripped, ids collide.
         p1 = generate_job_id(
             company="Co",
             title="Engineer",
@@ -438,7 +434,7 @@ class TestAnchorOverwrite768:
         id1 = self._gen("https://example.com/jobs/12345678")
         id2 = self._gen("https://example.com/jobs/87654321")
         assert id1 != id2
-        # Anchor is the extracted digit id, not the normalized company.
+        # Anchor is the extracted digit id, not the normalized company (url=None path).
         assert id1 != generate_job_id(company="Acme", title="Engineer", location="Remote", url=None)
 
     def test_url_none_uses_company_anchor(self):

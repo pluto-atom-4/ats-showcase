@@ -25,10 +25,6 @@ from src.tokenization.technical_compounds import (
     reclassify_compound,
 )
 
-# ============================================================================
-# UNIT TESTS: Core Functions
-# ============================================================================
-
 
 class TestTechnicalCompoundDetection:
     """Test core detection logic for technical compounds."""
@@ -147,7 +143,6 @@ class TestConfidenceScoring:
 
         for match in keyword_matches:
             score = get_confidence_score(match)
-            # Just verify these are detected and scored above 0
             assert score > 0, f"Keyword match should have positive score: {match} = {score}"
 
     def test_non_matches_zero_confidence(self):
@@ -210,11 +205,9 @@ class TestReclassifyCompound:
 
     def test_confidence_threshold_parameter(self):
         """Threshold parameter works correctly."""
-        # High confidence compound
         assert reclassify_compound("software development", 0.5)
         assert reclassify_compound("software development", 0.95)
 
-        # Non-compound with various thresholds
         assert not reclassify_compound("python", 0.1)
         assert not reclassify_compound("python", 0.5)
 
@@ -259,11 +252,6 @@ class TestTechnicalCompoundsHelper:
             assert cat in categories, f"Missing category: {cat}"
             assert isinstance(categories[cat], list)
             assert len(categories[cat]) > 0
-
-
-# ============================================================================
-# INTEGRATION TESTS: Preprocessor
-# ============================================================================
 
 
 class TestPreprocessorIntegration:
@@ -331,13 +319,7 @@ Software development experience required.
 """
         skills, technologies, requirements = preprocessor.extract_entities(text)
 
-        # Should extract something
         assert len(skills) > 0 or len(technologies) > 0
-
-
-# ============================================================================
-# EDGE CASES & BOUNDARY CONDITIONS
-# ============================================================================
 
 
 class TestEdgeCasesComprehensive:
@@ -363,7 +345,6 @@ class TestEdgeCasesComprehensive:
 
         for variant in variants:
             result = is_technical_compound(variant)
-            # Should handle whitespace robustly
             assert result, f"Whitespace not handled: {variant}"
 
     def test_phrase_length_boundaries(self):
@@ -392,26 +373,18 @@ class TestEdgeCasesComprehensive:
         for phrase in phrases:
             try:
                 result = is_technical_compound(phrase)
-                # Should not crash
                 assert isinstance(result, bool)
             except Exception as e:
                 pytest.fail(f"Failed on '{phrase}': {e}")
 
     def test_unicode_handling(self):
         """Unicode characters don't break detection."""
-        # ASCII should work fine
         assert is_technical_compound("software development")
 
-        # Non-ASCII shouldn't crash
         try:
             is_technical_compound("café")
         except Exception:
             pytest.fail("Unicode handling failure")
-
-
-# ============================================================================
-# QUALITY ASSURANCE & METRICS
-# ============================================================================
 
 
 class TestQualityMetrics:
@@ -420,7 +393,6 @@ class TestQualityMetrics:
     def test_detection_accuracy_high(self):
         """Overall detection accuracy >= 90%."""
         test_set = {
-            # True positives (should detect)
             "software development": True,
             "data processing": True,
             "microservice": True,
@@ -428,7 +400,6 @@ class TestQualityMetrics:
             "engineering technology": True,
             "manufacturing engineering": True,
             "system-level": True,
-            # True negatives (should not detect)
             "python": False,
             "java": False,
             "leadership": False,
@@ -496,11 +467,6 @@ class TestQualityMetrics:
             assert score > 0, f"Regression: {pattern} not detected"
 
 
-# ============================================================================
-# TEST SUMMARY & VALIDATION
-# ============================================================================
-
-
 @pytest.fixture(scope="session")
 def md_preprocessor():
     """Shared Preprocessor (en_core_web_md) loaded once per session."""
@@ -512,36 +478,28 @@ class TestComprehensiveSummary:
 
     def test_all_phases_integrated(self, md_preprocessor):
         """Verify all 5 phases are integrated."""
-        # Phase 1: Baseline
         assert len(get_technical_compounds()) > 50, "Phase 1: Patterns missing"
 
-        # Phase 2: Module functions
         assert callable(is_technical_compound), "Phase 2: is_technical_compound"
         assert callable(get_confidence_score), "Phase 2: get_confidence_score"
         assert callable(reclassify_compound), "Phase 2: reclassify_compound"
 
-        # Phase 3: Integration
         preprocessor = md_preprocessor
         skills, tech, req = preprocessor.extract_entities("software development")
-        # Should work without error
         assert isinstance(skills, (list, tuple)), "Phase 3: Integration broken"
 
-        # Phase 4: Validation
         assert is_technical_compound("software development"), "Phase 4: Validation failed"
 
-        # Phase 5: This test
         assert True, "Phase 5: Comprehensive tests running"
 
     def test_all_tests_passing(self):
         """Marker for all tests passing."""
-        # This test always passes if we reach it
         assert True
 
     def test_comprehensive_documentation(self):
         """Module has comprehensive documentation."""
         from src.tokenization import technical_compounds
 
-        # Check for docstrings
         assert technical_compounds.is_technical_compound.__doc__, "is_technical_compound missing docstring"
         assert technical_compounds.get_confidence_score.__doc__, "get_confidence_score missing docstring"
         assert technical_compounds.reclassify_compound.__doc__, "reclassify_compound missing docstring"

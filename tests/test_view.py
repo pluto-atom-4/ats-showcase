@@ -59,10 +59,8 @@ Located in Boston.
         """Test score filtering logic."""
         viewer = MarkdownReportViewer()
         filtered = viewer._filter_by_score(sample_report, 70.0, 100.0)
-        # Should include jobs with score >= 70 and <= 100
         assert "[1] Senior Engineer (Score: 95)" in filtered
         assert "[2] Mid-level Developer (Score: 88)" in filtered
-        # Should exclude lower scores
         assert "[3] Junior Developer (Score: 65)" not in filtered
         assert "[4] Data Scientist (Score: 45)" not in filtered
 
@@ -135,9 +133,8 @@ Description here.
 
     def test_view_default_path_exists(self):
         """Test view command with default path when it exists."""
-        # This will only pass if the default report file exists
         result = runner.invoke(app, ["view"])
-        # Should succeed if file exists, fail if not
+        # Passes only if the default report file exists; env-dependent.
         assert result.exit_code in [0, 1]
 
     def test_view_with_template_summary(self, sample_report_file):

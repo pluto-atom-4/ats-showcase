@@ -20,7 +20,6 @@ class TestPhase5KeywordsPresent:
     def test_all_33_phase5_keywords_present(self):
         """Verify all 33 new keywords from Phase 5 are in the keyword set."""
         phase5_keywords = {
-            # Engineering Tools (9)
             "ansys",
             "nastran",
             "optistruct",
@@ -30,30 +29,25 @@ class TestPhase5KeywordsPresent:
             "windchill",
             "simulink",
             "comsol",
-            # Signal Processing (4)
             "fft",
             "ifft",
             "cordic",
             "mac",
-            # Cloud/DevOps (5)
             "argocd",
             "flux",
             "gitops",
             "harbor",
             "quay",
-            # Data (6)
             "timescaledb",
             "clickhouse",
             "dvc",
             "pydantic",
             "sqlalchemy",
             "celery",
-            # IoT/Protocols (4)
             "mqtt",
             "amqp",
             "websocket",
             "coap",
-            # Manufacturing (5)
             "cam",
             "cnc",
             "plm",
@@ -73,15 +67,14 @@ class TestPhase5KeywordsPresent:
 
     def test_phase5_keywords_by_category(self):
         """Verify Phase 5 keywords are distributed correctly across categories."""
-        # Expected counts after Phase 5
         expected_counts = {
             "languages": 13,
             "web": 13,
-            "infrastructure": 20,  # +5 (argocd, flux, gitops, harbor, quay)
-            "databases": 16,  # +3 (timescaledb, clickhouse, dvc)
-            "hardware": 31,  # +13 (9 CAD tools + 4 DSP)
+            "infrastructure": 20,
+            "databases": 16,
+            "hardware": 31,
             "ml_ai": 20,
-            "tools": 27,  # +13 (pydantic, sqlalchemy, celery, mqtt, amqp, websocket, coap, cam, cnc, plm, erp, mrp)
+            "tools": 27,
             "methodologies": 8,
             "robotics": 5,
             "other": 8,
@@ -214,7 +207,6 @@ class TestNoDuplicates:
     def test_no_duplicates_within_categories(self):
         """Ensure no keyword appears twice within a category."""
         for category, keywords in TECH_KEYWORDS.items():
-            # Convert to list to check for duplicates
             kw_list = list(keywords)
             assert len(kw_list) == len(set(kw_list)), f"Duplicates found in category '{category}'"
 
@@ -294,7 +286,6 @@ class TestKeywordsIntegration:
             "plm",
         }
         all_kw = get_all_keywords()
-        # Most aerospace keywords should be present (dsp is not, but others are)
         covered = aerospace_keywords - {"dsp"}
         assert covered.issubset(all_kw)
 
@@ -332,5 +323,4 @@ class TestPhase5KeywordExtraction:
         """Verify keywords would be detected in sample aerospace/defense text."""
         all_kw = get_all_keywords()
         assert keyword.lower() in all_kw, f"Keyword '{keyword}' not found"
-        # Text contains keyword (case-insensitive)
         assert keyword.lower() in text.lower()

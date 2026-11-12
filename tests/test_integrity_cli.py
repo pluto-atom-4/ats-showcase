@@ -19,7 +19,6 @@ def _create_test_db(db_path: str):
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
 
-    # Create all necessary tables
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS jobs (
@@ -87,7 +86,6 @@ def _create_test_db(db_path: str):
         """
     )
 
-    # Create assessment tables
     AssessmentStore(db_path)
 
     conn.commit()
@@ -112,7 +110,6 @@ def test_integrity_check_empty_db(test_db):
 
 def test_integrity_check_with_orphan(test_db):
     """Check command should detect orphaned assessments."""
-    # Create orphaned assessment
     conn = AssessmentStore(test_db).conn
     assert conn is not None
     conn.execute(
@@ -126,7 +123,7 @@ def test_integrity_check_with_orphan(test_db):
     result = runner.invoke(app, ["integrity", "check", "--db", test_db])
     assert result.exit_code == 0
     assert "orphaned_assessment" in result.stdout
-    assert "1" in result.stdout  # Count
+    assert "1" in result.stdout
 
 
 def test_integrity_check_json_format(test_db):
@@ -134,9 +131,7 @@ def test_integrity_check_json_format(test_db):
     result = runner.invoke(app, ["integrity", "check", "--format", "json", "--db", test_db])
     assert result.exit_code == 0
 
-    # JSON is embedded in output, find and extract it
     try:
-        # Try to find { and } to extract JSON
         start_idx = result.stdout.find("{")
         end_idx = result.stdout.rfind("}") + 1
         if start_idx >= 0 and end_idx > start_idx:
@@ -146,7 +141,6 @@ def test_integrity_check_json_format(test_db):
             assert "total_issues" in output_json
             assert "summary" in output_json
     except (ValueError, json.JSONDecodeError):
-        # If JSON parsing fails, at least check that the command succeeded
         assert "integrity check" in result.stdout.lower() or "{" in result.stdout
 
 
@@ -169,7 +163,6 @@ def test_integrity_purge_requires_type(test_db):
 
 def test_integrity_purge_dry_run(test_db):
     """Purge command should show dry-run by default."""
-    # Create orphaned assessment
     conn = AssessmentStore(test_db).conn
     assert conn is not None
     conn.execute(
@@ -188,7 +181,6 @@ def test_integrity_purge_dry_run(test_db):
 
 def test_integrity_purge_requires_force(test_db):
     """Purge command should require --force for actual deletion."""
-    # Create orphaned assessment first
     conn = AssessmentStore(test_db).conn
     assert conn is not None
     conn.execute(
@@ -220,14 +212,12 @@ def test_integrity_repair_dry_run(test_db):
     """Repair command should show dry-run by default."""
     result = runner.invoke(app, ["integrity", "repair", "--db", test_db])
     assert result.exit_code == 0
-    # May show no repairs needed
     assert "[DRY RUN]" in result.stdout or "No safe repairs" in result.stdout
 
 
 def test_integrity_repair_requires_force(test_db):
     """Repair command should require --force for actual repair."""
     result = runner.invoke(app, ["integrity", "repair", "--no-dry-run", "--db", test_db])
-    # Should still work with no repairs, or fail if force required
     assert result.exit_code in [0, 1]
 
 

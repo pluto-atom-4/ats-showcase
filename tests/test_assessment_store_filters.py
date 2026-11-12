@@ -25,11 +25,9 @@ def store_with_test_data(temp_db):
     """Create store with test data for filtering."""
     store = AssessmentStore(temp_db)
 
-    # Create additional tables needed for testing
     if store.conn:
         cursor = store.conn.cursor()
 
-        # Create jobs table
         cursor.execute(
             """CREATE TABLE IF NOT EXISTS jobs (
                id TEXT PRIMARY KEY,
@@ -40,7 +38,6 @@ def store_with_test_data(temp_db):
             )"""
         )
 
-        # Create job_reviews table
         cursor.execute(
             """CREATE TABLE IF NOT EXISTS job_reviews (
                job_id TEXT PRIMARY KEY,
@@ -52,7 +49,6 @@ def store_with_test_data(temp_db):
             )"""
         )
 
-        # Insert test jobs with various crawled_at dates
         today = datetime.now().date()
         yesterday = today - timedelta(days=1)
         week_ago = today - timedelta(days=7)
@@ -74,13 +70,11 @@ def store_with_test_data(temp_db):
             (today.isoformat(),),
         )
 
-        # Insert a job_reviews entry (confirmed)
         cursor.execute(
             "INSERT INTO job_reviews VALUES ('job_2', 'Designer', 'DesignInc', 'confirmed', ?, ?)",
             (yesterday.isoformat(), datetime.now().isoformat()),
         )
 
-        # Insert an assessment using proper columns
         cursor.execute(
             """INSERT INTO job_assessments
                (job_id, title, company, location, overall_score, tech_score,
@@ -144,20 +138,18 @@ class TestGetJobsNeedingAssessment:
         """Test returns only confirmed jobs without assessments."""
         jobs = store_with_test_data.get_jobs_needing_assessment(limit=10)
         job_ids = [j["job_id"] for j in jobs]
-        assert "job_2" in job_ids  # confirmed, not assessed
-        assert "job_3" not in job_ids  # already assessed
-        assert "job_1" not in job_ids  # not confirmed
+        assert "job_2" in job_ids
+        assert "job_3" not in job_ids
+        assert "job_1" not in job_ids
 
     def test_ordered_by_crawled_at(self, store_with_test_data):
         """Test results ordered by crawled_at DESC."""
         jobs = store_with_test_data.get_jobs_needing_assessment(limit=10)
-        # job_2 should be first (recent, confirmed)
         if jobs:
             assert jobs[0]["job_id"] == "job_2"
 
     def test_limit_respected(self, store_with_test_data):
         """Test limit parameter is respected."""
-        # Create more confirmed jobs
         if store_with_test_data.conn:
             cursor = store_with_test_data.conn.cursor()
             today = datetime.now().date()
@@ -179,7 +171,6 @@ class TestGetJobsByScoreThreshold:
         """Test filtering by minimum score."""
         if store_with_test_data.conn:
             cursor = store_with_test_data.conn.cursor()
-            # Add more assessments
             for job_id, score in [("job_1", 75.0), ("job_2", 90.0), ("job_4", 60.0)]:
                 cursor.execute(
                     """INSERT INTO job_assessments
@@ -193,10 +184,10 @@ class TestGetJobsByScoreThreshold:
 
         jobs = store_with_test_data.get_jobs_by_score_threshold(min_score=80, max_score=100)
         job_ids = [j["job_id"] for j in jobs]
-        assert "job_2" in job_ids  # 90
-        assert "job_3" in job_ids  # 85
-        assert "job_1" not in job_ids  # 75
-        assert "job_4" not in job_ids  # 60
+        assert "job_2" in job_ids
+        assert "job_3" in job_ids
+        assert "job_1" not in job_ids
+        assert "job_4" not in job_ids
 
     def test_filter_by_max_score(self, store_with_test_data):
         """Test filtering by maximum score."""
@@ -215,9 +206,9 @@ class TestGetJobsByScoreThreshold:
 
         jobs = store_with_test_data.get_jobs_by_score_threshold(min_score=0, max_score=80)
         job_ids = [j["job_id"] for j in jobs]
-        assert "job_1" in job_ids  # 75
-        assert "job_4" in job_ids  # 60
-        assert "job_3" not in job_ids  # 85 (only <= 80, so not included)
+        assert "job_1" in job_ids
+        assert "job_4" in job_ids
+        assert "job_3" not in job_ids
 
 
 class TestGetJobsSince:
@@ -228,13 +219,10 @@ class TestGetJobsSince:
         today = datetime.now().date()
         yesterday = today - timedelta(days=1)
 
-        # Jobs from job_reviews table since yesterday
         jobs = store_with_test_data.get_jobs_since(yesterday.isoformat())
-        # Only job_2 is in job_reviews (other jobs are only in jobs table)
         job_ids = [j.get("job_id") or j.get("id") for j in jobs]
-        assert "job_2" in job_ids  # yesterday, confirmed
+        assert "job_2" in job_ids
 
-        # No jobs should be returned for future dates
         future = (today + timedelta(days=1)).isoformat()
         future_jobs = store_with_test_data.get_jobs_since(future)
         assert len(future_jobs) == 0
@@ -242,10 +230,8 @@ class TestGetJobsSince:
     def test_get_jobs_since_includes_exact_date(self, store_with_test_data):
         """Test that exact date is included."""
         yesterday = datetime.now().date() - timedelta(days=1)
-        # job_2 was reviewed yesterday, so it should be included
         jobs = store_with_test_data.get_jobs_since(yesterday.isoformat())
         job_ids = [j.get("job_id") or j.get("id") for j in jobs]
-        # Should include job_2 from yesterday
         assert "job_2" in job_ids
 
     def test_get_jobs_since_limit(self, store_with_test_data):
@@ -260,7 +246,7 @@ class TestGetJobsSince:
 
         if store.conn:
             cursor = store.conn.cursor()
-            # Only create jobs table, NOT job_reviews
+            # Only the jobs table, deliberately no job_reviews, to force the fallback; jobs uses id not job_id.
             cursor.execute(
                 """CREATE TABLE IF NOT EXISTS jobs (
                    id TEXT PRIMARY KEY,
@@ -278,8 +264,6 @@ class TestGetJobsSince:
             )
             store.conn.commit()
 
-        # Should still work via fallback
         jobs = store.get_jobs_since(today.isoformat())
         assert len(jobs) > 0
-        # jobs table uses 'id' not 'job_id'
         assert jobs[0].get("id") == "job_1" or jobs[0].get("job_id") == "job_1"

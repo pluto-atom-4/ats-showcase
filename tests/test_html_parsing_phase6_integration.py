@@ -18,7 +18,6 @@ class TestHTMLParsingIntegration:
         """Initialize Preprocessor with real spaCy model."""
         return Preprocessor(model="en_core_web_md")
 
-    # Realistic test job descriptions with known issues
     REALISTIC_TEST_JOBS = [
         {
             "name": "Carbon Robotics Job (Issue #190 base case)",
@@ -30,8 +29,8 @@ class TestHTMLParsingIntegration:
                 "Benefits: Competitive salary, health insurance, 401k.\n"
                 "Equal Opportunity Employer. Apply Now."
             ),
-            "expected_tech_min": 5,  # Python, JS, React, PostgreSQL, AWS, Docker, Kubernetes
-            "expected_skills_min": 3,  # backend, cloud, infrastructure
+            "expected_tech_min": 5,
+            "expected_skills_min": 3,
         },
         {
             "name": "Job with mixed-case fragments",
@@ -42,8 +41,8 @@ class TestHTMLParsingIntegration:
                 "Experience: Python, Java, Go, Rust.\n"
                 "We are looking for talented engineers."
             ),
-            "expected_tech_min": 3,  # Python, Java, Go, Rust
-            "max_fragments": 2,  # Should filter out mixed-case artifacts
+            "expected_tech_min": 3,
+            "max_fragments": 2,
         },
         {
             "name": "Job with section header artifacts",
@@ -54,7 +53,7 @@ class TestHTMLParsingIntegration:
                 "Technical Skills: C++, Python, CUDA, TensorFlow\n"
                 "Apply Now"
             ),
-            "expected_tech_min": 2,  # At least Python, TensorFlow
+            "expected_tech_min": 2,
             "max_fragments": 1,
         },
         {
@@ -65,7 +64,7 @@ class TestHTMLParsingIntegration:
                 "Python, JavaScript, Go, Rust required.\n"
                 "Full-time position. Competitive salary."
             ),
-            "expected_tech_min": 3,  # Python, JavaScript, Go, Rust
+            "expected_tech_min": 3,
             "max_fragments": 2,
         },
     ]
@@ -75,19 +74,15 @@ class TestHTMLParsingIntegration:
         for test_case in self.REALISTIC_TEST_JOBS:
             skills, tech, reqs = preprocessor.extract_entities(test_case["text"])
 
-            # Verify minimum expected technologies extracted
             assert len(tech) >= cast(int, test_case.get("expected_tech_min", 1)), (
                 f"{test_case['name']}: Expected at least {test_case.get('expected_tech_min', 1)} tech, got {len(tech)}"
             )
 
-            # Verify reasonable skill extraction
             assert len(skills) >= 0, f"{test_case['name']}: Skills extraction failed"
 
-            # Verify no excessive fragments (quality score)
             all_entities = skills + tech + reqs
             fragment_count = sum(1 for e in all_entities if preprocessor._is_suspicious_multi_word_fragment(e))
 
-            # Check fragment count is below maximum if specified
             if "max_fragments" in test_case:
                 max_frags = cast(int, test_case["max_fragments"])
                 assert fragment_count <= max_frags, (
@@ -103,22 +98,17 @@ class TestHTMLParsingIntegration:
             "RequiredQualificationsTo review resume and submit application."
         )
 
-        # Count potential fragments BEFORE filtering (simulated baseline)
-        # Simulate what extraction would capture before fragment filtering
         baseline_fragments = [
             "may differCulture StatementDeveloper",
             "Core CompetenciesRequired",
             "RequiredQualificationsTo",
         ]
 
-        # Run actual extraction with filtering
         skills, tech, reqs = preprocessor.extract_entities(problematic_text)
         all_entities = skills + tech + reqs
 
-        # Count actual fragments in results
         actual_fragments = [e for e in all_entities if preprocessor._is_suspicious_multi_word_fragment(e)]
 
-        # Should remove at least 75% of problematic fragments
         fragment_reduction = 1 - (len(actual_fragments) / len(baseline_fragments))
         assert fragment_reduction >= 0.75, f"Fragment reduction {fragment_reduction * 100:.1f}% below target of 75%"
 
@@ -140,7 +130,6 @@ class TestHTMLParsingIntegration:
             fragment_count = sum(1 for e in all_entities if preprocessor._is_suspicious_multi_word_fragment(e))
             quality_score = ((len(all_entities) - fragment_count) / len(all_entities)) * 100
 
-        # Target 99%+ quality
         assert quality_score >= 99.0, f"Quality score {quality_score:.1f}% below target of 99%"
 
     @pytest.mark.perf
@@ -164,7 +153,6 @@ class TestHTMLParsingIntegration:
 
         elapsed_ms = median_elapsed_ms(lambda: preprocessor.extract_entities(test_text), repeats=3, warmup=1)
 
-        # Target <100ms per job
         assert elapsed_ms < 100, f"Extraction took {elapsed_ms:.1f}ms, exceeds target of 100ms"
 
     def test_soft_skills_preserved(self, preprocessor):
@@ -178,7 +166,6 @@ class TestHTMLParsingIntegration:
 
         skills, tech, reqs = preprocessor.extract_entities(text)
 
-        # At least some soft skills should be present
         assert len(skills) > 0, "No soft skills extracted"
 
     def test_technical_compounds_reclassified(self, preprocessor):
@@ -191,33 +178,27 @@ class TestHTMLParsingIntegration:
 
         skills, tech, reqs = preprocessor.extract_entities(text)
 
-        # Technical compounds should be in tech, not skills
         tech_lower = [t.lower() for t in tech]
 
-        # machine learning type compounds should be in tech
         has_ml_compounds = any("learning" in t or "processing" in t for t in tech_lower)
         assert has_ml_compounds or len(tech) > 0, "No technical compounds detected in tech category"
 
     def test_backward_compatibility(self, preprocessor):
         """Ensure Phase 6 changes don't break existing extraction."""
         test_cases = [
-            # Simple clear cases
             ("Python developer", ["Python"]),
             ("Java and JavaScript", ["Java", "JavaScript"]),
             ("React with Node.js", ["React", "Node.js"]),
-            # Multi-word skills - may not extract single items
-            ("We need machine learning expertise", []),  # Technical compound in context
+            ("We need machine learning expertise", []),
         ]
 
         for text, _expected_keywords in test_cases:
             skills, tech, reqs = preprocessor.extract_entities(text)
             all_entities = skills + tech + reqs
 
-            # Most cases should extract something reasonable
             if text in ("Python developer", "Java and JavaScript", "React with Node.js"):
                 assert len(all_entities) > 0, f"Failed to extract from: {text}"
 
-            # Should not have obvious fragments
             for entity in all_entities:
                 assert not entity.startswith("may differ"), "Fragment not filtered"
                 assert not entity.endswith("To"), "Section header artifact not filtered"
@@ -249,17 +230,14 @@ class TestHTMLParsingIntegration:
 
         skills, tech, reqs = preprocessor.extract_entities(test_job)
 
-        # Should extract key technologies
         tech_lower = [t.lower() for t in tech]
         assert any("python" in t for t in tech_lower), "Python not detected"
         assert any("postgresql" in t or "postgres" in t for t in tech_lower), "PostgreSQL not detected"
         assert any("redis" in t for t in tech_lower), "Redis not detected"
         assert any("aws" in t or "gcp" in t for t in tech_lower), "Cloud platform not detected"
 
-        # Should NOT have fragments
         all_entities = skills + tech + reqs
         for entity in all_entities:
-            # Check for known fragment patterns
             assert not entity.lower().startswith("equal opportunity"), "Boilerplate not removed"
             assert not entity.lower().startswith("apply"), "Navigation not removed"
             assert "CompetenciesRequired" not in entity, "Section header artifact not removed"
@@ -277,11 +255,9 @@ class TestHTMLParsingIntegration:
 
         tech_lower = [t.lower() for t in tech]
 
-        # Should extract common keywords
         keywords_to_check = ["python", "go", "rust", "aws", "gcp", "docker", "kubernetes"]
         extracted_keywords = sum(1 for kw in keywords_to_check if any(kw in t for t in tech_lower))
 
-        # Should extract at least 50% of keywords
         assert extracted_keywords >= len(keywords_to_check) * 0.5, (
             f"Only {extracted_keywords} of {len(keywords_to_check)} keywords extracted"
         )
@@ -317,10 +293,8 @@ class TestPerformanceMetrics:
 
         avg_ms_per_job = elapsed_ms / len(jobs)
 
-        # Average should be <100ms per job
         assert avg_ms_per_job < 100, f"Average {avg_ms_per_job:.1f}ms per job exceeds target of 100ms"
 
-        # All jobs should have extracted something
         assert all(len(skills) + len(tech) + len(reqs) > 0 for skills, tech, reqs in results), (
             "Some jobs produced no results"
         )
@@ -357,18 +331,10 @@ class TestMarkdownDividerIntegration:
         reverted -- `add_markdown_section_headers` would then only emit
         headers, never dividers.
         """
-        # No blank line between section content and the next header --
-        # the adversarial shape the preprocessor's divider-boundary code
-        # (preprocessor.py:974-978) exists to handle, constructed directly
-        # against `add_markdown_section_headers` (the real production
-        # function Task 1 modified) to precisely control line adjacency.
+        # Built directly (no blank line before the next header) to control line adjacency for the divider-boundary code.
         markdown_in = "**Skills**\nPython\nKubernetes\n**Benefits**\n401k match\nHealth insurance"
         result = add_markdown_section_headers(markdown_in)
 
-        # "## Skills" is the very first line of the document, so it gets
-        # no leading blank/divider. "## Benefits" follows ordinary content
-        # ("Kubernetes"), so it gets a blank line + "---" immediately
-        # before it.
         assert result == ("## Skills\nPython\nKubernetes\n\n---\n## Benefits\n401k match\nHealth insurance")
 
     def test_divider_bearing_output_splits_sections_without_bleed(self, preprocessor):
@@ -381,14 +347,12 @@ class TestMarkdownDividerIntegration:
         """
         markdown_in = "**Skills**\nPython\nKubernetes\n**Benefits**\n401k match\nHealth insurance"
         crawler_output = add_markdown_section_headers(markdown_in)
-        assert "---" in crawler_output  # sanity: divider path is actually exercised below
+        assert "---" in crawler_output
 
         sections = preprocessor._extract_markdown_sections(crawler_output)
 
         assert sections["skills"] == "Python\nKubernetes"
         assert sections["benefits"] == "401k match\nHealth insurance"
-        # No bleed: skills content must not have absorbed benefits text or
-        # vice versa.
         assert "401k" not in sections["skills"]
         assert "Python" not in sections["benefits"]
 

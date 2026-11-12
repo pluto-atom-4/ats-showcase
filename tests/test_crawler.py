@@ -55,7 +55,7 @@ def test_selector_validation():
         "description": ".desc",
     }
 
-    invalid = {"title": ".title"}  # Missing required fields
+    invalid = {"title": ".title"}
 
     assert manager.validate_selectors(valid) is True
     assert manager.validate_selectors(invalid) is False

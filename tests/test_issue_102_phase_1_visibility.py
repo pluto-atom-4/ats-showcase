@@ -28,7 +28,6 @@ def store_with_test_data(temp_db):
     if store.conn:
         cursor = store.conn.cursor()
 
-        # Create job_reviews table
         cursor.execute(
             """CREATE TABLE IF NOT EXISTS job_reviews (
                job_id TEXT PRIMARY KEY,
@@ -39,7 +38,6 @@ def store_with_test_data(temp_db):
             )"""
         )
 
-        # Create job_assessments table (use AssessmentStore schema)
         cursor.execute(
             """CREATE TABLE IF NOT EXISTS job_assessments (
                job_id TEXT PRIMARY KEY,
@@ -55,7 +53,6 @@ def store_with_test_data(temp_db):
             )"""
         )
 
-        # Insert test data
         test_jobs = [
             ("job_1", "Python Dev", "TechCorp", "pending_review", "2026-07-01"),
             ("job_2", "Senior Python", "TechCorp", "pending_review", "2026-07-02"),
@@ -74,7 +71,6 @@ def store_with_test_data(temp_db):
                 (job_id, title, company, status, crawled_at),
             )
 
-        # Add assessments for some jobs
         assessments = [
             ("job_3", "Python Dev", "DataCorp", "Remote", 85.0, 80.0, 90.0, 75.0, "Good fit", "Recommended"),
             ("job_4", "Senior Python", "CloudInc", "NYC", 92.0, 90.0, 95.0, 85.0, "Excellent", "Highly recommended"),
@@ -142,16 +138,13 @@ class TestGetPipelineStats:
         store = AssessmentStore(temp_db)
         stats = store.get_pipeline_stats()
 
-        # Empty DB returns empty dict
         assert stats == {}
 
     def test_pipeline_stats_no_job_reviews_table(self, temp_db):
         """Test graceful fallback when job_reviews doesn't exist."""
         store = AssessmentStore(temp_db)
-        # Don't create job_reviews table
         stats = store.get_pipeline_stats()
 
-        # Should return empty dict without error
         assert stats == {}
 
     def test_pipeline_stats_counts_match_total(self, store_with_test_data):
@@ -171,8 +164,6 @@ class TestGetStatsWithFilters:
             skip_rejected=True, skip_assessed=False, skip_before_date=None
         )
 
-        # Total: 7 jobs
-        # Reject rejected (3): leaves 4
         assert stats["total"] == 7
         assert stats["would_skip"] == 3
         assert stats["would_process"] == 4
@@ -184,8 +175,6 @@ class TestGetStatsWithFilters:
             skip_rejected=False, skip_assessed=True, skip_before_date=None
         )
 
-        # Total: 7 jobs
-        # Skip assessed (2 confirmed jobs have assessments): leaves 5
         assert stats["total"] == 7
         assert stats["would_skip"] == 2
         assert stats["would_process"] == 5
@@ -197,8 +186,6 @@ class TestGetStatsWithFilters:
             skip_rejected=False, skip_assessed=False, skip_before_date="2026-07-04"
         )
 
-        # Jobs crawled before 2026-07-04 are job_1, job_2, job_3 (3 jobs)
-        # Only job_4 and onwards are kept
         assert stats["total"] == 7
         assert stats["reasons"]["crawled_before_date"] == 3
 
@@ -208,10 +195,6 @@ class TestGetStatsWithFilters:
             skip_rejected=True, skip_assessed=True, skip_before_date="2026-07-03"
         )
 
-        # Rejected: 3, Assessed: 2, Before date: 2
-        # But job_3 (pending_review but confirmed, assessed, crawled 2026-07-03 - not before)
-        # Actual: Skip job_1,2 (before date), job_5,6,7 (rejected), job_4 (assessed)
-        # Process: job_3
         assert stats["total"] == 7
         assert stats["would_process"] >= 0
 
@@ -233,7 +216,6 @@ class TestGetStatsWithFilters:
             skip_rejected=False, skip_assessed=False, skip_before_date=None
         )
 
-        # All jobs should be processed
         assert stats["would_process"] == 7
         assert stats["would_skip"] == 0
 
@@ -242,7 +224,6 @@ class TestGetStatsWithFilters:
         store = AssessmentStore(temp_db)
         stats = store.get_stats_with_filters()
 
-        # Empty DB returns empty dict
         assert stats == {}
 
     def test_filters_reasons_sum_to_skip(self, store_with_test_data):
@@ -256,7 +237,6 @@ class TestGetStatsWithFilters:
             + stats["reasons"]["already_assessed"]
             + stats["reasons"]["crawled_before_date"]
         )
-        # Note: some jobs may have multiple skip reasons, so we just verify it's reasonable
         assert reasons_total <= stats["total"]
 
 
@@ -265,11 +245,9 @@ class TestPipelineVisibilityIntegration:
 
     def test_pipeline_stats_full_workflow(self, store_with_test_data):
         """Test stats through complete workflow."""
-        # Initial state
         initial_stats = store_with_test_data.get_pipeline_stats()
         assert initial_stats["pending_review"] == 2
 
-        # Simulate marking a pending job as confirmed
         cursor = store_with_test_data.conn.cursor()
         cursor.execute(
             "UPDATE job_reviews SET status = ? WHERE job_id = ?",
@@ -277,24 +255,20 @@ class TestPipelineVisibilityIntegration:
         )
         store_with_test_data.conn.commit()
 
-        # Stats should reflect change
         updated_stats = store_with_test_data.get_pipeline_stats()
         assert updated_stats["pending_review"] == 1
         assert updated_stats["confirmed"] == 3
 
     def test_filter_effect_visualization(self, store_with_test_data):
         """Test that filters show realistic impact."""
-        # Get all jobs
         all_stats = store_with_test_data.get_stats_with_filters(
             skip_rejected=False, skip_assessed=False, skip_before_date=None
         )
 
-        # Apply common filters
         filtered_stats = store_with_test_data.get_stats_with_filters(
             skip_rejected=True, skip_assessed=True, skip_before_date=None
         )
 
-        # Filtered should show fewer would_process
         assert filtered_stats["would_process"] <= all_stats["would_process"]
         assert filtered_stats["would_skip"] >= all_stats["would_skip"]
 
@@ -302,9 +276,7 @@ class TestPipelineVisibilityIntegration:
         """Test that stats are internally consistent."""
         stats = store_with_test_data.get_stats_with_filters()
 
-        # Total should equal sum of process and skip
         assert stats["total"] == stats["would_process"] + stats["would_skip"]
 
-        # Reasons should not double-count (job has max one reason)
         reasons_sum = sum(stats["reasons"].values())
         assert reasons_sum <= stats["total"]

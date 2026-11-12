@@ -32,7 +32,6 @@ class TestBoldHeaderRecognition:
 
         sections = preprocessor._extract_markdown_sections(text)
 
-        # Verify bold headers are recognized as section boundaries
         assert "responsibilities" in sections
         assert "skills" in sections
         assert "Build scalable systems" in sections.get("responsibilities", "")
@@ -56,10 +55,8 @@ class TestBoldHeaderRecognition:
 
         sections = preprocessor._extract_markdown_sections(text)
 
-        # Verify bold headers with trailing text are recognized
         assert "responsibilities" in sections
         assert "qualifications" in sections
-        # Trailing text should be included in section content
         assert "include but are not limited to" in sections.get("responsibilities", "")
 
     @pytest.mark.unit
@@ -81,9 +78,7 @@ class TestBoldHeaderRecognition:
 
         sections = preprocessor._extract_markdown_sections(text)
 
-        # Verify both markdown and bold headers are recognized
         assert "responsibilities" in sections
-        # "technical_skills" gets classified as "skills" by _classify_section_from_header
         assert "skills" in sections
         assert "qualifications" in sections
 
@@ -104,10 +99,8 @@ class TestBoldHeaderRecognition:
 
         sections = preprocessor._extract_markdown_sections(text)
 
-        # Verify bold headers with em-dash/en-dash are recognized
         assert "responsibilities" in sections
         assert "skills" in sections
-        # Remaining text after em-dash should be in content
         assert "what you'll do" in sections.get("responsibilities", "")
 
 
@@ -122,7 +115,6 @@ class TestIsMarkdownDetection:
         except Exception as e:
             pytest.skip(f"spaCy model not available: {e}")
 
-        # Bold header at line start should be detected as markdown
         text_with_bold = "**Responsibilities**\n\nLead team and design systems."
         assert preprocessor._is_markdown(text_with_bold) is True
 
@@ -175,10 +167,6 @@ class TestEntityRoutingFromBoldSections:
 
         _skills, _technologies, requirements = preprocessor._extract_entities_by_section(text)
 
-        # Entities from responsibilities section should route to requirements
-        # Berlin and Amsterdam should be recognized as locations
-        # "Lead", "teams", "coordinate" should be in extracted entities
-
     @pytest.mark.unit
     def test_extract_entities_by_section_routes_from_bold_skills(self):
         """Test that entities in bold **Skills** sections are correctly routed."""
@@ -191,7 +179,6 @@ class TestEntityRoutingFromBoldSections:
 
         _skills, technologies, _requirements = preprocessor._extract_entities_by_section(text)
 
-        # Technologies from skills section should be recognized
         assert any(tech.lower() in ("python", "aws", "docker", "kubernetes") for tech in technologies)
 
     @pytest.mark.unit
@@ -205,9 +192,6 @@ class TestEntityRoutingFromBoldSections:
         text = "**Qualifications**\n\n5+ years of Python development. Experience with microservices.\n"
 
         _skills, _technologies, requirements = preprocessor._extract_entities_by_section(text)
-
-        # Qualifications should route to requirements
-        # This test verifies the section is recognized and processed
 
 
 class TestRegressionCases:
@@ -225,7 +209,6 @@ class TestRegressionCases:
 
         sections = preprocessor._extract_markdown_sections(text)
 
-        # Existing markdown header functionality should still work
         assert "responsibilities" in sections
         assert "skills" in sections
 
@@ -241,7 +224,6 @@ class TestRegressionCases:
 
         sections = preprocessor._extract_markdown_sections(text)
 
-        # Dividers should still separate sections
         assert "description" in sections
         assert "responsibilities" in sections
 
@@ -253,14 +235,11 @@ class TestRegressionCases:
         except Exception as e:
             pytest.skip(f"spaCy model not available: {e}")
 
-        # Test headers
         assert preprocessor._is_markdown("# Header") is True
 
-        # Test lists
         assert preprocessor._is_markdown("- item\n- item") is True
         assert preprocessor._is_markdown("1. item\n2. item") is True
 
-        # Test code blocks
         assert preprocessor._is_markdown("```python\ncode\n```") is True
 
     @pytest.mark.unit
@@ -275,7 +254,6 @@ class TestRegressionCases:
 
         _skills, _technologies, requirements = preprocessor._extract_entities_by_section(text)
 
-        # Existing routing should still work
         assert "Europe" in requirements
 
 
@@ -290,7 +268,6 @@ class TestBlueOriginBoldHeaders:
         except Exception as e:
             pytest.skip(f"spaCy model not available: {e}")
 
-        # Actual Blue Origin pattern
         text = (
             "**Responsibilities** include but are not limited to:\n\n"
             "Design and develop software architecture\n"
@@ -300,7 +277,6 @@ class TestBlueOriginBoldHeaders:
 
         sections = preprocessor._extract_markdown_sections(text)
 
-        # Should recognize the bold header as a section boundary
         assert "responsibilities" in sections
         assert "Design and develop" in sections.get("responsibilities", "")
 
@@ -326,11 +302,8 @@ class TestBlueOriginBoldHeaders:
 
         sections = preprocessor._extract_markdown_sections(text)
 
-        # All bold sections should be recognized
         assert "responsibilities" in sections
         assert "qualifications" in sections
-        # "What You'll Bring" gets classified as a section (with text as the section name)
-        # At minimum we should have 2+ sections
         assert len(sections) >= 2
 
     @pytest.mark.unit

@@ -14,7 +14,6 @@ def _create_test_db(db_path: str):
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
 
-    # Create all necessary tables
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS jobs (
@@ -82,7 +81,6 @@ def _create_test_db(db_path: str):
         """
     )
 
-    # Create assessment tables using AssessmentStore
     AssessmentStore(db_path)
 
     conn.commit()
@@ -108,7 +106,6 @@ def test_purge_orphaned_assessments_dry_run(purger):
 
     conn = p.conn
 
-    # Create orphaned assessment
     conn.execute(
         (
             "INSERT INTO job_assessments "
@@ -130,12 +127,10 @@ def test_purge_orphaned_assessments_dry_run(purger):
     )
     conn.commit()
 
-    # Dry run
     count, ids = p.purge_orphaned_assessments(dry_run=True)
     assert count == 1
     assert "orphaned_job" in ids
 
-    # Verify record still exists
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM job_assessments")
     assert cursor.fetchone()[0] == 1
@@ -147,7 +142,6 @@ def test_purge_orphaned_assessments_actual_delete(purger):
 
     conn = p.conn
 
-    # Create orphaned assessment
     conn.execute(
         (
             "INSERT INTO job_assessments "
@@ -169,12 +163,10 @@ def test_purge_orphaned_assessments_actual_delete(purger):
     )
     conn.commit()
 
-    # Actual delete
     count, ids = p.purge_orphaned_assessments(dry_run=False)
     assert count == 1
     assert "orphaned_job" in ids
 
-    # Verify record deleted
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM job_assessments")
     assert cursor.fetchone()[0] == 0
@@ -186,7 +178,6 @@ def test_purge_invalid_scores_dry_run(purger):
 
     conn = p.conn
 
-    # Create job with invalid score
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
@@ -212,12 +203,10 @@ def test_purge_invalid_scores_dry_run(purger):
     )
     conn.commit()
 
-    # Dry run
     count, ids = p.purge_invalid_scores(dry_run=True)
     assert count == 1
     assert "job1" in ids
 
-    # Verify record still exists
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM job_assessments WHERE job_id = ?", ("job1",))
     assert cursor.fetchone()[0] == 1
@@ -229,7 +218,6 @@ def test_purge_invalid_scores_actual_delete(purger):
 
     conn = p.conn
 
-    # Create valid and invalid assessment
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
         ("job1", "Title1", "Company1", "Location", "Desc", "pending_review"),
@@ -239,7 +227,6 @@ def test_purge_invalid_scores_actual_delete(purger):
         ("job2", "Title2", "Company2", "Location", "Desc", "pending_review"),
     )
 
-    # Valid assessment
     conn.execute(
         (
             "INSERT INTO job_assessments "
@@ -260,7 +247,6 @@ def test_purge_invalid_scores_actual_delete(purger):
         ),
     )
 
-    # Invalid assessment
     conn.execute(
         (
             "INSERT INTO job_assessments "
@@ -282,12 +268,10 @@ def test_purge_invalid_scores_actual_delete(purger):
     )
     conn.commit()
 
-    # Actual delete
     count, ids = p.purge_invalid_scores(dry_run=False)
     assert count == 1
     assert "job2" in ids
 
-    # Verify only valid record remains
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM job_assessments")
     assert cursor.fetchone()[0] == 1
@@ -301,7 +285,6 @@ def test_purge_malformed_recommendations_soft_delete(purger):
 
     conn = p.conn
 
-    # Create assessment with malformed JSON
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
@@ -327,12 +310,10 @@ def test_purge_malformed_recommendations_soft_delete(purger):
     )
     conn.commit()
 
-    # Soft delete (set to NULL)
     count, ids = p.purge_malformed_recommendations(dry_run=False)
     assert count == 1
     assert "job1" in ids
 
-    # Verify record exists but recommendations are NULL
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM job_assessments WHERE job_id = ?", ("job1",))
     assert cursor.fetchone()[0] == 1
@@ -347,7 +328,6 @@ def test_cascade_delete_job_dry_run(purger):
 
     conn = p.conn
 
-    # Create job with related records
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
@@ -379,12 +359,10 @@ def test_cascade_delete_job_dry_run(purger):
     )
     conn.commit()
 
-    # Dry run
     count, ids = p.cascade_delete_job("job1", dry_run=True)
     assert count == 5  # 1 job + 1 assessment + 1 preprocessed + 1 cost_tracking + 1 review
     assert "job1" in ids
 
-    # Verify all records still exist
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM jobs WHERE id = ?", ("job1",))
     assert cursor.fetchone()[0] == 1
@@ -396,7 +374,6 @@ def test_cascade_delete_job_actual(purger):
 
     conn = p.conn
 
-    # Create job with related records
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
@@ -428,11 +405,9 @@ def test_cascade_delete_job_actual(purger):
     )
     conn.commit()
 
-    # Actual delete
     count, ids = p.cascade_delete_job("job1", dry_run=False)
     assert count == 5
 
-    # Verify all records deleted
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM jobs WHERE id = ?", ("job1",))
     assert cursor.fetchone()[0] == 0
@@ -450,7 +425,6 @@ def test_purge_no_records_to_delete(purger):
     """Should handle case with no records to delete."""
     p, store, db_path = purger
 
-    # Purge with empty database
     count, ids = p.purge_orphaned_assessments(dry_run=False)
     assert count == 0
     assert len(ids) == 0
@@ -462,7 +436,6 @@ def test_purge_by_date_range_dry_run(purger):
 
     conn = p.conn
 
-    # Create job and assessment
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
@@ -489,12 +462,10 @@ def test_purge_by_date_range_dry_run(purger):
     )
     conn.commit()
 
-    # Dry run for date range
     count, ids = p.purge_by_date_range("2026-01-01 00:00:00", "2026-12-31 23:59:59", dry_run=True)
     assert count == 1
     assert "job1" in ids
 
-    # Verify record still exists
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM job_assessments")
     assert cursor.fetchone()[0] == 1
@@ -506,7 +477,6 @@ def test_transaction_rollback_on_error(purger):
 
     conn = p.conn
 
-    # Create invalid state (assessment without job, will cause issues)
     conn.execute(
         (
             "INSERT INTO job_assessments "
@@ -528,17 +498,14 @@ def test_transaction_rollback_on_error(purger):
     )
     conn.commit()
 
-    # First, verify it's there
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM job_assessments WHERE job_id = ?", ("orphaned_job",))
     initial = cursor.fetchone()[0]
     assert initial == 1
 
-    # Delete should work
     count, ids = p.purge_orphaned_assessments(dry_run=False)
     assert count == 1
 
-    # Verify it's gone
     cursor.execute("SELECT COUNT(*) FROM job_assessments WHERE job_id = ?", ("orphaned_job",))
     final = cursor.fetchone()[0]
     assert final == 0
@@ -550,7 +517,6 @@ def test_rebuild_fts_index_dry_run(purger):
 
     conn = p.conn
 
-    # Create job and assessment with FTS entry
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
         ("job1", "Engineer", "TechCorp", "Remote", "Desc", "pending_review"),
@@ -574,17 +540,14 @@ def test_rebuild_fts_index_dry_run(purger):
     )
     conn.commit()
 
-    # Verify FTS has NULL job_id before
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM job_assessments_fts WHERE job_id IS NULL")
     before = cursor.fetchone()[0]
     assert before == 1
 
-    # Dry run
     count, ids = p.rebuild_fts_index(dry_run=True)
     assert count == 1
 
-    # Verify FTS still has NULL job_id
     cursor.execute("SELECT COUNT(*) FROM job_assessments_fts WHERE job_id IS NULL")
     after = cursor.fetchone()[0]
     assert after == 1
@@ -596,7 +559,6 @@ def test_rebuild_fts_index_actual(purger):
 
     conn = p.conn
 
-    # Create job and assessment with FTS entry that has NULL job_id
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
         ("job1", "Engineer", "TechCorp", "Remote", "Desc", "pending_review"),
@@ -620,22 +582,18 @@ def test_rebuild_fts_index_actual(purger):
     )
     conn.commit()
 
-    # Verify FTS has NULL job_id before
     cursor = conn.cursor()
     cursor.execute("SELECT job_id FROM job_assessments_fts WHERE rowid = 1")
     before = cursor.fetchone()[0]
     assert before is None
 
-    # Actual rebuild
     count, ids = p.rebuild_fts_index(dry_run=False)
     assert count == 1
 
-    # Verify FTS now has correct job_id
     cursor.execute("SELECT job_id FROM job_assessments_fts WHERE rowid = 1")
     after = cursor.fetchone()[0]
     assert after == "job1"
 
-    # Verify no NULL job_ids in FTS
     cursor.execute("SELECT COUNT(*) FROM job_assessments_fts WHERE job_id IS NULL")
     null_count = cursor.fetchone()[0]
     assert null_count == 0
@@ -647,7 +605,6 @@ def test_purge_orphaned_job_reviews_dry_run(purger):
 
     conn = p.conn
 
-    # Create assessment and orphaned review
     conn.execute(
         (
             "INSERT INTO job_assessments "
@@ -667,17 +624,14 @@ def test_purge_orphaned_job_reviews_dry_run(purger):
     )
     conn.commit()
 
-    # Verify review exists
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM job_reviews")
     before = cursor.fetchone()[0]
     assert before == 1
 
-    # Dry run
     count, ids = p.purge_orphaned_job_reviews(dry_run=True)
     assert count == 1
 
-    # Verify review still exists
     cursor.execute("SELECT COUNT(*) FROM job_reviews")
     after = cursor.fetchone()[0]
     assert after == 1
@@ -689,7 +643,6 @@ def test_purge_orphaned_job_reviews_actual(purger):
 
     conn = p.conn
 
-    # Create assessment and orphaned reviews
     conn.execute(
         (
             "INSERT INTO job_assessments "
@@ -717,17 +670,14 @@ def test_purge_orphaned_job_reviews_actual(purger):
     )
     conn.commit()
 
-    # Verify reviews exist
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM job_reviews")
     before = cursor.fetchone()[0]
     assert before == 2
 
-    # Actual delete
     count, ids = p.purge_orphaned_job_reviews(dry_run=False)
     assert count == 2
 
-    # Verify reviews deleted
     cursor.execute("SELECT COUNT(*) FROM job_reviews")
     after = cursor.fetchone()[0]
     assert after == 0

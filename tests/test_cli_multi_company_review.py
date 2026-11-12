@@ -107,14 +107,12 @@ class TestMultiCompanyReview:
         db_path = temp_dir / "test.db"
         reviewer = JobReviewer(str(db_path))
 
-        # Mock interactive review to auto-confirm all
         def mock_review_func(*args, **kwargs):
             stats = args[-1]
             stats.total += 1
             stats.add_confirmed(150, 0.00045)
 
         with patch.object(reviewer, "review_job_interactive", side_effect=mock_review_func):
-            # Call with single Path (backward compat)
             stats = reviewer.review_batch(extracted_path, str(preprocessed_path))
 
         assert stats.confirmed == 2
@@ -135,7 +133,6 @@ class TestMultiCompanyReview:
             stats.add_confirmed(150, 0.00045)
 
         with patch.object(reviewer, "review_job_interactive", side_effect=mock_review_func):
-            # Call with string path (backward compat)
             stats = reviewer.review_batch(extracted_path, str(preprocessed_path))
 
         assert stats.confirmed == 2
@@ -156,10 +153,8 @@ class TestMultiCompanyReview:
             stats.add_confirmed(150, 0.00045)
 
         with patch.object(reviewer, "review_job_interactive", side_effect=mock_review_func):
-            # Call with list of files
             stats = reviewer.review_batch(extracted_files, str(preprocessed_path))
 
-        # Should process all jobs: 2 from carbonrobotics + 1 from boeing + 1 from blueorigin = 4 total
         assert stats.confirmed == 4
         assert stats.total == 4
         assert stats.total_tokens == 600  # 4 jobs * 150 tokens
@@ -190,7 +185,6 @@ class TestMultiCompanyReview:
         with patch.object(reviewer, "review_job_interactive", side_effect=side_effect_mixed):
             stats = reviewer.review_batch(extracted_files, str(preprocessed_path))
 
-        # 4 jobs: 2 confirmed, 2 rejected
         assert stats.confirmed == 2
         assert stats.rejected == 2
         assert stats.total == 4
@@ -230,7 +224,6 @@ class TestMultiCompanyReview:
         db_path = temp_dir / "test.db"
         reviewer = JobReviewer(str(db_path))
 
-        # Track job count
         job_count_processed = 0
 
         def counter_review(*args, **kwargs):
@@ -243,7 +236,6 @@ class TestMultiCompanyReview:
         with patch.object(reviewer, "review_job_interactive", side_effect=counter_review):
             stats = reviewer.review_batch(extracted_files, str(preprocessed_path))
 
-        # 4 files with 2, 1, 1 jobs respectively = 4 total jobs
         assert job_count_processed == 4
         assert stats.total == 4
 
@@ -257,7 +249,6 @@ class TestMultiCompanyReview:
         db_path = temp_dir / "test.db"
         reviewer = JobReviewer(str(db_path))
 
-        # Build expected company map from preprocessed jobs
         expected_companies = {j["job_id"]: j["company"] for j in preprocessed_jobs}
 
         def capture_and_save_review(self, job_idx, total_jobs, job, preprocessed, stats, allow_re_review=False):
@@ -269,10 +260,8 @@ class TestMultiCompanyReview:
             tokens = preprocessed.get("token_count", 0)
             cost = preprocessed.get("estimated_cost", 0.0)
 
-            # Verify company is not None (this is the bug we're testing)
             assert company is not None, f"Company should not be None for job {job_id}"
 
-            # Save to database (same as real code)
             self.save_review(
                 job_id, title, location, status="confirmed", tokens=tokens, estimated_cost=cost, company=company
             )
@@ -286,7 +275,6 @@ class TestMultiCompanyReview:
         assert stats.confirmed == 4
         assert stats.total == 4
 
-        # Verify all confirmed jobs have company in database
         assert reviewer.conn is not None
         cursor = reviewer.conn.cursor()
         cursor.execute("SELECT job_id, company FROM job_reviews WHERE status='confirmed'")

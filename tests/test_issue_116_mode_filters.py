@@ -24,12 +24,11 @@ class TestModeFilterNewOnly:
         """Test that new-only mode skips jobs already in job_reviews."""
         reviewer = JobReviewer(db_path=temp_db)
 
-        # Setup: Job already reviewed
         reviewer.save_review("job_1", "Engineer", "SF", "confirmed")
 
-        # With new-only mode, should skip
         skip, reason = reviewer.should_skip_job("job_1", mode="new-only")
         assert skip is True
+        # Mode filter runs before any other filter.
         assert reason == "already_reviewed"
 
         reviewer._close_db()
@@ -38,7 +37,6 @@ class TestModeFilterNewOnly:
         """Test that new-only mode includes jobs not yet reviewed."""
         reviewer = JobReviewer(db_path=temp_db)
 
-        # Job not in database at all
         skip, reason = reviewer.should_skip_job("job_999", mode="new-only")
         assert skip is False
         assert reason is None
@@ -49,13 +47,12 @@ class TestModeFilterNewOnly:
         """Test new-only mode combined with skip_rejected filter."""
         reviewer = JobReviewer(db_path=temp_db)
 
-        # Setup: Rejected job
         reviewer.save_review("job_1", "Engineer", "SF", "rejected", reason="location")
 
-        # With new-only, should skip due to already_reviewed (mode filter runs first)
         skip, reason = reviewer.should_skip_job("job_1", mode="new-only", skip_rejected=True)
         assert skip is True
-        assert reason == "already_reviewed"  # Mode filter catches it first
+        # Mode filter runs first, so the reason is already_reviewed even for a rejected job.
+        assert reason == "already_reviewed"
 
         reviewer._close_db()
 
@@ -74,12 +71,10 @@ class TestModeFilterAll:
         """Test that all mode includes already reviewed jobs."""
         reviewer = JobReviewer(db_path=temp_db)
 
-        # Setup: Job already reviewed and confirmed
         reviewer.save_review("job_1", "Engineer", "SF", "confirmed")
 
-        # With all mode, should NOT skip (mode filter allows it)
         skip, reason = reviewer.should_skip_job("job_1", mode="all")
-        assert skip is False  # Mode filter doesn't skip
+        assert skip is False
 
         reviewer._close_db()
 
@@ -87,13 +82,12 @@ class TestModeFilterAll:
         """Test all mode with skip_rejected filter."""
         reviewer = JobReviewer(db_path=temp_db)
 
-        # Setup: Rejected job
         reviewer.save_review("job_1", "Engineer", "SF", "rejected", reason="location")
 
-        # With all mode + skip_rejected, should skip due to status filter
         skip, reason = reviewer.should_skip_job("job_1", mode="all", skip_rejected=True)
         assert skip is True
-        assert reason == "previously_rejected"  # Status filter catches it
+        # mode="all" bypasses the mode filter, leaving the status filter to decide.
+        assert reason == "previously_rejected"
 
         reviewer._close_db()
 
@@ -101,12 +95,10 @@ class TestModeFilterAll:
         """Test all mode without skip_rejected filter."""
         reviewer = JobReviewer(db_path=temp_db)
 
-        # Setup: Rejected job
         reviewer.save_review("job_1", "Engineer", "SF", "rejected", reason="location")
 
-        # With all mode + skip_rejected=False, should NOT skip
         skip, reason = reviewer.should_skip_job("job_1", mode="all", skip_rejected=False)
-        assert skip is False  # No filter catches it
+        assert skip is False
 
         reviewer._close_db()
 
@@ -114,7 +106,6 @@ class TestModeFilterAll:
         """Test that all mode includes unreviewed jobs."""
         reviewer = JobReviewer(db_path=temp_db)
 
-        # Job not in database
         skip, reason = reviewer.should_skip_job("job_999", mode="all")
         assert skip is False
         assert reason is None
@@ -136,7 +127,6 @@ class TestAssessModeModeFilter:
         """Test assess new-only mode filters out already assessed jobs."""
         store = AssessmentStore(db_path=temp_db)
 
-        # Save an assessment
         store.save_assessment(
             job_id="job_1",
             title="Engineer",
@@ -152,11 +142,8 @@ class TestAssessModeModeFilter:
             actual_cost=0.0015,
         )
 
-        # Query: job should be excluded in new-only mode
-        # (This would be filtered in CLI logic, not in store itself)
         assessment = store.get_assessment_by_id("job_1")
         assert assessment is not None
-        # In new-only mode, this job would be filtered out
 
         store._close_db()
 
@@ -164,7 +151,6 @@ class TestAssessModeModeFilter:
         """Test assess all mode includes already assessed jobs."""
         store = AssessmentStore(db_path=temp_db)
 
-        # Save an assessment
         store.save_assessment(
             job_id="job_1",
             title="Engineer",
@@ -180,7 +166,6 @@ class TestAssessModeModeFilter:
             actual_cost=0.0015,
         )
 
-        # Query: job should be included in all mode
         assessment = store.get_assessment_by_id("job_1")
         assert assessment is not None
         assert assessment.get("overall_score") == 85.0
@@ -194,10 +179,8 @@ class TestModeFlagFiltering:
     @pytest.fixture
     def temp_files(self):
         """Create temporary extracted and preprocessed files."""
-        # Create temp directory
         tmpdir = Path(tempfile.mkdtemp())
 
-        # Create extracted jobs file
         extracted_jobs = [
             {
                 "id": "job_1",
@@ -219,14 +202,12 @@ class TestModeFlagFiltering:
         with open(extracted_file, "w") as f:
             json.dump(extracted_jobs, f)
 
-        # Create preprocessed jobs file (empty for this test)
         preprocessed_file = tmpdir / "preprocessed.json"
         with open(preprocessed_file, "w") as f:
             json.dump([], f)
 
         yield extracted_file, preprocessed_file, tmpdir
 
-        # Cleanup
         import shutil
 
         shutil.rmtree(tmpdir)
@@ -236,12 +217,11 @@ class TestModeFlagFiltering:
         extracted_file, preprocessed_file, _ = temp_files
         reviewer = JobReviewer(db_path=temp_db)
 
-        # Review first job
         reviewer.save_review("job_1", "Engineer", "TechCorp", "confirmed")
 
-        # Second review with new-only mode (default)
         skip, reason = reviewer.should_skip_job("job_1", mode="new-only")
         assert skip is True
+        # Mode filter runs before any other filter.
         assert reason == "already_reviewed"
 
         reviewer._close_db()
@@ -251,10 +231,8 @@ class TestModeFlagFiltering:
         extracted_file, preprocessed_file, _ = temp_files
         reviewer = JobReviewer(db_path=temp_db)
 
-        # Review first job
         reviewer.save_review("job_1", "Engineer", "TechCorp", "confirmed")
 
-        # With all mode, should not skip (just check other filters)
         skip, reason = reviewer.should_skip_job("job_1", mode="all", skip_rejected=False)
         assert skip is False
         assert reason is None
@@ -276,7 +254,6 @@ class TestModeStacksWithOtherFilters:
         """Test new-only mode with date filter."""
         reviewer = JobReviewer(db_path=temp_db)
 
-        # Setup: unreviewed job with old crawled_at
         if reviewer.conn:
             cursor = reviewer.conn.cursor()
             cursor.execute(
@@ -288,7 +265,6 @@ class TestModeStacksWithOtherFilters:
             cursor.execute("INSERT INTO jobs VALUES ('job_1', '2026-06-01')")
             reviewer.conn.commit()
 
-        # With new-only + skip_before_date, should skip due to date
         skip, reason = reviewer.should_skip_job("job_1", mode="new-only", skip_before_date="2026-07-01")
         assert skip is True
         assert reason is not None
@@ -300,7 +276,6 @@ class TestModeStacksWithOtherFilters:
         """Test all mode stacking with multiple filters."""
         reviewer = JobReviewer(db_path=temp_db)
 
-        # Setup: rejected job with old crawled_at
         reviewer.save_review("job_1", "Engineer", "SF", "rejected")
         if reviewer.conn:
             cursor = reviewer.conn.cursor()
@@ -313,7 +288,6 @@ class TestModeStacksWithOtherFilters:
             cursor.execute("INSERT INTO jobs VALUES ('job_1', '2026-06-01')")
             reviewer.conn.commit()
 
-        # Mode check passes (all mode), but status filter catches rejection
         skip, reason = reviewer.should_skip_job(
             "job_1",
             mode="all",
@@ -321,7 +295,7 @@ class TestModeStacksWithOtherFilters:
             skip_before_date="2026-07-01",
         )
         assert skip is True
-        # Should catch rejection first (status filter before date filter)
+        # Status filter runs before the date filter.
         assert reason == "previously_rejected"
 
         reviewer._close_db()

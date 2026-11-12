@@ -19,11 +19,6 @@ from storage.assessment_store import AssessmentStore
 runner = CliRunner()
 
 
-# ============================================================================
-# FIXTURES
-# ============================================================================
-
-
 @pytest.fixture
 def temp_db() -> Generator[str, None, None]:
     """Create temporary database."""
@@ -110,11 +105,6 @@ def store_with_sample_assessments(temp_db: str) -> AssessmentStore:
     return store
 
 
-# ============================================================================
-# TESTS
-# ============================================================================
-
-
 def test_export_basic(store_with_sample_assessments: AssessmentStore) -> None:
     """Test basic export with default options."""
     with patch("src.cli.AssessmentStore") as mock_store_cls:
@@ -150,7 +140,6 @@ def test_export_with_min_score(store_with_sample_assessments: AssessmentStore) -
             assert "Filtered:" in result.stdout
 
             report_content = output_path.read_text()
-            # Should include job1 (92) and job2 (78), but not job3 (65)
             assert "TechCorp" in report_content
             assert "DataInc" in report_content
             assert "WebDev Inc" not in report_content
@@ -171,7 +160,6 @@ def test_export_with_max_score(store_with_sample_assessments: AssessmentStore) -
             assert result.exit_code == 0
 
             report_content = output_path.read_text()
-            # Should include job2 (78) and job3 (65), but not job1 (92)
             assert "TechCorp" not in report_content
             assert "DataInc" in report_content
             assert "WebDev Inc" in report_content
@@ -268,7 +256,6 @@ def test_export_invalid_sort_by() -> None:
             ["export", "--sort-by", "invalid"],
         )
 
-        # Should fail validation in ExportConfig
         assert result.exit_code in (1, 2)
 
 
@@ -284,7 +271,6 @@ def test_export_invalid_template() -> None:
             ["export", "--template", "html"],
         )
 
-        # Should fail validation
         assert result.exit_code in (1, 2)
 
 
@@ -316,11 +302,10 @@ def test_export_markdown_formatting(
             assert result.exit_code == 0
 
             report_content = output_path.read_text()
-            # Basic markdown validation
-            assert report_content.startswith("# ")  # Has h1 heading
-            assert "##" in report_content  # Has h2 headings
-            assert report_content.count("```") % 2 == 0  # Code blocks closed
-            assert "---" in report_content  # Has horizontal rule
+            assert report_content.startswith("# ")
+            assert "##" in report_content
+            assert report_content.count("```") % 2 == 0
+            assert "---" in report_content
 
 
 def test_export_includes_top_matches(
@@ -338,8 +323,7 @@ def test_export_includes_top_matches(
 
             report_content = output_path.read_text()
             assert "## Top" in report_content
-            # Should list top matches
-            assert "TechCorp" in report_content  # job1 with score 92
+            assert "TechCorp" in report_content
 
 
 def test_export_includes_analytics(
@@ -376,7 +360,6 @@ def test_export_excludes_recommendations(
                 ["export", "--output", str(output_path), "--no-include-recommendations"],
             )
 
-            # Flag format depends on typer, but should work either way
             assert result.exit_code in (0, 2)
 
 
@@ -395,7 +378,7 @@ def test_export_from_date(store_with_sample_assessments: AssessmentStore) -> Non
             assert result.exit_code == 0
 
             report_content = output_path.read_text()
-            assert "Date:" in report_content  # Filter info in header
+            assert "Date:" in report_content
 
 
 def test_export_to_date(store_with_sample_assessments: AssessmentStore) -> None:

@@ -67,7 +67,6 @@ class TestChunkBySentences:
         text = " ".join(["Python Django PostgreSQL REST API microservices."] * 5)
         chunks = DataReshaper.chunk_by_sentences(text, target_tokens=30)
         assert len(chunks) >= 1
-        # Each chunk should have reasonable size (allow variance)
         assert all(len(chunk) > 10 for chunk in chunks)
 
     def test_chunk_whitespace_handling(self) -> None:
@@ -127,10 +126,8 @@ class TestFormatExtractedEntities:
         """Limit parameter restricts entity count."""
         skills = [f"Skill{i}" for i in range(20)]
         result = DataReshaper.format_extracted_entities(skills, [], [], limit=5)
-        # Should contain first 5 skills
         for i in range(5):
             assert f"Skill{i}" in result
-        # Should not contain beyond limit (may contain some due to formatting)
         assert result.count("Skill") <= 10
 
     def test_format_returns_string(self) -> None:
@@ -226,7 +223,6 @@ class TestPrepareAssessmentContext:
         context = DataReshaper.prepare_assessment_context("", "")
         assert context["cv"] == ""
         assert context["job_description"] == ""
-        # Token count may be 0 or minimal
         assert context["token_count"] >= 0
 
     def test_context_special_characters(self) -> None:

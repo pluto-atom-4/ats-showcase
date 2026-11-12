@@ -79,7 +79,6 @@ class TestBuildSimplePrompt:
 
         prompt = PromptBuilder.build_simple_prompt(cv, job, chunks=chunks)
 
-        # Chunks should be in prompt
         assert "Requirement 1" in prompt or "5+ years" in prompt
 
     def test_simple_prompt_without_chunks(self) -> None:
@@ -106,7 +105,6 @@ class TestBuildSimplePrompt:
         job = "We seek a Python expert"
         prompt = PromptBuilder.build_simple_prompt(cv, job)
 
-        # Should end with something prompting JSON
         assert "JSON:" in prompt or "json" in prompt.lower() or "Assessment" in prompt
 
     def test_simple_prompt_all_entities_included(self) -> None:
@@ -195,7 +193,6 @@ class TestBuildPromptWithExamples:
 
         prompt = PromptBuilder.build_prompt_with_examples(cv, job, chunks=chunks)
 
-        # At least one chunk should be in prompt
         assert any(chunk in prompt for chunk in chunks)
 
     def test_examples_prompt_example_is_valid_json(self) -> None:
@@ -204,9 +201,7 @@ class TestBuildPromptWithExamples:
         job = "We seek a Python expert"
         prompt = PromptBuilder.build_prompt_with_examples(cv, job)
 
-        # Extract example JSON from prompt (simple heuristic)
         if '"overall_score"' in prompt or "'overall_score'" in prompt:
-            # Example exists, good sign
             assert True
 
     def test_examples_prompt_includes_system(self) -> None:
@@ -215,7 +210,6 @@ class TestBuildPromptWithExamples:
         job = "We seek a Python expert"
         prompt = PromptBuilder.build_prompt_with_examples(cv, job)
 
-        # Should have system prompt guidance
         assert "objective" in prompt.lower() or "recruiter" in prompt.lower()
 
     def test_examples_prompt_ends_with_json(self) -> None:
@@ -287,9 +281,7 @@ class TestPromptComparison:
         simple_prompt = PromptBuilder.build_simple_prompt(cv, job)
         with_examples = PromptBuilder.build_prompt_with_examples(cv, job)
 
-        # Examples should have "Example" or similar
         assert "Example" in with_examples
-        # Simple may or may not have it
         assert isinstance(simple_prompt, str)
 
     def test_both_prompt_json_output(self) -> None:

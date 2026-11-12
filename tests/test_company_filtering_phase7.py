@@ -51,10 +51,8 @@ class TestCompanyNamesTaxonomy:
     def test_count_company_keywords(self) -> None:
         """Test company keyword counts by source."""
         counts = count_company_keywords()
-        # Each source should have keywords
         for source, count in counts.items():
             assert count > 0, f"Source {source} has no keywords"
-        # Total should be 45+
         total = sum(counts.values())
         assert total >= 45
 
@@ -72,7 +70,6 @@ class TestCompanyNamesTaxonomy:
 
     def test_is_company_keyword_exact_match(self) -> None:
         """Test exact word-boundary matching."""
-        # Exact matches should pass
         assert is_company_keyword("google")
         assert is_company_keyword("boeing")
         assert is_company_keyword("mit")
@@ -87,14 +84,12 @@ class TestCompanyNamesTaxonomy:
 
     def test_is_company_keyword_exact_match_only(self) -> None:
         """Test word-boundary matching (exact only, no substring)."""
-        # With word_boundary=True, should NOT match substrings
         assert not is_company_keyword("googles", word_boundary=True)
         assert not is_company_keyword("boeings", word_boundary=True)
         assert not is_company_keyword("pre-google", word_boundary=True)
 
     def test_is_company_keyword_substring(self) -> None:
         """Test substring matching."""
-        # With word_boundary=False, should match substrings
         assert is_company_keyword("googles", word_boundary=False)
         assert is_company_keyword("ex-boeing", word_boundary=False)
         assert is_company_keyword("carbon robotics", word_boundary=False)
@@ -152,19 +147,15 @@ class TestPreprocessorCompanyFiltering:
 
     def test_filter_single_company_name_from_skills(self, preprocessor: Preprocessor) -> None:
         """Test filtering of single company names from skills."""
-        # Company names should be filtered from skills
         skills, techs, reqs = preprocessor.extract_entities(
             "Required: communication skills, experience with Python and JavaScript."
         )
-        # Should extract Python and JavaScript in techs
         assert any("python" in t.lower() for t in techs), f"Python should be in techs, got: {techs}"
-        # Check that company filtering doesn't break regular extraction
         assert len(techs) > 0, "Should extract some technologies"
 
     def test_filter_company_name_in_requirement_context(self, preprocessor: Preprocessor) -> None:
         """Test that company names don't get extracted as standalone entities."""
         skills, techs, reqs = preprocessor.extract_entities("FPGA design required. Must know Python and Verilog.")
-        # FPGA and Python should be present (as technologies)
         all_entities = skills + techs + reqs
         assert len(all_entities) > 0, "Should extract some entities"
         assert any("fpga" in e.lower() for e in all_entities), f"FPGA should be extracted, got: {all_entities}"
@@ -174,17 +165,14 @@ class TestPreprocessorCompanyFiltering:
         skills, techs, reqs = preprocessor.extract_entities(
             "Required: communication, leadership, problem-solving skills"
         )
-        # These should be preserved as they're not company names
         assert any("communication" in s.lower() for s in skills), "Communication skill should be preserved"
         assert any("leadership" in s.lower() for s in skills), "Leadership skill should be preserved"
 
     def test_university_name_filtering(self, preprocessor: Preprocessor) -> None:
         """Test filtering of university names from extraction."""
         skills, techs, reqs = preprocessor.extract_entities("Familiar with Python and machine learning.")
-        # Should extract relevant techs/skills
         all_entities = skills + techs + reqs
         assert len(all_entities) > 0, "Should extract some entities"
-        # Verify Python or machine learning are extracted
         assert any("python" in e.lower() or "machine" in e.lower() for e in all_entities), (
             f"Should extract Python or ML, got: {all_entities}"
         )
@@ -192,7 +180,6 @@ class TestPreprocessorCompanyFiltering:
     def test_robotics_company_filtering(self, preprocessor: Preprocessor) -> None:
         """Test filtering of robotics company names."""
         skills, techs, reqs = preprocessor.extract_entities("Robotics programming: must know ROS and Python.")
-        # ROS and Python should be present
         all_entities = skills + techs + reqs
         assert any("ros" in e.lower() for e in all_entities), f"ROS should be extracted, got: {all_entities}"
         assert len(all_entities) > 0, "Should extract technologies"
@@ -202,14 +189,12 @@ class TestPreprocessorCompanyFiltering:
         skills, techs, reqs = preprocessor.extract_entities(
             "System design skills and distributed systems knowledge required."
         )
-        # Should extract relevant skills
         extracted = skills + techs + reqs
         assert len(extracted) > 0, "Should extract some entities from the text"
 
     def test_regression_soft_skills_unaffected(self, preprocessor: Preprocessor) -> None:
         """Test that Phase 5 soft skills extraction is unaffected by Phase 7."""
         skills, techs, reqs = preprocessor.extract_entities("Excellent communication and teamwork skills required.")
-        # Soft skills should still be extracted
         soft_skills_to_check = ["communication", "teamwork"]
         for soft_skill in soft_skills_to_check:
             assert any(soft_skill in s.lower() for s in skills), (
@@ -219,18 +204,15 @@ class TestPreprocessorCompanyFiltering:
     def test_regression_technical_keywords_unaffected(self, preprocessor: Preprocessor) -> None:
         """Test that Phase 5 technical keywords are unaffected by Phase 7."""
         skills, techs, reqs = preprocessor.extract_entities("Required expertise in Python, Kubernetes, and AWS.")
-        # Technical keywords should still be extracted
         tech_keywords_to_check = ["python", "kubernetes", "aws"]
         found_count = sum(1 for tech_kw in tech_keywords_to_check if any(tech_kw in t.lower() for t in techs))
         assert found_count >= 2, f"Tech keywords should be preserved, found {found_count}/3, got: {techs}"
 
     def test_regression_html_parsing_unaffected(self, preprocessor: Preprocessor) -> None:
         """Test that Phase 6 HTML parsing improvements are unaffected."""
-        # HTML-parsed text with fragments
         skills, techs, reqs = preprocessor.extract_entities(
             "Have strong Python skills. Experience with Kubernetes and Docker."
         )
-        # Tech keywords should be extracted
         all_entities = skills + techs + reqs
         assert any("python" in e.lower() for e in all_entities), f"Python should be extracted, got: {all_entities}"
         assert len(all_entities) > 0, "Should extract some entities"
@@ -238,7 +220,6 @@ class TestPreprocessorCompanyFiltering:
     @pytest.mark.perf
     def test_performance_extraction_speed(self, preprocessor: Preprocessor) -> None:
         """Test that company filtering doesn't significantly impact performance."""
-        # Use a representative job posting
         job_text = (
             "We're seeking a Senior Software Engineer with 5+ years of experience. "
             "Required skills: Python, Kubernetes, AWS, Docker, PostgreSQL, GraphQL. "
@@ -256,7 +237,6 @@ class TestPreprocessorCompanyFiltering:
 
         elapsed_ms = median_elapsed_ms(extract_ten, repeats=3, warmup=1)
 
-        # Should extract 10 jobs in <2 seconds (200ms per job)
         avg_time = elapsed_ms / 10 / 1000
         assert avg_time < 0.2, f"Extraction too slow: {avg_time * 1000:.0f}ms per job (target: <200ms)"
 
@@ -271,7 +251,6 @@ class TestIssueRegressions:
 
     def test_issue_190_keyword_expansion(self, preprocessor: Preprocessor) -> None:
         """Test that Issue #190 keyword expansion still works."""
-        # Verify that original tech keywords are still extracted
         skills, techs, reqs = preprocessor.extract_entities(
             "FPGA, Verilog, SystemVerilog, ASIC design expertise required."
         )
@@ -280,15 +259,12 @@ class TestIssueRegressions:
 
     def test_issue_191_compound_reclassification(self, preprocessor: Preprocessor) -> None:
         """Test that Issue #191 compound reclassification still works."""
-        # Verify technical terms are extracted
         skills, techs, reqs = preprocessor.extract_entities("Deep learning and neural networks expertise.")
-        # Should extract some technical terms
         all_entities = skills + techs + reqs
         assert len(all_entities) > 0, f"Should extract technical terms, got techs: {techs}, skills: {skills}"
 
     def test_issue_192_keyword_additions(self, preprocessor: Preprocessor) -> None:
         """Test that Issue #192 Phase 5 additions still work."""
-        # Aerospace/defense/manufacturing keywords
         skills, techs, reqs = preprocessor.extract_entities(
             "Experience with ANSYS, Nastran, Optistruct, and CAM/CNC systems."
         )
@@ -297,11 +273,9 @@ class TestIssueRegressions:
 
     def test_issue_193_html_parsing(self, preprocessor: Preprocessor) -> None:
         """Test that Issue #193 HTML parsing improvements still work."""
-        # Ensure HTML fragments are still filtered properly
         skills, techs, reqs = preprocessor.extract_entities(
             "Required<br>Python, JavaScript, React, Node.js<br>Fullstack development experience"
         )
-        # Should extract key techs despite HTML artifacts
         all_entities = skills + techs + reqs
         assert len(all_entities) > 0, "Should extract entities despite HTML artifacts"
 
@@ -319,7 +293,6 @@ class TestEdgeCases:
         skills, techs, reqs = preprocessor.extract_entities(
             "Python programming and systems architecture knowledge required."
         )
-        # Should extract meaningful skills/techs
         all_entities = skills + techs + reqs
         assert len(all_entities) > 0, "Should extract some entities"
 
@@ -328,18 +301,15 @@ class TestEdgeCases:
         job_text = "We seek Python experts with AWS experience. You'll work on distributed systems using Kubernetes."
         skills, techs, reqs = preprocessor.extract_entities(job_text)
 
-        # Tech skills should be preserved
         all_entities = skills + techs + reqs
         assert any("python" in e.lower() for e in all_entities), f"Python should be extracted, got: {all_entities}"
         assert any("aws" in e.lower() for e in all_entities), f"AWS should be extracted, got: {all_entities}"
 
     def test_whitespace_variations(self, preprocessor: Preprocessor) -> None:
         """Test handling of text with various whitespace."""
-        # Multiple spaces, tabs, etc.
         skills, techs, reqs = preprocessor.extract_entities(
             "Systems  architecture  and   distributed   computing  experience."
         )
-        # Should extract from text with whitespace variations
         all_entities = skills + techs + reqs
         assert len(all_entities) > 0, "Should extract entities despite whitespace"
 
@@ -348,10 +318,8 @@ class TestEdgeCases:
         skills, techs, reqs = preprocessor.extract_entities(
             "Experience with BoEinG systems and GooGLE Cloud Platform. Python and C++ skills required."
         )
-        # Company names in mixed case should still be filtered
         assert not any("boeing" in e.lower() for e in (skills + techs + reqs))
         assert not any("google" in e.lower() for e in (skills + techs + reqs))
-        # Tech skills should remain
         assert any("python" in e.lower() for e in skills + techs)
 
 
@@ -368,7 +336,6 @@ class TestMetricsValidation:
 
         Verifies company names are properly filtered from extraction.
         """
-        # Representative job postings
         test_jobs = [
             "Python and Kubernetes expertise required.",
             "FPGA design and digital signal processing skills needed.",
@@ -381,12 +348,10 @@ class TestMetricsValidation:
             skills, techs, reqs = preprocessor.extract_entities(job_text)
             all_extracted = skills + techs + reqs
 
-            # Should extract some technical content
             assert len(all_extracted) > 0, f"Should extract technical skills from: {job_text}"
 
     def test_quality_metric_improvement(self, preprocessor: Preprocessor) -> None:
         """Test that extraction quality is maintained with company name filtering."""
-        # Use a complex job posting
         job_text = (
             "Requirements: 10+ years Python, JavaScript, React. "
             "Experience with Kubernetes, Docker, AWS. "
@@ -397,11 +362,9 @@ class TestMetricsValidation:
 
         skills, techs, reqs = preprocessor.extract_entities(job_text)
 
-        # Count extracted items
         total_extracted = len(skills) + len(techs) + len(reqs)
         assert total_extracted > 0, "Should extract some entities"
 
-        # Verify key technologies are present
         all_entities = skills + techs + reqs
         key_techs = ["python", "kubernetes", "docker", "aws", "verilog", "fpga"]
         found_count = sum(1 for tech in key_techs if any(tech in e.lower() for e in all_entities))
