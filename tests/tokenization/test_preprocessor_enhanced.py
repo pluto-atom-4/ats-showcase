@@ -330,7 +330,6 @@ class TestPreprocessorEdgeCases:
         """Remove stopwords can filter effectively."""
         text = "the quick brown fox jumps over the lazy dog"
         result = preprocessor_with_mock.remove_stopwords(text)
-        # Should be shorter than original (stopwords removed)
         assert len(result) <= len(text)
 
     def test_extract_entities_with_duplicate_tech(self, preprocessor_with_mock):
@@ -347,7 +346,6 @@ class TestPreprocessorEdgeCases:
         text = "First sentence. Second sentence. Third."
         sentences = preprocessor_with_mock.segment_sentences(text)
         combined = " ".join(sentences)
-        # All words should be preserved
         assert "First" in combined
         assert "Second" in combined
         assert "Third" in combined
@@ -356,14 +354,12 @@ class TestPreprocessorEdgeCases:
         """Extract finds techs regardless of case."""
         text = "PYTHON and JavaScript and REACT"
         skills, tech, reqs = preprocessor_with_mock.extract_entities(text)
-        # Should find at least one tech despite case variations
         assert len(tech) > 0
 
     def test_remove_stopwords_preserves_nouns(self, preprocessor_with_mock):
         """Remove stopwords preserves important nouns."""
         text = "Developer with Python skills"
         result = preprocessor_with_mock.remove_stopwords(text)
-        # Core terms should be preserved
         assert len(result) > 0
 
     def test_segment_whitespace_only(self, preprocessor_with_mock):
@@ -382,7 +378,6 @@ class TestPreprocessorEdgeCases:
         """Extract always returns sorted lists."""
         text = "Django Python Flask JavaScript"
         skills, tech, reqs = preprocessor_with_mock.extract_entities(text)
-        # Verify sorted
         assert tech == sorted(tech)
         assert skills == sorted(skills)
         assert reqs == sorted(reqs)
@@ -404,7 +399,6 @@ class TestPreprocessorDocstringExamples:
 
     def test_segment_sentences_docstring(self, preprocessor_with_mock):
         """Test docstring example for segment_sentences."""
-        # Should split into sentences
         text = "This is first. This is second."
         result = preprocessor_with_mock.segment_sentences(text)
         assert isinstance(result, list)
@@ -412,7 +406,6 @@ class TestPreprocessorDocstringExamples:
 
     def test_extract_entities_docstring(self, preprocessor_with_mock):
         """Test docstring example for extract_entities."""
-        # Should return tuple of 3 lists
         text = "Python developer at Google"
         skills, tech, reqs = preprocessor_with_mock.extract_entities(text)
         assert isinstance(skills, list)
@@ -421,7 +414,6 @@ class TestPreprocessorDocstringExamples:
 
     def test_remove_stopwords_docstring(self, preprocessor_with_mock):
         """Test docstring example for remove_stopwords."""
-        # Should remove stopwords
         text = "the quick brown fox"
         result = preprocessor_with_mock.remove_stopwords(text)
         assert isinstance(result, str)
@@ -458,13 +450,11 @@ class TestPreprocessorExceptionHandling:
     def test_segment_sentences_exception_handling(self, preprocessor_with_exceptions):
         """Segment handles spaCy exceptions gracefully."""
         result = preprocessor_with_exceptions.segment_sentences("__RAISE_EXCEPTION__")
-        # Should return empty list on exception
         assert result == []
 
     def test_extract_entities_exception_handling(self, preprocessor_with_exceptions):
         """Extract handles spaCy exceptions gracefully."""
         skills, tech, reqs = preprocessor_with_exceptions.extract_entities("__RAISE_EXCEPTION__")
-        # Should return empty lists on exception
         assert skills == []
         assert tech == []
         assert reqs == []
@@ -473,26 +463,21 @@ class TestPreprocessorExceptionHandling:
         """Remove stopwords handles spaCy exceptions gracefully."""
         text = "__RAISE_EXCEPTION__"
         result = preprocessor_with_exceptions.remove_stopwords(text)
-        # Should return original text on exception
         assert result == text
 
     def test_segment_sentences_normal_after_exception(self, preprocessor_with_exceptions):
         """Segment works normally after handling exception."""
-        # First call that raises exception
         result1 = preprocessor_with_exceptions.segment_sentences("__RAISE_EXCEPTION__")
         assert result1 == []
 
-        # Second call should work fine
         result2 = preprocessor_with_exceptions.segment_sentences("Normal text.")
         assert len(result2) > 0
 
     def test_extract_entities_normal_after_exception(self, preprocessor_with_exceptions):
         """Extract works normally after handling exception."""
-        # First call that raises exception
         skills1, tech1, reqs1 = preprocessor_with_exceptions.extract_entities("__RAISE_EXCEPTION__")
         assert skills1 == [] and tech1 == [] and reqs1 == []
 
-        # Second call should work fine
         skills2, tech2, reqs2 = preprocessor_with_exceptions.extract_entities("Python developer")
         assert isinstance(skills2, list) and isinstance(tech2, list) and isinstance(reqs2, list)
 
@@ -504,50 +489,42 @@ class TestPreprocessorAdvancedExtraction:
         """Extract identifies adjectives as skills."""
         text = "experienced senior motivated developer"
         skills, tech, reqs = preprocessor_with_mock.extract_entities(text)
-        # Adjectives should be extracted as skills
         assert isinstance(skills, list)
 
     def test_extract_compound_nouns(self, preprocessor_with_mock):
         """Extract identifies compound nouns."""
         text = "machine learning web development mobile apps"
         skills, tech, reqs = preprocessor_with_mock.extract_entities(text)
-        # Should extract compound concepts
         assert isinstance(skills, list)
 
     def test_extract_technology_keywords(self, preprocessor_with_mock):
         """Extract identifies technology keywords by lemma."""
         text = "uses python developing django applications"
         skills, tech, reqs = preprocessor_with_mock.extract_entities(text)
-        # Should identify tech keywords
         assert isinstance(tech, list)
 
     def test_extract_mixed_case_preservation(self, preprocessor_with_mock):
         """Extract preserves case of extracted entities."""
         text = "Python Django PostgreSQL AWS"
         skills, tech, reqs = preprocessor_with_mock.extract_entities(text)
-        # Extracted entities should maintain case
         assert isinstance(tech, list)
 
     def test_segment_complex_punctuation(self, preprocessor_with_mock):
         """Segment handles complex punctuation correctly."""
         text = "Q: Is this a question? A: Yes! Really?! Absolutely."
         result = preprocessor_with_mock.segment_sentences(text)
-        # Should properly segment
         assert isinstance(result, list)
 
     def test_remove_stopwords_with_entities(self, preprocessor_with_mock):
         """Remove stopwords preserves all entity types."""
         text = "Google Cloud Platform AWS Azure required"
         result = preprocessor_with_mock.remove_stopwords(text)
-        # Should preserve important named entities
         assert isinstance(result, str)
 
     def test_extract_empty_entity_text_handling(self, preprocessor_with_mock):
         """Extract handles entities with empty text."""
-        # Normal extraction - test type safety
         text = "Python expert"
         skills, tech, reqs = preprocessor_with_mock.extract_entities(text)
-        # All results should be lists of strings
         assert all(isinstance(x, str) for x in skills)
         assert all(isinstance(x, str) for x in tech)
 
@@ -736,7 +713,8 @@ class TestPocSentenceSplitterWiring:
         on = Preprocessor(extract_requirements=False, enable_poc_sentence_splitter=True)
         off = Preprocessor(extract_requirements=False, enable_poc_sentence_splitter=False)
         assert on.segment_sentences(text) == off.segment_sentences(text)
-        assert on.segment_sentences(text)  # non-empty, so the comparison is meaningful
+        # Non-empty, so the equality above is meaningful.
+        assert on.segment_sentences(text)
 
     def test_segment_sentences_poc_returns_regex_split_when_on(self, blank_spacy_load):
         """With the flag on, segment_sentences_poc returns the regex split (structural newline splits, #677)."""

@@ -38,7 +38,8 @@ class TestSectionLabelEnum:
     def test_label_names_and_values_match(self) -> None:
         """Label enum names match their values (without SECTION_ prefix)."""
         for label in SectionLabel:
-            expected_name = label.value[8:].upper()  # Strip "SECTION_" prefix
+            # [8:] strips the "SECTION_" prefix.
+            expected_name = label.value[8:].upper()
             assert label.name == expected_name, f"Label name {label.name} does not match value {label.value}"
 
 

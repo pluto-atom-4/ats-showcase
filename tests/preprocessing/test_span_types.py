@@ -94,11 +94,9 @@ class TestSpanPattern:
         pattern1.metadata["key"] = "value"  # type: ignore[attr-defined]
         assert pattern2.metadata == {}
 
-        # This would fail if metadata dicts were aliased, but frozen so we can't assign
-        # Instead verify they are independent instances by creating with explicit dict
+        # Fields are frozen so they cannot be reassigned; check that equal metadata dicts are separate objects.
         p1 = SpanPattern(category="p1", metadata={})
         p2 = SpanPattern(category="p2", metadata={})
-        # They should be separate dict objects (though we can't mutate due to frozen)
         assert p1.metadata is not p2.metadata
 
     def test_span_pattern_invalid_regex(self) -> None:

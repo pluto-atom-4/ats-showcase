@@ -19,10 +19,8 @@ class TestInvalidInputHandling:
 
     def test_update_job_nonexistent(self, state_manager: StateManager) -> None:
         """Updating nonexistent job doesn't raise error."""
-        # Should not raise
         state_manager.update_job("nonexistent", score=90)
 
-        # Job still doesn't exist
         assert "nonexistent" not in state_manager.jobs
 
     def test_job_with_special_characters(self, state_manager: StateManager) -> None:
@@ -57,7 +55,6 @@ class TestNullAndMissingData:
         """Progress calculation safe when total_items is 0."""
         state_manager.start_phase("crawl", total_items=0)
         metrics = state_manager.phase_metrics["crawl"]
-        # Should not raise ZeroDivisionError
         assert metrics.progress_percent == 0.0
 
     def test_throughput_with_zero_items(self, state_manager: StateManager) -> None:
@@ -81,7 +78,6 @@ class TestBoundaryConditions:
         state_manager.start_phase("crawl", total_items=5)
         state_manager.increment_phase_progress("crawl", tokens=100, cost=0.0001)
 
-        # Metrics should always be >= 0
         metrics = state_manager.phase_metrics["crawl"]
         assert metrics.processed_items >= 0
         assert metrics.total_tokens >= 0
@@ -91,7 +87,6 @@ class TestBoundaryConditions:
         """Processing more items than total doesn't crash."""
         state_manager.start_phase("crawl", total_items=5)
 
-        # Process 10 items (more than 5)
         for _ in range(10):
             state_manager.increment_phase_progress("crawl", tokens=100)
 
@@ -123,13 +118,10 @@ class TestStateTransitionErrors:
 
     def test_complete_nonrunning_phase(self, state_manager: StateManager) -> None:
         """Completing phase that wasn't started doesn't crash."""
-        # Phase not started
         assert state_manager.phase_status["crawl"] == PhaseStatus.IDLE
 
-        # Complete it anyway
         state_manager.complete_phase("crawl")
 
-        # Should show as completed
         assert state_manager.phase_status["crawl"] == PhaseStatus.COMPLETED
 
     def test_error_already_completed_phase(self, state_manager: StateManager) -> None:
@@ -138,7 +130,6 @@ class TestStateTransitionErrors:
         state_manager.increment_phase_progress("crawl", tokens=100)
         state_manager.complete_phase("crawl")
 
-        # Error the completed phase
         state_manager.error_phase("crawl", "Late error")
 
         assert state_manager.phase_status["crawl"] == PhaseStatus.ERROR
@@ -148,7 +139,6 @@ class TestStateTransitionErrors:
         state_manager.start_phase("crawl", total_items=5)
         state_manager.error_phase("crawl", "Initial error")
 
-        # Restart
         state_manager.start_phase("crawl", total_items=5)
 
         assert state_manager.phase_status["crawl"] == PhaseStatus.RUNNING
@@ -182,7 +172,6 @@ class TestDataConsistency:
         state_manager.update_top_matches(jobs2)
         second_result = state_manager.top_matches.copy()
 
-        # Results are different but consistent
         assert first_result != second_result
         assert len(first_result) == len(second_result) == 2
 
@@ -193,7 +182,6 @@ class TestDataConsistency:
         for i in range(100):
             state_manager.increment_phase_progress("crawl", tokens=0, error=f"Error {i}")
 
-        # All errors should be recorded
         assert len(state_manager.current_errors) == 100
 
 
@@ -205,7 +193,6 @@ class TestSearchFilterLogic:
         # Test that special chars don't cause regex errors
         queries = ["C++", "(ML)", "C#", "$100K", "10+yrs"]
         for query in queries:
-            # These should not raise exceptions when normalized
             normalized = query.lower()
             assert isinstance(normalized, str)
 
@@ -215,7 +202,6 @@ class TestSearchFilterLogic:
         searches = ["PYTHON", "python", "Python", "PYTHONs"]
 
         for search in searches:
-            # Case-insensitive match should work
             matches = search.lower() in title.lower()
             if search.lower() == "pythons":
                 assert not matches
@@ -227,9 +213,7 @@ class TestSearchFilterLogic:
         queries = ["   ", "\t", "\n", "   python   "]
         for query in queries:
             stripped = query.strip()
-            # Empty queries should be handled
             if not stripped:
-                # Empty query shouldn't cause errors
                 pass
             else:
                 assert "python" in stripped.lower()
@@ -240,7 +224,6 @@ class TestSearchFilterLogic:
         assert len(state.jobs) == 0
         assert len(state.top_matches) == 0
 
-        # Adding and clearing jobs
         state.add_job("j1", "Title", "Company")
         assert len(state.jobs) == 1
 
@@ -287,15 +270,12 @@ class TestRecoveryFromErrors:
         state_manager.start_phase("crawl", total_items=5)
         state_manager.increment_phase_progress("crawl", tokens=100)
 
-        # Pause
         state_manager.paused = True
         assert state_manager.paused is True
 
-        # Resume
         state_manager.paused = False
         assert state_manager.paused is False
 
-        # Continue processing
         state_manager.increment_phase_progress("crawl", tokens=100)
 
         metrics = state_manager.phase_metrics["crawl"]

@@ -95,16 +95,13 @@ def _process_text_to_doc(text):
     """Convert text to mock spaCy doc with sentences, tokens, entities."""
     doc = MagicMock()
 
-    # Sentence segmentation
     sentences = text.split(". ")
     doc.sents = [Mock(text=sent.strip() + ("." if not sent.endswith(".") else "")) for sent in sentences]
 
-    # Tokens
     words = text.split()
     tokens = _create_tokens_from_text(text, words)
     doc.__iter__ = Mock(return_value=iter(tokens))
 
-    # Entities
     doc.ents = _extract_entities_from_text(text)
 
     return doc
@@ -137,7 +134,6 @@ def mock_spacy_model_with_exceptions():
         if text == "__RAISE_EXCEPTION__":
             raise RuntimeError("Simulated spaCy processing error")
 
-        # Normal processing
         doc = MagicMock()
         doc.sents = [Mock(text="Test sentence.")]
 

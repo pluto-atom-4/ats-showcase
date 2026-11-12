@@ -27,10 +27,6 @@ from src.preprocessing.section_extractor import (
 )
 from src.preprocessing.section_patterns import SectionLabel
 
-# =============================================================================
-# TESTS: split_bullets
-# =============================================================================
-
 
 class TestSplitBullets:
     """Test split_bullets() for various bullet marker types and edge cases."""
@@ -104,11 +100,6 @@ class TestSplitBullets:
         assert result == ["Item 1", "Item 2", "Item 3", "Item 4"]
 
 
-# =============================================================================
-# TESTS: Normalization and Deduplication
-# =============================================================================
-
-
 class TestNormalizationAndDedup:
     """Test requirement normalization and fuzzy deduplication."""
 
@@ -137,7 +128,6 @@ class TestNormalizationAndDedup:
         """Test that years patterns are standardized."""
         req = "5+ years of experience in Python"
         normalized = _normalize_requirement_for_comparison(req)
-        # Should normalize to "5+ years of experience"
         assert "5+" in normalized
         assert "years" in normalized.lower()
 
@@ -145,7 +135,6 @@ class TestNormalizationAndDedup:
         """Test that 'working with' patterns are collapsed."""
         req = "Knowledge of working with and/or interpreting data"
         normalized = _normalize_requirement_for_comparison(req)
-        # Should remove verbose "working with and/or" pattern
         assert "and/or" not in normalized.lower()
 
     def test_normalize_multiple_spaces(self) -> None:
@@ -214,11 +203,6 @@ class TestNormalizationAndDedup:
         assert _clamp_confidence(1.0) == 1.0
 
 
-# =============================================================================
-# TESTS: RequirementItem Dataclass
-# =============================================================================
-
-
 class TestRequirementItem:
     """Test RequirementItem frozen dataclass."""
 
@@ -281,11 +265,6 @@ class TestRequirementItem:
         assert isinstance(json_dict["source_section"], str)
 
 
-# =============================================================================
-# TESTS: SectionedResult Dataclass
-# =============================================================================
-
-
 class TestSectionedResult:
     """Test SectionedResult frozen dataclass."""
 
@@ -340,11 +319,6 @@ class TestSectionedResult:
         assert json_dict["schema_version"] == "3.0"
 
 
-# =============================================================================
-# TESTS: extract_sectioned
-# =============================================================================
-
-
 class TestExtractSectioned:
     """Test extract_sectioned() main extraction function."""
 
@@ -364,7 +338,6 @@ class TestExtractSectioned:
         # Create text longer than MAX_INPUT_CHARS
         long_text = "## Requirements\n" + "a" * (MAX_INPUT_CHARS + 1000)
         result = extract_sectioned(long_text)
-        # Should not raise; just truncated
         assert isinstance(result, SectionedResult)
 
     def test_no_sections_detected(self) -> None:
@@ -390,7 +363,6 @@ class TestExtractSectioned:
 """
         result = extract_sectioned(text, min_confidence=0.50)
         assert len(result.requirements) >= 2
-        # Should have detected SECTION_REQUIREMENTS
         assert "SECTION_REQUIREMENTS" in result.sections_detected
 
     def test_nice_to_have_section_lowered(self) -> None:
@@ -421,7 +393,7 @@ class TestExtractSectioned:
         result = extract_sectioned(text, min_confidence=0.50)
         # Should be filtered out (0.95 - 0.50 = 0.45 < 0.50)
         if result.requirements:
-            # If any slipped through, check they're not from BENEFITS
+            # If any slipped through, check they are not from BENEFITS.
             for req in result.requirements:
                 assert req.source_section != SectionLabel.BENEFITS
 
@@ -460,7 +432,7 @@ class TestExtractSectioned:
 """
         result = extract_sectioned(text, min_confidence=0.50)
         if result.requirements:
-            # Should have entries for sections with requirements
+            # Per-section counts must add up to the total.
             total = sum(result.requirements_by_section.values())
             assert total == len(result.requirements)
 
@@ -469,7 +441,7 @@ class TestExtractSectioned:
         from src.preprocessing.section_patterns import CONFIDENCE_ADJUSTMENT_BY_SECTION
 
         custom_adjustments = dict(CONFIDENCE_ADJUSTMENT_BY_SECTION)
-        custom_adjustments[SectionLabel.REQUIREMENTS] = 0.50  # Higher boost
+        custom_adjustments[SectionLabel.REQUIREMENTS] = 0.50
 
         text = """
 ## Requirements
@@ -477,7 +449,7 @@ class TestExtractSectioned:
 """
         result = extract_sectioned(text, confidence_adjustments=custom_adjustments)
         if result.requirements:
-            # Boost should be 0.50
+            # The injected 0.50 adjustment becomes the section boost.
             assert result.requirements[0].section_boost == 0.50
 
     def test_display_names_injection(self) -> None:
@@ -493,6 +465,7 @@ class TestExtractSectioned:
 """
         result = extract_sectioned(text, display_names=custom_names)
         if result.requirements:
+            # The injected display name is used.
             assert result.requirements[0].section_display_name == "Custom Requirements"
 
     def test_dedup_threshold_injectable(self) -> None:
@@ -503,11 +476,8 @@ class TestExtractSectioned:
 * Required Python (Preferred)
 * Must know Python
 """
-        # High threshold: keep more duplicates
         result_high = extract_sectioned(text, dedup_threshold=0.95, max_requirements=100)
-        # Low threshold: more deduplication
         result_low = extract_sectioned(text, dedup_threshold=0.5, max_requirements=100)
-        # Low threshold should have fewer items (more duplicates removed)
         assert len(result_low.requirements) <= len(result_high.requirements)
 
     def test_default_min_confidence(self) -> None:
@@ -517,8 +487,7 @@ class TestExtractSectioned:
 ## Requirements
 * Could have weak signal
 """
-        result = extract_sectioned(text)  # Uses default 0.50
-        # Result should respect the default
+        result = extract_sectioned(text)
         assert isinstance(result, SectionedResult)
 
     def test_default_max_requirements(self) -> None:
@@ -527,7 +496,7 @@ class TestExtractSectioned:
         text = """
 ## Requirements
 """ + "\n".join(["* Must know skill " + str(i) for i in range(50)])
-        result = extract_sectioned(text)  # Uses default 20
+        result = extract_sectioned(text)
         assert len(result.requirements) <= DEFAULT_MAX_REQUIREMENTS
 
     def test_requirements_sorted_by_confidence(self) -> None:
@@ -552,7 +521,6 @@ class TestExtractSectioned:
 * Must know Docker and Kubernetes
 """
         result = extract_sectioned(text, min_confidence=0.50)
-        # Should extract multiple requirements (one per bullet at least)
         assert len(result.requirements) >= 1
 
     def test_metadata_populated(self) -> None:
@@ -586,17 +554,10 @@ class TestExtractSectioned:
 """
         result = extract_sectioned(text, min_confidence=0.40, dedup_threshold=0.6)
 
-        # Should have deduplicated these two
         python_reqs = [r for r in result.requirements if "python" in r.text.lower()]
 
-        # Should keep only the "Must have" version (higher confidence)
         assert [r.text for r in python_reqs] == ["Must have Python"]
         assert python_reqs[0].final_confidence == pytest.approx(1.0)
-
-
-# =============================================================================
-# TESTS: Constants
-# =============================================================================
 
 
 class TestConstants:

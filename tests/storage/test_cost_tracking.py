@@ -26,7 +26,6 @@ class TestJobStoreCostTracking:
         """Test logging re-preprocessing metrics."""
         store = JobStore(temp_db)
 
-        # Add a job first
         store.add_job(
             job_id="job_123",
             title="Test Job",
@@ -36,7 +35,6 @@ class TestJobStoreCostTracking:
             estimated_cost=0.003,
         )
 
-        # Log reprocessing metrics
         store.log_reprocessing_metrics(
             job_id="job_123",
             tokens_before=1000,
@@ -47,7 +45,7 @@ class TestJobStoreCostTracking:
             cost_after=0.00195,
         )
 
-        # Verify the cost_tracking table was updated
+        # Row layout: job_id, phase, version_before/after, tokens_before/after, cost_before/after.
         assert store.conn is not None
         cursor = store.conn.cursor()
         cursor.execute(
@@ -58,21 +56,21 @@ class TestJobStoreCostTracking:
         row = cursor.fetchone()
 
         assert row is not None
-        assert row[0] == "job_123"  # job_id
-        assert row[1] == "reprocess"  # phase
-        assert row[2] == "v1.0"  # preprocessing_version_before
-        assert row[3] == "v2.0"  # preprocessing_version_after
-        assert row[4] == 1000  # tokens_before
-        assert row[5] == 650  # tokens_after
-        assert row[6] == pytest.approx(0.003, abs=1e-6)  # estimated_cost_before
-        assert row[7] == pytest.approx(0.00195, abs=1e-6)  # estimated_cost_after
+        assert row[0] == "job_123"
+        assert row[1] == "reprocess"
+        assert row[2] == "v1.0"
+        assert row[3] == "v2.0"
+        assert row[4] == 1000
+        assert row[5] == 650
+        assert row[6] == pytest.approx(0.003, abs=1e-6)
+        assert row[7] == pytest.approx(0.00195, abs=1e-6)
 
         store.close()
 
     def test_log_reprocessing_metrics_no_db(self) -> None:
         """Test logging metrics without database connection raises error."""
         store = JobStore(":memory:")
-        store.conn = None  # Simulate closed connection
+        store.conn = None
 
         with pytest.raises(RuntimeError, match="Database connection not available"):
             store.log_reprocessing_metrics(
@@ -104,7 +102,6 @@ class TestJobStoreCostTracking:
         """Test cost comparison report with mixed v1.0 and v2.0 jobs."""
         store = JobStore(temp_db)
 
-        # Add v1.0 jobs
         store.add_job(
             job_id="job_1",
             title="Job 1",
@@ -120,7 +117,6 @@ class TestJobStoreCostTracking:
             tokens=1200,
         )
 
-        # Add v2.0 jobs
         store.add_job(
             job_id="job_3",
             title="Job 3",
@@ -152,7 +148,6 @@ class TestJobStoreCostTracking:
         """Test cost comparison report includes re-preprocessing metrics."""
         store = JobStore(temp_db)
 
-        # Add jobs
         store.add_job(
             job_id="job_1",
             title="Job 1",
@@ -161,7 +156,6 @@ class TestJobStoreCostTracking:
             tokens=650,
         )
 
-        # Log reprocessing for a v1.0 → v2.0 migration
         store.log_reprocessing_metrics(
             job_id="job_1",
             tokens_before=1000,
@@ -185,10 +179,8 @@ class TestJobStoreCostTracking:
         """Test that cost_tracking table is created with all required columns."""
         store = JobStore(temp_db)
 
-        # Call method to ensure table exists
         store._ensure_cost_tracking_table()
 
-        # Verify table exists with required columns
         assert store.conn is not None
         cursor = store.conn.cursor()
         cursor.execute("PRAGMA table_info(cost_tracking)")
@@ -224,18 +216,16 @@ class TestJobStoreCostTracking:
             company="Test Company",
         )
 
-        # Log with unnormalized versions (no 'v' prefix)
         store.log_reprocessing_metrics(
             job_id="job_123",
             tokens_before=1000,
             tokens_after=650,
-            version_before="1.0",  # No 'v' prefix
-            version_after="2.0",  # No 'v' prefix
+            version_before="1.0",
+            version_after="2.0",
             cost_before=0.003,
             cost_after=0.00195,
         )
 
-        # Verify versions are normalized
         assert store.conn is not None
         cursor = store.conn.cursor()
         cursor.execute(
@@ -244,8 +234,8 @@ class TestJobStoreCostTracking:
         )
         row = cursor.fetchone()
 
-        assert row[0] == "v1.0"  # Should be normalized with 'v' prefix
-        assert row[1] == "v2.0"  # Should be normalized with 'v' prefix
+        assert row[0] == "v1.0"
+        assert row[1] == "v2.0"
 
         store.close()
 
@@ -261,7 +251,6 @@ class TestJobStoreCostTracking:
             tokens=650,
         )
 
-        # First run: v1.0 -> v2.0
         store.log_reprocessing_metrics(
             job_id="job_1",
             tokens_before=1000,
@@ -272,7 +261,6 @@ class TestJobStoreCostTracking:
             cost_after=0.00195,
         )
 
-        # Verify data is stored
         assert store.conn is not None
         cursor = store.conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM cost_tracking WHERE is_re_preprocessing = TRUE")
@@ -286,7 +274,6 @@ class TestJobStoreCostTracking:
         """Test cost savings calculations in report."""
         store = JobStore(temp_db)
 
-        # Add several v1.0 and v2.0 jobs
         for i in range(5):
             store.add_job(
                 job_id=f"job_v1_{i}",
@@ -307,11 +294,10 @@ class TestJobStoreCostTracking:
 
         report = store.get_cost_comparison_report()
 
-        # Calculate expected savings
-        # Token rate: $0.003 per 1M tokens
-        v1_total = 5 * 1000  # 5,000 tokens
-        v2_total = 5 * 650  # 3,250 tokens
-        tokens_saved = v1_total - v2_total  # 1,750 tokens
+        # Token rate is $0.003 per 1M tokens; 5 jobs at 1000 tokens (v1.0) vs 650 (v2.0).
+        v1_total = 5 * 1000
+        v2_total = 5 * 650
+        tokens_saved = v1_total - v2_total
         expected_savings = tokens_saved * (0.003 / 1_000_000)
 
         assert report.estimated_savings_usd == pytest.approx(expected_savings, abs=1e-8)

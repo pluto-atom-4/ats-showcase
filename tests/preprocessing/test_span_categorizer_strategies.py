@@ -230,7 +230,6 @@ class TestNLPSpanCategorizerOnBlankDoc:
     def test_categorizer_blank_doc_empty_requirements(self) -> None:
         """Categorizer on blank doc with empty requirements returns empty spans."""
         doc = spacy.blank("en")("test text")
-        # Register extension if not already present
         if not doc.has_extension("requirements"):
             doc.set_extension("requirements", default=None)
         doc._.requirements = []

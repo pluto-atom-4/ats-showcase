@@ -50,7 +50,6 @@ class TestPreprocessSelectiveFilters:
         result = cli_runner.invoke(app, ["preprocess", "--help"])
 
         assert result.exit_code == 0
-        # Strip ANSI codes from help output (Rich/Click formatting)
         clean_output = strip_ansi(result.stdout)
         # Check for filter options (help output may truncate with ellipsis)
         assert "--filter-by-age" in clean_output
@@ -62,7 +61,7 @@ class TestPreprocessSelectiveFilters:
 
     def test_preprocess_dry_run_mode_no_database_changes(self, cli_runner: CliRunner) -> None:
         """Test that --dry-run previews without modifying database."""
-        # Run with --dry-run (no jobs in default database)
+        # Accepts preview or no-jobs output; the database contents are not controlled here.
         result = cli_runner.invoke(
             app,
             [
@@ -74,18 +73,14 @@ class TestPreprocessSelectiveFilters:
             ],
         )
 
-        # Should not error or show "no jobs" message
         assert result.exit_code in [0, 1]
 
-        # Should show preview or "no jobs" message
         output = result.stdout.lower()
         assert any(x in output for x in ["dry run", "found", "would", "no jobs"])
 
     def test_preprocess_filter_by_age_flag(self, cli_runner: CliRunner, temp_db: str) -> None:
         """Test --filter-by-age flag is accepted and parsed."""
-        # Just verify the CLI accepts the flag without error
         with tempfile.TemporaryDirectory():
-            # Mock: Run with flags but expect to fail (no jobs to process)
             result = cli_runner.invoke(
                 app,
                 [
@@ -97,7 +92,6 @@ class TestPreprocessSelectiveFilters:
                 ],
             )
 
-            # Should either succeed (no jobs) or fail gracefully
             assert result.exit_code in [0, 1]
 
     def test_preprocess_filter_by_company_flag(self, cli_runner: CliRunner, temp_db: str) -> None:
@@ -113,7 +107,6 @@ class TestPreprocessSelectiveFilters:
             ],
         )
 
-        # Should accept the flag
         assert "No jobs found" in result.stdout or result.exit_code == 0
 
     def test_preprocess_filter_by_tokens_flag(self, cli_runner: CliRunner, temp_db: str) -> None:
@@ -129,12 +122,10 @@ class TestPreprocessSelectiveFilters:
             ],
         )
 
-        # Should accept the flag
         assert result.exit_code in [0, 1]
 
     def test_preprocess_limit_enforcement(self, cli_runner: CliRunner) -> None:
         """Test that --limit parameter restricts batch size."""
-        # Run with --limit 5 --dry-run (no jobs in default database)
         result = cli_runner.invoke(
             app,
             [
@@ -148,9 +139,7 @@ class TestPreprocessSelectiveFilters:
             ],
         )
 
-        # Should show preview or "no jobs" message
         assert result.exit_code in [0, 1]
-        # Check for limit or success
         output = result.stdout.lower()
         assert any(x in output for x in ["found", "preview", "no jobs"])
 
@@ -186,13 +175,11 @@ class TestPreprocessSelectiveFilters:
             ],
         )
 
-        # Should display filter criteria in output
         assert result.exit_code == 0
         assert "30" in result.stdout or "Filter criteria" in result.stdout
 
     def test_preprocess_no_jobs_found_message(self, cli_runner: CliRunner) -> None:
         """Test that 'No jobs found' message shown when filters match nothing."""
-        # Create empty database
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = str(Path(tmpdir) / "test.db")
             JobStore(db_path).close()
@@ -215,7 +202,6 @@ class TestSelectiveReprocessingIntegration:
 
     def test_gradual_migration_dry_run(self, cli_runner: CliRunner) -> None:
         """Test dry-run of gradual migration workflow."""
-        # Run: --filter-by-age 30 --limit 5 --dry-run
         result = cli_runner.invoke(
             app,
             [
@@ -238,7 +224,6 @@ class TestSelectiveReprocessingIntegration:
         """Test that cost estimates are shown in dry-run preview."""
         store = JobStore(temp_db)
 
-        # Setup: v1.0 job with known token count
         old_time = (datetime.now() - timedelta(days=40)).isoformat()
         assert store.conn is not None
         cursor = store.conn.cursor()
@@ -265,7 +250,6 @@ class TestSelectiveReprocessingIntegration:
         )
 
         assert result.exit_code == 0
-        # Should show cost estimate if show-estimates enabled
         if "--show-estimates" in result.stdout or "Estimated cost" in result.stdout:
             assert "$" in result.stdout or "tokens" in result.stdout
 
@@ -285,13 +269,11 @@ class TestSelectiveReprocessingIntegration:
         )
 
         assert result.exit_code in [0, 1]
-        # Should find jobs or show preview
         output = result.stdout.lower()
         assert any(x in output for x in ["would", "preview", "found", "no jobs", "amazon"])
 
     def test_high_value_job_targeting(self, cli_runner: CliRunner) -> None:
         """Test targeting high-token jobs for maximum savings."""
-        # Target high-value jobs: 1500+ tokens (no jobs in default database)
         result = cli_runner.invoke(
             app,
             [
@@ -304,7 +286,6 @@ class TestSelectiveReprocessingIntegration:
         )
 
         assert result.exit_code in [0, 1]
-        # Should show result or "no jobs" message
         output = result.stdout.lower()
         assert any(x in output for x in ["no jobs", "found", "would", "preview"])
 
@@ -321,7 +302,6 @@ class TestSelectiveReprocessingIntegration:
             ],
         )
 
-        # Should default to limit=100
         assert result.exit_code in [0, 1]
         output = result.stdout.lower()
         assert any(x in output for x in ["no jobs", "found", "would", "preview"])

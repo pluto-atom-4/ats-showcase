@@ -25,10 +25,8 @@ class TestPhaseIndicatorObserverFix:
     def test_phase_indicator_has_state_change_callback(self, state_manager):
         """PhaseIndicator has _on_state_change callback method."""
         indicator = PhaseIndicator(state_manager)
-        # Verify _on_state_change method exists and is callable
         assert hasattr(indicator, "_on_state_change")
         assert callable(indicator._on_state_change)
-        # Verify callback can be called (no errors)
         indicator._on_state_change("crawl")
 
     def test_phase_indicator_updates_emoji_on_crawl_start(self, state_manager):
@@ -36,8 +34,7 @@ class TestPhaseIndicatorObserverFix:
         indicator = PhaseIndicator(state_manager)
         state_manager.start_phase("crawl", total_items=10)
         content = indicator.render()
-        # Should show running indicator
-        assert "⏳" in content  # Running emoji
+        assert "⏳" in content
 
     def test_phase_indicator_updates_emoji_on_crawl_complete(self, state_manager):
         """PhaseIndicator shows complete emoji when crawl finishes."""
@@ -45,8 +42,7 @@ class TestPhaseIndicatorObserverFix:
         state_manager.start_phase("crawl", total_items=10)
         state_manager.complete_phase("crawl")
         content = indicator.render()
-        # Should show complete indicator
-        assert "✓" in content  # Complete emoji
+        assert "✓" in content
 
     def test_phase_indicator_shows_multiple_phase_transitions(self, state_manager):
         """PhaseIndicator correctly shows status of all phases."""
@@ -56,9 +52,8 @@ class TestPhaseIndicatorObserverFix:
         state_manager.start_phase("preprocess", total_items=10)
 
         content = indicator.render()
-        # Crawl done, preprocess running
-        assert "✓" in content  # At least one completed
-        assert "⏳" in content  # At least one running
+        assert "✓" in content
+        assert "⏳" in content
 
 
 class TestExportPanelAccumulatedMetricsFix:
@@ -68,7 +63,6 @@ class TestExportPanelAccumulatedMetricsFix:
         """ExportPanel displays accumulated tokens from prior phases."""
         panel = ExportPanel(state_manager)
 
-        # Simulate metrics from prior phases
         state_manager.start_phase("crawl", total_items=10)
         state_manager.increment_phase_progress("crawl", tokens=1000)
         state_manager.complete_phase("crawl")
@@ -81,13 +75,12 @@ class TestExportPanelAccumulatedMetricsFix:
         state_manager.increment_phase_progress("assess", tokens=3000)
         state_manager.complete_phase("assess")
 
-        # Now show export panel
         state_manager.start_phase("export", total_items=1)
         content = panel.render()
 
         # Should show accumulated tokens (1000 + 2000 + 3000 = 6000)
         assert "Accumulated" in content
-        assert "6" in content  # At least 6000 in output
+        assert "6" in content
 
     def test_export_panel_shows_accumulated_cost(self, state_manager):
         """ExportPanel displays accumulated cost from prior phases."""
@@ -104,9 +97,8 @@ class TestExportPanelAccumulatedMetricsFix:
         state_manager.start_phase("export", total_items=1)
         content = panel.render()
 
-        # Should show accumulated cost
         assert "Accumulated" in content
-        assert "$" in content  # Cost symbol
+        assert "$" in content
 
     def test_export_panel_hides_accumulated_when_empty(self, state_manager):
         """ExportPanel omits accumulated section if no prior metrics."""
@@ -114,7 +106,6 @@ class TestExportPanelAccumulatedMetricsFix:
         state_manager.start_phase("export", total_items=1)
         content = panel.render()
 
-        # No prior metrics, so no accumulated section
         assert "Accumulated" not in content
 
 
@@ -123,11 +114,9 @@ class TestJSONExportSchemaFix:
 
     def test_export_writes_json_to_correct_location(self, tmp_path, state_manager):
         """Export phase writes JSON to data/extracted_jobs/preprocessed_jobs.json."""
-        # Mock the export directory
         export_dir = tmp_path / "extracted_jobs"
         export_file = export_dir / "preprocessed_jobs.json"
 
-        # Add test job
         state_manager.add_job(
             job_id="test_job_1",
             title="Python Developer",
@@ -139,7 +128,6 @@ class TestJSONExportSchemaFix:
             estimated_cost=0.00045,
         )
 
-        # Simulate what dashboard export does
         preprocessed_jobs = [
             {
                 "job_id": job_id,
@@ -160,7 +148,6 @@ class TestJSONExportSchemaFix:
             encoding="utf-8",
         )
 
-        # Verify file was written
         assert export_file.exists()
         assert export_file.read_text()
 
@@ -169,7 +156,6 @@ class TestJSONExportSchemaFix:
         export_dir = tmp_path / "extracted_jobs"
         export_file = export_dir / "preprocessed_jobs.json"
 
-        # Add test job
         state_manager.add_job(
             job_id="test_job_1",
             title="Python Developer",
@@ -201,7 +187,6 @@ class TestJSONExportSchemaFix:
             encoding="utf-8",
         )
 
-        # Read and validate schema
         data = json.loads(export_file.read_text())
         assert len(data) > 0
 
@@ -242,7 +227,6 @@ class TestJSONExportSchemaFix:
             "crawled_date": iso_date,
         }
 
-        # Verify ISO format can be parsed back
         parsed = datetime.fromisoformat(cast(str, job_data["crawled_date"]))
         assert isinstance(parsed, datetime)
 
@@ -344,10 +328,8 @@ class TestStateManagerObserverPattern:
         state_manager.subscribe(bad_observer)
         state_manager.subscribe(good_observer)
 
-        # Should not raise, even though bad_observer fails
         state_manager.start_phase("crawl", total_items=10)
 
-        # good_observer should still be called
         assert calls["good"] == 1
 
     def test_state_manager_multiple_observers(self, state_manager):

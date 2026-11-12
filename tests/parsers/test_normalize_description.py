@@ -212,9 +212,7 @@ class TestMarkdownSectionDividers:
             "</table>"
         )
         result = normalize_description(html)
-        # A standalone '---' divider line is what the header-insertion pass
-        # would add; markdown table separator rows (e.g. '| --- | --- |')
-        # are unrelated and expected here, so check for exact '---' lines.
+        # Count only standalone '---' lines; markdown table separators like '| --- | --- |' are expected and unrelated.
         assert "---" not in result.split("\n")
 
     def test_no_doubled_dividers_on_consecutive_headers(self):
@@ -222,9 +220,7 @@ class TestMarkdownSectionDividers:
         markdown = "## Requirements\n### Subsection\nSome content"
         result = add_markdown_section_headers(markdown)
         lines = result.split("\n")
-        # "## Requirements" is the first line of the document (no leading
-        # divider), and "### Subsection" immediately follows another
-        # header, so it is also skipped -- no divider anywhere.
+        # ## Requirements opens the document and ### Subsection follows a header, so no divider is inserted.
         assert lines.count("---") == 0
         req_idx = lines.index("## Requirements")
         sub_idx = lines.index("### Subsection")

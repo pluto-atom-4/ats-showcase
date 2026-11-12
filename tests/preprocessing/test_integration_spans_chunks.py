@@ -16,7 +16,6 @@ from spacy.language import Language
 from src.tokenization.chunker import SemanticChunker
 from src.tokenization.preprocessor import Preprocessor
 
-# Sample job descriptions with requirements for testing
 SAMPLE_JOBS = [
     {
         "id": "job_001",
@@ -169,6 +168,7 @@ def preprocessor() -> Generator[Preprocessor, None, None]:
         Preprocessor instance
     """
     try:
+        # span_categorizer may be in the pipeline, but spans are not used for chunking here.
         prep = Preprocessor(
             model="en_core_web_md",
             extract_requirements=True,
@@ -201,20 +201,16 @@ class TestSpanPreservationIntegration:
         job = SAMPLE_JOBS[0]
         text = job["description"]
 
-        # Process through pipeline
         doc = preprocessor.nlp(text)  # type: ignore[misc]
 
-        # Should extract requirements
         requirements = getattr(doc._, "requirements", None)
         assert requirements is not None, "Phase 8a should extract requirements"
         assert len(requirements) > 0, f"Should extract requirements from: {text[:100]}"
 
-        # Should create spans
         requirement_spans = getattr(doc._, "requirement_spans", None)
         assert requirement_spans is not None, "Phase 8b should create spans"
         assert len(requirement_spans) > 0, f"Should create spans for: {len(requirements)} requirements"
 
-        # Log extraction results
         logging.info(f"Job {job['id']}: Extracted {len(requirements)} requirements, {len(requirement_spans)} spans")
 
     def test_chunk_respects_requirement_spans(
@@ -231,26 +227,21 @@ class TestSpanPreservationIntegration:
         job = SAMPLE_JOBS[0]
         text = job["description"]
 
-        # Process through full pipeline
         doc = preprocessor.nlp(text)  # type: ignore[misc]
         requirement_spans = getattr(doc._, "requirement_spans", [])
 
         if not requirement_spans:
             pytest.skip("No requirement spans extracted")
 
-        # Chunk with span preservation (should not crash)
         chunks = chunker.chunk(text, doc=doc)
 
-        # Should produce valid chunks
         assert len(chunks) > 0, "Should produce chunks with span preservation"
         assert all(isinstance(chunk, str) and chunk.strip() for chunk in chunks), (
             "All chunks should be non-empty strings"
         )
 
-        # Verify core content is preserved (basic sanity check)
         full_text_lower = text.lower()
         combined_chunks = " ".join(chunks).lower()
-        # Should contain most of the original content
         content_coverage = sum(1 for word in full_text_lower.split() if word in combined_chunks) / len(
             full_text_lower.split()
         )
@@ -280,12 +271,10 @@ class TestSpanPreservationIntegration:
             requirement_spans = getattr(doc._, "requirement_spans", [])
             total_spans += len(requirement_spans)
 
-            # Chunk with span preservation enabled
             chunks = chunker.chunk(text, doc=doc)
             total_chunks += len(chunks)
             jobs_processed += 1
 
-            # Basic validation: chunks should be created
             assert len(chunks) > 0, f"Should produce chunks for {job['id']}"
             assert all(isinstance(c, str) and c.strip() for c in chunks), f"Invalid chunks for {job['id']}"
 
@@ -294,9 +283,10 @@ class TestSpanPreservationIntegration:
             for job in SAMPLE_JOBS:
                 text = job["description"]
                 doc = preprocessor.nlp(text)  # type: ignore[misc]
+                # Result discarded; timing only.
                 _ = chunker.chunk(text, doc=doc)
             elapsed_ms = (time.perf_counter() - start) * 1000
-            return elapsed_ms / len(SAMPLE_JOBS)  # Per-job time
+            return elapsed_ms / len(SAMPLE_JOBS)
 
         # Warm-up absorbs first-call cost; median of repeats suppresses jitter.
         run_batch()
@@ -322,15 +312,12 @@ class TestSpanPreservationIntegration:
         job = SAMPLE_JOBS[0]
         text = job["description"]
 
-        # Create chunker with span preservation disabled
         chunker_no_spans = SemanticChunker(preserve_requirement_spans=False)
 
         doc = preprocessor.nlp(text)  # type: ignore[misc]
 
-        # Chunk with flag disabled
         chunks = chunker_no_spans.chunk(text, doc=doc)
 
-        # Should still produce chunks (backward compatible)
         assert len(chunks) > 0, "Should produce chunks even with span preservation disabled"
 
     def test_chunk_metadata_completeness(self, preprocessor: Preprocessor) -> None:
@@ -381,12 +368,9 @@ class TestBackwardCompatibility:
             job_text = SAMPLE_JOBS[0]["description"]
             doc = prep.nlp(job_text)  # type: ignore[misc]
 
-            # Should still extract requirements (Phase 8a)
             requirements = getattr(doc._, "requirements", None)
             assert requirements is not None
 
-            # span_categorizer may or may not be in pipeline (depends on implementation)
-            # But even if present, we're not using spans for chunking
         except OSError:
             pytest.skip("en_core_web_md not installed")
 
@@ -395,7 +379,6 @@ class TestBackwardCompatibility:
         chunker = SemanticChunker(preserve_requirement_spans=True)
         job_text = SAMPLE_JOBS[0]["description"]
 
-        # Should work without doc parameter
         chunks = chunker.chunk(job_text)
 
         assert len(chunks) > 0, "Should produce chunks without doc parameter"
@@ -411,13 +394,11 @@ class TestEdgeCases:
             preprocessor: Preprocessor fixture
             chunker: Chunker fixture
         """
-        # Text without requirements
         text = "This is a simple job posting without specific requirements mentions."
 
         doc = preprocessor.nlp(text)  # type: ignore[misc]
         chunks = chunker.chunk(text, doc=doc)
 
-        # Should still produce chunks (graceful degradation)
         assert len(chunks) > 0
 
     def test_single_long_span(self, preprocessor: Preprocessor, chunker: SemanticChunker) -> None:
@@ -440,7 +421,6 @@ class TestEdgeCases:
 
         if requirement_spans:
             chunks = chunker.chunk(long_requirement, doc=doc)
-            # Even with very long spans, shouldn't crash
             assert len(chunks) > 0
 
 
@@ -458,7 +438,7 @@ class TestTokenLevelSpanPreservation:
             preprocessor: Preprocessor fixture
             chunker: Chunker fixture
         """
-        for job in SAMPLE_JOBS[:3]:  # Test first 3 jobs for token-level validation
+        for job in SAMPLE_JOBS[:3]:
             text = job["description"]
             doc = preprocessor.nlp(text)  # type: ignore[misc]
             requirement_spans = getattr(doc._, "requirement_spans", [])
@@ -466,32 +446,26 @@ class TestTokenLevelSpanPreservation:
             if not requirement_spans:
                 continue
 
-            # Chunk with span preservation
             chunks = chunker.chunk(text, doc=doc)
 
-            # For each span, verify key content appears in chunks
             for span in requirement_spans:
                 span_text = span.get("span_text", "").strip()
                 if not span_text:
                     continue
 
-                # Normalize whitespace in span (multiple spaces/newlines → single space)
                 import re
 
                 normalized_span = re.sub(r"\s+", " ", span_text.lower())
                 normalized_chunks = [re.sub(r"\s+", " ", c.lower()) for c in chunks]
 
-                # Find which chunk(s) contain key keywords from span
-                # Extract first few significant words as search key
-                key_words = normalized_span.split()[:3]  # First 3 words
+                key_words = normalized_span.split()[:3]
                 search_key = " ".join(key_words)
 
                 containing_chunks = [c for c in normalized_chunks if search_key in c]
 
                 assert len(containing_chunks) > 0, f"Span key '{search_key}' not found in any chunk for job {job['id']}"
 
-                # Ideally should be in exactly one chunk (not split)
-                # Allow up to 2 if boundary alignment is tight, but log it
+                # A span may split across at most 2 chunks when the boundary is tight.
                 if len(containing_chunks) > 1:
                     logging.warning(
                         f"Span key '{search_key}' found in {len(containing_chunks)} chunks (possible split)"
@@ -511,21 +485,18 @@ class TestTokenLevelSpanPreservation:
             doc = preprocessor.nlp(text)  # type: ignore[misc]
             requirement_spans = getattr(doc._, "requirement_spans", [])
 
-            # Validate token indices
             for span in requirement_spans:
                 start_token = span.get("start_token", -1)
                 end_token = span.get("end_token", -1)
                 span_text = span.get("span_text", "")
 
                 if start_token >= 0 and end_token >= 0:
-                    # Tokens should be within document bounds
                     assert 0 <= start_token <= len(doc), (
                         f"start_token {start_token} out of bounds for doc with {len(doc)} tokens"
                     )
                     assert 0 <= end_token <= len(doc), (
                         f"end_token {end_token} out of bounds for doc with {len(doc)} tokens"
                     )
-                    # End should be >= start
                     assert end_token >= start_token, (
                         f"end_token {end_token} < start_token {start_token} for span '{span_text}'"
                     )
@@ -554,15 +525,10 @@ class TestChunkMetadataWithSpans:
         if not requirement_spans:
             pytest.skip("No requirement spans to validate")
 
-        # Process chunks
         chunks = chunker.chunk(text, doc=doc)
 
-        # Should have chunks
         assert len(chunks) > 0
 
-        # If chunker maintains metadata dict (future enhancement),
-        # each chunk should know which spans it contains
-        # For now, validate that chunking didn't crash and produced output
         for chunk in chunks:
             assert isinstance(chunk, str)
             assert len(chunk.strip()) > 0
@@ -603,30 +569,25 @@ class TestDetailedPerformanceMetrics:
         for _job_idx, job in enumerate(SAMPLE_JOBS):
             text = job["description"]
 
-            # Time NLP pipeline (use perf_counter for lower noise)
             start_nlp = time.perf_counter()
             doc = preprocessor.nlp(text)  # type: ignore[misc]
             nlp_ms = (time.perf_counter() - start_nlp) * 1000
             phase_times["nlp_pipeline"].append(nlp_ms)
 
-            # Time chunking (use perf_counter for lower noise)
             start_chunk = time.perf_counter()
-            _ = chunker.chunk(text, doc=doc)  # Process chunks, timing only
+            _ = chunker.chunk(text, doc=doc)
             chunk_ms = (time.perf_counter() - start_chunk) * 1000
             phase_times["chunking"].append(chunk_ms)
 
             total_ms = nlp_ms + chunk_ms
             phase_times["total"].append(total_ms)
 
-        # Use rank-based robustness checks instead of extrapolating quantiles
-        # statistics.quantiles(N=10, n=20, method="exclusive") extrapolates beyond max(data)
-        # at interpolation position 10.45, creating phantom p95=404ms not in actual data.
-        # Instead, use rank-based check: "at least 9/10 jobs under 300ms" is valid for any N.
+        # statistics.quantiles(method="exclusive") extrapolates past max(data), so p95 for N=10 is a phantom value.
+        # Use a rank check instead: at least 9 of 10 jobs under 300ms.
         median_total = statistics.median(phase_times["total"])
         max_total = max(phase_times["total"])
         jobs_under_300ms = sum(1 for t in phase_times["total"] if t < 300)
 
-        # Log phase breakdown
         avg_nlp = sum(phase_times["nlp_pipeline"]) / len(phase_times["nlp_pipeline"])
         avg_chunk = sum(phase_times["chunking"]) / len(phase_times["chunking"])
         avg_total = sum(phase_times["total"]) / len(phase_times["total"])
@@ -646,9 +607,6 @@ class TestDetailedPerformanceMetrics:
             f"  Jobs <300ms: {jobs_under_300ms}/10"
         )
 
-        # Rank-based check: at least 9/10 jobs should be under 300ms (allows 1 outlier)
-        # NOTE: A literal 95th percentile is not well-defined for N=10 samples.
-        # statistics.quantiles() default method="exclusive" extrapolates above max(data).
         assert jobs_under_300ms >= 9, (
             f"Only {jobs_under_300ms}/10 jobs under 300ms target (median={median_total:.1f}ms, max={max_total:.1f}ms)"
         )
@@ -688,7 +646,7 @@ class TestDetailedPerformanceMetrics:
                 doc = preprocessor.nlp(text)  # type: ignore[misc]
                 _ = chunker.chunk(text, doc=doc)
             elapsed_ms = (time.perf_counter() - start) * 1000
-            return elapsed_ms / count  # Per-job time
+            return elapsed_ms / count
 
         for count in job_counts:
             # Warm-up run absorbs first-call cost so it does not skew samples.
@@ -696,9 +654,7 @@ class TestDetailedPerformanceMetrics:
             samples = [run_batch(count) for _ in range(repeats)]
             medians.append(statistics.median(samples))
 
-        # Each batch should maintain similar per-job time (±50% variance
-        # acceptable). Medians of repeated perf_counter() samples are less
-        # noisy than a single time.time() sample (not quantified here).
+        # Per-job time may vary by +/-50% between batches.
         baseline = medians[0]
         assert baseline > 0, f"Baseline per-job time is {baseline}ms; cannot compute relative variance"
         for i in range(1, len(medians)):
@@ -748,32 +704,26 @@ class TestComprehensiveEndToEnd:
             text = job["description"]
 
             try:
-                # Phase 1: NLP + requirement extraction
                 doc = preprocessor.nlp(text)  # type: ignore[misc]
 
-                # Extract requirements
                 requirements = getattr(doc._, "requirements", [])
                 if requirements:
                     results["jobs_with_requirements"] += 1  # type: ignore[operator]
                     results["total_requirements"] += len(requirements)  # type: ignore[operator]
 
-                # Extract spans
                 requirement_spans = getattr(doc._, "requirement_spans", [])
                 if requirement_spans:
                     results["jobs_with_spans"] += 1  # type: ignore[operator]
                     results["total_spans"] += len(requirement_spans)  # type: ignore[operator]
 
-                # Phase 2: Chunking with span preservation
                 chunks = chunker.chunk(text, doc=doc)
                 results["total_chunks"] += len(chunks)  # type: ignore[operator]
 
-                # Validate chunks
                 assert all(isinstance(c, str) and c.strip() for c in chunks), f"Invalid chunks for {job_id}"
 
             except Exception as e:
                 results["errors"].append(f"{job_id}: {str(e)}")  # type: ignore[attr-defined]
 
-        # Log comprehensive results
         error_count = len(results["errors"])  # type: ignore[arg-type]
         logging.info(
             f"End-to-End Pipeline Results:\n"
@@ -786,7 +736,6 @@ class TestComprehensiveEndToEnd:
             f"  Errors: {error_count}"
         )
 
-        # Assertions
         assert results["total_jobs"] == 10, "Should process all 10 sample jobs"  # type: ignore[operator]
         assert len(results["errors"]) == 0, f"Pipeline errors: {results['errors']}"  # type: ignore[arg-type]
         assert results["jobs_with_requirements"] > 0, "Should extract requirements from some jobs"  # type: ignore[operator]
@@ -799,7 +748,7 @@ class TestComprehensiveEndToEnd:
                 doc = preprocessor.nlp(text)  # type: ignore[misc]
                 _ = chunker.chunk(text, doc=doc)
             elapsed_ms = (time.perf_counter() - start) * 1000
-            return elapsed_ms / len(SAMPLE_JOBS)  # Per-job time
+            return elapsed_ms / len(SAMPLE_JOBS)
 
         # Warm-up absorbs first-call cost; median of repeats suppresses jitter.
         run_batch()

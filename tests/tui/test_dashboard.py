@@ -43,7 +43,7 @@ class TestHeaderPanel:
         header = HeaderPanel(state_manager)
         content = header.render()
         assert "ATS Showcase" in content
-        assert "$" in content  # Cost symbol
+        assert "$" in content
 
 
 class TestCrawlPanel:
@@ -62,7 +62,7 @@ class TestCrawlPanel:
         state_manager.increment_phase_progress("crawl", tokens=100)
         content = panel.render()
         assert "CRAWL" in content
-        assert "100" in content  # Token count
+        assert "100" in content
 
 
 class TestPreprocessPanel:
@@ -95,7 +95,6 @@ class TestAssessPanel:
         panel = AssessPanel(state_manager)
         state_manager.start_phase("assess", total_items=3)
 
-        # Add jobs to state
         state_manager.add_job(
             job_id="job_1",
             title="Python Developer",
@@ -109,11 +108,9 @@ class TestAssessPanel:
             overall_score=87,
         )
 
-        # Verify panel header renders
         content = panel.render()
         assert "ASSESS" in content
 
-        # Verify jobs are in state (panel would display via JobTable widget)
         jobs_in_state = [j for j in state_manager.jobs.values() if j.get("overall_score")]
         assert len(jobs_in_state) == 2
         assert any(j["title"] == "Python Developer" for j in jobs_in_state)
@@ -170,7 +167,6 @@ class TestPhaseIndicator:
         state_manager.start_phase("crawl", total_items=5)
         indicator = PhaseIndicator(state_manager)
         content = indicator.render()
-        # Should show running indicator
         assert "⏳" in content or "Running" in content or "Crawl" in content
 
 
@@ -189,7 +185,7 @@ class TestProgressBar:
         state_manager.increment_phase_progress("crawl", tokens=50)
         content = bar.render()
         assert "%" in content
-        assert "(" in content  # Progress count
+        assert "(" in content
 
 
 class TestCostTracker:
@@ -221,6 +217,5 @@ class TestJobTable:
     def test_job_table_has_update_rows_method(self, state_manager):
         """JobTable has update_rows method."""
         table = JobTable(state_manager)
-        # Verify method exists and is callable
         assert hasattr(table, "update_rows")
         assert callable(table.update_rows)

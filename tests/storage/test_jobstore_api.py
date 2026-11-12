@@ -20,7 +20,6 @@ class TestJobStoreUpdatePreprocessingVersion:
 
     def test_update_version_v1_to_v2(self, store: JobStore) -> None:
         """Update job version from v1.0 to v2.0."""
-        # Add test job with v1.0
         store.add_job(
             job_id="job1",
             title="Test Job",
@@ -29,17 +28,14 @@ class TestJobStoreUpdatePreprocessingVersion:
             preprocessing_version="v1.0",
         )
 
-        # Update to v2.0
         store.update_preprocessing_version("job1", "v2.0")
 
-        # Verify
         job = store.get_job("job1")
         assert job is not None
         assert job["preprocessing_version"] == "v2.0"
 
     def test_update_version_v2_to_v3(self, store: JobStore) -> None:
         """Update job version from v2.0 to v3.0 (Issue #281 S5)."""
-        # Add test job with v2.0
         store.add_job(
             job_id="job1",
             title="Test Job",
@@ -48,10 +44,8 @@ class TestJobStoreUpdatePreprocessingVersion:
             preprocessing_version="v2.0",
         )
 
-        # Update to v3.0
         store.update_preprocessing_version("job1", "v3.0")
 
-        # Verify
         job = store.get_job("job1")
         assert job is not None
         assert job["preprocessing_version"] == "v3.0"
@@ -66,10 +60,8 @@ class TestJobStoreUpdatePreprocessingVersion:
             preprocessing_version="1.0",
         )
 
-        # Update with version without 'v' prefix
         store.update_preprocessing_version("job1", "3.0")
 
-        # Verify normalized to v-prefix format
         job = store.get_job("job1")
         assert job is not None
         assert job["preprocessing_version"] == "v3.0"
@@ -197,7 +189,6 @@ class TestJobStoreGetVersionStats:
 
     def test_get_version_stats_mixed(self, store: JobStore) -> None:
         """Returns count for all versions."""
-        # Add 3 v1.0 jobs
         for i in range(3):
             store.add_job(
                 job_id=f"v1_job{i}",
@@ -207,7 +198,6 @@ class TestJobStoreGetVersionStats:
                 preprocessing_version="v1.0",
             )
 
-        # Add 2 v2.0 jobs
         for i in range(3, 5):
             store.add_job(
                 job_id=f"v2_job{i}",
@@ -217,7 +207,6 @@ class TestJobStoreGetVersionStats:
                 preprocessing_version="v2.0",
             )
 
-        # Add 1 v3.0 job
         store.add_job(
             job_id="v3_job5",
             title="Job 5",

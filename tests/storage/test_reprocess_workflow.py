@@ -17,19 +17,15 @@ class TestReprocessingWorkflow:
 
     def test_reprocess_v1_jobs_only(self, store: JobStore) -> None:
         """Selective re-preprocess updates only v1.0 jobs."""
-        # Add v1.0 and v2.0 jobs
         store.add_job("job1", "Title 1", "Co1", "Remote", preprocessing_version="v1.0")
         store.add_job("job2", "Title 2", "Co2", "Remote", preprocessing_version="v2.0")
 
-        # Get v1.0 jobs
         v1_jobs = store.get_jobs_by_version("v1.0")
         assert len(v1_jobs) == 1
 
-        # Re-preprocess v1.0 to v2.0
         for job in v1_jobs:
             store.update_preprocessing_version(job["job_id"], "v2.0")
 
-        # Verify
         v1_after = store.get_jobs_by_version("v1.0")
         v2_after = store.get_jobs_by_version("v2.0")
         assert len(v1_after) == 0

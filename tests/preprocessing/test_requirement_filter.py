@@ -151,7 +151,6 @@ class TestConfidenceScoring:
         """Verify parenthetical context reduces confidence."""
         doc = nlp("Experience with Kubernetes (or Docker) is essential.")
         assert len(doc._.requirements) > 0
-        # At least one requirement should have reduced confidence due to parentheticals
         confidences = [req["confidence"] for req in doc._.requirements]
         assert min(confidences) < 0.95
 
@@ -162,7 +161,6 @@ class TestNegationHandling:
     def test_no_experience_required_excluded(self, nlp):
         """Verify 'no experience required' is excluded (negation)."""
         doc = nlp("No prior experience with our tools is required.")
-        # Should either not match or have zero confidence
         for req in doc._.requirements:
             if "experience" in req["text"].lower():
                 assert req["confidence"] == 0.0 or req["confidence"] < 0.1
@@ -170,9 +168,9 @@ class TestNegationHandling:
     def test_not_requirement_excluded(self, nlp):
         """Verify negated requirements are excluded."""
         doc = nlp("Not required: advanced Python skills")
-        # Negated requirements should not appear or have low confidence
         for req in doc._.requirements:
-            assert req["confidence"] > 0.0  # or not present
+            # Passes vacuously when the negated requirement is not extracted at all.
+            assert req["confidence"] > 0.0
 
 
 class TestSpanExtraction:
@@ -197,7 +195,6 @@ class TestSpanExtraction:
             start, end = req["span"]
             assert 0 <= start < len(text)
             assert start < end <= len(text)
-            # Verify text at span matches requirement
             assert text[start:end].lower() == req["text"].lower()
 
 
@@ -237,11 +234,9 @@ class TestFixtureSentences:
             doc = nlp(sentence)
             requirements = doc._.requirements
 
-            # Should have at least one requirement for positive cases
             if expected_matches:
                 assert len(requirements) > 0, f"[{fixture_id}] No requirements found in: {sentence}"
 
-                # Verify at least one expected trigger is present
                 found_triggers = {req["trigger_word"] for req in requirements}
                 expected_triggers = {m.get("trigger_word", "") for m in expected_matches}
                 assert found_triggers & expected_triggers, (
@@ -259,9 +254,7 @@ class TestFixtureSentences:
 
             doc = nlp(sentence)
 
-            # Should have no requirements for negative cases
             if not expected_matches:
-                # Either no requirements or all have very low confidence
                 for req in doc._.requirements:
                     assert req["confidence"] < 0.5, (
                         f"[{fixture_id}] Unexpected high-confidence requirement in negative case: {req}"
@@ -280,7 +273,6 @@ class TestEdgeCases:
         """Test conditional requirement (if statement)."""
         doc = nlp("If you have AWS certification, that's a bonus.")
         requirements = doc._.requirements
-        # Should match but with reduced confidence
         assert len(requirements) > 0
         assert requirements[0]["confidence"] < 0.5
 
@@ -315,7 +307,6 @@ class TestEdgeCases:
     def test_no_trigger_word(self, nlp):
         """Test sentence with no requirement trigger."""
         doc = nlp("We are looking for a talented individual to join our team.")
-        # Should have no or very few requirements
         assert len(doc._.requirements) == 0 or all(req["confidence"] < 0.5 for req in doc._.requirements)
 
 
@@ -326,9 +317,7 @@ class TestDeduplication:
         """Verify duplicate requirements are removed."""
         doc = nlp("Must have Python. Python is required. Must know Python language.")
         requirements = doc._.requirements
-        # Count unique requirement texts
         unique_texts = {req["text"].lower() for req in requirements}
-        # Should deduplicate similar requirements
         assert len(unique_texts) <= len(requirements)
 
 
@@ -337,29 +326,22 @@ class TestDeduplicationCasing:
 
     def test_preserve_capitalization_in_dedup(self, nlp):
         """Verify original casing is preserved when requirements deduplicated."""
-        # When two requirements match (lowercased) with same confidence,
-        # the one with better capitalization should win
+        # When two requirements match case-insensitively with equal confidence, the better-capitalized one wins.
         doc = nlp("required: Python language. Must use python language.")
         requirements = doc._.requirements
 
-        # Find deduplicated entry
         python_reqs = [r for r in requirements if "python" in r["text"].lower()]
         if python_reqs:
-            # Should keep "Python" (capitalized) not "python" (lowercase)
             best_req = python_reqs[0]
-            # At least one capital letter should be present
             assert any(c.isupper() for c in best_req["text"])
 
     def test_casing_preference_when_confidence_tied(self, nlp):
         """Verify better casing wins when confidence scores are tied."""
-        # Create a scenario where same requirement appears with different casings
         doc = nlp("Required: AWS certification. required: aws certification.")
         requirements = doc._.requirements
 
-        # Should keep better-cased version
         for req in requirements:
             if "aws" in req["text"].lower():
-                # Prefer "AWS" over "aws"
                 caps_count = sum(1 for c in req["text"] if c.isupper())
                 assert caps_count > 0
 
@@ -371,13 +353,10 @@ class TestCrossSentenceNegation:
         """Verify negation pattern detection in local context."""
         doc = nlp("No Python knowledge is required.")
         requirements = doc._.requirements
-        # Negation patterns should be detected (actual behavior may vary by pattern match)
-        # Just verify no crash and requirements extracted
         assert isinstance(requirements, list)
 
     def test_local_context_window_handling(self, nlp):
         """Verify local context window prevents false negations."""
-        # Long text before requirement with negation far away
         doc = nlp("Prior experience with proprietary systems is not a requirement. Python developers required.")
         requirements = doc._.requirements
         # Should complete without error, using local 50-char context window
@@ -385,13 +364,10 @@ class TestCrossSentenceNegation:
 
     def test_find_edge_case_fallback(self, nlp):
         """Verify fallback when requirement text not found in sentence (edge case)."""
-        # If matched text doesn't align with sentence boundaries,
-        # should use full_sentence as context (not crash on find() returning -1)
+        # If the match does not align with sentence boundaries, full_sentence is the context (find() returns -1).
         doc = nlp("Required: ability to manage teams. Also essential for leadership.")
         requirements = doc._.requirements
-        # Should complete without error even if span doesn't neatly fit extracted sentence
         assert isinstance(requirements, list)
-        # Verify at least some requirements extracted
         assert len(requirements) > 0
 
 
@@ -401,7 +377,6 @@ class TestBisectPerformance:
     @pytest.mark.slow
     def test_bisect_lookup_efficiency(self, nlp):
         """Verify O(log n) bisect-based sentence lookup works correctly."""
-        # Create a document with many sentences
         sentences = [
             "Required: Python programming skills.",
             "Must have Java expertise.",
@@ -417,8 +392,6 @@ class TestBisectPerformance:
         text = " ".join(sentences)
         doc = nlp(text)
 
-        # Should extract requirements from multiple sentences without O(n*m) performance
         requirements = doc._.requirements
-        # Verify requirements are extracted from all sentences
         trigger_words = {req["trigger_word"] for req in requirements}
         assert len(trigger_words) > 0

@@ -44,7 +44,6 @@ class TestPreprocessorCategorizerStrategy:
 
         # SYNTHETIC: Test fixture patterns
         """
-        # Create a temporary valid patterns file
         patterns = [
             {
                 "category": "tech",
@@ -58,13 +57,11 @@ class TestPreprocessorCategorizerStrategy:
             with open(patterns_file, "w") as f:
                 json.dump(patterns, f)
 
-            # Mock spacy.load
             mock_nlp = MagicMock()
             monkeypatch.setattr("spacy.load", lambda model: mock_nlp)
 
             from src.tokenization.preprocessor import Preprocessor
 
-            # Should not raise
             preprocessor = Preprocessor(
                 model="en_core_web_md",
                 categorizer_strategy="custom",
@@ -99,12 +96,11 @@ class TestPreprocessorCategorizerStrategy:
             categorizer_strategy="nlp",
         )
 
-        # Create a blank spaCy doc
+        # Create a blank spaCy doc (no model needed, custom categorizer is regex-only)
         nlp = spacy.blank("en")
         doc = nlp("test text")
 
         result = preprocessor.apply_custom_spans(doc)
-        # Should return doc unchanged
         assert result is doc
         assert not hasattr(doc._, "custom_spans") or doc._.custom_spans is None
 
@@ -137,14 +133,11 @@ class TestPreprocessorCategorizerStrategy:
                 span_patterns_path=str(patterns_file),
             )
 
-            # Create a blank spaCy doc (no model needed, custom categorizer is regex-only)
             nlp = spacy.blank("en")
             doc = nlp("python developer")
 
-            # apply_custom_spans should call the component
             result = preprocessor.apply_custom_spans(doc)
             assert result is doc
-            # custom_spans extension should be set (from component)
             assert hasattr(result._, "custom_spans")
 
     def test_nlp_strategy_default_parameter(self, monkeypatch) -> None:
@@ -182,7 +175,6 @@ class TestPreprocessorCategorizerStrategy:
         """
         with tempfile.TemporaryDirectory() as tmpdir:
             patterns_file = Path(tmpdir) / "invalid.json"
-            # Not an array
             with open(patterns_file, "w") as f:
                 json.dump({"invalid": "structure"}, f)
 

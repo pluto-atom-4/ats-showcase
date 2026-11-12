@@ -126,9 +126,9 @@ class TestJobDataFlow:
         state_manager.update_top_matches(jobs)
 
         assert len(state_manager.top_matches) == 5
-        assert state_manager.top_matches[0]["overall_score"] == 95  # j2
-        assert state_manager.top_matches[1]["overall_score"] == 90  # j4
-        assert state_manager.top_matches[4]["overall_score"] == 55  # j3
+        assert state_manager.top_matches[0]["overall_score"] == 95
+        assert state_manager.top_matches[1]["overall_score"] == 90
+        assert state_manager.top_matches[4]["overall_score"] == 55
 
     def test_top_matches_limited_to_five(self, state_manager: StateManager) -> None:
         """Top matches never exceeds 5 items."""
@@ -188,13 +188,12 @@ class TestPhaseMetricsCalculation:
             fake_clock.advance(0.05)
 
         throughput = state_manager.phase_metrics["assess"].items_per_second
-        assert throughput == pytest.approx(2 / 0.1)  # 20 items/sec
+        assert throughput == pytest.approx(2 / 0.1)
 
     def test_eta_seconds_calculation(self, state_manager: StateManager, fake_clock: _FakeClock) -> None:
         """ETA estimated from throughput and remaining items."""
         state_manager.start_phase("export", total_items=10)
 
-        # Process 2 items over 0.1 fake seconds to establish throughput
         for _ in range(2):
             state_manager.increment_phase_progress("export", tokens=100)
             fake_clock.advance(0.05)
@@ -202,8 +201,7 @@ class TestPhaseMetricsCalculation:
         eta = state_manager.phase_metrics["export"].eta_seconds
         remaining = 10 - 2
 
-        # 8 remaining items at 20 items/sec
-        assert eta == pytest.approx(remaining / (2 / 0.1))  # 0.4 s
+        assert eta == pytest.approx(remaining / (2 / 0.1))
 
 
 class TestErrorHandling:
@@ -231,7 +229,8 @@ class TestErrorHandling:
 
         metrics = state_manager.phase_metrics["crawl"]
         assert metrics.processed_items == 5
-        assert metrics.failed_items == 2  # i=1,3 failed (even indices succeed)
+        # Odd indices (i=1,3) fail; even indices succeed.
+        assert metrics.failed_items == 2
 
 
 class TestPausedState:
@@ -263,7 +262,6 @@ class TestLargeDataset:
         """StateManager handles 1000+ jobs efficiently."""
         state_manager.start_phase("assess", total_items=1000)
 
-        # Add 1000 jobs
         for i in range(1000):
             state_manager.add_job(
                 f"job_{i}",
@@ -274,11 +272,9 @@ class TestLargeDataset:
 
         assert len(state_manager.jobs) == 1000
 
-        # Update top matches with all jobs
         jobs_list = list(state_manager.jobs.values())
         state_manager.update_top_matches(jobs_list)
 
-        # Top 5 should be highest scores
         assert len(state_manager.top_matches) == 5
         scores = [j["overall_score"] for j in state_manager.top_matches]
         assert scores == sorted(scores, reverse=True)

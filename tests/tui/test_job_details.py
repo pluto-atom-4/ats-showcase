@@ -43,10 +43,10 @@ class TestJobDetailsPanel:
         panel = JobDetailsPanel("job_1", job_data)
         content = panel.render()
 
-        assert "85" in content  # Overall score
-        assert "90" in content  # Tech score
-        assert "80" in content  # Seniority score
-        assert "75" in content  # Location score
+        assert "85" in content
+        assert "90" in content
+        assert "80" in content
+        assert "75" in content
 
     def test_job_details_renders_summary(self):
         """JobDetailsPanel displays assessment summary."""
@@ -108,17 +108,14 @@ class TestJobTableExpansion:
 
         table = JobTable(state_manager)
 
-        # Manually set up job_rows (what update_rows does)
         job_1 = state_manager.jobs["job_1"]
         table.job_rows["row_0"] = job_1  # type: ignore[index]
 
-        # Test expansion
         table.expanded_job_id = "job_1"
         expanded = table.get_expanded_job()
         assert expanded is not None
         assert expanded["title"] == "Python Dev"
 
-        # Test collapse
         table.expanded_job_id = None
         assert table.get_expanded_job() is None
 
@@ -139,7 +136,7 @@ class TestJobTableExpansion:
 
         table = JobTable(state_manager)
 
-        # Manually setup job_rows to simulate what update_rows does
+        # Populate job_rows directly, mirroring update_rows without a DataTable.
         jobs = list(state_manager.jobs.values())
         for i, job in enumerate(jobs):
             table.job_rows[f"row_{i}"] = job  # type: ignore[index]
@@ -171,20 +168,18 @@ class TestAssessmentViewingWorkflow:
         panel = JobDetailsPanel(cast(str, job_data["id"]), job_data)
         content = panel.render()
 
-        assert "85" in content  # Score
-        assert "Strong technical fit" in content  # Summary
-        assert "Highlight Docker" in content  # Recommendation
+        assert "85" in content
+        assert "Strong technical fit" in content
+        assert "Highlight Docker" in content
 
     def test_filter_only_assessed_jobs_for_display(self, state_manager):
         """Only show jobs with scores in table."""
-        # Add unassessed job
         state_manager.add_job(
             job_id="job_1",
             title="Not Assessed Yet",
             company="Corp",
         )
 
-        # Add assessed job
         state_manager.add_job(
             job_id="job_2",
             title="Already Assessed",
@@ -192,7 +187,6 @@ class TestAssessmentViewingWorkflow:
             overall_score=85,
         )
 
-        # Filter only assessed
         assessed = [j for j in state_manager.jobs.values() if j.get("overall_score") is not None]
 
         assert len(assessed) == 1
@@ -209,6 +203,5 @@ class TestAssessmentViewingWorkflow:
         panel = JobDetailsPanel("job_1", job_data)
         content = panel.render()
 
-        # Should render without crashing
         assert "Minimal Job" in content
-        assert "0/100" in content  # Default score
+        assert "0/100" in content

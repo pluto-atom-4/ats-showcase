@@ -74,20 +74,16 @@ class TestCleanHtmlVsHTMLCleaner:
         """clean_html() produces comparable output to HTMLCleaner."""
         html = "<h1>Senior Python Developer</h1><p>Requirements: 5+ years Python</p><p>Apply Now</p>"
 
-        # HTMLCleaner path
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             cleaner = HTMLCleaner()
             cleaner_result = cleaner.clean(html)
 
-        # clean_html path
         clean_result = clean_html(html)
 
-        # Both should preserve core content
         assert "Python" in cleaner_result or "Developer" in cleaner_result
         assert "Python" in clean_result or "Developer" in clean_result
 
-        # Both should remove "Apply Now"
         assert "Apply Now" not in cleaner_result
         assert "Apply Now" not in clean_result
 
@@ -102,7 +98,6 @@ class TestCleanHtmlVsHTMLCleaner:
 
         clean_result = clean_html(html)
 
-        # Both should remove &nbsp;
         assert "&nbsp;" not in cleaner_result
         assert "&nbsp;" not in clean_result
 
@@ -117,7 +112,6 @@ class TestCleanHtmlVsHTMLCleaner:
 
         clean_result = clean_html(html)
 
-        # Both should remove these patterns
         assert "Equal Opportunity" not in cleaner_result
         assert "Equal Opportunity" not in clean_result
         assert "Share" not in cleaner_result
@@ -133,7 +127,6 @@ class TestCleanHtmlEnhancements:
 
         clean_result = clean_html(html, include_section_headers=True)
 
-        # Should have structured output (headers, content)
         assert "Python" in clean_result
         assert "AWS" in clean_result
 
@@ -141,15 +134,13 @@ class TestCleanHtmlEnhancements:
         """clean_html() supports skip_boilerplate_categories (new feature)."""
         html = "<p>Competitive salary. Full-time position.</p>"
 
-        # Can skip salary_benefits to preserve "$" and amount
         result = clean_html(html, skip_boilerplate_categories={"salary_benefits"})
 
-        # Even without salary in this example, the feature exists
+        # Skipping salary_benefits keeps the "$" and amount.
         assert isinstance(result, str)
 
     def test_clean_html_type_hints_improve_safety(self) -> None:
         """clean_html() has improved type hints for better IDE support."""
-        # clean_html() now accepts str | None for safer code
         result = clean_html("")
         assert result == ""
 
@@ -168,7 +159,6 @@ class TestEdgeCaseConsistency:
 
         clean_result = clean_html(html)
 
-        # Both should return empty string
         assert cleaner_result == ""
         assert clean_result == ""
 
@@ -183,7 +173,6 @@ class TestEdgeCaseConsistency:
 
         clean_result = clean_html(html)
 
-        # Both should return valid strings
         assert isinstance(cleaner_result, str)
         assert isinstance(clean_result, str)
         assert len(cleaner_result) > 0 or len(clean_result) > 0
@@ -204,7 +193,6 @@ class TestMigrationPath:
         # New pattern (recommended)
         new_result = clean_html(html)
 
-        # Both should produce usable output
         assert isinstance(old_result, str)
         assert isinstance(new_result, str)
         assert len(old_result) > 0
@@ -226,6 +214,5 @@ class TestMigrationPath:
             cleaner = HTMLCleaner()
             result = cleaner.extract_text(html, selector=".job-details")
 
-        # Should extract and clean the selected content
         assert isinstance(result, str)
         assert len(result) > 0

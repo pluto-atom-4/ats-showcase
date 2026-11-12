@@ -56,7 +56,7 @@ class TestSpanBoundaryAccuracy:
 
         # Test cases that have trigger words matched by Phase 8a
         extracted_count = 0
-        for case in atomic_cases[:3]:  # Test first 3
+        for case in atomic_cases[:3]:
             doc = preprocessor.nlp(case["raw_requirement"])  # type: ignore[misc]
             spans = getattr(doc._, "requirement_spans", [])
 
@@ -69,7 +69,6 @@ class TestSpanBoundaryAccuracy:
                 assert "end_token" in actual
                 assert actual["span_type"] in ["atomic", "compound"]
 
-        # Should extract at least one from atomic cases
         assert extracted_count >= 1, "Should extract at least one atomic span"
 
     def test_cross_boundary_sentence_end(self, fixtures: dict[str, Any], preprocessor: Preprocessor) -> None:
@@ -109,7 +108,6 @@ class TestSpanBoundaryAccuracy:
 
                 if case["expected_spans"]:
                     assert len(spans) > 0, f"Expected spans for: {case['id']}"
-                    # Verify 'if' stops the span
                     assert "if" not in spans[0]["span_text"].lower()
 
 
@@ -152,13 +150,11 @@ class TestCompoundValidation:
                 spans = getattr(doc._, "requirement_spans", [])
 
                 if len(spans) > 0:
-                    # Check if any span is compound (might not be due to Phase 8a extraction)
                     for span in spans:
                         if span["span_type"] == "compound" and span["conjunct_count"] >= 2:
                             found_compound_and = True
                             break
 
-        # Should find at least one compound with 'and'
         assert found_compound_and, "Should find at least one compound 'and' requirement"
 
     def test_compound_three_conjuncts_or(self, fixtures: dict[str, Any], preprocessor: Preprocessor) -> None:
@@ -199,7 +195,6 @@ class TestCompoundValidation:
 
                 if case["expected_spans"]:
                     assert len(spans) > 0, f"Expected spans for: {case['id']}"
-                    # Verify hyphen didn't fragment the span
                     assert "cross-functional" in spans[0]["span_text"].lower()
 
 
@@ -242,7 +237,6 @@ class TestMultiLineHandling:
 
                 if case["expected_spans"]:
                     assert len(spans) > 0, f"Expected spans for: {case['id']}"
-                    # Verify span crosses line break
                     assert spans[0]["span_type"] == "compound"
 
     def test_multiline_numbered_list(self, fixtures: dict[str, Any], preprocessor: Preprocessor) -> None:
@@ -254,9 +248,7 @@ class TestMultiLineHandling:
                 doc = preprocessor.nlp(case["raw_requirement"])  # type: ignore[misc]
                 spans = getattr(doc._, "requirement_spans", [])
 
-                # Should extract at least one span from the numbered list
                 assert len(spans) > 0, f"Expected spans for: {case['id']}"
-                # Verify spans have proper structure
                 for span in spans:
                     assert "span_text" in span
                     assert "span_type" in span
@@ -270,9 +262,7 @@ class TestMultiLineHandling:
                 doc = preprocessor.nlp(case["raw_requirement"])  # type: ignore[misc]
                 spans = getattr(doc._, "requirement_spans", [])
 
-                # Should extract at least one span from bullet list
                 assert len(spans) > 0, f"Expected spans for: {case['id']}"
-                # Verify structure
                 for span in spans:
                     assert "span_text" in span
                     assert "conjunct_count" in span
@@ -340,9 +330,7 @@ class TestNegationFiltering:
                 doc = preprocessor.nlp(case["raw_requirement"])  # type: ignore[misc]
                 spans = getattr(doc._, "requirement_spans", [])
 
-                # Should have spans extracted from mixed sentence
                 assert len(spans) > 0, f"Expected spans for: {case['id']}"
-                # Verify span structure (content may vary)
                 for span in spans:
                     assert "span_text" in span
                     assert "span_type" in span
@@ -387,7 +375,6 @@ class TestAmbiguousBoundaryResolution:
 
                 if case["expected_spans"]:
                     assert len(spans) > 0, f"Expected spans for: {case['id']}"
-                    # Span should include main part without extending past parens
                     assert "years" in spans[0]["span_text"].lower()
 
     def test_relative_clause_boundary(self, fixtures: dict[str, Any], preprocessor: Preprocessor) -> None:
@@ -400,9 +387,7 @@ class TestAmbiguousBoundaryResolution:
                 spans = getattr(doc._, "requirement_spans", [])
 
                 if len(spans) > 0:
-                    # Verify span is extracted (relative clause handling may include it)
                     assert len(spans) > 0, f"Expected spans for: {case['id']}"
-                    # Verify main content is present
                     span_text = spans[0]["span_text"].lower()
                     assert "java" in span_text or "experience" in span_text
 
@@ -420,12 +405,10 @@ class TestAmbiguousBoundaryResolution:
 
                 if len(spans) > 0:
                     found_or_case = True
-                    # Should have compound structure with 'or'
                     for span in spans:
                         if "or" in span["span_text"].lower():
                             assert span["conjunct_count"] >= 2
 
-        # Should find at least one degree case with 'or'
         assert found_or_case, "Should process degree with 'or' alternatives"
 
     def test_soft_skills_hyphenated_compound(self, fixtures: dict[str, Any], preprocessor: Preprocessor) -> None:
@@ -444,15 +427,11 @@ class TestAmbiguousBoundaryResolution:
 
             if len(spans) > 0:
                 extracted_count += 1
-                # Hyphenated words should not break span
                 for span in spans:
                     assert "span_text" in span
-                    # Verify structure is valid
                     if "-" in span["span_text"]:
-                        # Hyphenated words should be preserved in span
                         assert len(span["span_text"]) > 5
 
-        # Should extract at least one soft skills requirement
         assert extracted_count >= 1, "Should extract soft skills requirements"
 
     def test_infinitive_phrase_verb_object(self, fixtures: dict[str, Any], preprocessor: Preprocessor) -> None:
@@ -465,7 +444,6 @@ class TestAmbiguousBoundaryResolution:
 
             if case["expected_spans"]:
                 assert len(spans) > 0, f"Expected spans for: {case['id']}"
-                # Should include verb and object
                 span_text = spans[0]["span_text"].lower()
                 assert len(span_text.split()) >= 3, "Infinitive should include context"
 
@@ -500,9 +478,7 @@ class TestEdgeCasesComprehensive:
         doc = preprocessor.nlp(long_requirement)  # type: ignore[misc]
         spans = getattr(doc._, "requirement_spans", [])
 
-        # Should extract at least one span from long requirement
         assert len(spans) > 0, "Should extract spans from long requirement"
-        # Verify span has valid structure
         for span in spans:
             assert "span_text" in span
             assert "conjunct_count" in span
@@ -519,7 +495,6 @@ class TestEdgeCasesComprehensive:
         spans = getattr(doc._, "requirement_spans", [])
 
         assert len(spans) > 0, "Should handle nested parentheses"
-        # Main span should be extracted despite nesting
         assert any("java" in s["span_text"].lower() for s in spans)
 
     def test_multiple_conjunctions_mixed(self, preprocessor: Preprocessor) -> None:
@@ -533,7 +508,6 @@ class TestEdgeCasesComprehensive:
         spans = getattr(doc._, "requirement_spans", [])
 
         assert len(spans) > 0, "Should extract with mixed conjunctions"
-        # Verify all spans have valid structure
         for span in spans:
             assert "span_text" in span
             assert "conjunct_count" in span
@@ -585,7 +559,6 @@ class TestPerformanceBenchmark:
     @pytest.mark.perf
     def test_performance_100token_document_10spans(self, preprocessor: Preprocessor) -> None:
         """Test 100-token document with 10 requirement mentions processes in <50ms."""
-        # Create document with multiple requirement mentions
         document = (
             "Required: 5+ years Python. Knowledge of Docker. "
             "Experience with Kubernetes. Proficiency in REST APIs. "
@@ -604,7 +577,6 @@ class TestPerformanceBenchmark:
         doc = preprocessor.nlp(document)  # type: ignore[misc]
         spans = getattr(doc._, "requirement_spans", [])
 
-        # Verify spans extracted
         assert len(spans) > 0, "Should extract spans from complex document"
 
         # Performance assertion: <50ms for 100-token document
@@ -645,7 +617,5 @@ class TestPerformanceBenchmark:
         logger.info(f"Average processing time: {avg_time:.2f}ms")
         logger.info(f"Max processing time: {max_time:.2f}ms")
 
-        # Average should be well under 50ms
         assert avg_time < 40, f"Average time {avg_time:.2f}ms exceeds 40ms target"
-        # Max should not exceed 50ms
         assert max_time < 50, f"Max time {max_time:.2f}ms exceeds 50ms target"

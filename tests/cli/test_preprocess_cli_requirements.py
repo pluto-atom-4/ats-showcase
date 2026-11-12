@@ -124,7 +124,8 @@ def sample_jobs_file(
     try:
         yield job_file, sample_jobs
     finally:
-        pass  # tmp_path cleanup handled by pytest
+        # tmp_path cleanup is handled by pytest.
+        pass
 
 
 class TestPreprocessCLIRequirementExtraction:
@@ -134,10 +135,8 @@ class TestPreprocessCLIRequirementExtraction:
         """Test that --extract-requirements flag enables extraction."""
         job_file, _ = sample_jobs_file
 
-        # Extract requirements enabled (default)
         result = runner.invoke(app, ["preprocess", "--extract-requirements"])
 
-        # Should succeed
         assert result.exit_code == 0, f"CLI failed: {result.stdout}"
         assert "Preprocessing complete" in result.stdout or "Processing" in result.stdout
 
@@ -145,10 +144,8 @@ class TestPreprocessCLIRequirementExtraction:
         """Test that --no-extract-requirements flag disables extraction."""
         job_file, _ = sample_jobs_file
 
-        # Extract requirements disabled
         result = runner.invoke(app, ["preprocess", "--no-extract-requirements"])
 
-        # Should succeed
         assert result.exit_code == 0, f"CLI failed: {result.stdout}"
         assert "Preprocessing complete" in result.stdout or "Processing" in result.stdout
 
@@ -159,7 +156,6 @@ class TestPreprocessCLIRequirementExtraction:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_file = Path(tmpdir) / "requirements.json"
 
-            # Run preprocess with export flag
             result = runner.invoke(
                 app,
                 [
@@ -170,7 +166,6 @@ class TestPreprocessCLIRequirementExtraction:
                 ],
             )
 
-            # Should succeed (or skip if no jobs found)
             assert result.exit_code in [0, 1], f"CLI failed unexpectedly: {result.stdout}"
 
     def test_preprocess_help_includes_requirement_flags(self):
@@ -178,7 +173,6 @@ class TestPreprocessCLIRequirementExtraction:
         result = runner.invoke(app, ["preprocess", "--help"])
 
         assert result.exit_code == 0
-        # Strip ANSI codes before assertions
         help_output_clean = strip_ansi(result.stdout)
         # Check for flag names (may be truncated in help due to column width)
         assert "extract-requireme" in help_output_clean or "--extract-requirements" in help_output_clean
@@ -188,13 +182,10 @@ class TestPreprocessCLIRequirementExtraction:
 
     def test_default_extract_requirements_enabled(self):
         """Test that requirement extraction is enabled by default."""
-        # The default should be --extract-requirements (True)
         result = runner.invoke(app, ["preprocess", "--help"])
 
         assert result.exit_code == 0
-        # Strip ANSI codes before assertion
         help_output_clean = strip_ansi(result.stdout)
-        # Look for default mention in the help
         assert "extract-requirement" in help_output_clean.lower()
 
     def test_requirement_extraction_produces_json_output(self, sample_jobs_file):
@@ -204,7 +195,6 @@ class TestPreprocessCLIRequirementExtraction:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_file = Path(tmpdir) / "requirements.json"
 
-            # Run preprocess with export
             result = runner.invoke(
                 app,
                 [
@@ -215,17 +205,15 @@ class TestPreprocessCLIRequirementExtraction:
                 ],
             )
 
-            # Should complete (exit 0 or 1 if no jobs found)
             assert result.exit_code in [0, 1]
 
-            # If export happened, verify JSON format
+            # The export may not happen (e.g. no jobs), so verify JSON only if it did.
             if output_file.exists():
                 try:
                     with open(output_file) as f:
                         requirements = json.load(f)
                     assert isinstance(requirements, list)
 
-                    # Verify structure of requirements
                     for req in requirements:
                         assert isinstance(req, dict)
                         assert "text" in req
@@ -245,7 +233,6 @@ class TestPreprocessCLITokenCostAnalysis:
         """
         job_file, _ = sample_jobs_file
 
-        # Run with requirement extraction enabled
         result_with = runner.invoke(
             app,
             [
@@ -257,10 +244,8 @@ class TestPreprocessCLITokenCostAnalysis:
             ],
         )
 
-        # Extract token count from output
         tokens_with = _extract_token_count_from_output(result_with.stdout)
 
-        # Run without requirement extraction
         result_without = runner.invoke(
             app,
             [
@@ -274,11 +259,10 @@ class TestPreprocessCLITokenCostAnalysis:
 
         tokens_without = _extract_token_count_from_output(result_without.stdout)
 
-        # Both should complete successfully
         assert result_with.exit_code in [0, 1]
         assert result_without.exit_code in [0, 1]
 
-        # If we got token counts, verify impact is <5%
+        # Requirement extraction must add under 5% to total tokens.
         if tokens_with is not None and tokens_without is not None and tokens_without > 0:
             percent_increase = ((tokens_with - tokens_without) / tokens_without) * 100
             assert percent_increase < 5.0, f"Token increase too high: {percent_increase:.2f}% (expected <5%)"
@@ -292,7 +276,6 @@ class TestPreprocessCLITokenCostAnalysis:
             ["preprocess", "--extract-requirements", "--show-estimates"],
         )
 
-        # Should show cost information
         assert "Total cost" in result.stdout or "cost" in result.stdout.lower()
 
 
@@ -308,7 +291,6 @@ def _extract_token_count_from_output(output: str) -> int | None:
     for line in output.split("\n"):
         if "Total tokens:" in line:
             try:
-                # Extract number after "Total tokens:"
                 parts = line.split("Total tokens:")
                 if len(parts) > 1:
                     token_str = parts[1].strip().split()[0].replace(",", "")
