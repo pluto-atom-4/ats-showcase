@@ -40,12 +40,11 @@ def _has_negation_context(sentence: str, trigger: str) -> bool:
         r"\bwithout\b",
     ]
 
-    # Find trigger position
     trigger_pos = sentence.lower().find(trigger.lower())
     if trigger_pos == -1:
         return False
 
-    # Look ±50 chars around trigger
+    # Negation must fall within 50 chars of the trigger.
     context_start = max(0, trigger_pos - 50)
     context_end = min(len(sentence), trigger_pos + len(trigger) + 50)
     context = sentence[context_start:context_end]
@@ -79,11 +78,9 @@ def _apply_adjustments(base_confidence: float, sentence: str) -> float:
     if re.search(r"\(.*?\)", sentence):
         adj -= 0.10
 
-    # Conditional: lower confidence
     if re.search(r"\bif\b", sentence, re.IGNORECASE):
         adj -= 0.15
 
-    # Nice to have: significantly lower
     if re.search(r"nice\s+to\s+have", sentence, re.IGNORECASE):
         adj -= 0.25
 
@@ -113,23 +110,20 @@ def classify_sentence_as_requirement(
     if not sentence.strip():
         return None
 
-    # Try each pattern
     best_match: Optional[Dict[str, Any]] = None
 
     for pattern in REQUIREMENT_PATTERNS:
         if re.search(pattern["regex"], sentence, re.IGNORECASE):
-            # Found a match
             confidence: float = pattern["confidence"]
 
-            # Check negations
+            # A negated trigger discards the whole sentence, even if another pattern would match.
             if _has_negation_context(sentence, pattern["trigger"]):
-                return None  # Negation found, skip entirely
+                return None
 
-            # Apply context adjustments
             confidence = _apply_adjustments(confidence, sentence)
 
             if confidence > 0:
-                # Keep best match (by priority, then confidence)
+                # Lower priority number wins; ties go to higher confidence.
                 if best_match is None:
                     should_update = True
                 else:
@@ -150,7 +144,6 @@ def classify_sentence_as_requirement(
                     }
 
     if best_match:
-        # Remove temporary priority field
         best_match.pop("priority")
         return best_match
 

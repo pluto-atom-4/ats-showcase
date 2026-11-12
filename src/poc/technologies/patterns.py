@@ -1,4 +1,3 @@
-# Combined, deduplicated, and organized for maintenance
 TECH_TERMS = {
     # --- Carbon Robotics / AI / Robotics Specific ---
     "PyTorch",
@@ -56,7 +55,7 @@ TECH_TERMS = {
     "jira",
 }
 
-# Words that, directly after "<ambiguous term>-", count as tech evidence ("Go-based services").
-# Any other hyphen after an ambiguous term reads as an English compound ("Go-to-market", "Go-live").
+# Words that, directly after "<ambiguous term>-", count as tech evidence ("Go-based"); other hyphens read as English
+# compounds ("Go-to-market").
 # Membership is a judgment call pending real JD examples; do not widen without evidence (#513, #553).
 HYPHEN_TECH_SUFFIXES = frozenset({"based", "native", "lang", "like"})

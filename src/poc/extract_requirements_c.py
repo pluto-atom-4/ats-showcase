@@ -40,8 +40,6 @@ from .bullet_point_preprocessor import (
     normalize_markdown_artifacts_complete,
     split_by_bullet_markers,
 )
-
-# POC-B imports (Phase 2+ requirement patterns and classification)
 from .company_extractor import extract_company_name_enhanced
 from .extract_requirements_b import classify_sentence_as_requirement
 from .patterns import (
@@ -61,11 +59,6 @@ from .patterns import (
 from .requirement_patterns import REQUIREMENT_PATTERNS
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# OUTPUT MODELS (Pydantic)
-# =============================================================================
 
 
 class RequirementWithSection(BaseModel):
@@ -102,11 +95,6 @@ class SimpleRequirementExtractionOutputWithSections(BaseModel):
     )
 
 
-# =============================================================================
-# CUSTOM DOC EXTENSIONS (Module-level registration)
-# =============================================================================
-
-
 def _initialize_doc_extensions() -> None:
     """Register custom doc extensions for section metadata.
 
@@ -120,13 +108,7 @@ def _initialize_doc_extensions() -> None:
         Doc.set_extension("section_labels", default=set())
 
 
-# Initialize extensions at module load
 _initialize_doc_extensions()
-
-
-# =============================================================================
-# HELPER FUNCTIONS
-# =============================================================================
 
 
 def _clamp_confidence(value: float) -> float:
@@ -139,11 +121,6 @@ def _clamp_confidence(value: float) -> float:
         Confidence value clamped to [0.0, 1.0]
     """
     return max(0.0, min(1.0, value))
-
-
-# =============================================================================
-# SKELETON FUNCTIONS (Phase 2 - Section Detection Implementation)
-# =============================================================================
 
 
 def load_spacy_model(
@@ -172,11 +149,9 @@ def load_spacy_model(
         logger.error(msg)
         raise RuntimeError(msg) from e
 
-    # Use provided patterns or default from patterns.py
     if patterns is None:
         patterns = DEFAULT_SECTION_PATTERNS
 
-    # Add section_ruler if not already present
     if "span_ruler" not in nlp.pipe_names:
         logger.debug("Adding span_ruler to pipeline")
         ruler = nlp.add_pipe("span_ruler")
@@ -219,11 +194,9 @@ def detect_sections(
 
     logger.debug(f"detect_sections: processing {len(text)} characters")
 
-    # Use provided display names or default from patterns.py
     if display_names is None:
         display_names = DEFAULT_DISPLAY_NAMES
 
-    # Process text through spaCy pipeline (includes SpanRuler)
     doc = nlp(text)
 
     # Extract section spans from SpanRuler output
@@ -292,18 +265,16 @@ def extract_target_section_content(
 
     extracted_content = []
 
-    # Sort sections by start position for proper boundary detection
+    # Sorted by start so the next section's start is this section's content_end.
     sorted_sections = sorted(doc._.detected_sections, key=lambda s: s["start"])
 
-    # Remove overlapping sections: if section A is contained within section B, skip A
-    # (prefer longer, more specific matches)
+    # A section contained within another is skipped; the containing one keeps the content.
     non_overlapping_sections = []
     for section in sorted_sections:
         is_contained = False
         for other in sorted_sections:
             if other is section:
                 continue
-            # Check if this section's span is contained within another
             if other["start"] <= section["start"] and section["end"] <= other["end"]:
                 if other["start"] != section["start"] or other["end"] != section["end"]:
                     is_contained = True
@@ -317,37 +288,30 @@ def extract_target_section_content(
     for idx, section in enumerate(sorted_sections):
         section_label = section["label"]
 
-        # Skip filter sections (BENEFITS, COMPENSATION, HIRING_PROCESS)
         if section_label not in target_sections:
             logger.debug(f"Skipping filter section: {section_label}")
             continue
 
-        # Determine content boundaries
         content_start = section["end"]  # Start AFTER the section header
 
-        # End at the next section's start, or at doc end
         if idx + 1 < len(sorted_sections):
             content_end = sorted_sections[idx + 1]["start"]
         else:
             content_end = len(doc)
 
-        # Extract text tokens between boundaries
         if content_start < content_end:
             content_tokens = doc[content_start:content_end]
             content_text = content_tokens.text.strip()
 
             if content_text:
-                # Phase B: Check if section contains bullets and should be split
                 if split_by_bullets and contains_bullets(content_text):
                     logger.debug(f"Section {section_label} contains bullets, splitting...")
                     bullets = split_by_bullet_markers(content_text)
                     for bullet_idx, bullet in enumerate(bullets):
                         if bullet.strip():
-                            # Each bullet becomes a separate tuple
                             extracted_content.append((bullet.strip(), section_label, idx))
                             logger.debug(f"Added bullet {bullet_idx + 1} from {section_label}: {bullet[:60]}...")
                 else:
-                    # No bullets or split disabled; add full section content as single tuple
                     extracted_content.append((content_text, section_label, idx))
                     logger.debug(
                         f"Extracted {len(content_text)} chars from {section_label} "
@@ -409,24 +373,20 @@ def classify_sentence_with_section_boost(
     if not sentence or not sentence.strip():
         return None
 
-    # Use provided dicts or defaults from patterns.py
     if adjustments is None:
         adjustments = DEFAULT_ADJUSTMENTS
     if display_names is None:
         display_names = DEFAULT_DISPLAY_NAMES
 
-    # Phase 3, Step 1: Call POC-B classifier
     poc_b_result = classify_sentence_as_requirement(sentence, nlp)
 
     if poc_b_result is None:
         logger.debug(f"No requirement detected in sentence: {sentence[:60]}...")
         return None
 
-    # Phase 3, Step 2-3: Extract base confidence from POC-B result
     base_confidence = poc_b_result.get("confidence", 0.0)
     trigger_word = poc_b_result.get("trigger_word", "unknown")
 
-    # Phase 3, Step 4: Look up section boost
     if section_label not in adjustments:
         logger.warning(
             f"Unknown section_label '{section_label}', using default boost 0.0. "
@@ -436,13 +396,10 @@ def classify_sentence_with_section_boost(
     else:
         section_boost = adjustments[section_label]
 
-    # Phase 3, Step 5: Calculate final confidence
     final_confidence = _clamp_confidence(base_confidence + section_boost)
 
-    # Phase 3, Step 6: Look up section display name
     section_display_name = display_names.get(section_label, section_label)
 
-    # Phase 3, Step 7: Build and return enriched dict
     result = {
         "text": sentence,
         "trigger_word": trigger_word,
@@ -495,13 +452,9 @@ def extract_requirements_c(
 
     (Implementation: Phase 4 - Full Pipeline)
     """
-    # =========================================================================
-    # STAGE 1: Load & Setup (5 lines)
-    # =========================================================================
     logger.info("Phase 4: Starting POC-C extraction pipeline")
     logger.debug(f"Parameters: min_confidence={min_confidence}, max_requirements={max_requirements}")
 
-    # Use provided parameters or defaults from patterns.py
     if patterns is None:
         patterns = DEFAULT_SECTION_PATTERNS
     if adjustments is None:
@@ -514,36 +467,22 @@ def extract_requirements_c(
     nlp = load_spacy_model("en_core_web_md", patterns=patterns)
     logger.debug(f"Loaded spaCy model: {nlp.meta.get('name', 'unknown')}")
 
-    # =========================================================================
-    # STAGE 2: Markdown & Unicode Cleaning (Phase A only, preserving bullets for Phase B)
-    # =========================================================================
-    # Phase A: Clean markdown and unicode artifacts
-    # NOTE: Skip normalize_bullet_points() to preserve bullet markers for Phase B splitting
     cleaned_markdown = normalize_markdown_artifacts_complete(markdown)
     logger.debug("Cleaned markdown artifacts and unicode characters")
-    normalized_markdown = cleaned_markdown  # Use cleaned markdown without bullet normalization
+    # Skip normalize_bullet_points() so bullet markers survive for Phase B bullet splitting.
+    normalized_markdown = cleaned_markdown
 
-    # =========================================================================
-    # STAGE 3: Detect Sections (3 lines)
-    # =========================================================================
     doc = detect_sections(nlp, normalized_markdown, display_names=display_names)
     logger.debug(f"Detected sections: {sorted(doc._.section_labels) if doc._.section_labels else 'none'}")
 
-    # =========================================================================
-    # STAGE 4: Extract Target Sections (Phase B: Bullet-Level Splitting) (3 lines)
-    # =========================================================================
     extracted_sections = extract_target_section_content(doc, target_sections, split_by_bullets=True)
     logger.info(f"Extracted text from {len(extracted_sections)} target sections/bullets")
 
-    # =========================================================================
-    # STAGE 5: Classify with Section Boost (20-30 lines)
-    # =========================================================================
     candidate_requirements: List[Dict[str, Any]] = []
 
     for section_text, section_label, section_index in extracted_sections:
         logger.debug(f"Processing section {section_index} ({section_label}): {len(section_text)} chars")
 
-        # Split section into sentences using spaCy sentencizer
         section_doc = nlp(section_text)
         sentences = list(section_doc.sents)
         logger.debug(f"Split into {len(sentences)} sentences")
@@ -553,12 +492,10 @@ def extract_requirements_c(
             if not sentence_text:
                 continue
 
-            # Classify with section boost
             result = classify_sentence_with_section_boost(
                 sentence_text, section_label, nlp, adjustments=adjustments, display_names=display_names
             )
 
-            # Keep if result exists and confidence meets threshold
             if result and result.get("final_confidence", 0.0) >= min_confidence:
                 candidate_requirements.append(result)
                 logger.debug(
@@ -568,64 +505,45 @@ def extract_requirements_c(
 
     logger.info(f"Classified {len(candidate_requirements)} requirements (confidence >= {min_confidence})")
 
-    # =========================================================================
-    # STAGE 6: Deduplicate & Filter (15-20 lines)
-    # =========================================================================
-    # Deduplicate by normalized text (case-insensitive, whitespace stripped)
     dedup_dict: Dict[str, Dict[str, Any]] = {}
 
     for req in candidate_requirements:
-        # Normalize key for deduplication
         normalized_key = req["text"].lower().strip()
 
-        # Keep highest confidence version of each unique requirement
         if normalized_key not in dedup_dict:
             dedup_dict[normalized_key] = req
         else:
-            # Update if this version has higher confidence
             if req["final_confidence"] > dedup_dict[normalized_key]["final_confidence"]:
                 dedup_dict[normalized_key] = req
 
-    # Sort by final_confidence descending
     unique_reqs = sorted(
         dedup_dict.values(),
         key=lambda r: r["final_confidence"],
         reverse=True,
     )
 
-    # Limit to max_requirements
     unique_reqs = unique_reqs[:max_requirements]
 
     logger.info(f"Deduplicated to {len(unique_reqs)} unique requirements")
 
-    # =========================================================================
-    # STAGE 7: Extract Company (2 lines)
-    # =========================================================================
     company = extract_company_name_enhanced(markdown)
     logger.info(f"Extracted company: {company if company else 'unknown'}")
 
-    # =========================================================================
-    # STAGE 8: Build Metadata (15-20 lines)
-    # =========================================================================
-    # Count sections by label
     sections_detected: Dict[str, int] = {}
     for section in doc._.detected_sections:
         label = section["label"]
         sections_detected[label] = sections_detected.get(label, 0) + 1
 
-    # Count requirements by section
     requirements_by_section: Dict[str, int] = {}
     for req in unique_reqs:
         section = req["source_section"]
         requirements_by_section[section] = requirements_by_section.get(section, 0) + 1
 
-    # Count total sentences analyzed
     sentences_analyzed = 0
     for section_text, _, _ in extracted_sections:
         section_doc = nlp(section_text)
         sentences_analyzed += len(list(section_doc.sents))
 
-    # Build metadata dict
     metadata: Dict[str, Any] = {
         "sections_detected": sections_detected,
         "requirements_by_section": requirements_by_section,
@@ -642,13 +560,8 @@ def extract_requirements_c(
 
     logger.debug(f"Built metadata: {len(metadata)} fields")
 
-    # =========================================================================
-    # STAGE 9: Build Output (10-15 lines)
-    # =========================================================================
-    # Build requirements_simple (backward compatible)
     requirements_simple = [r["text"] for r in unique_reqs]
 
-    # Build requirements_detailed
     requirements_detailed = [
         RequirementWithSection(
             text=r["text"],
@@ -662,7 +575,6 @@ def extract_requirements_c(
         for r in unique_reqs
     ]
 
-    # Build and return output
     output = SimpleRequirementExtractionOutputWithSections(
         company=company,
         requirements=requirements_simple,
@@ -676,11 +588,6 @@ def extract_requirements_c(
     )
 
     return output
-
-
-# =============================================================================
-# CONVENIENCE INTERFACE
-# =============================================================================
 
 
 def extract_requirements(
@@ -702,7 +609,6 @@ def extract_requirements(
 
 
 if __name__ == "__main__":
-    # Simple CLI for testing
     import json
     import sys
 

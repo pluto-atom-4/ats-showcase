@@ -149,13 +149,11 @@ class JobSelectorApp(App):
 
     def on_mount(self) -> None:
         """Load jobs and populate selection list."""
-        # Load jobs if not provided at init
         if not self.all_jobs:
             result = load_jobs(self.input_dir)
             self.all_jobs = result.jobs
             self.all_warnings = result.warnings
 
-        # Initial population
         self._update_job_list()
         self._update_status_bar()
 
@@ -164,14 +162,11 @@ class JobSelectorApp(App):
         job_list = self.query_one("#job_list", SelectionList)
         job_list.clear_options()
 
-        # Filter jobs
         filtered_jobs = self._get_filtered_jobs()
 
-        # Add formatted job options
         for job in filtered_jobs:
             row_text = format_job_row(job)
             job_id = job["id"]
-            # Add option with job ID as value
             job_list.add_option((row_text, job_id))
 
     def _get_filtered_jobs(self) -> list[Job]:
@@ -190,7 +185,6 @@ class JobSelectorApp(App):
         """Update status bar with selection count."""
         job_list = self.query_one("#job_list", SelectionList)
         filtered = self._get_filtered_jobs()
-        # Count selected items (values in the SelectionList)
         total_selected = len(job_list.selected)
         status_bar = self.query_one("#status_bar", Static)
         status_bar.update(
@@ -212,7 +206,6 @@ class JobSelectorApp(App):
         Args:
             event: Selection change event from SelectionList.
         """
-        # Update status bar to reflect the new selection state
         self._update_status_bar()
 
     def action_select_all(self) -> None:
@@ -220,16 +213,13 @@ class JobSelectorApp(App):
         job_list = self.query_one("#job_list", SelectionList)
         filtered = self._get_filtered_jobs()
 
-        # Build set of job IDs in filtered view
         filtered_ids = {job["id"] for job in filtered}
 
         # Select all job IDs for jobs in the current filtered list
         for idx in range(job_list.option_count):
-            # Get the job ID from the option value
             option = job_list.get_option_at_index(idx)
             job_id = option.value
             if job_id in filtered_ids:
-                # Select if not already selected
                 if job_id not in job_list.selected:
                     job_list.select(job_id)
 
@@ -239,10 +229,8 @@ class JobSelectorApp(App):
         """Clear all selections."""
         job_list = self.query_one("#job_list", SelectionList)
 
-        # Collect selected values (job IDs) to avoid modification during iteration
         selected_values = list(job_list.selected)
 
-        # Deselect all
         for value in selected_values:
             job_list.deselect(value)
 
@@ -256,24 +244,19 @@ class JobSelectorApp(App):
         """
         job_list = self.query_one("#job_list", SelectionList)
 
-        # Get selected job IDs directly from widget
-        # job_list.selected returns list of job_id values
         selected_job_ids = set(job_list.selected)
 
-        # Filter to selected jobs
         selected_jobs = [j for j in self.all_jobs if j["id"] in selected_job_ids]
 
         if not selected_jobs:
             self.notify("No jobs selected to export.", title="Export", timeout=3)
             return
 
-        # Ensure all jobs have 'description' field (required by batch_processor)
-        # Default to null if not present
+        # batch_processor requires a description field.
         for job in selected_jobs:
             if "description" not in job:
                 job["description"] = None
 
-        # Export
         try:
             export_jobs(selected_jobs, self.output_path)
             self.notify(
@@ -318,7 +301,6 @@ def main() -> None:
     """Run the job selector TUI."""
     args = parse_args()
 
-    # Validate input directory exists and is a directory
     if not args.input_dir.exists():
         print(f"Error: Input directory does not exist: {args.input_dir}", file=sys.stderr)
         sys.exit(1)

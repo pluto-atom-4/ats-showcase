@@ -67,7 +67,6 @@ def _validate_job(raw: dict, source_file: str, index: int) -> tuple[Job | None, 
     if missing:
         return None, (f"{source_file}[{index}]: Missing required fields: {', '.join(sorted(missing))}")
 
-    # Build job with required fields + optional fields with safe defaults
     job: Job = {
         "id": raw["id"],
         "title": raw["title"],
@@ -76,7 +75,6 @@ def _validate_job(raw: dict, source_file: str, index: int) -> tuple[Job | None, 
         "status": raw["status"],
     }
 
-    # Add optional fields if present
     if "description" in raw and raw["description"] is not None:
         job["description"] = raw["description"]
     if "url" in raw and raw["url"] is not None:
@@ -129,11 +127,9 @@ def _load_single_file(path: Path) -> tuple[list[Job], str | None]:
         assert job is not None  # error is None only when job is not None
         jobs.append(job)
 
-    # If all entries failed validation, return error
     if validation_errors and not jobs:
         return [], f"{path.name}: All entries failed validation ({len(validation_errors)} errors)"
 
-    # If some entries failed, log those but continue with successful ones
     warning = None
     if validation_errors:
         warning = f"{path.name}: {len(validation_errors)} entries skipped (validation errors)"
@@ -162,17 +158,14 @@ def load_jobs(base_dir: Path = Path("data/extracted_jobs")) -> LoadResult:
     all_jobs: list[Job] = []
     warnings: list[str] = []
 
-    # Check if base_dir exists
     if not base_dir.exists():
         warnings.append(f"{base_dir}: Directory not found")
         return LoadResult(all_jobs, warnings)
 
-    # Check if base_dir is a directory
     if not base_dir.is_dir():
         warnings.append(f"{base_dir}: Not a directory")
         return LoadResult(all_jobs, warnings)
 
-    # Directory exists and is valid, discover and load files
     files = discover_source_files(base_dir)
 
     for file_path in files:

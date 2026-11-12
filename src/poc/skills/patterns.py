@@ -1,6 +1,4 @@
-# 1. Define Action Verbs (The "Anchors")
-# We use the root form (lemma). This ensures "designing", "designed",
-# and "design" are all caught by the single keyword "design".
+# Lemmas: the Matcher compares LEMMA, so "designing" and "designed" match "design".
 SKILL_VERBS = [
     "architect",
     "build",
