@@ -40,7 +40,7 @@ class TestMarkdownSectionSchema:
                 heading="Test",
                 content="Content",
                 section_type="requirements",
-                confidence=1.5,  # Invalid
+                confidence=1.5,
                 line_start=0,
                 line_end=10,
             )
@@ -53,7 +53,7 @@ class TestMarkdownSectionSchema:
                 heading="Test",
                 content="Content",
                 section_type="requirements",
-                confidence=-0.1,  # Invalid
+                confidence=-0.1,
                 line_start=0,
                 line_end=10,
             )
@@ -68,12 +68,11 @@ class TestMarkdownSectionSchema:
                 section_type="requirements",
                 confidence=0.85,
                 line_start=25,
-                line_end=10,  # Invalid: end < start
+                line_end=10,
             )
 
     def test_section_confidence_boundary_values(self):
         """Test boundary values for confidence [0.0, 1.0]."""
-        # Confidence = 0.0 (valid)
         section1 = MarkdownSection(
             section_id="sec_0",
             heading="Test",
@@ -85,7 +84,6 @@ class TestMarkdownSectionSchema:
         )
         assert section1.confidence == 0.0
 
-        # Confidence = 1.0 (valid)
         section2 = MarkdownSection(
             section_id="sec_1",
             heading="Test",
@@ -151,7 +149,7 @@ class TestMarkdownSectionSchema:
             heading="Requirements",
             content="5+ years experience",
             section_type="requirements",
-            confidence=0.9234,  # Should be rounded to 0.92
+            confidence=0.9234,
             line_start=10,
             line_end=25,
             matched_keywords=["years", "experience"],
@@ -163,7 +161,7 @@ class TestMarkdownSectionSchema:
         assert section_dict["heading"] == "Requirements"
         assert section_dict["content"] == "5+ years experience"
         assert section_dict["section_type"] == "requirements"
-        assert section_dict["confidence"] == 0.92  # Rounded
+        assert section_dict["confidence"] == 0.92
         assert section_dict["line_start"] == 10
         assert section_dict["line_end"] == 25
         assert section_dict["matched_keywords"] == ["years", "experience"]
@@ -178,7 +176,6 @@ class TestMarkdownSectionSchema:
             confidence=0.85,
             line_start=0,
             line_end=10,
-            # matched_keywords not provided, should default to []
         )
 
         assert section.matched_keywords == []
@@ -188,7 +185,7 @@ class TestMarkdownSectionSchema:
         """Test MarkdownSection with empty heading."""
         section = MarkdownSection(
             section_id="sec_0",
-            heading="",  # Empty heading (allowed)
+            heading="",
             content="Content without heading",
             section_type="requirements",
             confidence=0.85,
@@ -215,7 +212,6 @@ class TestMarkdownSectionNewFields:
             line_end=10,
         )
 
-        # New fields should default to empty or False
         assert section.all_types == []
         assert section.labels == []
         assert section.is_skip is False
@@ -286,13 +282,11 @@ class TestMarkdownSectionNewFields:
 
         section_dict = section.to_dict()
 
-        # Verify new fields are in dict
         assert "all_types" in section_dict
         assert "labels" in section_dict
         assert "is_skip" in section_dict
         assert "keyword_matches" in section_dict
 
-        # Verify content
         assert section_dict["all_types"] == section.all_types
         assert section_dict["labels"] == section.labels
         assert section_dict["is_skip"] is False
@@ -324,7 +318,6 @@ class TestMarkdownSectionNewFields:
         confidence values are rounded to 2 decimals consistently across both the primary
         confidence field and the all_types entries.
         """
-        # Create section with full-precision confidence values
         full_precision_confidence = 0.926789
         secondary_precision = 0.754321
 
@@ -333,38 +326,33 @@ class TestMarkdownSectionNewFields:
             heading="Requirements",
             content="5+ years experience required",
             section_type="requirements",
-            confidence=full_precision_confidence,  # 0.926789, should round to 0.93
+            confidence=full_precision_confidence,
             line_start=10,
             line_end=25,
             matched_keywords=["years"],
             all_types=[
                 {
                     "section_type": "requirements",
-                    "confidence": full_precision_confidence,  # Should also round to 0.93
+                    "confidence": full_precision_confidence,
                 },
-                {"section_type": "qualifications", "confidence": secondary_precision},  # Should round to 0.75
+                {"section_type": "qualifications", "confidence": secondary_precision},
             ],
             labels=["requirements", "qualifications"],
             is_skip=False,
         )
 
-        # Verify internal representation maintains full precision
         assert section.confidence == full_precision_confidence
         assert section.all_types[0]["confidence"] == full_precision_confidence
         assert section.all_types[1]["confidence"] == secondary_precision
 
-        # After to_dict(), serialization should round both
         section_dict = section.to_dict()
 
-        # Primary confidence should be rounded to 2 decimals
         assert section_dict["confidence"] == 0.93
 
-        # all_types entries should also be rounded to 2 decimals
         assert len(section_dict["all_types"]) == 2
-        assert section_dict["all_types"][0]["confidence"] == 0.93  # Same primary type, same rounded value
+        assert section_dict["all_types"][0]["confidence"] == 0.93
         assert section_dict["all_types"][1]["confidence"] == 0.75
 
-        # Verify all_types structure is preserved
         assert section_dict["all_types"][0]["section_type"] == "requirements"
         assert section_dict["all_types"][1]["section_type"] == "qualifications"
 
@@ -441,7 +429,6 @@ class TestJobResultWithSections:
 
         result.markdown_sections = sections
 
-        # Verify count matches
         assert len(result.markdown_sections) == result.sections_detected == 3
 
     def test_job_result_serialization_with_sections(self):
@@ -472,7 +459,6 @@ class TestJobResultWithSections:
 
         result.markdown_sections = [section]
 
-        # Convert to dict (should handle MarkdownSection objects)
         result_dict = asdict(result)
 
         assert "markdown_sections" in result_dict
@@ -515,10 +501,8 @@ class TestJobResultWithSections:
 
         result.markdown_sections = [section]
 
-        # Convert to dict
         result_dict = asdict(result)
 
-        # Verify new fields are in serialized output
         section_dict = result_dict["markdown_sections"][0]
         assert "all_types" in section_dict
         assert "labels" in section_dict
@@ -581,7 +565,6 @@ class TestBatchProcessorSectionIntegration:
             confidence_avg=0.0,
         )
 
-        # Verify markdown_sections field exists and is initialized
         assert hasattr(result, "markdown_sections")
         assert isinstance(result.markdown_sections, list)
         assert len(result.markdown_sections) == 0
@@ -610,17 +593,15 @@ class TestBatchProcessorSectionIntegration:
         This test verifies that when a section matches multiple types, all types
         are stored in all_types, not just the primary (highest-confidence) type.
         """
-        # Create a section representing multi-type classification
         section = MarkdownSection(
             section_id="sec_0",
             heading="Skills and Responsibilities",
             content="Manage Python projects and lead team",
-            section_type="skills",  # Primary type
-            confidence=0.90,  # Primary confidence
+            section_type="skills",
+            confidence=0.90,
             line_start=0,
             line_end=5,
             matched_keywords=["skill", "responsibility"],
-            # Full multi-type data preserved from SectionClassification
             all_types=[
                 {"section_type": "skills", "confidence": 0.90},
                 {"section_type": "responsibilities", "confidence": 0.75},
@@ -633,21 +614,17 @@ class TestBatchProcessorSectionIntegration:
             ],
         )
 
-        # Verify primary type from first entry
         assert section.section_type == "skills"
         assert section.confidence == 0.90
 
-        # Verify all types are preserved
         assert len(section.all_types) == 2
         assert section.all_types[0]["section_type"] == "skills"
         assert section.all_types[1]["section_type"] == "responsibilities"
 
-        # Verify labels (frozenset from SectionClassification converted to list)
         assert len(section.labels) == 2
         assert "skills" in section.labels
         assert "responsibilities" in section.labels
 
-        # Verify keyword matches with position and source
         assert len(section.keyword_matches) == 2
         assert section.keyword_matches[0]["source"] in ["title", "content"]
         assert "position" in section.keyword_matches[0]

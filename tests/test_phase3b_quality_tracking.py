@@ -115,7 +115,6 @@ class TestQualityComparisonReport:
             quality_metrics=[metric1, metric2],
         )
 
-        # (10 + (-5)) / 2 = 2.5
         assert report.avg_score_delta == 2.5
 
     def test_report_to_dict(self):
@@ -167,7 +166,6 @@ class TestJobStoreQualityTracking:
             preprocessing_version_after="v2.0",
         )
 
-        # Verify quality tracking table was created and populated
         if store.conn:
             cursor = store.conn.cursor()
             cursor.execute("SELECT COUNT(*) as count FROM quality_tracking")
@@ -183,7 +181,6 @@ class TestJobStoreQualityTracking:
             location="Remote",
         )
 
-        # Log with non-v-prefixed versions
         store.log_quality_impact(
             job_id="job_1",
             previous_assessment_score=75,
@@ -192,7 +189,6 @@ class TestJobStoreQualityTracking:
             preprocessing_version_after="2.0",
         )
 
-        # Verify versions were normalized
         if store.conn:
             cursor = store.conn.cursor()
             cursor.execute(
@@ -220,7 +216,6 @@ class TestJobStoreQualityTracking:
                 new_assessment_score=75 + i * 5,
             )
 
-        # Verify all records were logged
         if store.conn:
             cursor = store.conn.cursor()
             cursor.execute("SELECT COUNT(*) as count FROM quality_tracking")
@@ -230,7 +225,7 @@ class TestJobStoreQualityTracking:
     def test_log_quality_impact_no_connection(self):
         """Test error handling when database connection missing."""
         store = JobStore(":memory:")
-        store.conn = None  # Manually set connection to None
+        store.conn = None
 
         with pytest.raises(RuntimeError, match="Database connection not available"):
             store.log_quality_impact(
@@ -285,11 +280,11 @@ class TestJobStoreQualityTracking:
     def test_get_quality_comparison_report_mixed(self, store):
         """Test quality report with mixed improvements and regressions."""
         jobs_data = [
-            ("job_1", 70, 85),  # +15 improvement
-            ("job_2", 80, 75),  # -5 regression
-            ("job_3", 60, 60),  # 0 unchanged
-            ("job_4", 72, 85),  # +13 improvement
-            ("job_5", 90, 70),  # -20 major regression
+            ("job_1", 70, 85),
+            ("job_2", 80, 75),
+            ("job_3", 60, 60),
+            ("job_4", 72, 85),
+            ("job_5", 90, 70),
         ]
 
         for job_id, prev_score, new_score in jobs_data:
@@ -308,18 +303,16 @@ class TestJobStoreQualityTracking:
         assert report.score_unchanged == 1
         assert report.max_score_improvement == 15
         assert report.max_score_decline == -20
-        # avg_before = (70+80+60+72+90)/5 = 74.4
-        # avg_after = (85+75+60+85+70)/5 = 75.0
         assert report.avg_score_before == pytest.approx(74.4, abs=0.1)
         assert report.avg_score_after == 75.0
 
     def test_get_quality_comparison_report_regression_risk_threshold(self, store):
         """Test regression risk flagging for score declines >= 10 points."""
         jobs_data = [
-            ("job_1", 90, 85),  # -5 (not flagged)
-            ("job_2", 85, 70),  # -15 (flagged)
-            ("job_3", 80, 75),  # -5 (not flagged)
-            ("job_4", 95, 80),  # -15 (flagged)
+            ("job_1", 90, 85),
+            ("job_2", 85, 70),
+            ("job_3", 80, 75),
+            ("job_4", 95, 80),
         ]
 
         for job_id, prev_score, new_score in jobs_data:
@@ -332,7 +325,6 @@ class TestJobStoreQualityTracking:
 
         report = store.get_quality_comparison_report()
 
-        # Should flag jobs with delta <= -10
         assert len(report.regression_risk_jobs) == 2
         assert "job_2" in report.regression_risk_jobs
         assert "job_4" in report.regression_risk_jobs
@@ -348,7 +340,6 @@ class TestJobStoreQualityTracking:
                 new_assessment_score=75 + i,
             )
 
-        # Get limited report
         report = store.get_quality_comparison_report(limit_jobs=5)
 
         assert report.total_comparisons == 5
@@ -356,10 +347,10 @@ class TestJobStoreQualityTracking:
     def test_get_regression_risk_jobs(self, store):
         """Test retrieving regression risk jobs."""
         jobs_data = [
-            ("job_1", 90, 85),  # -5
-            ("job_2", 85, 70),  # -15
-            ("job_3", 80, 60),  # -20
-            ("job_4", 95, 90),  # -5
+            ("job_1", 90, 85),
+            ("job_2", 85, 70),
+            ("job_3", 80, 60),
+            ("job_4", 95, 90),
         ]
 
         for job_id, prev_score, new_score in jobs_data:
@@ -370,7 +361,6 @@ class TestJobStoreQualityTracking:
                 new_assessment_score=new_score,
             )
 
-        # Get jobs with delta <= -10
         risk_jobs = store.get_regression_risk_jobs(threshold=-10)
 
         assert len(risk_jobs) == 2
@@ -380,8 +370,8 @@ class TestJobStoreQualityTracking:
     def test_get_regression_risk_jobs_empty(self, store):
         """Test regression risk when no jobs meet threshold."""
         jobs_data = [
-            ("job_1", 90, 85),  # -5
-            ("job_2", 85, 80),  # -5
+            ("job_1", 90, 85),
+            ("job_2", 85, 80),
         ]
 
         for job_id, prev_score, new_score in jobs_data:
@@ -459,7 +449,6 @@ class TestAssessmentStoreQualityTracking:
 
         assessment = store.get_assessment_by_id("job_1")
 
-        # score_delta should be 65 - 80 = -15
         assert assessment["score_delta"] == -15
 
     def test_save_assessment_without_quality_tracking(self, store):
@@ -515,7 +504,6 @@ class TestQualityReportSerialization:
 
         result_dict = report.to_dict()
 
-        # Verify key fields
         assert result_dict["total_comparisons"] == 1
         assert result_dict["avg_score_before"] == 70.0
         assert result_dict["avg_score_after"] == 85.0
@@ -526,7 +514,6 @@ class TestQualityReportSerialization:
 
     def test_quality_report_to_dict_regression_risk_truncation(self):
         """Test that regression risk jobs list is truncated in dict."""
-        # Create report with many regression risk jobs
         jobs_list = [f"job_{i}" for i in range(50)]
 
         report = QualityComparisonReport(
@@ -536,6 +523,5 @@ class TestQualityReportSerialization:
 
         result_dict = report.to_dict()
 
-        # Should truncate to top 20
         assert result_dict["regression_risk_jobs_count"] == 50
         assert len(result_dict["regression_risk_jobs"]) == 20

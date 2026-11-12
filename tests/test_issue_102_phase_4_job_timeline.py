@@ -28,7 +28,6 @@ def reviewer_with_jobs(temp_db):
     if reviewer.conn:
         cursor = reviewer.conn.cursor()
 
-        # Insert test jobs with full timeline
         jobs: list[dict[str, Any]] = [
             {
                 "job_id": "job_1",
@@ -57,7 +56,7 @@ def reviewer_with_jobs(temp_db):
                 "location": "SF",
                 "status": "pending_review",
                 "crawled_at": "2026-07-03T08:00:00+00:00",
-                "preprocessed_at": None,  # Not preprocessed yet
+                "preprocessed_at": None,
                 "reviewed_at": None,
             },
         ]
@@ -79,7 +78,6 @@ def reviewer_with_jobs(temp_db):
                 ),
             )
 
-        # Create job_assessments table
         cursor.execute(
             """CREATE TABLE IF NOT EXISTS job_assessments (
                job_id TEXT PRIMARY KEY,
@@ -100,7 +98,6 @@ def reviewer_with_jobs(temp_db):
             )"""
         )
 
-        # Add assessments for jobs 1 and 2
         cursor.execute(
             """INSERT INTO job_assessments
                (job_id, title, company, overall_score, assessed_date)
@@ -155,7 +152,6 @@ class TestJobTimeline:
 
         timeline = reviewer_with_jobs.get_job_timeline("job_3")
         assert timeline["preprocessed_at"] is not None
-        # Should be recent timestamp (current year-month)
         today = datetime.now(timezone.utc)
         year_month = today.strftime("%Y-%m")
         assert year_month in timeline["preprocessed_at"]
@@ -178,7 +174,6 @@ class TestJobTimeline:
 
         timeline = reviewer.get_job_timeline("job_test")
         assert timeline["crawled_at"] is not None
-        # Should be recent timestamp (current year-month)
         today = datetime.now(timezone.utc)
         year_month = today.strftime("%Y-%m")
         assert year_month in timeline["crawled_at"]
@@ -203,29 +198,23 @@ class TestJobTimeline:
         """Test that timeline events occur in correct sequence."""
         timeline = reviewer_with_jobs.get_job_timeline("job_1")
 
-        # Parse timestamps
         crawled = datetime.fromisoformat(timeline["crawled_at"].replace("Z", "+00:00"))
         preprocessed = datetime.fromisoformat(timeline["preprocessed_at"].replace("Z", "+00:00"))
         reviewed = datetime.fromisoformat(timeline["reviewed_at"].replace("Z", "+00:00"))
         assessed = datetime.fromisoformat(timeline["assessed_at"].replace("Z", "+00:00"))
 
-        # Verify sequence
         assert crawled < preprocessed < reviewed < assessed
 
     def test_timeline_data_consistency(self, reviewer_with_jobs):
         """Test that timeline data remains consistent after updates."""
         job_id = "job_1"
 
-        # Get initial timeline
         timeline_1 = reviewer_with_jobs.get_job_timeline(job_id)
 
-        # Save a new review (should preserve timeline fields)
         reviewer_with_jobs.save_review(job_id, "Python Dev (Updated)", "Remote", "confirmed", company="TechCorp")
 
-        # Get timeline again
         timeline_2 = reviewer_with_jobs.get_job_timeline(job_id)
 
-        # crawled_at and preprocessed_at should still exist
         assert timeline_2["crawled_at"] == timeline_1["crawled_at"]
         assert timeline_2["preprocessed_at"] == timeline_1["preprocessed_at"]
 
@@ -246,14 +235,11 @@ class TestTimelineIntegration:
 
         job_id = "lifecycle_test"
 
-        # Step 1: Save initial review (with crawled_at)
         reviewer.save_review(job_id, "Test Job", "Remote", "pending_review", company="TestCorp")
         reviewer.set_crawled_at(job_id, "2026-07-01T08:00:00+00:00")
 
-        # Step 2: Preprocess
         reviewer.set_preprocessed_at(job_id)
 
-        # Step 3: Review
         reviewer.save_review(
             job_id,
             "Test Job",
@@ -264,7 +250,6 @@ class TestTimelineIntegration:
             company="TestCorp",
         )
 
-        # Verify timeline
         timeline = reviewer.get_job_timeline(job_id)
         assert timeline["crawled_at"] == "2026-07-01T08:00:00+00:00"
         assert timeline["preprocessed_at"] is not None
@@ -280,15 +265,12 @@ class TestTimelineIntegration:
 
         job_id = "multi_review_job"
 
-        # First review
         reviewer.save_review(job_id, "Job Title", "Remote", "confirmed", company="Corp1")
         first_reviewed = reviewer.get_prior_review(job_id)
 
-        # Re-review
         reviewer.save_review(job_id, "Job Title", "Remote", "rejected", reason="location", company="Corp1")
         second_reviewed = reviewer.get_prior_review(job_id)
 
-        # Both should have reviewed_at set
         assert first_reviewed is not None
         assert second_reviewed is not None
         assert second_reviewed.get("reviewed_at") is not None

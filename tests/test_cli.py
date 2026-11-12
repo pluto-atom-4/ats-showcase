@@ -44,7 +44,6 @@ class TestPreprocessSingleJobFieldMapping:
         preprocessed, token_count, estimated_cost, trigger_requirements = result
 
         assert preprocessed.title == job_dict["title"]
-        # markdown_description now includes title + location + description (via _build_preprocess_clean_text)
         assert job_dict["title"] in preprocessed.markdown_description
         assert job_dict["location"] in preprocessed.markdown_description
         assert token_count > 0
@@ -52,7 +51,7 @@ class TestPreprocessSingleJobFieldMapping:
 
     def test_returns_none_on_missing_required_field(self) -> None:
         """Invalid job dict (missing required JobPosting fields) fails gracefully."""
-        job_dict = {"title": "Incomplete Job"}  # missing company/description
+        job_dict = {"title": "Incomplete Job"}
 
         chunker = SemanticChunker()
         counter = TokenCounter()

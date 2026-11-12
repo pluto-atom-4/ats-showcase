@@ -66,7 +66,6 @@ class TestUpToFlagValidation:
         result = runner.invoke(app, ["all", "--help"])
         assert result.exit_code == 0
         clean_stdout = strip_ansi(result.stdout)
-        # Should not show "No such option"
         assert "No such option '--up-to'" not in clean_stdout
 
 
@@ -98,7 +97,6 @@ class TestUpToPhaseValues:
         """Verify 'crawl' is a valid phase."""
         result = runner.invoke(app, ["all", "--help"])
         assert result.exit_code == 0
-        # Help should appear (no error about unrecognized option)
         assert "all" in result.stdout.lower() or "ALL" in result.stdout
 
     @pytest.mark.unit
@@ -159,5 +157,4 @@ class TestIssue154Resolution:
         result = runner.invoke(app, ["all", "--help"])
         assert result.exit_code == 0
         clean_stdout = strip_ansi(result.stdout)
-        # Should mention halting or stopping
         assert "--up-to" in clean_stdout

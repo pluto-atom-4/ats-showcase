@@ -97,7 +97,6 @@ class TestFullPipeline:
         self, mock_llm_class: MagicMock, mock_prep_class: MagicMock, sample_cv: str, sample_jobs: List[dict[str, Any]]
     ) -> None:
         """Full workflow end-to-end produces assessment results."""
-        # Setup mocks
         mock_prep = MagicMock()
         mock_prep.extract_entities.return_value = (
             ["Python", "AWS"],
@@ -125,21 +124,18 @@ class TestFullPipeline:
         }
         mock_llm_class.return_value = mock_llm
 
-        # Run assessment
         assessor = Assessor()
         assessor.preprocessor = mock_prep
         assessor.llm_provider = mock_llm
 
         result = assessor.assess_job(sample_cv, sample_jobs[0]["description"])
 
-        # Verify result structure
         assert "assessment" in result
         assert "entity_score" in result
         assert "cost_tracking" in result
         assert "token_savings_percent" in result
         assert "metadata" in result
 
-        # Verify assessment content
         assert result["assessment"]["overall_score"] == 85
         assert result["entity_score"]["overall_entity_score"] > 0
 
@@ -149,7 +145,6 @@ class TestFullPipeline:
         self, mock_llm_class: MagicMock, mock_prep_class: MagicMock, sample_jobs: List[dict[str, Any]]
     ) -> None:
         """Jobs extracted from crawl are valid and structured correctly."""
-        # Verify sample jobs have required fields
         assert len(sample_jobs) == 3
         for job in sample_jobs:
             assert "job_id" in job
@@ -158,7 +153,6 @@ class TestFullPipeline:
             assert "location" in job
             assert "url" in job
 
-        # Verify first job structure
         assert sample_jobs[0]["title"] == "Senior Python Developer"
         assert sample_jobs[0]["company"] == "TechCorp"
 
@@ -204,14 +198,12 @@ class TestFullPipeline:
         }
         mock_llm_class.return_value = mock_llm
 
-        # Run assessment
         assessor = Assessor()
         assessor.preprocessor = mock_prep
         assessor.llm_provider = mock_llm
 
         result = assessor.assess_job(sample_cv, sample_jobs[0]["description"])
 
-        # Verify result is complete and ready for storage
         assert result["assessment"]["overall_score"] == 80
         assert "cost_tracking" in result
         assert "metadata" in result
@@ -224,7 +216,6 @@ class TestDatabasePersistence:
         """Job status transitions: pending → confirmed → assessed."""
         job = sample_jobs[0].copy()
 
-        # Simulate status transitions
         job["status"] = "pending_review"
         assert job["status"] == "pending_review"
 
@@ -236,8 +227,6 @@ class TestDatabasePersistence:
 
     def test_cost_tracking_accumulated(self, sample_jobs: List[dict[str, Any]]) -> None:
         """Cost metrics accumulate across multiple job assessments."""
-        # In real flow, costs are tracked per assessment
-        # Verify sample jobs can be iterated for cost tracking
         total_jobs = len(sample_jobs)
         assert total_jobs == 3
 
@@ -246,7 +235,6 @@ class TestDatabasePersistence:
         job_id = sample_jobs[0]["job_id"]
         job = sample_jobs[0]
 
-        # Verify job can be retrieved by ID
         assert job is not None
         assert job["job_id"] == job_id
 
@@ -257,12 +245,9 @@ class TestDatabasePersistence:
         """Re-assessing same job is idempotent."""
         job = sample_jobs[0]
 
-        # Simulate multiple assessment calls on same job
-        # In real DB, UPSERT pattern ensures idempotency
         first_job = job.copy()
         second_job = job.copy()
 
-        # Both should be identical
         assert first_job["job_id"] == second_job["job_id"]
         assert first_job == second_job
 
@@ -271,7 +256,6 @@ class TestDatabasePersistence:
         job = sample_jobs[0].copy()
         job["status"] = "rejected"
 
-        # Verify rejected status prevents assessment
         assert job["status"] == "rejected"
 
 
@@ -286,7 +270,6 @@ class TestErrorHandling:
         malformed = "<html><body><p>Unclosed paragraph<div>Nested bad</body></html>"
         result = cleaner.clean(malformed)
 
-        # Should not crash, should extract text
         assert len(result) > 0
         assert isinstance(result, str)
 
@@ -310,7 +293,6 @@ class TestErrorHandling:
 
     def test_export_handles_empty_results(self) -> None:
         """Export doesn't crash on empty assessment results."""
-        # Empty list should not cause export to crash
         empty_jobs: List[dict[str, Any]] = []
         assert len(empty_jobs) == 0
 
@@ -353,7 +335,6 @@ class TestCostTracking:
 
         result = assessor.assess_job(sample_cv, sample_jobs[0]["description"])
 
-        # Verify cost tracking
         cost = result["cost_tracking"]
         assert cost["estimated_input"] == 600
         assert cost["actual_input"] == 550
@@ -393,13 +374,11 @@ class TestCostTracking:
         assessor.preprocessor = mock_prep
         assessor.llm_provider = mock_llm
 
-        # Assess multiple jobs
         total_cost = 0.0
         for job in sample_jobs:
             result = assessor.assess_job(sample_cv, job["description"])
             total_cost += result["cost_tracking"]["actual_cost_usd"]
 
-        # Verify accumulation
         assert total_cost > 0.0
 
     @patch("src.assessment.assessor.Preprocessor")
@@ -435,12 +414,9 @@ class TestCostTracking:
         assessor.preprocessor = mock_prep
         assessor.llm_provider = mock_llm
 
-        # Mock baseline to be 600 so savings = (1 - 400/600) * 100 ≈ 33.3%
         with patch.object(assessor, "_estimate_baseline_tokens", return_value=600):
             result = assessor.assess_job(sample_cv, sample_jobs[0]["description"])
 
-        # Token savings: (1 - 400/600) * 100 ≈ 33.3%
-        # Should be positive
         assert result["token_savings_percent"] > 30
         assert result["token_savings_percent"] < 35
 
@@ -452,12 +428,9 @@ class TestDataIntegrity:
         """Same job URL not duplicated in database."""
         url = sample_jobs[0]["url"]
 
-        # Simulate database deduplication via UNIQUE constraint
-        # Using a set to verify URL uniqueness
         urls = {job["url"] for job in sample_jobs}
-        assert len(urls) == 3  # All 3 jobs have unique URLs
+        assert len(urls) == 3
 
-        # Verify same URL can't be added twice
         sample_urls = {sample_jobs[0]["url"]: True}
         assert url in sample_urls
 
@@ -468,10 +441,8 @@ class TestDataIntegrity:
         entities = (["Python", "AWS"], ["Docker"], ["5 years"])
         mock_prep.extract_entities.return_value = entities
 
-        # Extract from same text twice
         result1 = mock_prep.extract_entities(sample_cv)
         result2 = mock_prep.extract_entities(sample_cv)
 
-        # Should be identical
         assert result1 == result2
         assert result1 == entities

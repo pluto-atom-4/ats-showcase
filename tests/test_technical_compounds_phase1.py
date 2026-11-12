@@ -11,7 +11,6 @@ import pytest
 from src.tokenization.preprocessor import Preprocessor
 from src.tokenization.technical_compounds import is_technical_compound
 
-# Test data: 10 representative jobs with known technical compounds
 TEST_JOBS_PHASE1 = [
     {
         "id": "job_001",
@@ -175,7 +174,6 @@ Stack:
     },
 ]
 
-# Technical compounds to track
 TECHNICAL_COMPOUNDS = {
     "software development": 6,  # Expected in Phase 3 output
     "data processing": 3,
@@ -184,7 +182,6 @@ TECHNICAL_COMPOUNDS = {
     "system-level": 3,
 }
 
-# Hard technologies that should NOT be reclassified
 HARD_TECHNOLOGIES = {
     "python",
     "javascript",
@@ -203,7 +200,6 @@ HARD_TECHNOLOGIES = {
     "linux",
 }
 
-# Soft skills that should NOT be reclassified
 SOFT_SKILLS_TO_PRESERVE = {
     "leadership",
     "communication",
@@ -269,16 +265,13 @@ class TestPhase1Baseline:
         job = TEST_JOBS_PHASE1[0]
         skills, technologies, requirements = preprocessor.extract_entities(job["description"])
 
-        # Verify extraction happened
         assert len(skills) > 0 or len(technologies) > 0 or len(requirements) > 0, "No entities extracted from job_001"
 
-        # Log baseline for Phase 1 analysis
         print(f"\nJob {job['id']} baseline extraction:")
         print(f"  Skills: {sorted(skills)}")
         print(f"  Technologies: {sorted(technologies)}")
         print(f"  Requirements: {sorted(requirements)}")
 
-        # Check for some expected hard technologies
         tech_lower = [t.lower() for t in technologies]
         assert any(t in tech_lower for t in ["python", "javascript"]), "Expected to extract Python or JavaScript"
 
@@ -299,13 +292,11 @@ class TestPhase1Baseline:
             results["total_technologies_extracted"] += len(technologies)
             results["total_requirements_extracted"] += len(requirements)
 
-            # Check for technical compounds in skills
             skills_lower = [s.lower() for s in skills]
             for compound in TECHNICAL_COMPOUNDS:
                 if compound in skills_lower:
                     results["compound_detections"][compound] += 1
 
-        # Report baseline metrics
         print("\n=== Phase 1 Baseline Metrics ===")
         print(f"Total jobs analyzed: {results['total_jobs']}")
         print(f"Total skills extracted: {results['total_skills_extracted']}")
@@ -315,7 +306,6 @@ class TestPhase1Baseline:
         for compound, count in results["compound_detections"].items():
             print(f"  - '{compound}': {count} job(s)")
 
-        # Verify extraction happened
         assert results["total_skills_extracted"] > 0, "No skills extracted across all jobs"
         assert results["total_technologies_extracted"] > 0, "No technologies extracted across all jobs"
 
@@ -326,7 +316,6 @@ class TestPhase1Baseline:
 
         tech_lower = [t.lower() for t in technologies]
 
-        # Verify at least some hard technologies were found
         found_hard_tech = [t for t in HARD_TECHNOLOGIES if t in tech_lower]
         assert len(found_hard_tech) > 0, f"Expected to find hard technologies from {HARD_TECHNOLOGIES}"
 
@@ -335,7 +324,5 @@ class TestPhase1Baseline:
         job = TEST_JOBS_PHASE1[0]
         skills, technologies, requirements = preprocessor.extract_entities(job["description"])
 
-        # Note: Soft skills may not all be extracted due to filtering
-        # Just verify extraction didn't fail
         print(f"\nExtracted skills: {sorted(skills)}")
         print(f"Extracted technologies: {sorted(technologies)}")

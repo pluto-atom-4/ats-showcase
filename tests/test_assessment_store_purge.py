@@ -23,7 +23,6 @@ def store_with_assessments(temp_db):
     """Create store with sample assessments."""
     store = AssessmentStore(temp_db)
 
-    # Create sample assessments
     assessments = [
         {
             "job_id": "job1",
@@ -110,7 +109,6 @@ class TestPurgeByDate:
         initial_count = store_with_assessments.count_assessments()
         assert initial_count == 3
 
-        # Dry run with future date (should match all assessments)
         result = store_with_assessments.purge_by_date(
             before_date="2099-12-31",
             dry_run=True,
@@ -119,7 +117,6 @@ class TestPurgeByDate:
         assert result["count"] == 3
         assert result["dry_run"] is True
 
-        # Verify nothing was deleted
         final_count = store_with_assessments.count_assessments()
         assert final_count == 3
 
@@ -128,7 +125,6 @@ class TestPurgeByDate:
         initial_count = store_with_assessments.count_assessments()
         assert initial_count == 3
 
-        # Delete with future date (all should match)
         result = store_with_assessments.purge_by_date(
             before_date="2099-12-31",
             dry_run=False,
@@ -137,25 +133,21 @@ class TestPurgeByDate:
         assert result["count"] == 3
         assert result["dry_run"] is False
 
-        # Verify all were deleted
         final_count = store_with_assessments.count_assessments()
         assert final_count == 0
 
     def test_purge_before_date_partial(self, store_with_assessments):
         """Test partial deletion before date."""
-        # This test uses a past date that won't match anything
         result = store_with_assessments.purge_by_date(
             before_date="2020-01-01",
             dry_run=False,
         )
 
-        # Should not delete anything (all assessments created after 2020-01-01)
         assert result["count"] == 0
         assert store_with_assessments.count_assessments() == 3
 
     def test_purge_after_date(self, store_with_assessments):
         """Test purge with after_date."""
-        # With past date, should match all assessments
         result = store_with_assessments.purge_by_date(
             after_date="2020-01-01",
             dry_run=True,
@@ -179,37 +171,29 @@ class TestPurgeByDate:
 
     def test_purge_fts_cleanup(self, store_with_assessments):
         """Test that FTS index is cleaned up on purge."""
-        # Verify initial assessment can be searched
         results = store_with_assessments.search_by_keyword("Python")
         assert len(results) > 0
 
-        # Purge all
         store_with_assessments.purge_by_date(
             before_date="2099-12-31",
             dry_run=False,
         )
 
-        # Verify assessment is gone from database
         assert store_with_assessments.count_assessments() == 0
 
-        # Try to search - should return empty
         results = store_with_assessments.search_by_keyword("Python")
         assert len(results) == 0
 
     def test_purge_before_after_validation(self, store_with_assessments):
         """Test that both before and after dates can be used together."""
-        # Get initial count
         initial_count = store_with_assessments.count_assessments()
 
-        # Try to delete with both dates (past range - nothing should match)
         result = store_with_assessments.purge_by_date(
             before_date="2019-12-31",
             after_date="2018-01-01",
             dry_run=True,
         )
 
-        # Nothing should match
         assert result["count"] == 0
 
-        # Verify count unchanged
         assert store_with_assessments.count_assessments() == initial_count

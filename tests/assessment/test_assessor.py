@@ -84,7 +84,6 @@ class TestEntityScoring:
 
         score = mock_assessor._compute_entity_score(cv_entities, job_entities)
 
-        # CV has 1/2 job skills (50%), 1/2 job tech (50%), no reqs
         assert 40 < score["skill_match"] < 60
         assert 40 < score["tech_match"] < 60
         assert 30 < score["overall_entity_score"] < 70
@@ -119,7 +118,6 @@ class TestEntityScoring:
 
         score = mock_assessor._compute_entity_score(cv_entities, job_entities)
 
-        # Empty CV should score low
         assert score["skill_match"] == 0.0
         assert score["tech_match"] == 0.0
 
@@ -134,7 +132,6 @@ class TestEntityScoring:
 
         score = mock_assessor._compute_entity_score(cv_entities, job_entities)
 
-        # Empty job requirements = full score (no requirements to match)
         assert score["skill_match"] == 100.0
         assert score["tech_match"] == 100.0
 
@@ -225,11 +222,11 @@ class TestTokenSavings:
     def test_baseline_long_job_description(self, mock_assessor: Assessor) -> None:
         """Baseline for very long job description."""
         cv = "CV text"
-        job = "Job description " * 100  # ~1600 chars
+        job = "Job description " * 100
 
         baseline = mock_assessor._estimate_baseline_tokens(cv, job)
 
-        assert baseline > 100  # Substantial token count
+        assert baseline > 100
 
 
 class TestAssessmentIntegration:
@@ -239,15 +236,13 @@ class TestAssessmentIntegration:
     @patch("src.assessment.assessor.LLMProvider")
     def test_assess_job_success(self, mock_llm_class: MagicMock, mock_preprocessor_class: MagicMock) -> None:
         """Successful assessment returns AssessmentResult."""
-        # Mock preprocessor
         mock_preprocessor = MagicMock()
         mock_preprocessor.extract_entities.side_effect = [
-            (["Python"], ["AWS"], []),  # CV entities
-            (["Python", "Go"], ["AWS", "GCP"], []),  # Job entities
+            (["Python"], ["AWS"], []),
+            (["Python", "Go"], ["AWS", "GCP"], []),
         ]
         mock_preprocessor_class.return_value = mock_preprocessor
 
-        # Mock LLM provider
         mock_llm = MagicMock()
         mock_llm.assess_job.return_value = {
             "assessment": {"overall_score": 75},
@@ -267,7 +262,6 @@ class TestAssessmentIntegration:
         }
         mock_llm_class.return_value = mock_llm
 
-        # Test
         assessor = Assessor()
         assessor.preprocessor = mock_preprocessor
         assessor.llm_provider = mock_llm
@@ -450,7 +444,7 @@ class TestAssessmentIntegration:
                 "estimated_input": 600,
                 "estimated_output": 150,
                 "estimated_cost_usd": 0.002,
-                "actual_input": 400,  # 400/600 = 66.7% of baseline
+                "actual_input": 400,
                 "actual_output": 150,
                 "actual_cost_usd": 0.00123,
             },
@@ -465,10 +459,8 @@ class TestAssessmentIntegration:
         assessor = Assessor()
         assessor.preprocessor = mock_preprocessor
         assessor.llm_provider = mock_llm
-        # Mock baseline to be 600 so savings = (1 - 400/600) * 100 ≈ 33.3%
         with patch.object(assessor, "_estimate_baseline_tokens", return_value=600):
             result = assessor.assess_job("CV", "Job")
-            # Savings = (1 - actual/baseline) * 100 = (1 - 400/600) * 100 ≈ 33.3%
             assert result["token_savings_percent"] > 30
             assert result["token_savings_percent"] < 40
 
@@ -579,10 +571,9 @@ class TestEdgeCases:
         assessor = Assessor()
         assessor.preprocessor = mock_preprocessor
         assessor.llm_provider = mock_llm
-        # Mock baseline to be 2000 so savings = (1 - 1500/2000) * 100 = 25%
         with patch.object(assessor, "_estimate_baseline_tokens", return_value=2000):
-            cv_long = "CV " * 500  # Very long CV
-            job_long = "Job " * 500  # Very long job
+            cv_long = "CV " * 500
+            job_long = "Job " * 500
 
             result = assessor.assess_job(cv_long, job_long)
             assert "assessment" in result

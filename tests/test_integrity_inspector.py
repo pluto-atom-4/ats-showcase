@@ -17,7 +17,6 @@ def _create_test_db(db_path: str):
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
 
-    # Create all necessary tables
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS jobs (
@@ -85,9 +84,7 @@ def _create_test_db(db_path: str):
         """
     )
 
-    # Create assessment tables using AssessmentStore
     AssessmentStore(db_path)
-    # The store will create job_assessments and fts tables on init
 
     conn.commit()
     conn.close()
@@ -98,7 +95,6 @@ def checker(tmp_path):
     """Create temporary database with test data."""
     db_path = str(tmp_path / "test_integrity.db")
 
-    # Initialize full database
     _create_test_db(db_path)
 
     from src.storage.assessment_store import AssessmentStore
@@ -120,7 +116,6 @@ def test_check_orphaned_assessments_with_orphan(checker):
     """Should detect orphaned assessments (no matching job)."""
     inspector, store, db_path = checker
 
-    # Create assessment without job
     conn = inspector.conn
     conn.execute(
         (
@@ -153,7 +148,6 @@ def test_check_invalid_scores_with_invalid(checker):
     """Should detect scores outside [0, 100] range."""
     inspector, store, db_path = checker
 
-    # Create assessment with invalid scores
     conn = inspector.conn
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
@@ -168,8 +162,8 @@ def test_check_invalid_scores_with_invalid(checker):
         ),
         (
             "job1",
-            150,  # Invalid: > 100
-            -10,  # Invalid: < 0
+            150,
+            -10,
             85,
             60,
             "[]",
@@ -209,7 +203,7 @@ def test_check_malformed_recommendations(checker):
             80,
             70,
             60,
-            "invalid json {",  # Malformed
+            "invalid json {",
             "Test",
             100,
             0.01,
@@ -231,7 +225,6 @@ def test_check_duplicate_assessments(checker):
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
     )
-    # The schema enforces UNIQUE(job_id), so we can't insert duplicates
     conn.execute(
         (
             "INSERT INTO job_assessments "
@@ -253,7 +246,7 @@ def test_check_duplicate_assessments(checker):
     )
     conn.commit()
 
-    # Check should find no duplicates (because schema prevents them)
+    # UNIQUE(job_id) means duplicates cannot be inserted here, so the check must find none.
     issues = inspector.check_duplicate_assessments()
     assert len(issues) == 0
 
@@ -303,7 +296,6 @@ def test_full_check_with_multiple_issues(checker):
 
     conn = inspector.conn
 
-    # Add orphaned assessment
     conn.execute(
         (
             "INSERT INTO job_assessments "
@@ -324,7 +316,6 @@ def test_full_check_with_multiple_issues(checker):
         ),
     )
 
-    # Add job with invalid score
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
@@ -366,7 +357,6 @@ def test_check_missing_preprocessing(checker):
 
     conn = inspector.conn
 
-    # Create job and assessment but no preprocessed record
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
         ("job1", "Title", "Company", "Location", "Desc", "pending_review"),
@@ -403,7 +393,6 @@ def test_check_missing_cost_tracking(checker):
 
     conn = inspector.conn
 
-    # Create cost_tracking entry without job
     conn.execute(
         "INSERT INTO cost_tracking (job_id, phase, input_tokens, output_tokens, cost) VALUES (?, ?, ?, ?, ?)",
         ("nonexistent_job", "assess", 100, 50, 0.01),
@@ -421,7 +410,6 @@ def test_purge_recommendations_ordered(checker):
 
     conn = inspector.conn
 
-    # Add multiple issue types
     conn.execute(
         (
             "INSERT INTO job_assessments "
@@ -445,9 +433,7 @@ def test_purge_recommendations_ordered(checker):
 
     report = inspector.run_full_check()
 
-    # Check that recommendations are present
     assert len(report.purge_recommendations) > 0
-    # High priority items should appear first
     if "orphaned_assessment" in report.summary_by_type:
         assert any("orphaned" in rec for rec in report.purge_recommendations)
 
@@ -456,7 +442,6 @@ def test_check_fts_data_consistency_clean(checker):
     """FTS with matching job_ids should have no issues."""
     inspector, store, db_path = checker
 
-    # Create job and assessment
     conn = inspector.conn
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
@@ -485,7 +470,6 @@ def test_check_fts_data_consistency_clean(checker):
     )
     conn.commit()
 
-    # Populate FTS with valid data
     conn.execute(
         (
             "INSERT INTO job_assessments_fts "
@@ -504,7 +488,6 @@ def test_check_fts_data_consistency_null_job_ids(checker):
     """FTS with NULL job_ids should be detected."""
     inspector, store, db_path = checker
 
-    # Create job and assessment
     conn = inspector.conn
     conn.execute(
         "INSERT INTO jobs (id, title, company, location, description, status) VALUES (?, ?, ?, ?, ?, ?)",
@@ -533,7 +516,6 @@ def test_check_fts_data_consistency_null_job_ids(checker):
     )
     conn.commit()
 
-    # Create FTS entry with NULL job_id (simulating out-of-sync)
     conn.execute(
         (
             "INSERT INTO job_assessments_fts "
@@ -556,7 +538,6 @@ def test_check_job_reviews_anomalies_null_job_id(checker):
 
     conn = inspector.conn
 
-    # Create orphaned job_reviews with NULL job_id
     conn.execute(
         (
             "INSERT INTO job_reviews "
@@ -579,7 +560,6 @@ def test_check_job_reviews_anomalies_orphaned_id(checker):
 
     conn = inspector.conn
 
-    # Create assessment
     conn.execute(
         (
             "INSERT INTO job_assessments "
@@ -602,7 +582,6 @@ def test_check_job_reviews_anomalies_orphaned_id(checker):
         ),
     )
 
-    # Create review with non-existent job_id
     conn.execute(
         (
             "INSERT INTO job_reviews "
@@ -617,11 +596,6 @@ def test_check_job_reviews_anomalies_orphaned_id(checker):
     assert len(issues) == 1
     assert issues[0].issue_type == "orphaned_job_review"
     assert "not in job_assessments" in issues[0].details
-
-
-# ============================================================================
-# Duplicate inspection (issue #786): read-only scans
-# ============================================================================
 
 
 def _write_json(path, payload):

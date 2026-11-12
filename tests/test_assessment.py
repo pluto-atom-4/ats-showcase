@@ -80,12 +80,10 @@ class TestLLMProvider:
             client = MagicMock()
             mock_class.return_value = client
 
-            # Mock successful response with proper content structure
             response = MagicMock()
             response.usage.input_tokens = 600
             response.usage.output_tokens = 50
 
-            # Create a proper TextBlock-like object with .text attribute
             text_block = MagicMock()
             text_block.text = json.dumps(
                 {
@@ -98,7 +96,6 @@ class TestLLMProvider:
                 }
             )
 
-            # Make response.content iterable as a list
             response.content = [text_block]
             client.messages.create.return_value = response
 
@@ -110,7 +107,7 @@ class TestLLMProvider:
         provider = LLMProvider(api_key="test-key")
 
         assert provider.api_key == "test-key"
-        assert provider.model == "claude-sonnet-5"  # Default model
+        assert provider.model == "claude-sonnet-5"
 
     def test_init_without_api_key_raises(self):
         """Test initialization without API key raises error."""
@@ -138,7 +135,6 @@ class TestLLMProvider:
         """Test assessment with markdown-wrapped JSON response."""
         mock, client = mock_anthropic
 
-        # Mock response with markdown code block - proper content structure
         response = MagicMock()
         response.usage.input_tokens = 600
         response.usage.output_tokens = 50
@@ -181,7 +177,6 @@ class TestLLMProvider:
             cv_text="CV text",
         )
 
-        # Cost: (input_tokens / 1M * $3.0) + (output_tokens / 1M * $15.0) for Sonnet
         expected_cost = (600 / 1_000_000) * 3.0 + (50 / 1_000_000) * 15.0
         assert abs(result.actual_cost - expected_cost) < 0.000001
 
@@ -248,7 +243,6 @@ class TestAssessmentStore:
         """Test getting top matches."""
         store = AssessmentStore(db_path=temp_db)
 
-        # Save multiple assessments
         for i in range(5):
             store.save_assessment(
                 job_id=f"job_{i}",
@@ -275,7 +269,6 @@ class TestAssessmentStore:
         """Test filtering by score."""
         store = AssessmentStore(db_path=temp_db)
 
-        # Save assessments with different scores
         for i, score in enumerate([45, 55, 65, 75, 85, 95]):
             store.save_assessment(
                 job_id=f"job_{i}",
@@ -293,7 +286,7 @@ class TestAssessmentStore:
             )
 
         results = store.get_assessments_by_score(min_score=70)
-        assert len(results) == 3  # 75, 85, 95
+        assert len(results) == 3
 
         store._close_db()
 
@@ -352,7 +345,6 @@ class TestAssessmentStore:
         """Test score distribution."""
         store = AssessmentStore(db_path=temp_db)
 
-        # Save assessments in different ranges
         scores = [25, 55, 72, 88]
         for i, score in enumerate(scores):
             store.save_assessment(
@@ -371,10 +363,10 @@ class TestAssessmentStore:
             )
 
         distribution = store.get_score_distribution()
-        assert distribution["0-50"] >= 1  # Job with score 25
-        assert distribution["50-70"] >= 1  # Job with score 55
-        assert distribution["70-85"] >= 1  # Job with score 72
-        assert distribution["85-100"] >= 1  # Job with score 88
+        assert distribution["0-50"] >= 1
+        assert distribution["50-70"] >= 1
+        assert distribution["70-85"] >= 1
+        assert distribution["85-100"] >= 1
 
         store._close_db()
 
@@ -431,7 +423,6 @@ class TestAssessmentStore:
 
     def test_persistence(self, temp_db):
         """Test database persistence."""
-        # First connection
         store1 = AssessmentStore(db_path=temp_db)
         store1.save_assessment(
             job_id="job_1",
@@ -449,7 +440,6 @@ class TestAssessmentStore:
         )
         store1._close_db()
 
-        # Second connection
         store2 = AssessmentStore(db_path=temp_db)
         result = store2.get_assessment_by_id("job_1")
         assert result is not None

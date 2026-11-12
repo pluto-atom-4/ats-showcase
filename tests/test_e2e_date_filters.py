@@ -19,7 +19,6 @@ def temp_db_with_dated_assessments():
 
     store = AssessmentStore(db_path)
 
-    # Create assessments with specific dates via direct SQL
     import sqlite3
 
     conn = sqlite3.connect(db_path)
@@ -105,7 +104,6 @@ def temp_db_with_dated_assessments():
             ),
         )
 
-        # Also insert into FTS
         cursor.execute(
             """INSERT INTO job_assessments_fts
                (job_id, title, company, summary, recommendations)
@@ -138,7 +136,7 @@ class TestExportDateFilteringWorkflow:
         exporter = MarkdownExporter(store, config)
         report = exporter.generate_report()
 
-        assert "3" in report  # 3 assessments
+        assert "3" in report
         assert "Python Engineer" in report
         assert "ML Engineer" in report
         assert "Data Scientist" in report
@@ -152,10 +150,9 @@ class TestExportDateFilteringWorkflow:
         exporter = MarkdownExporter(store, config)
         report = exporter.generate_report()
 
-        # Should include June and December assessments
         assert "ML Engineer" in report
         assert "Data Scientist" in report
-        assert "Python Engineer" not in report  # January is before June
+        assert "Python Engineer" not in report
 
     def test_export_by_date_to(self, temp_db_with_dated_assessments):
         """Export with to-date filters correctly."""
@@ -166,10 +163,9 @@ class TestExportDateFilteringWorkflow:
         exporter = MarkdownExporter(store, config)
         report = exporter.generate_report()
 
-        # Should include January and June assessments
         assert "Python Engineer" in report
         assert "ML Engineer" in report
-        assert "Data Scientist" not in report  # December is after June
+        assert "Data Scientist" not in report
 
     def test_export_date_range(self, temp_db_with_dated_assessments):
         """Export with date range filters exactly."""
@@ -181,7 +177,6 @@ class TestExportDateFilteringWorkflow:
         exporter = MarkdownExporter(store, config)
         report = exporter.generate_report()
 
-        # Should include June and December
         assert "ML Engineer" in report
         assert "Data Scientist" in report
         assert "Python Engineer" not in report
@@ -190,14 +185,13 @@ class TestExportDateFilteringWorkflow:
         """Export with single day filter."""
         store, _ = temp_db_with_dated_assessments
 
-        # Note: assessments are on dates like 2025-06-20, not 2026-06-20
+        # Fixture assessments are dated 2025-06-20, not 2026; the year is deliberate.
         date_from = parse_date_str("2025-06-19")
         date_to = parse_date_str("2025-06-21")
         config = ExportConfig(date_from=date_from, date_to=date_to)
         exporter = MarkdownExporter(store, config)
         report = exporter.generate_report()
 
-        # Should include only June assessment
         assert "ML Engineer" in report
         assert "Python Engineer" not in report
         assert "Data Scientist" not in report
@@ -211,7 +205,6 @@ class TestExportDateFilteringWorkflow:
         exporter = MarkdownExporter(store, config)
         report = exporter.generate_report()
 
-        # Should include ML Engineer (85) but not Data Scientist (78)
         assert "ML Engineer" in report
         assert "Data Scientist" not in report
 
@@ -232,7 +225,6 @@ class TestExportDateFilteringWorkflow:
         """Export with filter matching no assessments."""
         store, _ = temp_db_with_dated_assessments
 
-        # Filter for future date
         date_from = parse_date_str("2030-01-01")
         config = ExportConfig(date_from=date_from)
         exporter = MarkdownExporter(store, config)
@@ -253,9 +245,9 @@ class TestPurgeDateFilteringWorkflow:
 
         result = store.purge_by_date(before_date="2025-07-01", dry_run=True)
 
-        assert result["count"] == 2  # Jan and June
+        assert result["count"] == 2
         assert result["dry_run"] is True
-        assert store.count_assessments() == 3  # Nothing deleted
+        assert store.count_assessments() == 3
 
     def test_purge_before_date_deletes(self, temp_db_with_dated_assessments):
         """Purge before-date actually deletes."""
@@ -275,7 +267,6 @@ class TestPurgeDateFilteringWorkflow:
 
         result = store.purge_by_date(after_date="2025-06-01", dry_run=False)
 
-        # Should delete June and December (after June 1)
         assert result["count"] == 2
         assert store.count_assessments() == 1
 
@@ -285,7 +276,6 @@ class TestPurgeDateFilteringWorkflow:
 
         result = store.purge_by_date(after_date="2025-01-31", before_date="2025-12-01", dry_run=False)
 
-        # Should delete June (between Jan 31 and Dec 1)
         assert result["count"] == 1
         assert store.count_assessments() == 2
 
@@ -295,7 +285,6 @@ class TestPurgeDateFilteringWorkflow:
 
         store.purge_by_date(before_date="2025-06-01", dry_run=False)
 
-        # Only January should be deleted, June and December remain
         remaining = store.get_top_matches(limit=10)
         assert len(remaining) == 2
 
@@ -312,7 +301,6 @@ class TestCombinedWorkflows:
         """Export filtered results, then purge old records."""
         store, _ = temp_db_with_dated_assessments
 
-        # Export recent assessments
         date_from = parse_date_str("2025-06-01")
         config = ExportConfig(date_from=date_from)
         exporter = MarkdownExporter(store, config)
@@ -321,16 +309,13 @@ class TestCombinedWorkflows:
         assert "ML Engineer" in report
         assert "Data Scientist" in report
 
-        # Purge old assessments
         purge_result = store.purge_by_date(before_date="2025-06-01", dry_run=False)
         assert purge_result["count"] == 1
 
-        # Export after purge
         config2 = ExportConfig()
         exporter2 = MarkdownExporter(store, config2)
         report2 = exporter2.generate_report()
 
-        # Only June and December remain
         assert "ML Engineer" in report2
         assert "Data Scientist" in report2
         assert "Python Engineer" not in report2
@@ -339,14 +324,11 @@ class TestCombinedWorkflows:
         """Dry-run purge lets user preview before deletion."""
         store, _ = temp_db_with_dated_assessments
 
-        # Check what would be deleted
         result = store.purge_by_date(before_date="2025-07-01", dry_run=True)
         preview_count = result["count"]
 
-        # Delete for real
         result2 = store.purge_by_date(before_date="2025-07-01", dry_run=False)
 
-        # Counts should match
         assert result2["count"] == preview_count
         assert store.count_assessments() == 3 - preview_count
 
@@ -354,12 +336,10 @@ class TestCombinedWorkflows:
         """Verify dry-run default prevents accidental deletion."""
         store, _ = temp_db_with_dated_assessments
 
-        # Without dry_run=False, should not delete
         result = store.purge_by_date(before_date="2025-12-31")
 
-        # Default is dry_run=True
         assert result["dry_run"] is True
-        assert store.count_assessments() == 3  # Nothing deleted
+        assert store.count_assessments() == 3
 
 
 class TestEdgeCasesAndErrors:
@@ -416,7 +396,6 @@ class TestEdgeCasesAndErrors:
         exporter = MarkdownExporter(store, config)
         report = exporter.generate_report()
 
-        # Should still generate valid report
         assert "Job Details" in report
         assert len(report) > 100
 
@@ -435,7 +414,6 @@ class TestPerformanceAndScale:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Create 100 assessments
         for i in range(100):
             cursor.execute(
                 """INSERT INTO job_assessments
@@ -465,13 +443,11 @@ class TestPerformanceAndScale:
         conn.commit()
         conn.close()
 
-        # Export with filter should be fast
         date_from = parse_date_str("2025-06-01")
         config = ExportConfig(date_from=date_from, min_score=75)
         exporter = MarkdownExporter(store, config)
         report = exporter.generate_report()
 
-        # Should have generated report
         assert len(report) > 100
 
         Path(db_path).unlink(missing_ok=True)
@@ -487,7 +463,6 @@ class TestPerformanceAndScale:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Create 100 assessments
         for i in range(100):
             cursor.execute(
                 """INSERT INTO job_assessments
@@ -517,7 +492,6 @@ class TestPerformanceAndScale:
         conn.commit()
         conn.close()
 
-        # Purge should handle large dataset
         result = store.purge_by_date(before_date="2025-06-01", dry_run=False)
 
         assert result["count"] > 0

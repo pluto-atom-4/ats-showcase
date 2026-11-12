@@ -23,10 +23,8 @@ class TestEnvLoading:
         """Test load_dotenv is called in CLI main function."""
         from src import cli
 
-        # Check that load_dotenv is imported
         assert hasattr(cli, "load_dotenv"), "load_dotenv not imported in cli.py"
 
-        # Verify main function exists
         assert hasattr(cli, "main"), "main function not defined in cli.py"
 
     @pytest.mark.skipif(
@@ -50,7 +48,6 @@ class TestEnvLoading:
         """Test improved error message from LLMProvider."""
         from src.llm.provider import LLMProvider
 
-        # Clear API key from environment
         original_key = os.environ.pop("ANTHROPIC_API_KEY", None)
 
         try:
@@ -62,7 +59,6 @@ class TestEnvLoading:
             assert ".env" in error_msg
             assert "export" in error_msg.lower()
         finally:
-            # Restore original key if it existed
             if original_key:
                 os.environ["ANTHROPIC_API_KEY"] = original_key
 
@@ -70,15 +66,12 @@ class TestEnvLoading:
         """Test LLMProvider can be initialized with explicit API key."""
         from src.llm.provider import LLMProvider
 
-        # Should not raise with explicit key (though Anthropic client init might)
         test_key = "test-key-for-unit-test"  # pragma: allowlist secret
         try:
             provider = LLMProvider(api_key=test_key)
             assert provider.api_key == test_key
         except Exception as e:
-            # Anthropic client initialization might fail, but key should be set
             if "test-key" not in str(e):
-                # If the error isn't about the key format, check it was at least set
                 pass
 
 
@@ -89,23 +82,18 @@ class TestEnvIntegration:
         """Test loading custom .env file."""
         from dotenv import load_dotenv
 
-        # Create temp .env file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False, dir=".") as f:
             f.write("TEST_VAR=test_value\n")
             f.write("ANOTHER_VAR=another_value\n")
             temp_env_path = f.name
 
         try:
-            # Load the temp .env file
             load_dotenv(temp_env_path)
 
-            # Verify values loaded
             assert os.getenv("TEST_VAR") == "test_value"
             assert os.getenv("ANOTHER_VAR") == "another_value"
         finally:
-            # Clean up
             Path(temp_env_path).unlink()
-            # Clear test variables
             os.environ.pop("TEST_VAR", None)
             os.environ.pop("ANOTHER_VAR", None)
 
@@ -113,19 +101,15 @@ class TestEnvIntegration:
         """Test that .env doesn't override already-set env vars."""
         from dotenv import load_dotenv
 
-        # Set environment variable
         os.environ["OVERRIDE_TEST"] = "original"
 
-        # Create temp .env with different value
         with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False, dir=".") as f:
             f.write("OVERRIDE_TEST=from_env_file\n")
             temp_env_path = f.name
 
         try:
-            # Load should not override existing env vars
             load_dotenv(temp_env_path, override=False)
 
-            # Should keep original value
             assert os.getenv("OVERRIDE_TEST") == "original"
         finally:
             Path(temp_env_path).unlink()

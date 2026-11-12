@@ -14,7 +14,6 @@ def store(tmp_path):
     db_path = str(tmp_path / "test.db")
     store = AssessmentStore(db_path)
 
-    # Add test data with different companies
     store.save_assessment(
         job_id="google_1",
         title="Senior Python Engineer",
@@ -103,7 +102,7 @@ class TestCompanyFiltering:
     def test_search_by_keyword_no_company_filter(self, store):
         """Search without company filter should return all matches."""
         results = store.search_by_keyword("engineer", min_score=0)
-        assert len(results) >= 3  # Python, ML, Backend, Frontend engineers
+        assert len(results) >= 3
         companies = {r["company"] for r in results}
         assert "Google" in companies
         assert "Amazon" in companies
@@ -158,9 +157,7 @@ class TestCompanyFiltering:
         """Extract top keywords from job descriptions."""
         keywords = store.get_top_keywords(limit=5)
         assert len(keywords) > 0
-        # Should be list of (keyword, frequency) tuples
         assert all(isinstance(k, tuple) and len(k) == 2 for k in keywords)
-        # Keywords should be sorted by frequency (descending)
         freqs = [k[1] for k in keywords]
         assert freqs == sorted(freqs, reverse=True)
 
@@ -168,14 +165,12 @@ class TestCompanyFiltering:
         """Extract top keywords for specific company."""
         keywords = store.get_top_keywords(limit=5, company="Google")
         assert len(keywords) > 0
-        # All keywords should be from Google's job descriptions
         assert all(isinstance(k, tuple) for k in keywords)
 
     def test_get_top_keywords_filters_common_words(self, store):
         """Top keywords should filter out common words."""
         keywords = store.get_top_keywords(limit=10)
         keyword_words = [k[0] for k in keywords]
-        # Should not include common words like 'and', 'the', 'for'
         assert "and" not in keyword_words
         assert "the" not in keyword_words
         assert "for" not in keyword_words
@@ -191,7 +186,6 @@ class TestCompanyFilteringEdgeCases:
 
         assert store.get_companies() == []
         assert store.get_company_summary() == []
-        # get_stats_by_company returns a dict with 0 counts for empty company
         stats = store.get_stats_by_company("Google")
         assert stats.get("total_assessments", 0) == 0
         assert store.get_top_keywords(company="Google") == []
@@ -249,7 +243,6 @@ class TestCompanyFilteringEdgeCases:
         )
 
         companies = store.get_companies()
-        # NULL company should not appear in distinct list
         assert None not in companies
         assert len(companies) == 0
 

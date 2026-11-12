@@ -28,7 +28,7 @@ class TestModelConfiguration:
 
     def test_validate_model_accepts_valid(self):
         """validate_model accepts supported model IDs."""
-        validate_model("claude-sonnet-5")  # Should not raise
+        validate_model("claude-sonnet-5")
         validate_model("claude-haiku-4-5-20251001")
         validate_model("claude-opus-4-8")
 
@@ -72,7 +72,7 @@ class TestModelConfiguration:
         assert "claude-haiku-4-5-20251001" in models_list
         assert "claude-sonnet-5" in models_list
         assert "claude-opus-4-8" in models_list
-        assert "," in models_list  # Comma-separated
+        assert "," in models_list
 
     def test_model_aliases_exist(self):
         """Model aliases are defined."""
@@ -106,7 +106,7 @@ class TestModelConfiguration:
 
     def test_validate_model_accepts_aliases(self):
         """validate_model accepts aliases."""
-        validate_model("haiku")  # Should not raise
+        validate_model("haiku")
         validate_model("sonnet")
         validate_model("opus")
 

@@ -15,7 +15,6 @@ from src.cli import app
 runner = CliRunner()
 
 
-# Fixtures for test data
 @pytest.fixture
 def sample_cv() -> str:
     """Sample CV text."""
@@ -117,19 +116,16 @@ def test_assess_single_job(
         patch("src.storage.assessment_store.AssessmentStore") as mock_store_cls,
         patch("src.assessment.assessor.Assessor") as mock_assessor_cls,
     ):
-        # Mock JobReviewer
         reviewer = MagicMock()
         reviewer.get_confirmed_jobs.return_value = [sample_preprocessed_job]
         mock_reviewer_cls.return_value = reviewer
 
-        # Mock AssessmentStore
         store = MagicMock()
         store.save_assessment.return_value = None
         store.get_stats.return_value = {"avg_score": 75.0}
         store.get_top_matches.return_value = []
         mock_store_cls.return_value = store
 
-        # Mock Assessor
         assessor = MagicMock()
         assessor.model = "claude-3-5-sonnet-20241022"
         assessor.assess_job.return_value = mock_assessor_result
@@ -155,19 +151,16 @@ def test_assess_multiple_jobs(
         patch("src.storage.assessment_store.AssessmentStore") as mock_store_cls,
         patch("src.assessment.assessor.Assessor") as mock_assessor_cls,
     ):
-        # Mock JobReviewer
         reviewer = MagicMock()
         reviewer.get_confirmed_jobs.return_value = [sample_preprocessed_job, sample_preprocessed_job_2]
         mock_reviewer_cls.return_value = reviewer
 
-        # Mock AssessmentStore
         store = MagicMock()
         store.save_assessment.return_value = None
         store.get_stats.return_value = {"avg_score": 75.0}
         store.get_top_matches.return_value = []
         mock_store_cls.return_value = store
 
-        # Mock Assessor
         assessor = MagicMock()
         assessor.model = "claude-3-5-sonnet-20241022"
         assessor.assess_job.return_value = mock_assessor_result
@@ -189,19 +182,16 @@ def test_assess_cost_tracking(
         patch("src.storage.assessment_store.AssessmentStore") as mock_store_cls,
         patch("src.assessment.assessor.Assessor") as mock_assessor_cls,
     ):
-        # Mock JobReviewer
         reviewer = MagicMock()
         reviewer.get_confirmed_jobs.return_value = [sample_preprocessed_job]
         mock_reviewer_cls.return_value = reviewer
 
-        # Mock AssessmentStore
         store = MagicMock()
         store.save_assessment.return_value = None
         store.get_stats.return_value = {"avg_score": 75.0}
         store.get_top_matches.return_value = []
         mock_store_cls.return_value = store
 
-        # Mock Assessor
         assessor = MagicMock()
         assessor.model = "claude-3-5-sonnet-20241022"
         assessor.assess_job.return_value = mock_assessor_result
@@ -248,19 +238,16 @@ def test_assess_rate_limit_handling(
         patch("src.storage.assessment_store.AssessmentStore") as mock_store_cls,
         patch("src.assessment.assessor.Assessor") as mock_assessor_cls,
     ):
-        # Mock JobReviewer
         reviewer = MagicMock()
         reviewer.get_confirmed_jobs.return_value = [sample_preprocessed_job]
         mock_reviewer_cls.return_value = reviewer
 
-        # Mock AssessmentStore
         store = MagicMock()
         store.save_assessment.return_value = None
         store.get_stats.return_value = {"avg_score": 75.0}
         store.get_top_matches.return_value = []
         mock_store_cls.return_value = store
 
-        # Mock Assessor - raise generic exception (simulates error)
         assessor = MagicMock()
         assessor.model = "claude-3-5-sonnet-20241022"
         assessor.assess_job.side_effect = Exception("Rate limited")
@@ -268,7 +255,6 @@ def test_assess_rate_limit_handling(
 
         result = runner.invoke(app, ["assess", "--cv", temp_cv_file, "--mode", "all"])
 
-        # Should complete even though assessment failed (error is non-fatal)
         assert "Assessment complete" in result.stdout or "Failed" in result.stdout or result.exit_code in (0, 1)
 
 
@@ -281,19 +267,16 @@ def test_assess_verify_cost_flag(
         patch("src.storage.assessment_store.AssessmentStore") as mock_store_cls,
         patch("src.assessment.assessor.Assessor") as mock_assessor_cls,
     ):
-        # Mock JobReviewer
         reviewer = MagicMock()
         reviewer.get_confirmed_jobs.return_value = [sample_preprocessed_job]
         mock_reviewer_cls.return_value = reviewer
 
-        # Mock AssessmentStore
         store = MagicMock()
         store.save_assessment.return_value = None
         store.get_stats.return_value = {"avg_score": 75.0}
         store.get_top_matches.return_value = []
         mock_store_cls.return_value = store
 
-        # Mock Assessor
         assessor = MagicMock()
         assessor.model = "claude-3-5-sonnet-20241022"
         mock_assessor_cls.return_value = assessor
@@ -301,8 +284,7 @@ def test_assess_verify_cost_flag(
         result = runner.invoke(
             app,
             ["assess", "--cv", temp_cv_file, "--verify-cost", "--limit", "1"],
-            input="n\n",  # Decline to proceed
+            input="n\n",
         )
 
-        # Should prompt for cost verification
         assert "Estimated" in result.stdout or "Aborted" in result.stdout

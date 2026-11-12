@@ -64,7 +64,6 @@ class TestEstimateCost:
         estimate1 = provider.estimate_cost(prompt, max_output_tokens=100)
         estimate2 = provider.estimate_cost(prompt, max_output_tokens=500)
 
-        # More output tokens should cost more
         assert estimate2["total_cost_usd"] > estimate1["total_cost_usd"]
 
     def test_estimate_cost_sonnet_pricing(self) -> None:
@@ -74,7 +73,6 @@ class TestEstimateCost:
 
         estimate = provider.estimate_cost(prompt)
 
-        # Sonnet: $0.003 input per 1M
         assert estimate["total_cost_usd"] > 0
 
     def test_estimate_cost_haiku_pricing(self) -> None:
@@ -84,7 +82,6 @@ class TestEstimateCost:
 
         estimate = provider.estimate_cost(prompt)
 
-        # Haiku is cheaper than Sonnet
         assert estimate["total_cost_usd"] > 0
 
     def test_estimate_cost_empty_prompt(self) -> None:
@@ -92,14 +89,13 @@ class TestEstimateCost:
         provider = LLMProvider(api_key="sk-test")
         estimate = provider.estimate_cost("")
 
-        # Should still return valid structure
         assert "total_cost_usd" in estimate
         assert estimate["total_cost_usd"] >= 0
 
     def test_estimate_cost_long_prompt(self) -> None:
         """Estimate handles long prompt."""
         provider = LLMProvider(api_key="sk-test")
-        prompt = "Test prompt " * 1000  # Very long
+        prompt = "Test prompt " * 1000
 
         estimate = provider.estimate_cost(prompt)
 
@@ -113,7 +109,6 @@ class TestAssessJobMocking:
     @patch("src.assessment.llm_integration.anthropic.Anthropic")
     def test_assess_job_success(self, mock_anthropic_class) -> None:
         """Successful assessment returns expected structure."""
-        # Mock the Anthropic client and response
         mock_client = MagicMock()
         mock_anthropic_class.return_value = mock_client
 
@@ -129,7 +124,6 @@ class TestAssessJobMocking:
 
         mock_client.messages.create.return_value = mock_message
 
-        # Test
         provider = LLMProvider(api_key="sk-test")
         cv = "5 years Python, Django"
         job = "Senior Python developer needed"
@@ -202,7 +196,6 @@ class TestAssessJobMocking:
         provider = LLMProvider(api_key="sk-test")
         provider.assess_job("CV", "Job", use_examples=False)
 
-        # Verify build_simple_prompt was used (check call count)
         mock_client.messages.create.assert_called_once()
 
     @patch("src.assessment.llm_integration.anthropic.Anthropic")
@@ -221,7 +214,6 @@ class TestAssessJobMocking:
         provider = LLMProvider(api_key="sk-test")
         provider.assess_job("CV", "Job", use_examples=True)
 
-        # Verify the call was made
         mock_client.messages.create.assert_called_once()
 
 
@@ -241,13 +233,12 @@ class TestAssessJobErrors:
             provider.assess_job("CV", "Job")
 
     @patch("src.assessment.llm_integration.anthropic.Anthropic")
-    @patch("time.sleep")  # Mock sleep to speed up test
+    @patch("time.sleep")
     def test_assess_job_rate_limit_retries(self, mock_sleep, mock_anthropic_class) -> None:
         """Rate limit error retries with backoff."""
         mock_client = MagicMock()
         mock_anthropic_class.return_value = mock_client
 
-        # First 2 attempts fail with rate limit, 3rd succeeds
         rate_limit_error = RateLimitError("Rate limited", response=MagicMock(), body={})
         mock_message = MagicMock()
         mock_message.content = [MagicMock(text='{"overall_score": 75}')]
@@ -259,9 +250,7 @@ class TestAssessJobErrors:
         provider = LLMProvider(api_key="sk-test")
         result = provider.assess_job("CV", "Job", max_retries=3)
 
-        # Should succeed on 3rd attempt
         assert result["assessment"]["overall_score"] == 75
-        # Should have slept (2 times for first 2 retries)
         assert mock_sleep.call_count == 2
 
     @patch("src.assessment.llm_integration.anthropic.Anthropic")
@@ -271,7 +260,6 @@ class TestAssessJobErrors:
         mock_client = MagicMock()
         mock_anthropic_class.return_value = mock_client
 
-        # Create mock server error
         server_error = APIStatusError("Server error", response=MagicMock(status_code=503), body={})
         mock_message = MagicMock()
         mock_message.content = [MagicMock(text='{"overall_score": 75}')]
@@ -299,7 +287,6 @@ class TestAssessJobErrors:
         with pytest.raises(APIStatusError):
             provider.assess_job("CV", "Job", max_retries=3)
 
-        # Should only try once (no retries for 4xx)
         assert mock_client.messages.create.call_count == 1
 
     @patch("src.assessment.llm_integration.anthropic.Anthropic")
@@ -309,7 +296,7 @@ class TestAssessJobErrors:
         mock_anthropic_class.return_value = mock_client
 
         mock_message = MagicMock()
-        mock_message.content = [MagicMock(text='{"invalid json')]  # Invalid JSON
+        mock_message.content = [MagicMock(text='{"invalid json')]
         mock_message.usage.input_tokens = 600
         mock_message.usage.output_tokens = 150
 
@@ -335,7 +322,6 @@ class TestAssessJobErrors:
         with pytest.raises(RateLimitError):
             provider.assess_job("CV", "Job", max_retries=3)
 
-        # All 3 attempts should have been made
         assert mock_client.messages.create.call_count == 3
 
 
@@ -384,7 +370,6 @@ class TestAssessJobEdgeCases:
         mock_client = MagicMock()
         mock_anthropic_class.return_value = mock_client
 
-        # Minimal valid JSON
         mock_message = MagicMock()
         mock_message.content = [MagicMock(text='{"overall_score": 50}')]
         mock_message.usage.input_tokens = 600
@@ -395,5 +380,4 @@ class TestAssessJobEdgeCases:
         provider = LLMProvider(api_key="sk-test")
         result = provider.assess_job("CV", "Job")
 
-        # Should not crash, should return what we got
         assert result["assessment"]["overall_score"] == 50

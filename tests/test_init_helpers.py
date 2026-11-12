@@ -30,14 +30,11 @@ class TestInitializeDbCommon:
 
         conn = initialize_db_common(temp_db_path, tables)
 
-        # Verify connection is created
         assert conn is not None
         assert isinstance(conn, sqlite3.Connection)
 
-        # Verify row_factory is set
         assert conn.row_factory == sqlite3.Row
 
-        # Verify tables exist
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test_table'")
         assert cursor.fetchone() is not None
@@ -57,10 +54,8 @@ class TestInitializeDbCommon:
 
         conn = initialize_db_common(nested_path, tables)
 
-        # Verify directory was created
         assert Path(nested_path).parent.exists()
 
-        # Verify database file was created
         assert Path(nested_path).exists()
 
         conn.close()
@@ -75,7 +70,6 @@ class TestInitializeDbCommon:
 
         assert conn.row_factory == sqlite3.Row
 
-        # Verify we can access columns by name
         cursor = conn.cursor()
         cursor.execute("INSERT INTO test_table (name) VALUES (?)", ("test",))
         cursor.execute("SELECT * FROM test_table")
@@ -99,7 +93,6 @@ class TestInitializeDbCommon:
         cursor.execute("SELECT COUNT(*) as count FROM sqlite_master WHERE type='table'")
         count = cursor.fetchone()["count"]
 
-        # Should have at least our 3 tables (SQLite may have internal tables)
         assert count >= 3
 
         conn.close()
@@ -110,7 +103,6 @@ class TestInitializeDbCommon:
 
         conn = initialize_db_common(temp_db_path, tables)
 
-        # Should still return a valid connection
         assert conn is not None
         assert isinstance(conn, sqlite3.Connection)
 
@@ -118,7 +110,6 @@ class TestInitializeDbCommon:
 
     def test_table_creation_failure(self, temp_db_path):
         """Test that table creation failure raises an error."""
-        # Invalid SQL will cause OperationalError
         tables = {
             "bad_table": "INVALID SQL STATEMENT",
         }
@@ -135,7 +126,6 @@ class TestInitializeDbCommon:
         conn = initialize_db_common(temp_db_path, tables)
         conn.close()
 
-        # Reopen connection and verify table persisted
         new_conn = sqlite3.connect(temp_db_path)
         cursor = new_conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test_table'")
@@ -148,11 +138,9 @@ class TestInitializeDbCommon:
             "test_table": "CREATE TABLE IF NOT EXISTS test_table (id INTEGER PRIMARY KEY, name TEXT)",
         }
 
-        # Create tables first time
         conn1 = initialize_db_common(temp_db_path, tables)
         conn1.close()
 
-        # Create again - should not fail
         conn2 = initialize_db_common(temp_db_path, tables)
         assert conn2 is not None
 
@@ -168,7 +156,6 @@ class TestInitializeDbCommon:
             "test_table": "CREATE TABLE IF NOT EXISTS test_table (id INTEGER PRIMARY KEY)",
         }
 
-        # Patch sqlite3.connect to raise an error
         with patch("sqlite3.connect") as mock_connect:
             mock_connect.side_effect = sqlite3.OperationalError("Cannot open database")
 
@@ -235,14 +222,12 @@ class TestInitializeDbCommon:
 
         cursor = conn.cursor()
 
-        # Verify jobs table exists and has correct schema
         cursor.execute("PRAGMA table_info(jobs)")
         columns = cursor.fetchall()
         column_names = [row[1] for row in columns]
         assert "job_id" in column_names
         assert "title" in column_names
 
-        # Verify assessments table exists
         cursor.execute("PRAGMA table_info(assessments)")
         columns = cursor.fetchall()
         column_names = [row[1] for row in columns]
@@ -257,11 +242,9 @@ class TestInitializeDbCommon:
             "test_table": "CREATE TABLE IF NOT EXISTS test_table (id INTEGER PRIMARY KEY)",
         }
 
-        # Capture log at INFO level
         with caplog.at_level(logging.INFO):
             conn = initialize_db_common(temp_db_path, tables)
 
-            # Check that info log was created
             assert any(
                 "Initialized database" in record.message for record in caplog.records if record.levelname == "INFO"
             )
@@ -277,12 +260,10 @@ class TestInitializeDbCommon:
         conn1 = initialize_db_common(temp_db_path, tables)
         conn2 = initialize_db_common(temp_db_path, tables)
 
-        # Insert via first connection
         cursor1 = conn1.cursor()
         cursor1.execute("INSERT INTO test_table (value) VALUES (?)", ("test1",))
         conn1.commit()
 
-        # Read via second connection
         cursor2 = conn2.cursor()
         cursor2.execute("SELECT COUNT(*) as count FROM test_table")
         count = cursor2.fetchone()["count"]

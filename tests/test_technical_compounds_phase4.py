@@ -58,7 +58,7 @@ class TestCompoundDetectionAccuracy:
             "teamwork",
             "software",
             "data",
-            "system",  # Keywords alone should NOT match
+            "system",
         ]
 
         for word in single_words:
@@ -75,7 +75,6 @@ class TestCompoundDetectionAccuracy:
         ]
 
         for phrase in partial_compounds:
-            # These should be detected due to keyword matching (Tier 2 or 3)
             is_detected = is_technical_compound(phrase)
             if is_detected:
                 confidence = get_confidence_score(phrase)
@@ -90,15 +89,12 @@ class TestCompoundDetectionAccuracy:
             "engineering technology": True,
             "manufacturing engineering": True,
             "system-level": True,
-            # Hard technologies (should NOT detect)
             "python": False,
             "java": False,
             "docker": False,
-            # Soft skills (should NOT detect)
             "leadership": False,
             "communication": False,
             "teamwork": False,
-            # Multi-word tech (should detect)
             "web framework": True,
             "api service": True,
             "cloud platform": True,
@@ -129,17 +125,12 @@ class TestMetricsImprovement:
 
     def test_skills_extraction_baseline(self, preprocessor):
         """Test baseline skills extraction (Phase 3 before reclassification)."""
-        # With reclassification, skills should be reduced
-        # (some moved to technologies)
         text = "Software development, data processing, leadership, communication"
 
         skills, technologies, requirements = preprocessor.extract_entities(text)
 
-        # After reclassification, "software development" and "data processing"
-        # should be in technologies, not skills
         tech_lower = [t.lower() for t in technologies]
 
-        # Verify compounds moved to tech
         has_compounds_in_tech = any("software" in t and "development" in t for t in tech_lower) or any(
             "data" in t and "processing" in t for t in tech_lower
         )
@@ -159,7 +150,6 @@ Technologies: Python, Docker, Kubernetes, REST API.
 
         tech_lower = [t.lower() for t in technologies]
 
-        # Should have both compounds AND hard technologies
         has_hard_tech = any(t in tech_lower for t in ["python", "docker", "kubernetes"])
         assert has_hard_tech, f"Missing hard technologies. Got: {technologies}"
 
@@ -231,12 +221,12 @@ class TestEdgeCases:
     def test_similar_phrases_differentiation(self):
         """Test differentiation between similar phrases."""
         test_cases = [
-            ("system", False),  # Single word
-            ("system level", False),  # Not in exact patterns (note the space vs dash)
-            ("system-level", True),  # Exact match
-            ("software", False),  # Single word
-            ("software development", True),  # Exact match
-            ("software engineer", False),  # Contains keyword but not compound
+            ("system", False),
+            ("system level", False),
+            ("system-level", True),
+            ("software", False),
+            ("software development", True),
+            ("software engineer", False),
         ]
 
         for phrase, expected in test_cases:
@@ -260,10 +250,10 @@ class TestEdgeCases:
     def test_whitespace_handling(self):
         """Test handling of extra whitespace."""
         variants = [
-            "  software development  ",  # Leading/trailing
-            "software  development",  # Extra spaces
-            "software\tdevelopment",  # Tab
-            "software\ndevelopment",  # Newline
+            "  software development  ",
+            "software  development",
+            "software\tdevelopment",
+            "software\ndevelopment",
         ]
 
         results = []
@@ -274,13 +264,12 @@ class TestEdgeCases:
 
     def test_confidence_threshold_edge_cases(self):
         """Test confidence thresholds at boundary values."""
-        # Test various thresholds
         threshold_tests = [
-            ("software development", 0.0, True),  # High confidence ≥ 0.0
-            ("software development", 0.5, True),  # High confidence ≥ 0.5
-            ("software development", 0.95, True),  # High confidence ≥ 0.95
-            ("python", 0.5, False),  # No confidence, threshold=0.5
-            ("python", 1.0, False),  # No confidence, threshold=1.0
+            ("software development", 0.0, True),
+            ("software development", 0.5, True),
+            ("software development", 0.95, True),
+            ("python", 0.5, False),
+            ("python", 1.0, False),
         ]
 
         for phrase, threshold, expected in threshold_tests:
@@ -293,7 +282,6 @@ class TestEdgeCases:
 
         skills, technologies, requirements = preprocessor.extract_entities(text)
 
-        # Should find compounds (or parts of them) in technologies
         print("\nPartial substring test:")
         print(f"  Text: {text}")
         print(f"  Technologies: {sorted(technologies)}")
@@ -305,11 +293,11 @@ class TestConfidenceScoreValidation:
     def test_confidence_scores_realistic(self):
         """Test confidence scores are realistic and ordered."""
         test_cases = [
-            ("software development", 0.8, 1.0),  # Tier 1: exact match
-            ("web service", 0.8, 1.0),  # Tier 1: exact match in patterns
-            ("custom framework", 0.6, 0.8),  # Tier 2: keyword match
-            ("python", 0.0, 0.0),  # No match
-            ("leadership", 0.0, 0.0),  # Soft skill
+            ("software development", 0.8, 1.0),
+            ("web service", 0.8, 1.0),
+            ("custom framework", 0.6, 0.8),
+            ("python", 0.0, 0.0),
+            ("leadership", 0.0, 0.0),
         ]
 
         for phrase, min_confidence, max_confidence in test_cases:
@@ -321,13 +309,10 @@ class TestConfidenceScoreValidation:
 
     def test_confidence_scores_ordered(self):
         """Test that confidence scores follow expected ordering."""
-        # Exact matches should have highest confidence
         exact_score = get_confidence_score("software development")
 
-        # Keyword patterns should have lower or equal confidence
         keyword_score = get_confidence_score("custom framework")
 
-        # Non-matches should have zero confidence
         no_match_score = get_confidence_score("python")
 
         assert exact_score >= 0.8, f"Exact match score should be >= 0.8, got {exact_score}"

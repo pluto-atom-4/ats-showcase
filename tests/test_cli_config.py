@@ -65,7 +65,6 @@ class TestLoadCompaniesFromDirectory:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
 
-            # Create multiple config files
             config1 = {
                 "companies": {
                     "Company1": {
@@ -116,7 +115,7 @@ class TestFilterEnabledCompanies:
         companies = {
             "Company1": {"enabled": True, "name": "Company One"},
             "Company2": {"enabled": False, "name": "Company Two"},
-            "Company3": {"name": "Company Three"},  # No enabled flag (default to True)
+            "Company3": {"name": "Company Three"},
         }
 
         enabled, disabled = filter_enabled_companies(companies)

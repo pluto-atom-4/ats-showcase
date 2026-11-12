@@ -26,11 +26,11 @@ class TestDateParsing:
     def test_invalid_date_formats(self):
         """Test various invalid date formats."""
         invalid_dates = [
-            "05-31-2026",  # MM-DD-YYYY
-            "31/05/2026",  # DD/MM/YYYY
-            "2026/05/31",  # YYYY/MM/DD
-            "May 31, 2026",  # Text format
-            "2026.05.31",  # Dot separator
+            "05-31-2026",
+            "31/05/2026",
+            "2026/05/31",
+            "May 31, 2026",
+            "2026.05.31",
         ]
 
         for date_str in invalid_dates:
@@ -40,9 +40,9 @@ class TestDateParsing:
     def test_invalid_dates(self):
         """Test invalid calendar dates."""
         invalid_dates = [
-            "2026-13-01",  # Invalid month
-            "2026-05-32",  # Invalid day
-            "2026-02-30",  # Feb 30 (invalid)
+            "2026-13-01",
+            "2026-05-32",
+            "2026-02-30",
         ]
 
         for date_str in invalid_dates:
@@ -51,12 +51,10 @@ class TestDateParsing:
 
     def test_date_parsing_edge_cases(self):
         """Test edge case dates."""
-        # Leap year
         dt = parse_date_str("2024-02-29")
         assert dt.day == 29
         assert dt.month == 2
 
-        # Year boundaries
         dt = parse_date_str("2000-01-01")
         assert dt.year == 2000
 
