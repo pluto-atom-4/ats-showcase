@@ -28,9 +28,11 @@ ENCODING_RE = re.compile(r"coding[:=]\s*[-\w.]+")
 WHY_RE = re.compile(
     r"\b(?:why|because|hazard|do not|don't|workaround|units?|ordering|order matters"
     r"|race|deadlock|thread-unsafe|timezone|utc|axis|sign convention|rad|deg)\b"
-    r"|https?://|#\d+|\bSYNTHETIC\b",
+    r"|https?://",
     re.IGNORECASE,
 )
+ISSUE_REF_RE = re.compile(r"(?<![\w&])#\d+\b")
+SYNTHETIC_RE = re.compile(r"\bSYNTHETIC\b")
 TODO_RE = re.compile(r"\b(?:todo|fixme)\b", re.IGNORECASE)
 TRACKED_REF_RE = re.compile(r"#\d+|https?://|issue\s+\d+", re.IGNORECASE)
 
@@ -69,7 +71,7 @@ def _classify(text: str, line_no: int, full_line: bool) -> str:
         return "directive"
     if TODO_RE.search(body):
         return "why" if TRACKED_REF_RE.search(body) else "remove"
-    if WHY_RE.search(body):
+    if WHY_RE.search(body) or ISSUE_REF_RE.search(body, 1) or SYNTHETIC_RE.search(body):
         return "why"
     return "remove"
 
