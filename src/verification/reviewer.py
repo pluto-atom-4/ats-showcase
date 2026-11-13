@@ -117,29 +117,27 @@ class JobReviewer:
             return
         cursor = self.conn.cursor()
 
-        # Add crawled_at column if missing
         try:
             cursor.execute("ALTER TABLE job_reviews ADD COLUMN crawled_at TIMESTAMP")
             self.conn.commit()
             logger.info("Added crawled_at column to job_reviews")
         except sqlite3.OperationalError:
-            pass  # Column already exists
+            # Expected: column already exists; any other OperationalError is swallowed too.
+            pass
 
-        # Add preprocessed_at column if missing
         try:
             cursor.execute("ALTER TABLE job_reviews ADD COLUMN preprocessed_at TIMESTAMP")
             self.conn.commit()
             logger.info("Added preprocessed_at column to job_reviews")
         except sqlite3.OperationalError:
-            pass  # Column already exists
+            pass
 
-        # Add preprocessing_version column if missing (Phase 2)
         try:
             cursor.execute("ALTER TABLE job_reviews ADD COLUMN preprocessing_version TEXT DEFAULT 'v2.0'")
             self.conn.commit()
             logger.info("Added preprocessing_version column to job_reviews")
         except sqlite3.OperationalError:
-            pass  # Column already exists
+            pass
 
     def _close_db(self) -> None:
         """Close database connection."""
@@ -171,7 +169,7 @@ class JobReviewer:
             return
         cursor = self.conn.cursor()
 
-        # Get existing row to preserve timeline fields
+        # Carry over timeline fields: INSERT OR REPLACE below would otherwise wipe them.
         cursor.execute(
             "SELECT crawled_at, preprocessed_at FROM job_reviews WHERE job_id = ?",
             (job_id,),
@@ -290,7 +288,6 @@ class JobReviewer:
             "assessed_at": None,
         }
 
-        # Get crawled_at and review timeline
         try:
             cursor.execute(
                 "SELECT crawled_at, preprocessed_at, reviewed_at, status FROM job_reviews WHERE job_id = ?",
@@ -304,7 +301,6 @@ class JobReviewer:
         except (sqlite3.OperationalError, KeyError):
             pass
 
-        # Get assessed_at from assessments
         try:
             cursor.execute(
                 "SELECT assessed_date FROM job_assessments WHERE job_id = ?",
@@ -415,23 +411,19 @@ class JobReviewer:
         if not self.conn:
             return False, None
 
-        # Check mode filter first
         skip, reason = self._check_mode_filter(job_id, mode)
         if skip:
             return skip, reason
 
-        # Check review status
         skip, reason = self._check_review_status(job_id, skip_rejected)
         if skip:
             return skip, reason
 
-        # Check if assessed
         if skip_assessed:
             skip, reason = self._check_assessment_status(job_id)
             if skip:
                 return skip, reason
 
-        # Check crawled_at date
         if skip_before_date:
             skip, reason = self._check_crawled_date(job_id, skip_before_date)
             if skip:
@@ -468,7 +460,6 @@ class JobReviewer:
         tokens = preprocessed.get("token_count", 0)
         cost = preprocessed.get("estimated_cost", 0.0)
 
-        # Check if already reviewed
         existing_status = self.get_review_status(job_id)
         prior_review = None
         if existing_status and not allow_re_review:
@@ -476,7 +467,6 @@ class JobReviewer:
             stats.add_skipped()
             return
 
-        # If re-review allowed, check for prior decision
         if allow_re_review and existing_status:
             prior_review = self.get_prior_review(job_id)
 
@@ -605,12 +595,11 @@ class JobReviewer:
         if not timestamp:
             return "not processed"
         try:
-            # Handle ISO format timestamps (with or without timezone)
             if "T" in timestamp:
-                dt_part = timestamp.split("T")[0]  # Get YYYY-MM-DD
-                time_part = timestamp.split("T")[1].split("+")[0].split("Z")[0][:5]  # Get HH:MM
+                dt_part = timestamp.split("T")[0]
+                time_part = timestamp.split("T")[1].split("+")[0].split("Z")[0][:5]
                 return f"{dt_part} {time_part}"
-            return timestamp[:16]  # Fallback: first 16 chars
+            return timestamp[:16]
         except Exception:
             return "invalid timestamp"
 
@@ -618,7 +607,7 @@ class JobReviewer:
         """Display job lifecycle timeline before review."""
         timeline = self.get_job_timeline(job_id)
         if all(v is None for v in timeline.values()):
-            return  # No timeline data to display
+            return
 
         typer.echo("\n   📅 Timeline:")
         crawled = self._format_timestamp(timeline.get("crawled_at"))
@@ -696,29 +685,25 @@ class JobReviewer:
         """
         import typer
 
-        # Handle backward compat: convert single path to list
+        # Backward compat: a single path becomes a one-element list.
         if isinstance(extracted_files, (str, Path)):
             extracted_files = [Path(extracted_files)]
         else:
             extracted_files = [Path(f) if isinstance(f, str) else f for f in extracted_files]
 
-        # Validate preprocessed file exists
         preprocessed_path = Path(preprocessed_file)
         if not preprocessed_path.exists():
             logger.error(f"Preprocessed jobs file not found: {preprocessed_file}")
             typer.echo(f"❌ File not found: {preprocessed_file}", err=True)
             raise typer.Exit(1)
 
-        # Load preprocessed jobs
         with open(preprocessed_path) as f:
             preprocessed_jobs = json.load(f)
 
-        # Map preprocessed by job_id
         preprocessed_map = {j["job_id"]: j for j in preprocessed_jobs}
 
         stats = ReviewStats()
 
-        # Load and review all extracted files
         all_extracted_jobs = []
         for extracted_path in extracted_files:
             if not extracted_path.exists():
@@ -734,18 +719,16 @@ class JobReviewer:
         typer.echo(f"\n👀 Starting job review ({total_jobs} jobs total)\n")
 
         job_counter = 0
-        # When re-review is allowed, show all jobs regardless of review status or assessment
+        # Re-review must see already-reviewed jobs, so skip flags are disabled.
         effective_mode = "all" if allow_re_review else mode
         effective_skip_rejected = False if allow_re_review else skip_rejected
         effective_skip_assessed = False if allow_re_review else skip_assessed
         for extracted_path, extracted_jobs in all_extracted_jobs:
-            source_name = extracted_path.stem  # e.g., "carbonrobotics_jobs"
+            source_name = extracted_path.stem
             for idx, job in enumerate(extracted_jobs):
-                # Use actual job ID from extracted job for lookup in preprocessed_map
                 job_id = job.get("id", f"{source_name}_{idx + 1}")
                 preprocessed = preprocessed_map.get(job_id, {})
 
-                # Phase 3: Check if job should be skipped based on filters
                 should_skip, skip_reason = self.should_skip_job(
                     job_id,
                     mode=effective_mode,
@@ -767,7 +750,6 @@ class JobReviewer:
 
                 job_counter += 1
 
-        # Display summary
         typer.echo(stats.get_summary())
 
         return stats
@@ -783,13 +765,11 @@ class JobReviewer:
 
         store = AssessmentStore(self.db_path)
 
-        # Get base pipeline stats
         stats = store.get_pipeline_stats()
         if not stats:
             typer.echo("⚠️  No pipeline statistics available (database tables not initialized)")
             return
 
-        # Get filter impact stats
         filter_stats = store.get_stats_with_filters(
             skip_rejected=skip_rejected,
             skip_assessed=skip_assessed,

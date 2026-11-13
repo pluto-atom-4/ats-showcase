@@ -52,7 +52,6 @@ class DataExporter:
             lines.append("# Integrity Issues Report")
             lines.append(f"\nGenerated: {datetime.utcnow().isoformat()} UTC\n")
 
-            # Summary section
             error_count = sum(1 for i in issues if i.severity == "error")
             warning_count = sum(1 for i in issues if i.severity == "warning")
             info_count = sum(1 for i in issues if i.severity == "info")
@@ -63,14 +62,12 @@ class DataExporter:
             lines.append(f"- **Warnings**: {warning_count}")
             lines.append(f"- **Info**: {info_count}\n")
 
-            # Group by issue type
             by_type: Dict[str, List[IntegrityIssue]] = {}
             for issue in issues:
                 if issue.issue_type not in by_type:
                     by_type[issue.issue_type] = []
                 by_type[issue.issue_type].append(issue)
 
-            # Issues by type table
             lines.append("## Issues by Type")
             lines.append("| Type | Count | Table | Severity | Action |")
             lines.append("|------|-------|-------|----------|--------|")
@@ -86,7 +83,6 @@ class DataExporter:
 
             lines.append("\n")
 
-            # Details section
             lines.append("## Issue Details\n")
             for issue_type in sorted(by_type.keys()):
                 lines.append(f"### {issue_type.replace('_', ' ').title()}\n")
@@ -186,7 +182,6 @@ class DataExporter:
         try:
             Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-            # Group issues by type
             by_type: Dict[str, List[Dict[str, Any]]] = {}
             for issue in issues:
                 if issue.issue_type not in by_type:
@@ -202,7 +197,6 @@ class DataExporter:
                 }
                 by_type[issue.issue_type].append(issue_dict)
 
-            # Export each type to CSV
             exported_files = {}
             for issue_type, records in by_type.items():
                 filename = f"{output_dir}/{issue_type}.csv"

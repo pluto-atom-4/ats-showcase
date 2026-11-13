@@ -116,7 +116,6 @@ def get_summary_prompt() -> str:
 Be concise and informative for quick scanning."""
 
 
-# Prompt templates registry
 PROMPTS = {
     "assessment": get_assessment_prompt,
     "extraction": get_extraction_prompt,

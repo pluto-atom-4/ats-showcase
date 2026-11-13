@@ -22,7 +22,6 @@ class AssessmentStore:
 
     def _initialize_db(self) -> None:
         """Initialize database and schema."""
-        # Use common initialization helper with assessment-related schemas
         tables = {
             "job_assessments": ASSESSMENT_TABLE_SQL,
             "job_assessments_fts": ASSESSMENT_FTS_SQL,
@@ -45,7 +44,7 @@ class AssessmentStore:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_job_assessments_job_id ON job_assessments(job_id)")
             self.conn.commit()
         except sqlite3.OperationalError as e:
-            # Only log unexpected errors; IF NOT EXISTS should prevent duplicates
+            # Re-creating an existing index is harmless; only other errors warrant a warning.
             if "already exists" in str(e).lower():
                 logger.debug(f"Index already exists: {e}")
             else:
@@ -58,7 +57,6 @@ class AssessmentStore:
 
         cursor = self.conn.cursor()
 
-        # Columns to add for quality tracking (Phase 3B)
         columns_to_add = [
             ("preprocessing_version", "TEXT"),
             ("preprocessing_quality_check", "BOOLEAN DEFAULT FALSE"),
@@ -72,7 +70,6 @@ class AssessmentStore:
                 self.conn.commit()
                 logger.info(f"Added column {col_name} to job_assessments (Phase 3B migration)")
             except sqlite3.OperationalError as e:
-                # Only ignore "column already exists" errors; other errors are unexpected
                 if "already exists" in str(e).lower() or "duplicate column name" in str(e).lower():
                     logger.debug(f"Column {col_name} already exists")
                 else:
@@ -129,12 +126,10 @@ class AssessmentStore:
 
         cursor = self.conn.cursor()
 
-        # Calculate score delta if previous score provided
         score_delta = None
         if previous_assessment_score is not None:
             score_delta = int(overall_score) - previous_assessment_score
 
-        # Save to main table
         cursor.execute(
             """INSERT OR REPLACE INTO job_assessments
                (job_id, title, company, location, overall_score, tech_score,
@@ -166,7 +161,6 @@ class AssessmentStore:
             ),
         )
 
-        # Update FTS index
         cursor.execute(
             """INSERT OR REPLACE INTO job_assessments_fts
                (job_id, title, company, summary, recommendations)
@@ -285,7 +279,6 @@ class AssessmentStore:
 
         cursor = self.conn.cursor()
 
-        # Total assessments
         cursor.execute("SELECT COUNT(*) as count FROM job_assessments")
         total = cursor.fetchone()["count"]
 
@@ -301,7 +294,6 @@ class AssessmentStore:
                 "total_output_tokens": 0,
             }
 
-        # Scores & tokens
         cursor.execute("""SELECT
                AVG(overall_score) as avg_score,
                MAX(overall_score) as max_score,
@@ -449,7 +441,6 @@ class AssessmentStore:
         cursor = self.conn.cursor()
 
         try:
-            # Get all titles and summaries
             if company:
                 cursor.execute(
                     """SELECT title, summary FROM job_assessments WHERE company = ?""",
@@ -463,10 +454,8 @@ class AssessmentStore:
             if not text.strip():
                 return []
 
-            # Extract keywords: split by whitespace, filter short words, count
             keywords_freq: Dict[str, int] = {}
             for word in text.lower().split():
-                # Remove punctuation and filter short words
                 word = word.strip(".,;:!?()-").strip()
                 if len(word) > 3 and word not in (
                     "and",
@@ -479,7 +468,6 @@ class AssessmentStore:
                 ):
                     keywords_freq[word] = keywords_freq.get(word, 0) + 1
 
-            # Sort by frequency, return top N
             sorted_keywords = sorted(keywords_freq.items(), key=lambda x: x[1], reverse=True)
             return sorted_keywords[:limit]
         except sqlite3.OperationalError:
@@ -510,7 +498,6 @@ class AssessmentStore:
                 except (json.JSONDecodeError, TypeError):
                     pass
 
-        # Sort by frequency
         return dict(
             sorted(
                 recommendations_summary.items(),
@@ -594,7 +581,6 @@ class AssessmentStore:
 
         cursor = self.conn.cursor()
 
-        # Count by score range
         cursor.execute(
             """SELECT COUNT(*) as count FROM job_assessments
                WHERE company = ? AND overall_score >= 75""",
@@ -668,7 +654,6 @@ class AssessmentStore:
 
         cursor = self.conn.cursor()
 
-        # Build WHERE clause
         where_parts = []
         params = []
 
@@ -685,14 +670,12 @@ class AssessmentStore:
 
         where_clause = " AND ".join(where_parts)
 
-        # Get affected records
         cursor.execute(f"SELECT COUNT(*) as count FROM job_assessments WHERE {where_clause}", params)
         affected_count = cursor.fetchone()["count"]
 
         if affected_count == 0:
             return {"count": 0, "dry_run": dry_run, "before_date": before_date, "after_date": after_date}
 
-        # Only delete if not dry_run
         if not dry_run:
             cursor.execute(f"DELETE FROM job_assessments WHERE {where_clause}", params)
             cursor.execute(
@@ -722,12 +705,10 @@ class AssessmentStore:
 
         cursor = self.conn.cursor()
 
-        # Check if assessed
         cursor.execute("SELECT COUNT(*) as count FROM job_assessments WHERE job_id = ?", (job_id,))
         if cursor.fetchone()["count"] > 0:
             return "assessed"
 
-        # Check job status in job_reviews table if it exists
         try:
             cursor.execute("SELECT status FROM job_reviews WHERE job_id = ?", (job_id,))
             row = cursor.fetchone()
@@ -757,7 +738,6 @@ class AssessmentStore:
         cursor = self.conn.cursor()
 
         try:
-            # Try joining with job_reviews table first
             cursor.execute(
                 """SELECT jr.* FROM job_reviews jr
                    LEFT JOIN job_assessments ja ON jr.job_id = ja.job_id
@@ -767,7 +747,6 @@ class AssessmentStore:
                 (limit,),
             )
         except sqlite3.OperationalError:
-            # Fallback to jobs table if job_reviews doesn't exist
             try:
                 cursor.execute(
                     """SELECT j.* FROM jobs j
@@ -838,7 +817,6 @@ class AssessmentStore:
         cursor = self.conn.cursor()
 
         try:
-            # Try job_reviews table first
             cursor.execute(
                 """SELECT jr.* FROM job_reviews jr
                    WHERE jr.crawled_at >= ?
@@ -847,7 +825,6 @@ class AssessmentStore:
                 (crawled_at_date, limit),
             )
         except sqlite3.OperationalError:
-            # Fallback to jobs table
             try:
                 cursor.execute(
                     """SELECT j.* FROM jobs j
@@ -883,7 +860,6 @@ class AssessmentStore:
         }
 
         try:
-            # Try job_reviews table first (has status field)
             cursor.execute("SELECT status, COUNT(*) as count FROM job_reviews GROUP BY status")
             for row in cursor.fetchall():
                 status = row["status"]
@@ -894,7 +870,6 @@ class AssessmentStore:
             logger.debug("job_reviews table not found, pipeline stats unavailable")
             return {}
 
-        # Add count of assessed jobs
         try:
             cursor.execute("SELECT COUNT(*) as count FROM job_assessments")
             row = cursor.fetchone()
@@ -907,19 +882,17 @@ class AssessmentStore:
 
     def _fetch_jobs_for_filter_stats(self, cursor: sqlite3.Cursor) -> list[Any]:
         """Fetch jobs for filter stats, trying multiple query variants."""
+        # Tried in order: job_reviews.crawled_at, jobs.crawled_at via join, then NULL.
         queries = [
-            # Try job_reviews.crawled_at first (test fixture schema)
             """SELECT jr.job_id, jr.status, jr.crawled_at,
                CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed
                FROM job_reviews jr
                LEFT JOIN job_assessments ja ON jr.job_id = ja.job_id""",
-            # Try jobs.crawled_at via join (production schema)
             """SELECT jr.job_id, jr.status, j.crawled_at,
                CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed
                FROM job_reviews jr
                LEFT JOIN job_assessments ja ON jr.job_id = ja.job_id
                LEFT JOIN jobs j ON jr.job_id = j.id""",
-            # Fallback without crawled_at
             """SELECT jr.job_id, jr.status, NULL as crawled_at,
                CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed
                FROM job_reviews jr

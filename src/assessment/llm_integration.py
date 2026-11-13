@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 _token_counter = TokenCounter()
 
-# Pricing for Claude models (per 1M tokens)
+# Hazard: values differ from SUPPORTED_MODELS per-1M prices (sonnet 3.0/15.0) yet are
+# divided by 1_000_000 at use, so costs come out 1000x lower.
 MODEL_PRICING = {
     "claude-3-5-sonnet-20241022": {
         "input": 0.003,
@@ -58,7 +59,8 @@ class LLMProvider:
             Dict with 'input_tokens', 'output_tokens', 'total_cost_usd'
         """
         input_tokens = _token_counter.count_tokens(prompt)
-        output_tokens = max_output_tokens  # Conservative estimate
+        # Upper bound: real output length is unknown before the call.
+        output_tokens = max_output_tokens
 
         pricing = MODEL_PRICING.get(self.model, MODEL_PRICING["claude-3-5-sonnet-20241022"])
         input_cost = (input_tokens * pricing["input"]) / 1_000_000
@@ -148,28 +150,23 @@ class LLMProvider:
             anthropic.RateLimitError: Rate limited after retries
             anthropic.APIStatusError: Other API errors after retries
         """
-        # Build prompt
         if use_examples:
             prompt = PromptBuilder.build_prompt_with_examples(cv_text, job_description)
         else:
             prompt = PromptBuilder.build_simple_prompt(cv_text, job_description)
 
-        # Estimate cost
         estimate = self.estimate_cost(prompt)
         logger.info(f"Assessment estimate: {estimate['input_tokens']} input tokens, ${estimate['total_cost_usd']:.6f}")
 
-        # Call API with retries
         message, elapsed_ms = self._call_api_with_retries(prompt, max_retries)
 
         try:
-            # Parse response (assuming first content block is text)
             if not message.content or not hasattr(message.content[0], "text"):
                 raise ValueError("Unexpected response format: no text content")
 
             response_text: str = message.content[0].text
             assessment = json.loads(response_text)
 
-            # Track actual usage
             actual_input = message.usage.input_tokens
             actual_output = message.usage.output_tokens
             pricing = MODEL_PRICING.get(self.model, MODEL_PRICING["claude-3-5-sonnet-20241022"])

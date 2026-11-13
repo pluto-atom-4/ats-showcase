@@ -22,7 +22,6 @@ SUPPORTED_MODELS: Dict[str, Tuple[str, float, float]] = {
     ),
 }
 
-# Aliases: short names map to full model IDs
 MODEL_ALIASES: Dict[str, str] = {
     "haiku": "claude-haiku-4-5-20251001",
     "sonnet": "claude-sonnet-5",
@@ -39,11 +38,9 @@ def resolve_model_alias(model_input: str) -> str:
     Returns:
         Full model ID
     """
-    # Check if it's an alias (case-insensitive)
     lower_input = model_input.lower()
     if lower_input in MODEL_ALIASES:
         return MODEL_ALIASES[lower_input]
-    # Return as-is if not an alias (assume full ID)
     return model_input
 
 
@@ -56,7 +53,6 @@ def validate_model(model_id: str) -> None:
     Raises:
         ValueError: If model not in SUPPORTED_MODELS
     """
-    # Resolve alias first
     resolved_id = resolve_model_alias(model_id)
 
     if resolved_id not in SUPPORTED_MODELS:

@@ -130,7 +130,6 @@ class ATPDashboard(Screen[None]):
         self.interactive = interactive
         self.up_to = up_to
 
-        # Load CV if provided
         if cv_file:
             self._load_cv(cv_file)
 
@@ -281,7 +280,6 @@ class ATPDashboard(Screen[None]):
                         description=job.description or "",
                     )
 
-                    # In TUI mode, all interactive review happens in review phase, not crawl
                     self.state.increment_phase_progress("crawl")
                     await asyncio.sleep(0.01)
 
@@ -312,28 +310,22 @@ class ATPDashboard(Screen[None]):
 
             for job_id, job_data in self.state.jobs.items():
                 try:
-                    # Extract description to clean
                     description = job_data.get("description", "")
                     if not description:
                         self.state.increment_phase_progress("preprocess", tokens=0)
                         continue
 
-                    # Clean HTML to text
                     clean_text = clean_html(description)
                     if not clean_text:
                         self.state.increment_phase_progress("preprocess", tokens=0)
                         continue
 
-                    # Chunk semantically by sentences
                     chunks = chunker.chunk(clean_text)
 
-                    # Count tokens in all chunks
                     total_tokens = sum(counter.count_tokens(chunk) for chunk in chunks)
 
-                    # Calculate estimated cost
                     estimated_cost = counter.estimate_cost(total_tokens)
 
-                    # Update job with preprocessing results
                     self.state.update_job(
                         job_id,
                         clean_text=clean_text,
@@ -371,7 +363,6 @@ class ATPDashboard(Screen[None]):
 
             for job_id, job_data in self.state.jobs.items():
                 if self.interactive:
-                    # Show review dialog for interactive mode
                     logger.info(f"Showing review dialog for job {job_id}")
                     decision = await self.app.push_screen_wait(
                         JobReviewDialog(
@@ -394,10 +385,10 @@ class ATPDashboard(Screen[None]):
                     elif decision == "reject":
                         self.state.update_job(job_id, status="rejected")
                         rejected_count += 1
-                    else:  # skip or escape
+                    else:
+                        # Skip or escape: job stays pending_review.
                         self.state.update_job(job_id, status="pending_review")
                 else:
-                    # Non-interactive: auto-confirm all
                     self.state.update_job(job_id, status="confirmed")
                     confirmed_count += 1
 
@@ -430,27 +421,24 @@ class ATPDashboard(Screen[None]):
 
             for job_id, job_data in self.state.jobs.items():
                 try:
-                    # Skip rejected jobs (filtered during interactive review)
+                    # Review leaves rejected jobs in state.jobs; skip them here.
                     if job_data.get("status") == "rejected":
                         logger.debug(f"Skipping rejected job {job_id}")
                         self.state.increment_phase_progress("assess", tokens=0)
                         continue
 
-                    # Get preprocessed chunks
                     chunks = job_data.get("chunks", [])
                     if not chunks:
                         logger.debug(f"No chunks for job {job_id}, skipping")
                         self.state.increment_phase_progress("assess", tokens=0)
                         continue
 
-                    # Assess with LLM
                     result = provider.assess_job(
                         job_id=job_id,
                         job_chunks=chunks,
                         cv_text=self.cv_text,
                     )
 
-                    # Update job with assessment results
                     self.state.update_job(
                         job_id,
                         overall_score=result.overall_score,
@@ -461,10 +449,8 @@ class ATPDashboard(Screen[None]):
                         recommendations=result.recommendations,
                     )
 
-                    # Update progress with actual tokens and cost
                     self.state.increment_phase_progress("assess", tokens=result.tokens_used, cost=result.actual_cost)
 
-                    # Update top matches after each assessment
                     matches = [
                         {
                             "id": jid,
@@ -497,7 +483,6 @@ class ATPDashboard(Screen[None]):
         self.state.start_phase("export", total_items=1)
 
         try:
-            # Export preprocessed jobs to JSON (persist state to disk)
             export_dir = Path("data/extracted_jobs")
             export_dir.mkdir(parents=True, exist_ok=True)
             preprocessed_file = export_dir / "preprocessed_jobs.json"
@@ -522,12 +507,10 @@ class ATPDashboard(Screen[None]):
             )
             logger.info(f"Preprocessed jobs exported to {preprocessed_file}")
 
-            # Generate markdown report
             report_dir = Path("data/assessments")
             report_dir.mkdir(parents=True, exist_ok=True)
             report_file = report_dir / "assessment_report.md"
 
-            # Build markdown content
             lines = [
                 "# ATS Showcase Assessment Report",
                 f"\nGenerated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
@@ -537,7 +520,6 @@ class ATPDashboard(Screen[None]):
                 f"- Total cost: ${self.state.total_cost_usd:.6f}",
             ]
 
-            # Add top matches section
             if self.state.top_matches:
                 lines.append("\n## Top Matches")
                 for i, match in enumerate(self.state.top_matches, 1):
@@ -554,7 +536,6 @@ class ATPDashboard(Screen[None]):
                             for rec in job["recommendations"]:
                                 lines.append(f"- {rec}")
 
-            # Add all jobs section (sorted by score)
             lines.append("\n## All Assessed Jobs")
             jobs_sorted = sorted(
                 [(jid, jdata) for jid, jdata in self.state.jobs.items() if jdata.get("overall_score")],
@@ -568,7 +549,6 @@ class ATPDashboard(Screen[None]):
                 if "location" in job:
                     lines.append(f"**Location:** {job['location']}")
 
-            # Write report
             report_content = "\n".join(lines)
             report_file.write_text(report_content, encoding="utf-8")
             logger.info(f"Report written to {report_file}")

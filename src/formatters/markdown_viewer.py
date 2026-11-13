@@ -12,10 +12,10 @@ from rich.markdown import Markdown
 class ScoreLevel(Enum):
     """Score severity levels for coloring."""
 
-    EXCELLENT = (90, "bright_green")  # 90-100
-    GOOD = (75, "green")  # 75-89
-    FAIR = (50, "yellow")  # 50-74
-    POOR = (0, "red")  # 0-49
+    EXCELLENT = (90, "bright_green")
+    GOOD = (75, "green")
+    FAIR = (50, "yellow")
+    POOR = (0, "red")
 
 
 class MarkdownReportViewer:

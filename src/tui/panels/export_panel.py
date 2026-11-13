@@ -29,7 +29,6 @@ class ExportPanel(BasePanelWidget):
 
         lines.append(self.render_phase_metrics())
 
-        # Show accumulated totals from all prior phases
         prior_phases = ["crawl", "preprocess", "assess"]
         prior_tokens = sum(self.state.phase_metrics[p].total_tokens for p in prior_phases)
         prior_cost = sum(self.state.phase_metrics[p].total_cost_usd for p in prior_phases)
@@ -39,7 +38,6 @@ class ExportPanel(BasePanelWidget):
             lines.append("Accumulated (from prior phases):")
             lines.append(f"  Tokens: {format_tokens(prior_tokens)} | Cost: {format_cost(prior_cost)}")
 
-        # Show export-specific info
         lines.append(f"Reports generated: {metrics.processed_items}")
 
         return "\n".join(lines)

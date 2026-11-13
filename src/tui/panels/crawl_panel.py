@@ -32,7 +32,7 @@ class CrawlPanel(BasePanelWidget):
 
         if self.state.current_errors:
             lines.append("\n⚠️  Errors:")
-            for error in self.state.current_errors[-3:]:  # Show last 3 errors
+            for error in self.state.current_errors[-3:]:
                 lines.append(f"  • {error}")
 
         return "\n".join(lines)

@@ -47,7 +47,6 @@ class JobTable(DataTable[str]):
         """Apply search and status filters, then render table."""
         filtered = self.all_jobs
 
-        # Apply search filter
         if self.search_query:
             query_lower = self.search_query.lower()
             filtered = [
@@ -58,11 +57,9 @@ class JobTable(DataTable[str]):
                 or query_lower in j.get("location", "").lower()
             ]
 
-        # Apply status filter
         if self.status_filter:
             filtered = [j for j in filtered if j.get("status") == self.status_filter]
 
-        # Clear and re-render table
         self.clear()
         self.job_rows.clear()
 
@@ -108,7 +105,6 @@ class JobTable(DataTable[str]):
         if self.cursor_row >= len(self.job_rows):
             return None
 
-        # Get row key from current cursor position
         row_keys = list(self.job_rows.keys())
         if self.cursor_row < len(row_keys):
             return self.job_rows[row_keys[self.cursor_row]]

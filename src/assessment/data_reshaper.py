@@ -30,7 +30,6 @@ class DataReshaper:
         if not text or not text.strip():
             return []
 
-        # Split on sentence boundaries (period, question mark, exclamation)
         sentences = [s.strip() for s in text.replace("!", ".").replace("?", ".").split(".") if s.strip()]
 
         chunks: List[str] = []
@@ -40,7 +39,6 @@ class DataReshaper:
         for sent in sentences:
             sent_tokens = _token_counter.count_tokens(sent)
 
-            # If adding this sentence exceeds target, finalize current chunk
             if current_tokens + sent_tokens > target_tokens and current_chunk:
                 chunk_text = " ".join(current_chunk)
                 chunks.append(chunk_text)
@@ -52,7 +50,6 @@ class DataReshaper:
                 current_chunk.append(sent)
                 current_tokens += sent_tokens
 
-        # Add final chunk
         if current_chunk:
             chunk_text = " ".join(current_chunk)
             chunks.append(chunk_text)
@@ -121,10 +118,8 @@ class DataReshaper:
 
         chunks_list: List[str] = chunks if chunks is not None else []
 
-        # Format entities
         entities_text = DataReshaper.format_extracted_entities(*extracted_entities)
 
-        # Build context
         context: Dict[str, Any] = {
             "cv": cv_text,
             "job_description": job_description,
@@ -132,7 +127,6 @@ class DataReshaper:
             "chunks": chunks_list,
         }
 
-        # Count tokens for cost estimation
         full_text = f"{cv_text}\n{job_description}\n{entities_text}\n{chr(10).join(chunks_list)}"
         token_count = _token_counter.count_tokens(full_text)
 

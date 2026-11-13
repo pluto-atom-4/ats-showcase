@@ -84,7 +84,6 @@ class LLMProvider:
             api_key: Anthropic API key (defaults to ANTHROPIC_API_KEY env var)
             model_id: Claude model ID (defaults to DEFAULT_MODEL from config)
         """
-        # Set model and pricing
         if model_id:
             validate_model(model_id)
             self.model = resolve_model_alias(model_id)
@@ -140,11 +139,9 @@ class LLMProvider:
         """
         import anthropic
 
-        # Combine job chunks and build prompt
         job_text = "\n".join(job_chunks)
         prompt = self._build_assessment_prompt(cv_text, job_text)
 
-        # Retry logic (max 3 attempts)
         for attempt in range(3):
             try:
                 logger.debug(f"Assessing job {job_id} (attempt {attempt + 1}/3)")
@@ -156,7 +153,6 @@ class LLMProvider:
                     messages=[{"role": "user", "content": prompt}],
                 )
 
-                # Parse response and extract tokens
                 response_text = self._extract_response_text(response)
                 response_text = self._clean_json_response(response_text)
                 data = self._parse_assessment_response(
@@ -165,7 +161,6 @@ class LLMProvider:
                     response.usage.output_tokens,
                 )
 
-                # Build and return result
                 result = self._build_assessment_result(job_id, data, response)
                 logger.info(
                     f"Assessed job {job_id}: overall={result.overall_score}, "
@@ -188,7 +183,6 @@ class LLMProvider:
                 result_or_retry = self._handle_parse_error(attempt, job_id, resp)
                 if isinstance(result_or_retry, AssessmentResult):
                     return result_or_retry
-                # Continue to next attempt if should_retry is True
 
         raise ValueError(f"Failed to assess job {job_id} after 3 attempts")
 
@@ -244,7 +238,6 @@ class LLMProvider:
         """
         data: Dict[str, Any] = json.loads(response_text)
 
-        # Validate required fields
         required_fields = [
             "overall_score",
             "tech_score",
@@ -345,7 +338,6 @@ class LLMProvider:
             return True
         else:
             logger.error(f"Failed to parse assessment response for job {job_id}")
-            # Return default assessment on final parse failure
             if response:
                 total_tokens = response.usage.input_tokens + response.usage.output_tokens
             else:

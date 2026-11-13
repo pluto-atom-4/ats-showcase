@@ -25,8 +25,8 @@ class ExportConfig:
 
     min_score: int = 0
     max_score: int = 100
-    sort_by: str = "score"  # score, company, location
-    template_style: str = "detailed"  # detailed, summary
+    sort_by: str = "score"
+    template_style: str = "detailed"
     include_recommendations: bool = True
     include_stats: bool = True
     date_from: Optional[datetime] = None
@@ -45,7 +45,6 @@ class ExportConfig:
         if self.template_style not in ("detailed", "summary"):
             raise ValueError("template_style must be 'detailed' or 'summary'")
 
-        # Validate date parameters
         if self.date_from and self.date_to:
             if self.date_from > self.date_to:
                 raise ValueError("date_from must be <= date_to")
@@ -135,7 +134,6 @@ class MarkdownExporter:
             if not assessed_date_str:
                 continue
 
-            # Parse assessed_date string to datetime
             try:
                 if isinstance(assessed_date_str, datetime):
                     assessed_date = assessed_date_str
@@ -152,7 +150,6 @@ class MarkdownExporter:
                 logger.warning(f"Could not parse date for job {assessment.get('job_id')}")
                 continue
 
-            # Check range
             if self.config.date_from and assessed_date < self.config.date_from:
                 continue
             if self.config.date_to and assessed_date > self.config.date_to:
@@ -173,10 +170,8 @@ class MarkdownExporter:
             min_score=self.config.min_score, max_score=self.config.max_score
         )
 
-        # Apply date range filtering
         assessments = self._filter_by_date_range(assessments)
 
-        # Sort by configured field
         if self.config.sort_by == "score":
             assessments.sort(key=lambda x: x["overall_score"], reverse=True)
         elif self.config.sort_by == "company":
@@ -200,7 +195,6 @@ class MarkdownExporter:
             "",
         ]
 
-        # Show filters applied
         filters = []
         if self.config.min_score > 0 or self.config.max_score < 100:
             filters.append(f"Score: {self.config.min_score}-{self.config.max_score}")
@@ -213,7 +207,6 @@ class MarkdownExporter:
             lines.append(f"**Filters:** {' | '.join(filters)}")
             lines.append("")
 
-        # Cost summary
         stats = self.store.get_stats()
         if stats and "total_cost" in stats:
             lines.append(
@@ -268,13 +261,11 @@ class MarkdownExporter:
         """
         lines = []
 
-        # Header
         company = job.get("company", "N/A")
         title = job.get("title", "N/A")
         lines.append(f"### [{index}] {title} @ {company}")
         lines.append("")
 
-        # Scores
         overall = job.get("overall_score", 0)
         tech = job.get("tech_score", 0)
         seniority = job.get("seniority_score", 0)
@@ -282,13 +273,11 @@ class MarkdownExporter:
         lines.append(f"- **Overall Score:** {overall} | Tech: {tech} | Seniority: {seniority} | Location: {location}")
         lines.append("")
 
-        # Location
         location_str = job.get("location", "")
         if location_str:
             lines.append(f"- **Location:** {location_str}")
             lines.append("")
 
-        # Recommendations
         if self.config.include_recommendations:
             recommendations = job.get("recommendations", [])
             if recommendations:
@@ -306,7 +295,6 @@ class MarkdownExporter:
 
         lines = ["## Analytics", ""]
 
-        # Score statistics
         scores = [a.get("overall_score", 0) for a in assessments]
         if scores:
             avg_score = sum(scores) / len(scores)
@@ -318,7 +306,6 @@ class MarkdownExporter:
             lines.append(f"  - Max: {max_score}")
             lines.append("")
 
-        # Score distribution
         ranges = self.store.get_score_ranges()
         if ranges:
             lines.append("- **Score Distribution**")
@@ -328,7 +315,6 @@ class MarkdownExporter:
                 lines.append(f"  - {range_key}: {count:3d} {bar}")
             lines.append("")
 
-        # Cost breakdown
         stats = self.store.get_stats()
         if stats and stats.get("total_cost", 0) > 0:
             input_tokens = stats.get("total_input_tokens", 0)

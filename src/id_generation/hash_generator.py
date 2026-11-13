@@ -17,7 +17,6 @@ def normalize_field(text: str) -> str:
     """Normalize text field: lowercase, remove non-alphanumeric chars."""
     if not text:
         return ""
-    # Lowercase and remove all non-alphanumeric characters
     return re.sub(r"\W+", "", text.lower())
 
 
@@ -50,23 +49,19 @@ def generate_job_id(
         Job ID in format: "{portal}:{hash[:16]}"
         Example: "greenhouse:a1b2c3d4e5f6g7h8"
     """
-    # Normalize inputs
     norm_company = normalize_field(company)
     norm_title = normalize_field(title)
     norm_location = normalize_field(location)
 
-    # Try to extract portal-specific ID from URL
     anchor = None
     if url:
         anchor = extract_portal_id(url)
         if not portal:
             portal = detect_portal(url)
 
-    # Default portal if still not detected
     if not portal:
         portal = "custom"
 
-    # Custom portals with a jobId query param: keep only that param in the anchor
     custom_anchor = _custom_portal_anchor(url) if url and portal == "custom" else None
 
     # Anchor priority (#768): custom jobId > extracted portal id > cleaned URL > company
@@ -75,13 +70,10 @@ def generate_job_id(
     elif not anchor:
         from src.id_generation.url_utils import clean_canonical_url
 
-        # Fallback if no URL provided
         anchor = clean_canonical_url(url) if url else norm_company
 
-    # Create payload for hashing
     payload = f"{norm_company}|{norm_title}|{norm_location}|{anchor}"
 
-    # Generate SHA-256 hash and take first 16 chars
     hash_digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     return f"{portal}:{hash_digest[:16]}"

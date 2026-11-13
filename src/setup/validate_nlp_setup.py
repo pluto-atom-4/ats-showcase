@@ -9,7 +9,6 @@ import subprocess
 import sys
 from typing import Any, Dict
 
-# ANSI color codes for terminal output
 GREEN = "\033[92m"
 RED = "\033[91m"
 YELLOW = "\033[93m"
@@ -65,10 +64,9 @@ def validate_spacy() -> Dict[str, Any]:
                 "detail": f"spaCy {version} found, but 3.8.0+ required",
             }
 
-        # Test model loading
         try:
             nlp = spacy.load("en_core_web_md")
-            _ = nlp("Test sentence for NER validation.")  # Validate model is functional
+            _ = nlp("Test sentence for NER validation.")
             return {
                 "status": "✅",
                 "version": version,
@@ -192,7 +190,7 @@ def check_system_dependencies() -> Dict[str, Any]:
 
         print_status("ℹ️", "Install missing", "sudo apt-get install libxml2-dev libxslt-dev python3-dev")
 
-    elif os_name == "Darwin":  # macOS
+    elif os_name == "Darwin":
         print(f"\n{BOLD}System Dependencies (macOS):{RESET}")
         libs = ["libxml2", "libxslt"]
         for lib in libs:
@@ -224,7 +222,6 @@ def main() -> int:
     print(f"{BOLD}🔍 NLP Setup Validation for Issue #7{RESET}")
     print(f"{BOLD}{'=' * 70}{RESET}\n")
 
-    # Core validations
     print(f"{BOLD}Python & Core Dependencies:{RESET}")
     py_result = validate_python_version()
     print_status(py_result["status"], "Python", py_result["detail"])
@@ -238,7 +235,6 @@ def main() -> int:
     tk_result = validate_tiktoken()
     print_status(tk_result["status"], "tiktoken", tk_result["detail"])
 
-    # HTML processing chain
     print(f"\n{BOLD}HTML Processing Chain:{RESET}")
     md_result = validate_markitdown()
     print_status(md_result["status"], "MarkItDown", md_result.get("detail", ""))
@@ -249,10 +245,8 @@ def main() -> int:
     lx_result = validate_lxml()
     print_status(lx_result["status"], "lxml", lx_result.get("detail", ""))
 
-    # System dependencies
     check_system_dependencies()
 
-    # Summary
     print(f"\n{BOLD}{'=' * 70}{RESET}")
     critical_ok = (
         py_result["status"] == "✅"
