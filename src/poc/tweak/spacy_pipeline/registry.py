@@ -70,8 +70,7 @@ Example - Custom Configuration (direct instantiation):
 
 from spacy.language import Language
 
-# Import section_classifier to trigger @Language.factory() decorator registration
-# (the factory is defined in section_classifier.py)
+# Importing section_classifier triggers its @Language.factory() registration.
 from . import section_classifier  # noqa: F401
 from .html_markdown_converter import HTMLMarkdownConverter
 from .html_preprocessor import HTMLPreprocessor

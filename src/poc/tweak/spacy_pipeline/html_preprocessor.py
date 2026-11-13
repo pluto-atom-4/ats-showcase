@@ -174,17 +174,11 @@ class HTMLPreprocessor(PipelineComponent):
         if not html_text:
             return html_text
 
-        # Parse HTML with BeautifulSoup
-        # html.parser is the built-in Python parser (no external dependencies)
         soup = BeautifulSoup(html_text, "html.parser")
 
-        # Replace non-breaking spaces in all text nodes
-        # find_all(string=True) returns all NavigableString objects (text nodes)
         for text_node in soup.find_all(string=True):
-            # Replace \\xa0 (non-breaking space) with regular space
             text_node.replace_with(text_node.replace("\xa0", " "))
 
-        # Return normalized HTML as string
         return str(soup)
 
     @property

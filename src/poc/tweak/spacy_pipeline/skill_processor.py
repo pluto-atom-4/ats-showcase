@@ -81,25 +81,14 @@ class SkillProcessor:
         self.min_confidence = min_confidence
         self.matcher = Matcher(nlp.vocab)
 
-        # Define the Matcher Pattern
-        # Logic: [Action Verb] + [Optional Preposition/Article] + [Descriptive Nouns/Adjectives]
         pattern = [
-            # The Action: Must be a verb and its base form must be in our list
             {"POS": "VERB", "LEMMA": {"IN": SKILL_VERBS}},
-            # Optional: Connector words like "with", "the", "of"
-            # (e.g., "partner WITH", "lead THE")
             {"POS": {"IN": ["ADP", "DET", "PART"]}, "OP": "?"},
-            # The Meat: A sequence of Nouns, Adjectives, Proper Nouns, or Verbs
-            # (e.g., "novel deep learning architectures", "distributed teams")
-            # Note: VERB included for past participles (e.g., "distributed") tagged by spaCy
-            # as VERB instead of ADJ. ADP excluded (prepositions shouldn't appear as descriptors)
             {"POS": {"IN": ["ADJ", "NOUN", "PROPN", "VERB"]}, "OP": "+"},
         ]
 
-        # Add pattern to matcher
         self.matcher.add("SKILL_PHRASE", [pattern])
 
-        # Register Doc extension for skills if not present
         if not Doc.has_extension("skills"):
             Doc.set_extension("skills", default=[])
 
@@ -117,7 +106,6 @@ class SkillProcessor:
             return False
         line_lower = line.lower().strip()
         title_lower = section_title.lower().strip()
-        # Check for exact match or match without trailing punctuation
         return line_lower == title_lower or line_lower == title_lower.rstrip(":")
 
     def _strip_bullet_marker(self, line: str) -> str:
@@ -129,9 +117,7 @@ class SkillProcessor:
         Returns:
             Line with bullet marker removed
         """
-        # Remove leading whitespace first
         line = line.lstrip()
-        # Match bullet markers: -, *, •, or numbered (1. 2. etc)
         line = re.sub(r"^[-*•]\s*", "", line)
         line = re.sub(r"^\d+\.\s*", "", line)
         return line
@@ -148,7 +134,6 @@ class SkillProcessor:
         stripped = line.strip()
         if not stripped.endswith(":"):
             return False
-        # Check if before the colon, there are only word characters and spaces
         before_colon = stripped[:-1].strip()
         return bool(re.match(r"^[\w\s]+$", before_colon))
 
@@ -184,13 +169,11 @@ class SkillProcessor:
         # Check if last word (or last two words for 'a plus') is in stoplist
         while words:
             last_word = words[-1].lower().rstrip(".,;:")
-            # Check for "a plus" pattern
             if len(words) >= 2:
                 last_two = " ".join(words[-2:]).lower().rstrip(".,;:")
                 if last_two in QUALIFIER_STOPLIST:
                     words = words[:-2]
                     continue
-            # Check single word
             if last_word in QUALIFIER_STOPLIST:
                 words.pop()
             else:
@@ -210,30 +193,21 @@ class SkillProcessor:
         Returns:
             True if chunk contains a tech term or special token
         """
-        # Special tokens (exact matches after lowercasing)
         special_tokens = {"c++", "c#", "sql"}
 
-        # Build a set of lowercased tokens from the doc
         doc_tokens_lower = {token.text.lower() for token in doc}
 
-        # Check special tokens (exact match)
         if doc_tokens_lower & special_tokens:
             return True
 
-        # Check TECH_TERMS with word-boundary logic
-        # For single-word TECH_TERMS, check exact token match
-        # For multi-word TECH_TERMS, check if consecutive tokens match the phrase
         for tech_term in TECH_TERMS:
             tech_lower = tech_term.lower()
-            # Single-word term: check if any token matches
             if " " not in tech_term:
                 if tech_lower in doc_tokens_lower:
                     return True
             else:
-                # Multi-word term: check if phrase appears in doc
-                # Reconstruct the text and check if phrase is present as words
                 doc_text = " ".join(token.text.lower() for token in doc)
-                # Use word boundaries to avoid substring matches
+                # Word boundaries so a multi-word term does not match inside a longer word.
                 pattern = r"\b" + re.escape(tech_lower) + r"\b"
                 if re.search(pattern, doc_text):
                     return True
@@ -252,11 +226,9 @@ class SkillProcessor:
         special_tokens = {"c++", "c#", "sql"}
         token_lower = token.text.lower()
 
-        # Check special tokens
         if token_lower in special_tokens:
             return True
 
-        # Check TECH_TERMS
         if token_lower in TECH_TERMS:
             return True
 
@@ -271,41 +243,34 @@ class SkillProcessor:
         Returns:
             True if chunk passes all filters
         """
-        # Strip whitespace
         chunk_text = chunk_text.strip()
         if not chunk_text:
             return False
 
-        # Parse with spaCy once
         try:
             chunk_doc = self.nlp(chunk_text)
         except Exception:
-            # If spaCy parsing fails, reject
             return False
 
-        # Check token count (max 6)
+        # At most 6 tokens.
         if len(chunk_doc) > 6:
             return False
 
-        # Drop stopword-only and qualifier-only chunks
         chunk_lower = chunk_text.lower()
         if chunk_lower in QUALIFIER_STOPLIST:
             return False
 
-        # Check for NOUN/PROPN/X tokens
         has_noun_propn_x = any(token.pos_ in ("NOUN", "PROPN", "X") for token in chunk_doc)
 
-        # Per-token rule: reject chunk if any VERB/AUX/PRON token
-        # is not a tech term (e.g., reject "going forward", allow "Go")
         for token in chunk_doc:
+            # Reject chunks containing a verb, auxiliary or pronoun token unless it is a tech term ("going forward" vs
+            # "Go").
             if token.pos_ in ("VERB", "AUX", "PRON"):
                 if not self._is_tech_token(token):
                     return False
 
-        # Check for whole-token tech terms
         has_tech_term = self._has_whole_token_tech_term(chunk_doc)
 
-        # Must have either NOUN/PROPN/X or a tech term
         if not has_noun_propn_x and not has_tech_term:
             return False
 
@@ -321,14 +286,11 @@ class SkillProcessor:
         Returns:
             List of skill strings
         """
-        # Skip if line is a title echo
         if self._is_title_echo(line, section_title):
             return []
 
-        # Strip leading bullet marker
         line = self._strip_bullet_marker(line)
 
-        # Skip colon-terminated headers (they yield nothing)
         if self._is_colon_terminated_header(line):
             return []
 
@@ -336,16 +298,13 @@ class SkillProcessor:
         if not line:
             return []
 
-        # Split on delimiters
         items = self._split_skill_items(line)
 
         skills = []
         for item in items:
-            # Strip trailing qualifiers
             item = self._strip_trailing_qualifiers(item)
             item = item.strip()
 
-            # Validate chunk
             if self._is_valid_skill_chunk(item):
                 skills.append(item.lower())
 
@@ -381,32 +340,24 @@ class SkillProcessor:
         Raises:
             TypeError: If doc is not a spaCy Doc
         """
-        # Get classified sections from doc extension (handle None/missing gracefully)
         classified_sections = doc._.classified_sections if doc._.classified_sections else []
 
-        # Extract skills from sections
         skills: List[Dict[str, Any]] = []
-        seen_skills: Set[str] = set()  # Deduplicate skills
+        seen_skills: Set[str] = set()
 
         for section, classification in classified_sections:
             try:
-                # Filter to SKILLS section type only (B2 decision)
                 if SectionType.SKILLS not in classification.labels:
                     continue
 
-                # Confidence gate (Issue #347). If all_types is empty/absent,
-                # fall back to labels-only behavior above (backward compatible).
+                # Confidence gate (Issue #347). If all_types is empty/absent, the gate is skipped.
                 all_types = getattr(classification, "all_types", None)
                 if all_types:
                     top_type = all_types[0]
                     if top_type.section_type == SectionType.SKILLS:
                         skills_confidence = top_type.confidence
                     else:
-                        # SKILLS+TECHNOLOGIES overlap (e.g. "Technical Stack" section
-                        # classified TECHNOLOGIES (0.85) / SKILLS (0.72)): unlike
-                        # RequirementProcessor's top-ranked-only rule, extraction here
-                        # keys off SKILLS' own confidence, scanned from all_types,
-                        # even when SKILLS isn't the #1-ranked type.
+                        # SKILLS is a label but not ranked first: look up its own confidence so the gate still applies.
                         skills_entry = next(
                             (tc for tc in all_types if tc.section_type == SectionType.SKILLS),
                             None,
@@ -420,9 +371,7 @@ class SkillProcessor:
                         )
                         continue
 
-                # Only content lines are candidate text (Issue #354, Issue #375).
-                # Section titles are headings by construction and are never treated as
-                # skill-bearing text; the title is still used for title-echo detection below.
+                # Only content lines are candidate text; section titles are not (Issue #354, Issue #375).
                 text_lines = []
                 if section.content:
                     text_lines.extend(section.content.splitlines())
@@ -430,14 +379,13 @@ class SkillProcessor:
                 if not text_lines:
                     continue
 
-                # Process each line separately through spaCy
                 for line in text_lines:
                     line_stripped = line.strip()
                     if not line_stripped:
                         continue
 
-                    # Skip literal markdown heading lines such as "## Technical Skills"
-                    # so heading text never reaches the Matcher or noun-led fallback (Issue #375)
+                    # Skip markdown heading lines so heading text never reaches the Matcher or noun-led fallback (Issue
+                    # #375).
                     if line_stripped.startswith("#"):
                         continue
 
@@ -447,14 +395,11 @@ class SkillProcessor:
                         logger.error(f"Failed to process skills line: {e}")
                         continue
 
-                    # Find matches using verb-led matcher
                     try:
                         matches = self.matcher(skill_doc, as_spans=True)
 
-                        # Filter overlapping spans
                         unique_spans = filter_spans(matches)
 
-                        # Extract skill text, normalize, and deduplicate
                         for span in unique_spans:
                             skill_text = span.text.strip().lower()
                             if skill_text and skill_text not in seen_skills:
@@ -467,7 +412,6 @@ class SkillProcessor:
                         )
                         continue
 
-                    # If verb-led extraction yielded no spans, try noun-led fallback
                     if not unique_spans:
                         try:
                             noun_led_skills = self._extract_noun_led_skills(line_stripped, section.title or "")
@@ -483,10 +427,8 @@ class SkillProcessor:
 
             except Exception as e:
                 logger.error(f"Error extracting skills from section '{section.title}': {e}")
-                # Continue with next section
                 continue
 
-        # Store extracted skills in doc extension
         doc._.skills = skills
 
         return doc

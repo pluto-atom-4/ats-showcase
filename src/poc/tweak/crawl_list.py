@@ -40,11 +40,6 @@ from src.poc.tweak.common import (
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
-# JOB EXTRACTION
-# ============================================================================
-
-
 def extract_url_param(url: str, param_name: str) -> Optional[str]:
     """Extract a URL query parameter value.
 
@@ -58,7 +53,7 @@ def extract_url_param(url: str, param_name: str) -> Optional[str]:
     try:
         parsed = urlparse(url)
         params = parse_qs(parsed.query)
-        # parse_qs returns lists of values, so we take the first
+        # parse_qs returns lists of values, so take the first
         return params.get(param_name, [None])[0]
     except Exception as e:
         logger.debug(f"Error extracting URL parameter '{param_name}' from '{url}': {e}")
@@ -70,7 +65,6 @@ async def extract_text(element: Any, selector: Optional[str]) -> Optional[str]:
     if not selector:
         return None
     try:
-        # Try direct querySelector first
         sub_element = await element.query_selector(selector)
         if sub_element:
             text = await sub_element.text_content()
@@ -97,7 +91,6 @@ async def extract_link(element: Any, selector: Optional[str]) -> Optional[str]:
     if not selector:
         return None
     try:
-        # Try direct querySelector first
         sub_element = await element.query_selector(selector)
         if sub_element:
             href = await sub_element.get_attribute("href")
@@ -142,15 +135,13 @@ def parse_posted_date(text: Optional[str], reference: datetime) -> Optional[str]
     try:
         text_lower = text.strip().lower()
 
-        # Handle "Posted Today"
         if "posted" in text_lower and "today" in text_lower:
             return reference.date().isoformat()
 
-        # Handle "Posted Yesterday"
         if "posted" in text_lower and "yesterday" in text_lower:
             return (reference.date() - timedelta(days=1)).isoformat()
 
-        # Handle "Posted N Days Ago" and "Posted 30+ Days Ago"
+        # "Posted N Days Ago" and "Posted 30+ Days Ago"
         match = re.search(r"posted\s+(\d+)\+?\s+days?\s+ago", text_lower)
         if match:
             days_ago = int(match.group(1))
@@ -189,15 +180,12 @@ def parse_field(text: Optional[str], label: str, next_field: Optional[str] = Non
         if label not in text:
             return None
 
-        # Find start position after label
         start = text.index(label) + len(label)
 
-        # If next_field is provided, find end position
         if next_field and next_field in text[start:]:
             end = text.index(next_field, start)
             value = text[start:end].strip()
         else:
-            # Extract rest of text after label
             value = text[start:].strip()
 
         # Limit length to 100 chars to prevent excess tokens
@@ -256,23 +244,19 @@ async def extract_detail_page_fields(
         if job_id_param:
             result["job_id"] = job_id_param
 
-        # Fetch detail page
         goto_success = await retry_goto(page, detail_url, max_attempts=2, timeout_ms=10000, logger=logger)
         if not goto_success:
             logger.debug(f"Failed to navigate to detail page: {detail_url}")
             return result
 
-        # Wait a bit for page to stabilize
         await page.wait_for_timeout(500)
 
-        # Extract description from detail_page_description selector
         description_selector = selectors.get("detail_page_description")
         if description_selector:
             description = await extract_text(page, description_selector)
             if description:
                 result["description"] = description
 
-        # Extract job_id from detail_page_job_id selector if not found in URL
         if not result["job_id"]:
             job_id_selector = selectors.get("detail_page_job_id")
             if job_id_selector:
@@ -280,14 +264,12 @@ async def extract_detail_page_fields(
                 if job_id:
                     result["job_id"] = job_id
 
-        # Extract job_type from direct selector, or fall back to text parsing
         job_type_selector = selectors.get("detail_page_job_type")
         if job_type_selector:
             job_type = await extract_text(page, job_type_selector)
             if job_type:
                 result["job_type"] = job_type
 
-        # Fall back to text parsing if direct selector didn't work
         if not result["job_type"]:
             details_container_selector = selectors.get("detail_page_details_container")
             if details_container_selector:
@@ -296,21 +278,18 @@ async def extract_detail_page_fields(
                     if container:
                         details_text = await container.text_content()
                         if details_text:
-                            # Parse job_type: text after "Job types:" and before next field
                             job_type = parse_field(details_text, "Job types:", "Location type:")
                             if job_type:
                                 result["job_type"] = job_type
                 except Exception as e:
                     logger.debug(f"Error extracting details from container: {e}")
 
-        # Extract location_type from direct selector, or fall back to text parsing
         location_type_selector = selectors.get("detail_page_location_type")
         if location_type_selector:
             location_type = await extract_text(page, location_type_selector)
             if location_type:
                 result["location_type"] = location_type
 
-        # Fall back to text parsing if direct selector didn't work
         if not result["location_type"]:
             details_container_selector = selectors.get("detail_page_details_container")
             if details_container_selector:
@@ -319,14 +298,12 @@ async def extract_detail_page_fields(
                     if container:
                         details_text = await container.text_content()
                         if details_text:
-                            # Parse location_type: text after "Location type:" and before next field
                             location_type = parse_field(details_text, "Location type:", "Skills")
                             if location_type:
                                 result["location_type"] = location_type
                 except Exception as e:
                     logger.debug(f"Error extracting details from container: {e}")
 
-        # Extract compensation from detail_page_compensation selector
         compensation_selector = selectors.get("detail_page_compensation")
         if compensation_selector:
             compensation = await extract_text(page, compensation_selector)
@@ -374,11 +351,9 @@ async def extract_job_from_container(
         display company. Returns None if extraction fails or title is missing.
     """
     try:
-        # Debug logging at start of function
         container_type = container.tag_name if hasattr(container, "tag_name") else "unknown"
         logger.debug(f"Container {container_index}: Extracting job from container (type: {container_type})")
 
-        # Extract title with detailed logging
         try:
             title = await extract_text(container, selectors.get("title"))
             logger.debug(f"Container {container_index} title extraction: {title}")
@@ -386,7 +361,6 @@ async def extract_job_from_container(
             logger.warning(f"Container {container_index} title extraction failed: {e}")
             title = None
 
-        # Extract location with detailed logging
         try:
             location = await extract_text(container, selectors.get("location"))
             logger.debug(f"Container {container_index} location extraction: {location}")
@@ -394,7 +368,6 @@ async def extract_job_from_container(
             logger.warning(f"Container {container_index} location extraction failed: {e}")
             location = None
 
-        # Extract link with detailed logging
         try:
             link = await extract_link(container, selectors.get("link"))
             logger.debug(f"Container {container_index} link extraction: {link}")
@@ -402,7 +375,6 @@ async def extract_job_from_container(
             logger.warning(f"Container {container_index} link extraction failed: {e}")
             link = None
 
-        # Extract posted_on_text
         try:
             posted_on_text = await extract_text(container, selectors.get("posted_on"))
             logger.debug(f"Container {container_index} posted_on extraction: {posted_on_text}")
@@ -410,7 +382,6 @@ async def extract_job_from_container(
             logger.warning(f"Container {container_index} posted_on extraction failed: {e}")
             posted_on_text = None
 
-        # Extract description with detailed logging
         try:
             description = await extract_text(container, selectors.get("description"))
             desc_preview = description[:50] if description else None
@@ -425,7 +396,6 @@ async def extract_job_from_container(
             logger.debug(f"Container {container_index}: Skipping container: no title found")
             return None
 
-        # Extract company name from card (falls back to config name if absent)
         try:
             extracted_company = await extract_text(container, selectors.get("company"))
             logger.debug(f"Container {container_index} company extraction: {extracted_company}")
@@ -435,36 +405,30 @@ async def extract_job_from_container(
 
         company_to_use = extracted_company or company_name
 
-        # Handle jobId extraction for WorkSource jobs via navigation
-        # For WorkSource: click link → navigate → extract jobId from detail page URL → navigate back
         url = ""
+        # WorkSource jobId extraction via navigation: click link -> navigate -> read jobId from the detail page URL.
         if link and company_key == "WorkSource":
             link_preview = link[:80] if link else "None"
             logger.debug(
                 f"Container {container_index}: [jobId_extract] Processing WorkSource link with click: {link_preview}..."
             )
             try:
-                # Step 1: Click the link selector on the container
                 link_selector = selectors.get("link")
                 if link_selector:
                     link_elem = await container.query_selector(link_selector)
                     if link_elem:
-                        # Click the link to navigate to detail page
                         await link_elem.click()
                         logger.debug(f"Container {container_index}: [jobId_extract] Clicked link selector")
 
-                        # Step 2: Wait for navigation to complete
                         await page.wait_for_timeout(1000)
                         logger.debug(f"Container {container_index}: [jobId_extract] Navigation wait completed")
 
-                        # Step 3: Extract jobId from current page URL
                         current_url = page.url
                         job_id_param = extract_url_param(current_url, "jobId")
                         logger.debug(f"Container {container_index}: [jobId_extract] Current page URL: {current_url}")
                         logger.debug(f"Container {container_index}: [jobId_extract] jobId extracted: {job_id_param}")
 
                         if job_id_param:
-                            # Construct URL with jobId parameter
                             separator = "&" if "?" in base_url else "?"
                             url = base_url + separator + f"jobId={job_id_param}"
                             logger.debug(
@@ -483,7 +447,6 @@ async def extract_job_from_container(
                     logger.warning(f"Container {container_index}: [jobId_extract] No link selector configured")
             except Exception as e:
                 logger.warning(f"Container {container_index}: [jobId_extract] Click navigation failed: {e}")
-                # Fallback to link-as-is if click fails
                 if link:
                     if link.startswith("http"):
                         url = link
@@ -493,11 +456,9 @@ async def extract_job_from_container(
                         url = link
                     logger.debug(f"Container {container_index}: [jobId_extract] Fallback: using link directly: {url}")
         elif link and not base_url:
-            # Link but no base_url: use as-is
             url = link
             logger.debug(f"Container {container_index}: [jobId_extract] No base_url, using link directly: {url}")
         elif link and base_url:
-            # Link and base_url but not WorkSource: simple URL join
             if link.startswith("http"):
                 url = link
                 logger.debug(f"Container {container_index}: [jobId_extract] Absolute link, using as-is: {url}")
@@ -507,7 +468,6 @@ async def extract_job_from_container(
                     f"Container {container_index}: [jobId_extract] Relative link, joining with base_url: {url}"
                 )
 
-        # Generate deterministic job ID
         job_id = generate_job_id(
             company=company_to_use,
             title=title,
@@ -547,11 +507,6 @@ async def extract_job_from_container(
         return None
 
 
-# ============================================================================
-# COMPANY CRAWLING
-# ============================================================================
-
-
 async def crawl_company_jobs(
     browser: Browser,
     company_key: str,
@@ -581,7 +536,6 @@ async def crawl_company_jobs(
         logger.warning(f"Company {company_key} has no URL configured")
         return []
 
-    # Get display name from config (e.g., "Carbon Robotics" instead of "CarbonRobotics")
     company_display_name = company_config.get("name", company_key)
 
     crawler_config = company_config.get("crawler", {})
@@ -592,13 +546,11 @@ async def crawl_company_jobs(
         page = await browser.new_page()
         page.set_default_timeout(timeout_ms)
 
-        # Navigate to career page
         if not await retry_goto(page, url, max_attempts=3, timeout_ms=timeout_ms, logger=logger):
             logger.warning(f"Failed to navigate to {company_key} career page")
             await page.close()
             return []
 
-        # Wait for optional selector
         wait_selector = crawler_config.get("wait_for_selector", selectors.get("job_container"))
         if wait_selector:
             try:
@@ -607,13 +559,11 @@ async def crawl_company_jobs(
             except Exception as e:
                 logger.warning(f"Wait selector '{wait_selector}' not found: {e}")
 
-        # Delay before extraction
         delay_ms = crawler_config.get("delay_ms", 2000)
         await page.wait_for_timeout(delay_ms)
 
-        # Extract job containers
-        # For WorkSource, use job_card selector to iterate individual cards (20 cards)
-        # For other companies, use job_container selector (prevents regression)
+        # WorkSource: use job_card selector to iterate individual cards (20 cards).
+        # Other companies use job_container (prevents regression).
         if company_key == "WorkSource":
             job_selector = selectors.get("job_card") or GENERIC_FALLBACK_SELECTORS.get("job_card")
             selector_type = "job_card"
@@ -646,7 +596,6 @@ async def crawl_company_jobs(
                     logger.debug(f"Extracted job {i}/{len(job_containers)}: {job['title'][:50]}...")
             except Exception as e:
                 logger.warning(f"Failed to extract job {i} from {company_key}: {e}")
-                # Continue to next job on failure
 
         await page.close()
         logger.info(f"Successfully extracted {len(jobs)} jobs from {company_key}")
@@ -655,11 +604,6 @@ async def crawl_company_jobs(
     except Exception as e:
         logger.error(f"Error crawling {company_key}: {e}")
         return []
-
-
-# ============================================================================
-# MAIN CRAWL FUNCTION
-# ============================================================================
 
 
 async def crawl_all_companies(
@@ -686,7 +630,6 @@ async def crawl_all_companies(
     logger.info(f"Config dir: {config_dir}")
     logger.info(f"Output dir: {output_dir}")
 
-    # Create output directory
     output_path = Path(output_dir)
     try:
         output_path.mkdir(parents=True, exist_ok=True)
@@ -694,14 +637,12 @@ async def crawl_all_companies(
         logger.error(f"Failed to create output directory {output_dir}: {e}")
         return 1
 
-    # Load config
     try:
         merged_config = load_all_company_configs(config_dir)
     except (FileNotFoundError, ValueError) as e:
         logger.error(f"Config loading failed: {e}")
         return 1
 
-    # Filter companies
     companies_to_crawl = merged_config
     if company_filter:
         if company_filter not in companies_to_crawl:
@@ -712,7 +653,6 @@ async def crawl_all_companies(
 
     logger.info(f"Crawling {len(companies_to_crawl)} companies")
 
-    # Initialize browser
     playwright: Optional[Playwright] = None
     browser: Optional[Browser] = None
     try:
@@ -722,7 +662,6 @@ async def crawl_all_companies(
         return 2
 
     try:
-        # Crawl each company sequentially
         for company_key, company_config in companies_to_crawl.items():
             try:
                 jobs = await crawl_company_jobs(
@@ -732,7 +671,6 @@ async def crawl_all_companies(
                     timeout_ms=timeout_ms,
                 )
 
-                # Write output JSON (even if empty)
                 output_file = output_path / f"{company_key}_jobs.json"
                 try:
                     with open(output_file, "w", encoding="utf-8") as f:
@@ -743,18 +681,12 @@ async def crawl_all_companies(
 
             except Exception as e:
                 logger.error(f"Error processing company {company_key}: {e}")
-                # Continue to next company on failure
 
         logger.info("Crawl completed successfully")
         return 0
 
     finally:
         await close_browser(playwright, browser)
-
-
-# ============================================================================
-# CLI ENTRY POINT
-# ============================================================================
 
 
 def main() -> int:
@@ -821,10 +753,8 @@ Examples:
 
     args = parser.parse_args()
 
-    # Setup logging
     setup_logging(__name__, level=args.log_level)
 
-    # Run crawler
     try:
         exit_code = asyncio.run(
             crawl_all_companies(

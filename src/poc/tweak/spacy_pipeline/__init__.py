@@ -203,12 +203,10 @@ Module Contents:
 - registry: spaCy factory registrations
 """
 
-# Import components for public API
-# Import registry module to trigger @Language.factory() decorators
-# This must happen on module import so factories are registered
 # Set up Doc extensions for extracted data (Issue #321)
 from spacy.tokens import Doc
 
+# Importing registry registers the component factories; it must run on package import.
 from . import registry  # noqa: F401
 from .base import PipelineComponent
 from .heading_promoter import HeadingPromoter

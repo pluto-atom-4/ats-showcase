@@ -11,8 +11,6 @@ Issue #733: copied section-header keyword vocabulary.
 
 from typing import FrozenSet
 
-# Phrases present in production _SECTION_HEADER_KEYWORDS but absent from the POC
-# promoter union (KNOWN_PLAIN_HEADINGS). All entries are lowercase.
 SECTION_HEADER_KEYWORDS_ONLY: FrozenSet[str] = frozenset(
     [
         "accountabilities",

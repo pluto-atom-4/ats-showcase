@@ -42,11 +42,6 @@ from src.poc.tweak.common import (
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
-# IFRAME EXTRACTION
-# ============================================================================
-
-
 async def extract_from_frame_element(
     frame: Any,
     frame_index: int,
@@ -58,7 +53,7 @@ async def extract_from_frame_element(
         if not elem:
             return ""
 
-        # Fallback chain: innerHTML → outerHTML → innerText
+        # Fallback chain: innerHTML -> outerHTML -> innerText
         content: Optional[str] = await elem.inner_html()
         if not content or len(content.strip()) < 50:
             content = await elem.evaluate("el => el.outerHTML")
@@ -78,8 +73,7 @@ async def extract_from_frame_element(
 async def extract_from_frame_body(frame: Any, frame_index: int) -> str:
     """Extract content from frame body using fallback chain."""
     try:
-        # Get raw HTML from frame body (preferred for preprocessing)
-        # Fallback chain: innerHTML → outerHTML → innerText
+        # Fallback chain: innerHTML (raw HTML, preferred for preprocessing) -> outerHTML -> innerText
         content: Optional[str] = await frame.evaluate("() => document.body.innerHTML")
         if not content or len(content.strip()) < 100:
             content = await frame.evaluate("() => document.body.outerHTML")
@@ -115,14 +109,12 @@ async def fetch_iframe_content(
         Raw HTML or text content from iframe, or empty string if extraction fails
     """
     try:
-        # Wait for iframe to load
         await page.wait_for_load_state("networkidle")
         await page.wait_for_timeout(500)
 
         frames = page.frames
         logger.debug(f"Found {len(frames)} frames on page")
 
-        # Try each frame to find content
         for i, frame in enumerate(frames):
             try:
                 if inner_selector:
@@ -143,11 +135,6 @@ async def fetch_iframe_content(
     except Exception as e:
         logger.debug(f"Error accessing iframe: {e}")
         return ""
-
-
-# ============================================================================
-# SELECTOR PRESENCE WAITING
-# ============================================================================
 
 
 async def selector_present(page: Page, selector: Optional[str], timeout_ms: int) -> bool:
@@ -179,23 +166,16 @@ async def selector_present(page: Page, selector: Optional[str], timeout_ms: int)
         return False
 
 
-# ============================================================================
-# DESCRIPTION EXTRACTION
-# ============================================================================
-
-
-# WorkSource (Issue #765). No JSON-LD exists on WorkSource: primary source is the
-# getJobDetails Apex response; fallback is the DOM at the stable job-details URL.
+# WorkSource (Issue #765). No JSON-LD exists on WorkSource: primary source is the getJobDetails Apex response;
+# fallback is the DOM at the stable job-details URL.
 WORKSOURCE_COMPANY_KEY = "WorkSource"
 WORKSOURCE_API_PATH = "/webruntime/api/apex/execute"
 WORKSOURCE_API_METHOD = "getJobDetails"
 WORKSOURCE_DETAIL_URL = "https://worksource.my.site.com/worksourcewa/job-search/job-details"
 
-# Shell = WorkSource search-list page (rendered when the job-search URL with jobId is loaded).
-# Length cannot discriminate: the shell (~15.5k text chars) is longer than a real detail page
-# (~6.7k text chars). These phrases appear on the shell and on NO real detail page capture
-# (verified against .playwright-mcp worksource_shell_search.json / worksource_real_detail.json).
-# Two distinct hits are required so one phrase in ordinary prose is not treated as shell.
+# Shell = WorkSource search-list page. Length cannot discriminate: the shell (~15.5k text chars) is longer than a real
+# detail page (~6.7k). These phrases appear on the shell and on no real detail page capture; two distinct hits are
+# required so one phrase in ordinary prose is not treated as shell.
 WORKSOURCE_SHELL_MARKERS = ("Refine your search", "Clear filters", "Viewing 1 - 20 of")
 SHELL_MARKER_MIN_HITS = 2
 
@@ -288,7 +268,6 @@ async def _extract_dom_description(page: Page, selectors: Dict[str, str]) -> Opt
             logger.debug("Description selector not found on page")
             return None
 
-        # Check if element is an iframe
         try:
             tag_name = await desc_elem.evaluate("el => el.tagName.toLowerCase()")
         except Exception:
@@ -299,7 +278,6 @@ async def _extract_dom_description(page: Page, selectors: Dict[str, str]) -> Opt
             inner_selector = selectors.get("inner_description_selector")
             description = await fetch_iframe_content(page, inner_selector)
         else:
-            # Regular element - extract HTML
             logger.debug(f"Detected direct DOM description (tag: {tag_name})")
             description = ""
             try:
@@ -325,9 +303,9 @@ async def _extract_worksource_description(
     """API intercept first; on any failure or shell content, read the DOM at job-details?jobId=."""
     return_value = await fetch_worksource_job_via_api(page, job_url, api_timeout_ms=api_timeout_ms)
     api_description = return_value.get("jobDescription") if return_value else None
-    # Deliberately overlaps the generic shell guard in extract_description_from_detail_page
-    # (~line 380): that guard would discard shell content, but this check must run first so
-    # shell API content triggers the DOM fallback instead of returning None.
+    # Deliberately overlaps the generic shell guard in extract_description_from_detail_page: that guard would discard
+    # shell content, but this check must run first so shell API content triggers the DOM fallback instead of returning
+    # None.
     if isinstance(api_description, str) and api_description.strip() and not is_shell_content(api_description):
         return api_description.strip()
 
@@ -390,11 +368,6 @@ async def extract_description_from_detail_page(
         return None
 
 
-# ============================================================================
-# JOB DETAIL FETCHING
-# ============================================================================
-
-
 async def fetch_job_details(
     browser: Browser,
     job: Dict[str, Any],
@@ -434,7 +407,6 @@ async def fetch_job_details(
         detail_page = await browser.new_page()
         detail_page.set_default_timeout(timeout_ms)
 
-        # Navigate to detail page
         if not await retry_goto(
             detail_page,
             job_url,
@@ -446,28 +418,25 @@ async def fetch_job_details(
             await detail_page.close()
             return job_copy
 
-        # Adaptive retry loop for slow-loading description pages
         description: Optional[str] = None
-        attempt_timeouts = [500, 1000, 2000]  # ms for attempts 1, 2, 3
+        # Adaptive retry for slow-loading description pages; ms per attempt.
+        attempt_timeouts = [500, 1000, 2000]
 
         for attempt in range(1, 4):
             attempt_timeout = attempt_timeouts[attempt - 1]
             logger.info(f"Extraction attempt {attempt}/3 for {job_title}")
             start_time = time.time()
 
-            # Resolve selectors for company
             selectors = resolve_company_selectors(company_name, merged_config)
             if not selectors:
                 selectors = GENERIC_FALLBACK_SELECTORS
 
-            # Check if description selector is present
             desc_selector = selectors.get("description_selector")
             selector_found = await selector_present(detail_page, desc_selector, attempt_timeout)
 
-            # WorkSource: the listing page has no description node, so the selector gate would
-            # skip the getJobDetails intercept entirely. Always attempt extraction for it (#765).
+            # WorkSource: the listing page has no description node, so the selector gate would skip the getJobDetails
+            # intercept entirely. Always attempt extraction for it (#765).
             if selector_found or company_key == WORKSOURCE_COMPANY_KEY:
-                # Attempt extraction
                 description = await extract_description_from_detail_page(
                     detail_page,
                     job_url,
@@ -489,7 +458,6 @@ async def fetch_job_details(
                 f"Attempt {attempt} failed or no content after {elapsed:.2f}s (selector_found={selector_found})"
             )
 
-        # If extraction failed on all attempts
         if not description:
             logger.warning(f"Failed to extract description for {job_title} after 3 attempts")
             if "description" not in job_copy or not job_copy["description"]:
@@ -508,13 +476,7 @@ async def fetch_job_details(
             job_url,
             str(e),
         )
-        # Return original job unchanged on error
         return job_copy
-
-
-# ============================================================================
-# MAIN DETAIL FETCHING FUNCTION
-# ============================================================================
 
 
 async def fetch_all_job_details(
@@ -543,7 +505,6 @@ async def fetch_all_job_details(
     logger.info(f"Input file: {input_file}")
     logger.info(f"Output file: {output_file}")
 
-    # Load input jobs
     try:
         with open(input_file, "r", encoding="utf-8") as f:
             jobs = json.load(f)
@@ -559,19 +520,16 @@ async def fetch_all_job_details(
         logger.warning("No jobs found in input file")
         return 1
 
-    # Limit jobs for testing
     if max_jobs:
         jobs = jobs[:max_jobs]
         logger.info(f"Limited to first {max_jobs} jobs for testing")
 
-    # Load config
     try:
         merged_config = load_all_company_configs(config_dir)
     except (FileNotFoundError, ValueError) as e:
         logger.error(f"Config loading failed: {e}")
         return 1
 
-    # Initialize browser
     playwright: Optional[Playwright] = None
     browser: Optional[Browser] = None
     try:
@@ -581,7 +539,6 @@ async def fetch_all_job_details(
         return 2
 
     try:
-        # Fetch details for each job sequentially
         enriched_jobs: List[Dict[str, Any]] = []
         for i, job in enumerate(jobs, 1):
             try:
@@ -603,10 +560,8 @@ async def fetch_all_job_details(
                     job.get("url"),
                     str(e),
                 )
-                # Append original job on error
                 enriched_jobs.append(job)
 
-        # Write output JSON
         output_path = Path(output_file)
         try:
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -622,11 +577,6 @@ async def fetch_all_job_details(
 
     finally:
         await close_browser(playwright, browser)
-
-
-# ============================================================================
-# CLI ENTRY POINT
-# ============================================================================
 
 
 def main() -> int:
@@ -702,10 +652,8 @@ Examples:
 
     args = parser.parse_args()
 
-    # Setup logging
     setup_logging(__name__, level=args.log_level)
 
-    # Run detail crawler
     try:
         exit_code = asyncio.run(
             fetch_all_job_details(

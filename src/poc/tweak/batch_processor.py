@@ -78,7 +78,6 @@ from src.poc.tweak.spacy_pipeline.heading_text import is_heading_only, normalize
 
 logger = logging.getLogger(__name__)
 
-# Allowed description_selector_match strategies
 DESCRIPTION_MATCH_STRATEGIES = {"first", "all", "longest"}
 
 _WHITESPACE_RUN_RE = re.compile(r"\s+")
@@ -249,13 +248,11 @@ def load_jobs(path: str) -> List[Dict[str, Any]]:
     with open(file_path) as f:
         data = json.load(f)
 
-    # Validate input is array
     if not isinstance(data, list):
         raise ValueError(
             f"Expected JSON array at root, got {type(data).__name__}. Input must be an array of job records."
         )
 
-    # Validate each record has description field (but allow null values)
     for i, job in enumerate(data):
         if not isinstance(job, dict):
             raise ValueError(f"Record {i} is not a dict (type: {type(job).__name__}). Each job must be an object.")
@@ -340,7 +337,6 @@ def process_job(
     title = job.get("title", "Unknown")
     company = job.get("company", "Unknown")
 
-    # Initialize result
     result = JobResult(
         job_id=job_id,
         title=title,
@@ -354,18 +350,15 @@ def process_job(
 
     raw_html = job.get("description", "")
 
-    # Handle null description gracefully
     if raw_html is None:
         raw_html = ""
 
     # Stage 0: Scope to selector if provided (Issue #363, #367)
     if description_selector:
-        # Validate description_match strategy (only when selector is provided)
         effective_strategy = description_match
         # isinstance guard: an unhashable value (e.g. list from malformed config) would raise TypeError
         # on set membership and abort the batch; treat it as invalid instead.
         if not isinstance(description_match, str) or description_match not in DESCRIPTION_MATCH_STRATEGIES:
-            # Invalid strategy: log warning and use "first"
             result.add_warning(
                 "html_scoping",
                 f"Invalid description_selector_match value '{description_match}'; "
@@ -378,17 +371,13 @@ def process_job(
 
             scope_result = scope_to_selector(raw_html, description_selector, strategy=effective_strategy)
 
-            # Handle different match scenarios
             if scope_result.match_count == 0:
-                # No matches: warn and use full HTML
                 result.add_warning(
                     "html_scoping",
                     f"Selector '{description_selector}' matched 0 elements; processing full HTML",
                 )
             elif scope_result.fragment:
-                # Have a fragment (matched 1+ elements)
                 if scope_result.match_count > 1:
-                    # Multiple matches: warn with strategy name
                     strategy_msg = {
                         "first": "using first match",
                         "all": "using all matches",
@@ -399,10 +388,8 @@ def process_job(
                         f"Selector '{description_selector}' matched {scope_result.match_count} "
                         f"elements; {strategy_msg}",
                     )
-                # Use the scoped fragment (single or strategy-selected of multiple)
                 raw_html = scope_result.fragment
         except ValueError as e:
-            # Invalid CSS selector: warn and use full HTML
             result.add_warning(
                 "html_scoping",
                 f"Invalid CSS selector '{description_selector}': {e}; processing full HTML",
@@ -442,7 +429,6 @@ def process_job(
             promoted_markdown = heading_promoter.process(polished_markdown)
         except Exception as e:
             result.add_error("heading_promoter", str(e))
-            # Non-fatal: continue with unpromoted markdown
 
     # Stage 4: Parse sections using MarkdownSpanRuler
     try:
@@ -458,18 +444,16 @@ def process_job(
                 try:
                     classification = classifier.classify(section)
 
-                    # Extract primary (highest-confidence) type for backward compatibility
-                    # (Issue #338: preserving full multi-type data without breaking existing fields)
+                    # Primary (highest-confidence) type keeps existing fields backward compatible (Issue #338: full
+                    # multi-type data preserved).
                     if classification.all_types:
                         primary_type = classification.all_types[0]
                         confidences.append(primary_type.confidence)
 
-                        # Count total keyword matches from all candidate types
                         for type_class in classification.all_types:
                             result.keyword_matches += len(type_class.matched_keywords)
 
-                        # Build all_types list: convert TypeClassification tuples to dicts
-                        # Note: Store full precision here; rounding only happens in MarkdownSection.to_dict()
+                        # Store full precision here; rounding only happens in MarkdownSection.to_dict().
                         all_types_list = [
                             {
                                 "section_type": type_class.section_type.value,
@@ -478,7 +462,6 @@ def process_job(
                             for type_class in classification.all_types
                         ]
 
-                        # Build keyword_matches list: convert KeywordMatch tuples to dicts
                         keyword_matches_list = [
                             {
                                 "keyword": km.keyword,
@@ -510,7 +493,6 @@ def process_job(
                         )
                         markdown_sections.append(md_section)
                     else:
-                        # No types classified: create default section with zero confidence
                         md_section = MarkdownSection(
                             section_id=f"sec_{section_idx}",
                             heading=section.title or "",
@@ -532,35 +514,28 @@ def process_job(
 
                 except Exception as sec_err:
                     result.add_error("section_classification", str(sec_err))
-                    # Continue processing other sections
 
             result.markdown_sections = markdown_sections
 
-            # Aggregate confidence stats across all sections
             if confidences:
                 result.confidence_min = min(confidences)
                 result.confidence_max = max(confidences)
                 result.confidence_avg = sum(confidences) / len(confidences)
             else:
-                # If all section classifications failed, reset to valid defaults
                 result.confidence_min = 0.0
                 result.confidence_max = 0.0
                 result.confidence_avg = 0.0
 
     except Exception as e:
         result.add_error("section_parsing", str(e))
-        # Errors in section parsing/classification do not halt further processing;
-        # we report sections detected and partial confidence stats if any
+        # Errors in section parsing/classification do not halt further processing; sections detected and partial
+        # confidence stats are still reported.
 
-    # Stages 6-8: Extract requirements, skills, technologies from doc (per-stage error handling)
     try:
-        # Create a spaCy Doc for extraction using the fully-configured nlp pipeline
-        # This ensures all extensions and components are available
         doc = nlp(polished_markdown)
         # Sentences come from polished_markdown, not promoted_markdown (intentional; no section alignment).
-        # Drop known heading/boilerplate sentences (Issue #732 item 2) and sentences that equal a
-        # structural section title (Issue #732 item 2b). Checks see de-escaped text; kept sentences
-        # keep their original form.
+        # Drop known heading/boilerplate sentences (#732 item 2) and section-title sentences (#732 item 2b).
+        # Checks see de-escaped text; kept sentences keep their original form.
         known_section_titles = _normalized_section_titles(sections)
         kept_sentences: List[str] = []
         for s in doc._.poc_sentences or []:
@@ -572,8 +547,8 @@ def process_job(
             kept_sentences.append(s)
         result.sentences = kept_sentences
 
-        # Ensure sections are populated on the doc for classification
-        doc._.sections = sections  # Pre-populate sections from ruler output
+        # SectionClassifierComponent reads doc._.sections, so populate it from the ruler output.
+        doc._.sections = sections
 
         # Apply classifiers and extract data
         from src.poc.tweak.spacy_pipeline import SectionClassifierComponent
@@ -612,13 +587,9 @@ def process_job(
         min_description_chars=min_description_chars,
     )
 
-    # Stage 9 (Issue #754, #757 B): fallback for NEEDS_HUMAN_REVIEW jobs (tier 1+2) and for COMPLETE
-    # complete-gap jobs (tier 2 only). apply_fallback sets PARTIAL_RECOVERY itself when it recovers
-    # entries (zero recovery leaves the outcome unchanged); do not set the outcome here.
-    # A fallback failure must not crash the job. It is logged, not recorded in result.errors
-    # (has_errors() would turn the job into ERROR), and any partial appends are rolled back so
-    # the job keeps its pre-fallback outcome (NEEDS_HUMAN_REVIEW or COMPLETE), whatever stage of apply_fallback raised
-    # (apply_fallback sets PARTIAL_RECOVERY before its final log line).
+    # Stage 9 (Issue #754, #757 B): fallback for NEEDS_HUMAN_REVIEW (tier 1+2) and complete-gap COMPLETE (tier 2).
+    # apply_fallback sets PARTIAL_RECOVERY itself; a failure is logged, not added to result.errors
+    # (has_errors() would turn the job into ERROR), and partial appends are rolled back.
     pre_fallback_outcome = result.extraction_outcome
     pre_fallback_lists = (list(result.requirements), list(result.skills), list(result.technologies))
     try:
@@ -683,10 +654,8 @@ def run_batch(
         ValueError: If input file is not valid JSON array
         OSError: If spaCy model cannot be loaded
     """
-    # Load jobs
     jobs = load_jobs(input_path)
 
-    # Load spaCy model once
     try:
         nlp = spacy.load("en_core_web_md")
     except OSError as e:
@@ -694,7 +663,7 @@ def run_batch(
             f"Failed to load spaCy model 'en_core_web_md': {e}. Run: uv run python -m spacy download en_core_web_md"
         ) from e
 
-    # Explicit entity_ruler registration (required by TechnologyProcessor, D5 decision)
+    # Explicit entity_ruler registration (required by TechnologyProcessor, D5 decision).
     if "entity_ruler" not in nlp.pipe_names:
         nlp.add_pipe("entity_ruler", before="ner")
 
@@ -707,7 +676,6 @@ def run_batch(
     tech_patterns = TechnologyProcessor.generate_tech_patterns()
     ruler.add_patterns(tech_patterns)  # type: ignore
 
-    # Instantiate components once
     preprocessor = HTMLPreprocessor()
     converter = HTMLMarkdownConverter()
     polisher = MarkdownPolisher()
@@ -715,14 +683,12 @@ def run_batch(
     markdown_ruler = MarkdownSpanRuler(nlp)
     classifier = SectionClassifier()
 
-    # Add pipeline components (all use last=True, D3 decision)
     req_processor = RequirementProcessor(nlp, "requirement_processor")
     skill_processor = SkillProcessor(nlp, "skill_processor")
     tech_processor = TechnologyProcessor(nlp, "technology_processor")
 
-    # Process all jobs
     results = []
-    # Cache of source_config -> (selector, match, error): skips re-resolving a key already seen in this batch
+    # Cache of source_config -> (selector, match, error): skips re-resolving a key already seen in this batch.
     scoping_cache: Dict[str, Tuple[Optional[str], str, Optional[str]]] = {}
     for job in jobs:
         job_selector = description_selector
@@ -755,7 +721,6 @@ def run_batch(
             min_section_confidence=fallback_min_section_confidence,
         )
         if resolve_error is not None:
-            # Unknown/invalid source_config: process job unscoped (as before), record a warning
             result.add_warning("source_config", resolve_error)
         results.append(result)
 
@@ -775,13 +740,11 @@ def print_summary(results: List[JobResult]) -> str:
     """
     lines = []
 
-    # Header
     lines.append("=" * 80)
     lines.append("BATCH PROCESSING SUMMARY")
     lines.append("=" * 80)
     lines.append("")
 
-    # Per-job results
     lines.append("PER-JOB RESULTS:")
     lines.append("-" * 80)
 
@@ -820,7 +783,6 @@ def print_summary(results: List[JobResult]) -> str:
             for stage, warning in result.warnings:
                 lines.append(f"    - {stage}: {warning}")
 
-    # Aggregate statistics
     lines.append("")
     lines.append("-" * 80)
     lines.append("AGGREGATE STATISTICS:")
@@ -848,7 +810,6 @@ def print_summary(results: List[JobResult]) -> str:
         outcome_count = sum(1 for r in results if r.extraction_outcome is outcome)
         lines.append(f"{outcome.value.replace('_', ' ').capitalize()}: {outcome_count}")
 
-    # Confidence stats
     confidences_with_values = [r.confidence_avg for r in results if r.sections_detected > 0 and r.confidence_avg > 0]
     if confidences_with_values:
         avg_confidence = sum(confidences_with_values) / len(confidences_with_values)
@@ -878,16 +839,13 @@ def _resolve_description_selector(company: str, config_dir: str) -> str:
     Raises:
         ValueError: If company not found, or found but has no selectors.description_selector
     """
-    # Lazy import: only import common.py when --company is used
     from src.poc.tweak.common import load_all_company_configs, resolve_company_selectors
 
     merged_config = load_all_company_configs(config_dir)
 
-    # Try to resolve selectors for the given company
     selectors = resolve_company_selectors(company, merged_config)
 
     if not selectors:
-        # No selectors found for this company
         raise ValueError(f"No configuration found for company '{company}' in {config_dir}")
 
     description_selector = selectors.get("description_selector")
@@ -922,19 +880,15 @@ def _resolve_description_match(company: str, config_dir: str) -> str:
     Raises:
         ValueError: If company not found
     """
-    # Lazy import: only import common.py when --company is used
     from src.poc.tweak.common import load_all_company_configs, resolve_company_selectors
 
     merged_config = load_all_company_configs(config_dir)
 
-    # Try to resolve selectors for the given company
     selectors = resolve_company_selectors(company, merged_config)
 
     if not selectors:
-        # No selectors found for this company
         raise ValueError(f"No configuration found for company '{company}' in {config_dir}")
 
-    # Return the strategy value, or "first" if key is absent
     return selectors.get("description_selector_match", "first")
 
 
@@ -1043,7 +997,6 @@ def main() -> int:
     if not 0.0 <= args.fallback_min_section_confidence <= 1.0:
         parser.error("--fallback-min-section-confidence must be between 0.0 and 1.0")
 
-    # Resolve description_selector and description_selector_match from --company if provided
     description_selector = None
     description_match = "first"
     if args.company:
@@ -1068,7 +1021,6 @@ def main() -> int:
         )
         print_summary(results)
 
-        # Export to JSON if requested
         if args.output_json:
             payload = []
             for r in results:

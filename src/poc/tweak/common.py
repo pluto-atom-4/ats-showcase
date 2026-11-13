@@ -15,9 +15,7 @@ from typing import Any, Dict, Optional, Tuple, cast
 from playwright.async_api import Browser, Playwright, async_playwright
 
 
-# ============================================================================
-# ASYNCIO CLEANUP HANDLER (Issue #309)
-# ============================================================================
+# Issue #309: Playwright's harmless "Event loop is closed" error at shutdown is filtered via sys.excepthook.
 def _suppress_event_loop_closed_exception() -> None:
     """
     Suppress RuntimeError: Event loop is closed from subprocess cleanup.
@@ -34,7 +32,6 @@ def _suppress_event_loop_closed_exception() -> None:
 
     def new_excepthook(exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         if isinstance(exc_val, RuntimeError) and "Event loop is closed" in str(exc_val):
-            # Suppress this specific exception; it's from subprocess cleanup
             pass
         else:
             old_excepthook(exc_type, exc_val, exc_tb)
@@ -42,13 +39,10 @@ def _suppress_event_loop_closed_exception() -> None:
     sys.excepthook = new_excepthook
 
 
-# Register handler on module import
+# Runs at import: replaces sys.excepthook process-wide.
 _suppress_event_loop_closed_exception()
 
 
-# ============================================================================
-# GENERIC FALLBACK SELECTORS
-# ============================================================================
 GENERIC_FALLBACK_SELECTORS = {
     "job_container": "[class*='job'], [class*='posting'], tr",
     "title": "h1, h2, h3, p.title, .job-title, [class*='title']",
@@ -56,11 +50,6 @@ GENERIC_FALLBACK_SELECTORS = {
     "link": "a[href]",
     "description_selector": "[class*='description'], [class*='details'], main, article, section",
 }
-
-
-# ============================================================================
-# BROWSER INITIALIZATION
-# ============================================================================
 
 
 async def init_browser(headless: bool = True) -> Tuple[Playwright, Browser]:
@@ -114,11 +103,6 @@ async def close_browser(
             logging.warning(f"Error stopping playwright: {e}")
 
 
-# ============================================================================
-# PAGE NAVIGATION WITH RETRY
-# ============================================================================
-
-
 async def retry_goto(
     page: Any,
     url: str,
@@ -157,7 +141,7 @@ async def retry_goto(
             return True
         except Exception as e:
             if attempt < max_attempts:
-                backoff_sec = 2 ** (attempt - 1)  # 2s, 4s, 8s, ...
+                backoff_sec = 2 ** (attempt - 1)
                 logger.debug(f"Navigation attempt {attempt} failed: {e}. Retrying in {backoff_sec}s...")
                 await asyncio.sleep(backoff_sec)
             else:
@@ -165,11 +149,6 @@ async def retry_goto(
                 return False
 
     return False
-
-
-# ============================================================================
-# CONFIG LOADING & MERGING
-# ============================================================================
 
 
 def load_all_company_configs(config_dir: str = "config_test") -> Dict[str, Any]:
@@ -214,11 +193,6 @@ def load_all_company_configs(config_dir: str = "config_test") -> Dict[str, Any]:
     return merged_companies
 
 
-# ============================================================================
-# SELECTOR RESOLUTION
-# ============================================================================
-
-
 def resolve_company_selectors(job_company_name: str, merged_config: Dict[str, Any]) -> Dict[str, str]:
     """
     Resolve CSS selectors for a company, matching on both key and name field.
@@ -239,7 +213,6 @@ def resolve_company_selectors(job_company_name: str, merged_config: Dict[str, An
     """
     job_name_lower = job_company_name.strip().lower()
 
-    # Try matching against keys
     for key, config in merged_config.items():
         if not isinstance(config, dict):
             continue
@@ -248,7 +221,6 @@ def resolve_company_selectors(job_company_name: str, merged_config: Dict[str, An
             if selectors and isinstance(selectors, dict):
                 return cast(Dict[str, str], selectors)
 
-    # Try matching against "name" field
     for _key, config in merged_config.items():
         if not isinstance(config, dict):
             continue
@@ -261,14 +233,8 @@ def resolve_company_selectors(job_company_name: str, merged_config: Dict[str, An
             if selectors and isinstance(selectors, dict):
                 return cast(Dict[str, str], selectors)
 
-    # No match found, return empty dict (caller will use fallbacks)
     logging.debug(f"No selector config found for company '{job_company_name}', using fallbacks")
     return {}
-
-
-# ============================================================================
-# LOGGING SETUP
-# ============================================================================
 
 
 def setup_logging(
@@ -293,12 +259,10 @@ def setup_logging(
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 
-    # Create logs directory if needed
     log_dir = os.path.dirname(log_file)
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir)
 
-    # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(getattr(logging, level.upper(), logging.INFO))
     console_format = logging.Formatter(
@@ -307,10 +271,9 @@ def setup_logging(
     )
     console_handler.setFormatter(console_format)
 
-    # File handler (rotating, max 10MB per file, 5 backups)
     file_handler = logging.handlers.RotatingFileHandler(
         log_file,
-        maxBytes=10 * 1024 * 1024,  # 10 MB
+        maxBytes=10 * 1024 * 1024,
         backupCount=5,
     )
     file_handler.setLevel(getattr(logging, level.upper(), logging.INFO))
@@ -320,7 +283,7 @@ def setup_logging(
     )
     file_handler.setFormatter(file_format)
 
-    # Add handlers to logger (avoid duplicates)
+    # Add handlers only once (avoid duplicates).
     if not logger.handlers:
         logger.addHandler(console_handler)
         logger.addHandler(file_handler)

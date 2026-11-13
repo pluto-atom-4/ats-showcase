@@ -39,15 +39,9 @@ from src.poc.tweak.spacy_pipeline.section_header_keywords import SECTION_HEADER_
 
 logger = logging.getLogger(__name__)
 
-# Promoter-only set: 61 phrases (Issue #365 base set plus live-job-seen extras).
-# All phrases pass consistency test: classify as non-'other' type via SectionClassifier.
-# Excludes the 7 'other' phrases from the architect's draft: eeo statement, equal employment
-# opportunity, job duties, must have, the role, who we are, who you are.
-# duties, education and nice to have are also 'other' but are deliberately in-vocabulary via
-# SECTION_HEADER_KEYWORDS_ONLY (Issue #733), not in this set.
-# Extras: "in this role you will" (RESPONSIBILITIES), "what will make you succeed" (QUALIFICATIONS).
-# Promoter-only phrases. The 6 canonical filter phrases (KNOWN_HEADING_PHRASES in heading_text.py)
-# are unioned in below, so the five overlapping phrases are not listed twice.
+# Promoter-only set: 61 phrases (Issue #365 base set plus live-job-seen extras), none classified 'other'.
+# duties, education and nice to have are 'other' but in-vocabulary via SECTION_HEADER_KEYWORDS_ONLY (#733), not here.
+# The canonical filter phrases (KNOWN_HEADING_PHRASES) are unioned in below rather than listed twice.
 _PROMOTER_ONLY_HEADINGS: FrozenSet[str] = frozenset(
     [
         "ability",
@@ -114,23 +108,16 @@ _PROMOTER_ONLY_HEADINGS: FrozenSet[str] = frozenset(
     ]
 )
 
-# Full promoter vocabulary (83 phrases): promoter-only (61) + canonical filter phrases (6) +
-# 16 section-header keywords copied from production _SECTION_HEADER_KEYWORDS (Issue #733).
-# The 16 copied phrases are promoted even though SectionClassifier classifies 15 of 16 as
-# SectionType.OTHER (only "what you'll do" is RESPONSIBILITIES). This is a human decision for
-# Issue #733, not a classifier-consistency result. The allowlist test pins this behaviour.
+# Full vocabulary (83): promoter-only (61) + canonical filter phrases (6) + 16 section-header keywords (Issue #733).
+# Promoting them regardless of SectionClassifier labels is a human decision (#733), not a consistency result.
+# The allowlist test pins this behaviour.
 KNOWN_PLAIN_HEADINGS: FrozenSet[str] = _PROMOTER_ONLY_HEADINGS | KNOWN_HEADING_PHRASES | SECTION_HEADER_KEYWORDS_ONLY
 
-# Normalised form of the synthesized heading, used by Guard 5 to detect an existing EEO heading.
 EEO_HEADING_NORMALIZED = "equal opportunity employer"
 
-# EEO phrase triggers for Issue #374 (small, high-precision set)
-# Matched case-insensitively in first ~200 chars of paragraph.
-# Known limitation: "is an equal opportunity", "does not discriminate" and "affirmative action" are
-# generic and can false-positive on non-EEO sentences, e.g. "This is an equal opportunity to grow
-# your career." or "Our affirmative action plan is posted in the lobby."
-# followed by a boilerplate paragraph ("Please contact HR.") is isolated under an EEO heading.
-# Accepted for now; tightening the phrases would change detection behaviour, so it is not done here.
+# EEO phrase triggers (Issue #374): small, high-precision set, matched in the first sentence, first ~200 chars.
+# Known limitation (accepted): generic triggers such as "is an equal opportunity" can false-positive on non-EEO text,
+# e.g. "This is an equal opportunity to grow your career."
 EEO_TRIGGERS: FrozenSet[str] = frozenset(
     [
         "equal opportunity employer",
@@ -142,32 +129,26 @@ EEO_TRIGGERS: FrozenSet[str] = frozenset(
     ]
 )
 
-# Markdown heading prefix (Issue #374). Stripped before the known-heading check in Guard 4 so
-# that a line already promoted to "## Benefits" by an earlier pass still matches "benefits".
+# Markdown heading prefix (Issue #374). Stripped before the known-heading check so that a line already
+# promoted to "## Benefits" by an earlier pass still matches "benefits".
 HEADING_PREFIX_PATTERN = re.compile(r"^#{1,6}\s+")
 
-# End of a sentence: sentence-ending punctuation followed by whitespace (Issue #374). An EEO
-# paragraph is only a candidate when its trigger sits in this first sentence.
+# End of a sentence: sentence-ending punctuation followed by whitespace (Issue #374).
+# An EEO paragraph is only a candidate when its trigger sits in this first sentence.
 FIRST_SENTENCE_END_PATTERN = re.compile(r"[.!?](?=\s)")
 
 # Sentence boundary used to examine every sentence after the first (Issue #374).
-# Known limitation (accepted): this splits after abbreviations such as "U.S.", so "Acme is an equal
-# opportunity employer. Applicants from the U.S. are welcome." is not isolated: the fragment
-# "Applicants from the U.S." is not EEO-ish and blocks isolation.
+# Known limitation (accepted): it also splits after abbreviations such as "U.S.", and the fragment "Applicants from the
+# U.S." then blocks isolation.
 _SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?])\s+")
 
 # DEI vocabulary that may follow an EEO sentence in the same paragraph (Issue #374).
-# Known limitation: hand-picked DEI vocabulary, so a job sentence that contains "diversity"
-# (e.g. "You will build diversity dashboards.") is treated as EEO-ish and does not block isolation.
+# Known limitation: hand-picked, so a job sentence containing "diversity" is also treated as EEO-ish.
 EEO_CONTINUATION_PATTERN = re.compile(r"\b(diversity|diverse|inclusion|inclusive|belonging)\b", re.IGNORECASE)
 
-# "without regard to" followed by a protected-class term within ~60 chars (Issue #374 Defect 3).
-# A bare "on the basis of" lead-in is deliberately absent: job content such as "Pay is set on the
-# basis of age and experience." or "Decisions are made on the basis of race conditions." would
-# otherwise be read as an EEO statement.
-# Protected-class terms, singular and plural: race(s), color(s), religion(s)/religious, sex(es),
-# gender(s), national origin(s), age(s), disability/disabilities, veteran(s), sexual orientation(s),
-# marital status(es), genetic(s).
+# "without regard to" + protected-class term within ~60 chars (Issue #374 Defect 3); terms are singular or plural.
+# A bare "on the basis of" lead-in is deliberately absent: "Pay is set on the basis of age and experience."
+# would otherwise read as an EEO statement.
 PROTECTED_CLASS_PATTERN = re.compile(
     r"without regard to\s+.{0,60}?\b(races?|colors?|religions?|religious|sex(?:es)?|genders?|"
     r"national origins?|ages?|disabilit(?:y|ies)|veterans?|sexual orientations?|marital status(?:es)?|"
@@ -175,61 +156,31 @@ PROTECTED_CLASS_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Discrimination-disclaimer wording for a sentence after an EEO first sentence (Issue #374 round 6).
-# "does not discriminate" is also an EEO trigger for the first sentence; this pattern additionally
-# covers a first-person disclaimer ("We do not discriminate.", "We will not discriminate.") and a
-# "do/does/will not discriminate" followed by "on", "against" or "based" (e.g. "Acme will not
-# discriminate on the basis of race."), so that such a later sentence is EEO-ish and does not block
-# isolation. "never" is deliberately absent: "Our ranking never discriminates against junior
-# candidates." is job content. Known limitation: a first-person job sentence such as "We do not
-# discriminate between file types." is still EEO-ish, and a third-person subject without a following
-# on/against/based ("The tool will not discriminate between file types.") is job content.
+# Disclaimer sentence after an EEO first sentence (Issue #374 round 6): "We do not discriminate." or
+# "do/does/will not discriminate" followed by on/against/based, so it does not block isolation.
+# Known limitation: a first-person job sentence "We do not discriminat..." is also read as EEO-ish.
 DISCRIMINATE_PATTERN = re.compile(
     r"\b(?:(?:we|i)\s+(?:do|will)\s+not\s+discriminat\w*|"
     r"(?:do(?:es)?|will)\s+not\s+discriminat\w*\s+(?:on|against|based)\b)",
     re.IGNORECASE,
 )
 
-# "encouraged to apply" (Issue #374 round 6), e.g. "Women, minorities, veterans and individuals with
-# disabilities are encouraged to apply." The phrase is generic, so it is accepted only as a sentence
-# after an EEO first sentence. Known limitation: a generic "Candidates with 5+ years are encouraged
-# to apply." sharing a paragraph with an EEO first sentence would be swept in; accepted.
+# "encouraged to apply" (Issue #374 round 6), e.g. "Women, minorities, veterans and individuals with disabilities are
+# encouraged to apply."
+# Only consulted for sentences after an EEO first sentence, so it cannot trigger isolation by itself.
 ENCOURAGED_TO_APPLY_PATTERN = re.compile(r"encouraged to apply", re.IGNORECASE)
 
-# ADA keyword and contact/email phrases, matched on word boundaries so that "ada" does not match
-# "Canada" or "adapt" (Issue #374). The ADA token is case-sensitive so the language "Ada"
-# ("Experience with Ada.") is not treated as boilerplate; all other alternatives are
-# case-insensitive. Bare "contact" and "email" are deliberately absent: they also open
-# ordinary sentences such as "Contact the hiring manager for role details.", which must not be
-# treated as boilerplate. A bare "accommodation" is also absent: "Relocation accommodations are
-# available for this role." is job content. Accommodation notices are matched by
-# ACCOMMODATION_REQUEST_PATTERN and ACCOMMODATION_LABEL_PATTERN instead.
-# Known limitation: bare "disability" and "by email" are still matched case-insensitively, so
-# ordinary sentences containing them can be read as boilerplate.
+# Word boundaries keep "ada" out of "Canada"/"adapt" (Issue #374); ADA is case-sensitive so the language "Ada" passes.
+# Bare "contact", "email" and "accommodation" are deliberately absent (they open ordinary job sentences).
+# Known limitation: bare "disability" and "by email" still match case-insensitively.
 BOILERPLATE_WORD_PATTERN = re.compile(
     r"\b(?:(?-i:ADA)|disability|contact\s+(?:us|hr)|email\s+(?:us|hr)|by\s+email)\b",
     re.IGNORECASE,
 )
 
-# Accommodation notices only: "accommodation(s)" followed by "on/upon/to request" within ~60 chars
-# on the same sentence (e.g. "Accommodations are available on request."), or "request(ed)
-# [a] [reasonable] accommodation(s)" (e.g. "Request reasonable accommodations here."). Business
-# uses such as "Manage travel accommodation requests" are job content and do not match.
-# Also "accommodation request(s) can/may/should/will be made|submitted|sent|directed" (e.g.
-# "Accommodation requests can be made through HR."), "if/should you require ... accommodation(s)"
-# (e.g. "If you require accommodation, let us know.") and a notice lead-in "applicants/candidates/
-# individuals/persons/those/anyone/people/someone/all who/whom require ... accommodation(s)" (e.g.
-# "Applicants who require accommodation in the application process will be supported."). The lead-in is
-# a closed list of generic people words, so job content such as "Engineers who require accommodations for
-# travel." is not matched, and the bare "require ... accommodation(s)" wording is not matched either:
-# "The role may require accommodations for travel." is job content.
-# Known limitation: the generic lead-ins "all" and "people" also match job wording such as "All who
-# require accommodations for travel."
-# Known false positives (accepted): the "request(ed) [a] accommodation" alternative matches travel and
-# booking wording such as "Request accommodation from the hiring manager." or "Request accommodations
-# for travel.", and "accommodations ... to request" matches "Book accommodations to request approval.".
-# "that" is not a lead-in: job wording such as "A role that requires accommodations for travel." is job content.
-# These are pinned as isolated in test_travel_booking_accommodation_wording_is_boilerplate_known_limitation.
+# Accommodation notices only; "Manage travel accommodation requests" or bare "require ... accommodation" do not match.
+# Known limitation: lead-ins "all" and "people" match job wording ("All who require accommodations for travel.").
+# Accepted false positives: test_travel_booking_accommodation_wording_is_boilerplate_known_limitation.
 ACCOMMODATION_REQUEST_PATTERN = re.compile(
     r"\baccommodations?\b[^.!?]{0,60}\b(?:on|upon|to)\s+request\w*|"
     r"\brequest\w*\s+(?:a\s+)?(?:reasonable\s+)?accommodations?\b|"
@@ -314,33 +265,28 @@ class HeadingPromoter(PipelineComponent):
         """
         original = text
         try:
-            # Handle empty input
             if not text:
                 return text
 
-            # Normalise line endings to the first one detected (CRLF or LF) so that
-            # mixed input produces uniform output. Everything below works on LF.
+            # Normalise line endings to the first one detected (CRLF or LF) so mixed input produces uniform output.
+            # Everything below works on LF.
             first_newline = text.find("\n")
             line_ending = "\r\n" if first_newline > 0 and text[first_newline - 1] == "\r" else "\n"
             text = text.replace("\r\n", "\n")
 
-            # Phase 1: Isolate trailing EEO paragraphs
+            # Phase 1: isolate trailing EEO paragraphs
             text = self._isolate_eeo_paragraphs(text)
 
-            # Phase 2: Promote plain-text headings
+            # Phase 2: promote plain-text headings
             lines = text.split("\n")
             result_lines = []
 
             for i, line in enumerate(lines):
                 stripped = line.strip()
 
-                # Check if line should be promoted
                 if self._should_promote(stripped, i == 0, i > 0 and not lines[i - 1].strip()):
-                    # Normalize and check against known headings
                     normalized = self._normalize(stripped)
                     if normalized in self._headings:
-                        # Promote: preserve leading/trailing whitespace from original line
-                        # Extract the part of the line that should become the heading
                         promoted = "## " + stripped.rstrip(":").strip()
                         result_lines.append(promoted)
                     else:
@@ -354,7 +300,6 @@ class HeadingPromoter(PipelineComponent):
             return result
 
         except Exception as e:
-            # Non-fatal: log and return original text
             logger.warning(f"Error in heading_promoter.process(): {e}")
             return original
 
@@ -382,7 +327,7 @@ class HeadingPromoter(PipelineComponent):
         if not text:
             return text
 
-        # Input is LF-normalised by process(); preserve original trailing newline status
+        # Input is LF-normalised by process(); the original trailing-newline status is restored on return.
         line_ending = "\n"
         has_trailing_newline = text.endswith(line_ending)
 
@@ -390,16 +335,13 @@ class HeadingPromoter(PipelineComponent):
         paragraphs, para_starts = self._split_paragraphs_with_indices(lines)
 
         if len(paragraphs) < 2:
-            # Need at least 2 paragraphs
             return text
 
-        # Find first EEO paragraph such that everything after it is a trailing block
-        # of boilerplate or further EEO paragraphs. Because the first qualifying EEO
-        # paragraph is chosen, a run of EEO paragraphs is isolated at its first member.
+        # Find the first EEO paragraph such that everything after it is boilerplate or further EEO paragraphs.
+        # Because the first qualifying EEO paragraph is chosen, a run of EEO paragraphs is isolated at its first member.
         first_eeo_idx = -1
         for i in range(len(paragraphs)):
             if self._is_eeo_paragraph(paragraphs[i]):
-                # Check if all paragraphs after this one are empty, boilerplate, or EEO
                 all_trailing_ok = True
                 for j in range(i + 1, len(paragraphs)):
                     if not (self._is_empty_or_boilerplate(paragraphs[j]) or self._is_eeo_paragraph(paragraphs[j])):
@@ -413,32 +355,19 @@ class HeadingPromoter(PipelineComponent):
         if first_eeo_idx < 0:
             return text
 
-        # Check guards before inserting synthetic heading
         eeo_para = paragraphs[first_eeo_idx]
         if not eeo_para:
             return text
 
-        # Guard 1: the EEO paragraph's first line is already a markdown heading ("#" to "######",
-        # e.g. promoted by an earlier pass). _is_eeo_paragraph ignores a leading heading marker when judging
-        # candidacy, so such a paragraph can be selected; it is left unchanged rather than
-        # headed twice.
+        # Guard 1: _is_eeo_paragraph ignores a leading heading marker, so a paragraph whose first line is already
+        # a markdown heading can be selected; leave it unchanged rather than heading it twice.
         first_line_stripped = eeo_para[0].strip()
         if HEADING_PREFIX_PATTERN.match(first_line_stripped):
             return text
 
-        # Guard 2: the EEO paragraph's first line is itself a known heading phrase. Heading marker
-        # and emphasis characters are stripped first, as Guard 5 does, so that "# Benefits",
-        # "__Benefits__" and "_Benefits_" are recognised as the known heading.
-        # Two shapes reach here:
-        # - The first line is the EEO heading itself (a standalone "Equal Opportunity Employer"
-        #   line, which matches the EEO trigger on its own). Return unchanged: a synthetic heading
-        #   would double it.
-        # - A known heading followed by an EEO sentence in the same paragraph (e.g. "Benefits"
-        #   then "We are an equal opportunity employer."). The paragraph matches on the sentence,
-        #   so the heading line is split off: the EEO sentence gets its own synthetic section
-        #   below the heading (Issue #493). Split is applied after Guards 3 and 5, so it is only
-        #   reached when neither a preceding heading nor an existing EEO heading applies.
-        # A single-line paragraph that is only a known heading has nothing to split: return unchanged.
+        # Guard 2: the first line is a known heading. Return unchanged if it is the EEO heading or a 1-line paragraph;
+        # otherwise split the heading off so the EEO sentence gets its own synthetic section below it (Issue #493).
+        # Applied after Guards 3 and 5, so it only runs when no preceding or existing EEO heading applies.
         heading_text = HEADING_PREFIX_PATTERN.sub("", first_line_stripped).strip("*_: ")
         normalized = self._normalize(heading_text)
         split_glued_heading = False
@@ -447,38 +376,32 @@ class HeadingPromoter(PipelineComponent):
                 return text
             split_glued_heading = True
 
-        # Guard 3: Check if preceding paragraph ends with a heading
+        # Guard 3: the preceding paragraph ends with a heading
         if first_eeo_idx > 0:
             preceding_para = paragraphs[first_eeo_idx - 1]
             if preceding_para and HEADING_PREFIX_PATTERN.match(preceding_para[-1].strip()):
                 return text
 
-        # Guard 5 (silent skip): an EEO heading already exists anywhere in the document, with a
-        # "#" heading marker and/or "*" or "_" emphasis (e.g. a standalone "Equal Opportunity
-        # Employer" line above, "**Equal Opportunity Employer**", or one promoted by an earlier
-        # pass). Inserting another would duplicate that heading.
+        # Guard 5 (silent skip): an EEO heading already exists anywhere in the document, with a "#" marker and/or "*" or
+        # "_" emphasis;
+        # inserting another would duplicate it.
         for line in lines:
             if self._normalize(line.strip().strip("#*_: ")) == EEO_HEADING_NORMALIZED:
                 return text
 
-        # Insert heading before the first EEO paragraph's first line
         insert_line_idx = para_starts[first_eeo_idx]
 
-        # Build result with inserted lines
         result_lines = list(lines)
+        # Keep the glued known heading line in place and insert the synthetic EEO heading, with blank lines around it,
+        # after that line.
         if split_glued_heading:
-            # Keep the known heading line where it is; a blank line, the synthetic EEO heading and a
-            # blank line follow it, matching the standard insertion layout. Phase 2 promotes only
-            # the known heading.
             result_lines.insert(insert_line_idx + 1, "")
             result_lines.insert(insert_line_idx + 2, "## Equal Opportunity Employer")
             result_lines.insert(insert_line_idx + 3, "")
         else:
-            # Insert heading and blank line before EEO paragraph at its start index
             result_lines.insert(insert_line_idx, "## Equal Opportunity Employer")
             result_lines.insert(insert_line_idx + 1, "")
 
-        # Reconstruct, preserving original trailing newline status
         result = line_ending.join(result_lines)
         if not has_trailing_newline and result.endswith(line_ending):
             result = result[: -len(line_ending)]
@@ -538,18 +461,15 @@ class HeadingPromoter(PipelineComponent):
 
         first_line = HEADING_PREFIX_PATTERN.sub("", para[0].strip()).rstrip(":").strip()
 
-        # Must not be a bullet, table or list line
         if not first_line or first_line[0] in "#*-+|" or first_line[0].isdigit():
             return False
 
-        # Combine paragraph text for matching
         para_text = " ".join([first_line] + [line.strip() for line in para[1:]])
-        # Only the first sentence is searched, so an EEO sentence after job content is not
-        # isolated together with that content (Issue #374).
+        # Triggers are searched in the first sentence only; later sentences are checked below so EEO text is not
+        # isolated together with job content (Issue #374).
         first_sentence = self._first_sentence(para_text)
         check_text = first_sentence[:200].casefold()
 
-        # Check simple triggers, then "without regard to" with protected class pattern
         triggered = any(trigger in check_text for trigger in EEO_TRIGGERS) or bool(
             PROTECTED_CLASS_PATTERN.search(first_sentence[:400])
         )
@@ -557,7 +477,6 @@ class HeadingPromoter(PipelineComponent):
             return False
 
         # A paragraph whose later sentences are job content is not an EEO paragraph (Issue #374).
-        # Only the sentences after the first are checked; the first one has already passed.
         for sentence in _SENTENCE_SPLIT_PATTERN.split(para_text)[1:]:
             if not self._is_eeo_ish_sentence(sentence):
                 return False
@@ -629,8 +548,8 @@ class HeadingPromoter(PipelineComponent):
         if BOILERPLATE_WORD_PATTERN.search(text):
             return True
 
-        # Strip a markdown heading marker and emphasis so "## Accommodations", "**Accommodations**"
-        # and "_Accommodations_" count as a bare label (Issue #374).
+        # Strip a markdown heading marker and emphasis so "## Accommodations", "**Accommodations**" and
+        # "_Accommodations_" count as a bare label (Issue #374).
         label_text = HEADING_PREFIX_PATTERN.sub("", text).strip().strip("*_: ")
         if ACCOMMODATION_REQUEST_PATTERN.search(text) or ACCOMMODATION_LABEL_PATTERN.fullmatch(label_text):
             return True
@@ -649,27 +568,21 @@ class HeadingPromoter(PipelineComponent):
         Returns:
             True if the line passes structural checks (not already formatted, correct position)
         """
-        # Empty lines cannot be promoted
         if not stripped_line:
             return False
 
-        # Must not start with markdown/list markers
         if stripped_line[0] in "#*-+|":
             return False
 
-        # Must not start with digit (list indicator like "1. ", "2. ")
         if stripped_line[0].isdigit():
             return False
 
-        # Must not be already formatted as bold (**...**)
         if stripped_line.startswith("**") and stripped_line.endswith("**"):
             return False
 
-        # Must not contain list-like patterns (digit followed by . or ))
         if re.match(r"^\d+[\.\)]", stripped_line):
             return False
 
-        # Previous line must be blank or this is first line
         if not (is_first or prev_blank):
             return False
 
@@ -691,16 +604,12 @@ class HeadingPromoter(PipelineComponent):
         Returns:
             Normalised text suitable for set membership testing
         """
-        # Lowercase
         text = text.casefold()
 
-        # Normalise apostrophes (both straight ' and curly ')
         text = text.replace("\u2019", "'").replace("\u2018", "'")
 
-        # Collapse multiple spaces
         text = " ".join(text.split())
 
-        # Strip trailing colon and whitespace
         text = text.rstrip(":").strip()
 
         return text
