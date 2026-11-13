@@ -288,3 +288,16 @@ def test_assess_verify_cost_flag(
         )
 
         assert "Estimated" in result.stdout or "Aborted" in result.stdout
+
+
+def test_assess_default_model_is_config_default() -> None:
+    """Omitting --model must construct the Assessor with DEFAULT_MODEL."""
+    from src.cli import _initialize_assessor_and_validate
+    from src.config.models import DEFAULT_MODEL
+
+    with patch("src.assessment.assessor.Assessor") as mock_assessor_cls:
+        mock_assessor_cls.return_value.model = DEFAULT_MODEL
+
+        _initialize_assessor_and_validate(None)
+
+        mock_assessor_cls.assert_called_once_with(model=DEFAULT_MODEL)
