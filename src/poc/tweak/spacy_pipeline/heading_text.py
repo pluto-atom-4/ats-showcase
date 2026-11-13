@@ -20,12 +20,9 @@ Issue #268: Drop heading-only requirements. Issue #724: shared helper.
 import re
 from typing import Optional
 
-# Edge-anchored only. Leading: '#', '*', '_', whitespace. Trailing: any run of '*', '_', ':',
-# '.', whitespace, and a closing ATX run of '#' only when preceded by whitespace
-# ("## Heading ##"), in any order, so "**Foo** ##" and "**Foo ##**" both strip fully.
-# A '#' attached to a word is kept, so "C#" stays "c#".
-# Interior punctuation (e.g. "C++", "snake_case", "e.g.") is kept.
-# Trailing '.' is stripped together with markers so "**Foo**." matches "**Foo.**".
+# Strips leading #, *, _ and whitespace, and trailing *, _, :, . and whitespace,
+# including a closing ATX run of #'s that is preceded by whitespace; markers in any order are fully stripped.
+# A "#" attached to a word is kept ("C#" stays "c#").
 _HEADING_MARKER_PATTERN = re.compile(r"^[#*_\s]+|(?:[*_:.\s]|\s#+(?=[\s*_:.#]*$))+$")
 
 _INNER_WHITESPACE_PATTERN = re.compile(r"\s+")
@@ -41,10 +38,9 @@ KNOWN_HEADING_PHRASES: frozenset[str] = frozenset(
     }
 )
 
-# Boilerplate sentence family dropped as non-requirements. Deliberately narrow: it matches only
-# the "applicants who do not meet ... will not be forwarded to the hiring department" notice and
-# its small wording variants, not a general boilerplate detector. Matched against the normalized
-# key (lowercased, markers/trailing periods stripped, whitespace collapsed).
+# Deliberately narrow, not a general boilerplate detector; matched against the normalized key.
+# Matches the "applicants who do not meet ... qualifications will not be forwarded to the hiring department" notice,
+# which is boilerplate, not a heading.
 _BOILERPLATE_PATTERN = re.compile(
     r"applicants who do not meet (?:these|the minimum|the) qualifications "
     r"will not be forwarded to the hiring department$"

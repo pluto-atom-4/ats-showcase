@@ -53,18 +53,14 @@ def clean_and_convert(html_input):
         >>> "Hello **World**" in markdown
         True
     """
-    # Initialize pipeline components
     preprocessor = HTMLPreprocessor()
     converter = HTMLMarkdownConverter(fallback_mode="html")
     polisher = MarkdownPolisher()
 
-    # Stage 1: Preprocess HTML (remove non-breaking spaces, normalize)
     html_clean = preprocessor.process(html_input)
 
-    # Stage 2: Convert HTML to Markdown
     markdown = converter.process(html_clean)
 
-    # Stage 3: Polish Markdown (apply formatting rules)
     markdown_final = polisher.process(markdown)
 
     return markdown_final.strip()

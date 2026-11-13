@@ -20,10 +20,6 @@ class RequirementPattern(TypedDict):
     priority: int
 
 
-# =============================================================================
-# REQUIREMENT PATTERNS (from src/poc/requirement_patterns.py)
-# =============================================================================
-
 REQUIREMENT_PATTERNS: List[RequirementPattern] = [
     # TIER 1: High-confidence (0.90-0.95) - Mandatory language
     {
@@ -149,7 +145,7 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.92,
         "priority": 2,
     },
-    # PHASE C EXPANSION: Education Patterns (4 patterns)
+    # PHASE C EXPANSION: Education patterns
     {
         "trigger": "degree abbreviation",
         "regex": r"\b(?:BS\+|MS\+|BA\+|MA\+|BS|MS|BA|MA|PhD)\b",
@@ -174,7 +170,7 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.78,
         "priority": 2,
     },
-    # PHASE C EXPANSION: Location/On-site Patterns (2 patterns)
+    # PHASE C EXPANSION: Location/on-site patterns
     {
         "trigger": "on-site location",
         "regex": r"\b(?:on-site|on site|office|in-office|remote|hybrid|office-based)\b",
@@ -187,7 +183,7 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.75,
         "priority": 2,
     },
-    # PHASE C EXPANSION: Soft Skill Patterns (4 patterns)
+    # PHASE C EXPANSION: Soft skill patterns
     {
         "trigger": "communication skills",
         "regex": r"\b(?:communicat(?:e|ion|or)|written|verbal|presentation)\s+(?:skills?|abilities?)\b",
@@ -214,10 +210,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
     },
 ]
 
-
-# =============================================================================
-# SKILL PATTERNS (from src/poc/skills/patterns.py)
-# =============================================================================
 
 SKILL_VERBS: List[str] = [
     "architect",
@@ -247,12 +239,8 @@ SKILL_VERBS: List[str] = [
 ]
 
 
-# =============================================================================
-# TECHNOLOGY PATTERNS (from src/poc/technologies/patterns.py)
-# =============================================================================
-
 TECH_TERMS: Set[str] = {
-    # --- Carbon Robotics / AI / Robotics Specific ---
+    # Carbon Robotics / AI / Robotics specific
     "PyTorch",
     "C++",
     "computer vision",
@@ -303,9 +291,7 @@ TECH_TERMS: Set[str] = {
 }
 
 
-# =============================================================================
 # NOUN-LED SKILL FALLBACK PATTERNS (Issue #372)
-# =============================================================================
 
 QUALIFIER_STOPLIST: Set[str] = {
     "required",

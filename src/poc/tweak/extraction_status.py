@@ -40,10 +40,10 @@ class ExtractionOutcome(str, Enum):
     ERROR = "error"
 
 
-# Hardcoded defaults. Tunable via keyword-only arguments of classify_extraction_outcome().
+# Defaults; classify_extraction_outcome() accepts keyword overrides.
 MIN_SECTIONS_FOR_REAL_JD = 5
 MIN_DESCRIPTION_CHARS = 800
-# Consumed by the fallback extraction spec (Spec 4), not by classify_extraction_outcome().
+# Not read by classify_extraction_outcome(); used by the fallback extraction path.
 FALLBACK_MIN_SECTION_CONFIDENCE = 0.45
 
 

@@ -270,28 +270,23 @@ class HTMLMarkdownConverter(PipelineComponent):
 
         temp_path = None
         try:
-            # Pre-process: clean up HTML structure and non-breaking spaces
             html_text = self._preprocess_html(html_text)
 
-            # Write to temp file
             temp_path = self._write_temp_file(html_text)
 
-            # Convert to Markdown
             markdown = self._convert_to_markdown(temp_path)
 
             return markdown
 
-        except Exception as e:  # Catch any exception during conversion
+        except Exception as e:
             logger.warning(f"HTML to Markdown conversion failed: {e}")
 
             if self.fallback_mode == "raise":
                 raise
 
-            # Fallback: return original HTML
             return html_text
 
         finally:
-            # Always clean up temp file, even on exception
             if temp_path is not None:
                 self._cleanup_temp_file(temp_path)
 
@@ -314,14 +309,12 @@ class HTMLMarkdownConverter(PipelineComponent):
         try:
             soup = BeautifulSoup(html_text, "html.parser")
 
-            # Replace non-breaking spaces in all text nodes
             for text_node in soup.find_all(string=True):
                 text_node.replace_with(text_node.replace("\xa0", " "))
 
             return str(soup)
         except Exception as e:
             logger.debug(f"BeautifulSoup preprocessing failed: {e}")
-            # If preprocessing fails, return original HTML
             return html_text
 
     def _write_temp_file(self, html_text: str) -> str:

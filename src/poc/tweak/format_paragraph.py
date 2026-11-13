@@ -7,26 +7,20 @@ from markitdown import MarkItDown
 
 
 def transform_html_to_markdown(html_input):
-    # --- STEP 1: Parse and Clean with BeautifulSoup ---
     soup = BeautifulSoup(html_input, "html.parser")
 
-    # Replace non-breaking spaces (&nbsp;) with standard spaces
     for text_node in soup.find_all(string=True):
         cleaned_text = text_node.replace("\xa0", " ")
         text_node.replace_with(cleaned_text)
 
-    # Force the bold header into its own block
-    # We look for <b> tags followed by a <br/>
+    # Force the bold header into its own block: look for <b> tags followed by a <br/>.
     for b_tag in soup.find_all("b"):
         if b_tag.next_sibling and b_tag.next_sibling.name == "br":
-            # Create a new paragraph tag to wrap the bold element
-            # This ensures MarkItDown treats it as a separate block
+            # Wrap the bold element in <p> so MarkItDown treats it as a separate block
             p_tag = soup.new_tag("p")
             b_tag.wrap(p_tag)
-            # Remove the now redundant <br/> tag
             b_tag.parent.next_sibling.decompose()
 
-    # --- STEP 2: Convert with MarkItDown ---
     md_converter = MarkItDown()
 
     # We use a temporary file because MarkItDown is optimized for file-path inputs
@@ -41,18 +35,14 @@ def transform_html_to_markdown(html_input):
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
-    # --- STEP 3: Final Regex Polish ---
-    # Ensure there is exactly one empty line after any bold text ending with a colon
-    # This fixes cases where the converter might only output a single \n
+    # Exactly one empty line after bold text ending with a colon (the converter may output a single \n)
     final_md = re.sub(r"(\*\*.*?\*\*:)\s*\n", r"\1\n\n", markdown_output)
 
-    # Clean up any triple newlines created by the process
     final_md = re.sub(r"\n{3,}", "\n\n", final_md)
 
     return final_md.strip()
 
 
-# --- Example Usage ---
 html_content = """
 <p>
     <b><span>Pay &amp; Benefits:&nbsp;</span></b><br />

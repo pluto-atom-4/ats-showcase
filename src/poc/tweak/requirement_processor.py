@@ -8,7 +8,6 @@ The canonical location is: src.poc.tweak.spacy_pipeline.requirement_processor
 Issue #321: Implement requirement processor for batch pipeline.
 """
 
-# Re-export from canonical location
 from src.poc.tweak.spacy_pipeline.requirement_processor import RequirementProcessor
 
 __all__ = [

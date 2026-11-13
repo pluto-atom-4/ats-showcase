@@ -64,12 +64,10 @@ def _has_negation_context(sentence: str, trigger: str) -> bool:
         r"\bwithout\b",
     ]
 
-    # Find trigger position
     trigger_pos = sentence.lower().find(trigger.lower())
     if trigger_pos == -1:
         return False
 
-    # Look ±50 chars around trigger
     context_start = max(0, trigger_pos - 50)
     context_end = min(len(sentence), trigger_pos + len(trigger) + 50)
     context = sentence[context_start:context_end]
@@ -107,7 +105,6 @@ def _apply_adjustments(base_confidence: float, sentence: str) -> float:
     if re.search(r"\bif\b", sentence, re.IGNORECASE):
         adj -= 0.15
 
-    # Nice to have: significantly lower
     if re.search(r"nice\s+to\s+have", sentence, re.IGNORECASE):
         adj -= 0.25
 
@@ -155,7 +152,6 @@ class RequirementProcessor:
         self._name = name
         self.min_confidence = min_confidence
 
-        # Register Doc extension for requirements if not present
         if not Doc.has_extension("requirements"):
             Doc.set_extension("requirements", default=[])
 
@@ -185,22 +181,17 @@ class RequirementProcessor:
         Raises:
             TypeError: If doc is not a spaCy Doc
         """
-        # Get classified sections from doc extension (handle None/missing gracefully)
         classified_sections = doc._.classified_sections if doc._.classified_sections else []
 
-        # Extract requirements from sections
         requirements: List[Dict[str, Any]] = []
 
         for section, classification in classified_sections:
             try:
-                # Filter to QUALIFICATIONS section type only (B2 decision)
-                # "requirements" section type maps to SectionType.QUALIFICATIONS
                 if SectionType.QUALIFICATIONS not in classification.labels:
                     continue
 
-                # Issue #346: when all_types is present, gate extraction on the
-                # top-ranked type's confidence. Falls back to labels-only
-                # behavior above when all_types is empty/absent.
+                # Issue #346: when all_types is present and QUALIFICATIONS ranks first, skip the section if its
+                # confidence is below min_confidence.
                 all_types = classification.all_types
                 if all_types and all_types[0].section_type == SectionType.QUALIFICATIONS:
                     top_confidence = all_types[0].confidence
@@ -211,20 +202,15 @@ class RequirementProcessor:
                         )
                         continue
 
-                # Extract from section content. Section titles are never
-                # classified (Issue #375): headings must not become requirements.
+                # Only section content is classified (Issue #375): headings must not become requirements.
                 if section.content:
                     for sentence in re.split(r"[.\r\n]+", section.content):
                         sentence = sentence.strip()
                         if not sentence:
                             continue
 
-                        # Issue #375: skip literal markdown heading lines
-                        # (e.g. "## Essential Qualifications") inside content.
-                        # Issue #268: skip bold/colon/known-phrase headings matching the
-                        # section title (via is_heading_only). `startswith('#')` stays as a
-                        # generic literal-heading-marker fallback for headings that match
-                        # neither the section title nor the known phrases.
+                        # Skip literal markdown heading lines (Issue #375) and bold/colon/known-phrase headings matching
+                        # the section title (Issue #268).
                         if sentence.startswith("#") or is_heading_only(sentence, section.title, section.level):
                             continue
 
@@ -234,10 +220,8 @@ class RequirementProcessor:
 
             except Exception as e:
                 logger.error(f"Error extracting requirements from section at line {section.start_line}: {e}")
-                # Continue with next section
                 continue
 
-        # Store extracted requirements in doc extension
         doc._.requirements = requirements
 
         return doc
@@ -257,23 +241,18 @@ class RequirementProcessor:
         if not sentence.strip():
             return None
 
-        # Try each pattern
         best_match: Optional[Dict[str, Any]] = None
 
         for pattern in REQUIREMENT_PATTERNS:
             if re.search(pattern["regex"], sentence, re.IGNORECASE):
-                # Found a match
                 confidence: float = pattern["confidence"]
 
-                # Check negations
                 if _has_negation_context(sentence, pattern["trigger"]):
-                    return None  # Negation found, skip entirely
+                    return None
 
-                # Apply context adjustments
                 confidence = _apply_adjustments(confidence, sentence)
 
                 if confidence > 0:
-                    # Keep best match (by priority, then confidence)
                     if best_match is None:
                         should_update = True
                     else:
@@ -293,9 +272,8 @@ class RequirementProcessor:
                         }
 
         if best_match:
-            # Remove temporary priority field, simplify output
             best_match.pop("priority")
-            best_match.pop("trigger_word")  # Remove trigger word from output
+            best_match.pop("trigger_word")
             return best_match
 
         return None

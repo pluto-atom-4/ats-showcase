@@ -65,9 +65,8 @@ logger = logging.getLogger(__name__)
 TIER1_TAG = "tier1_relaxed_section"
 TIER2_TAG = "tier2_taxonomy"
 
-# Confidence caps for recovered entries. Normal-path entries are scored above these
-# (skills/technologies are 1.0). Tier 1 entries never exceed TIER1_CONFIDENCE; taxonomy
-# entries carry no classification signal and use TIER2_CONFIDENCE.
+# Fixed confidences for recovered items: tier 1 also caps requirement confidence at this value;
+# tier 2 (taxonomy) is lower.
 TIER1_CONFIDENCE = 0.5
 TIER2_CONFIDENCE = 0.3
 
@@ -280,7 +279,6 @@ def apply_fallback(
         polished_markdown,
         shared_nlp,
         need_skills=not job_result.skills,
-        # Always True on the complete-gap path (technologies is empty there by definition).
         need_technologies=not job_result.technologies,
     )
     recovered += _append_new(job_result.skills, "skill", [(s, TIER2_CONFIDENCE) for s in taxonomy["skills"]], TIER2_TAG)

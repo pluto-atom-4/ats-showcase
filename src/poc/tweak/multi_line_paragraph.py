@@ -23,11 +23,7 @@ from typing import Any, Dict, List, Optional
 
 from spacy.language import Language
 
-# ============================================================================
-# Phase 1: Constants and Pattern Definitions
-# ============================================================================
-
-# Header patterns from span_sections_markdown.py lines 5-36
+# Header patterns mirror span_sections_markdown.py.
 HEADER_PATTERN = r"^#{1,3}"
 """Regex pattern for H1, H2, H3 headers (e.g., #, ##, ###)."""
 
@@ -40,21 +36,15 @@ BOLD_PATTERN = r"^\*\*.+\*\*\s*$"
 COMBINED_PATTERN = f"({HEADER_PATTERN})|({HEADER_BOLD_PATTERN})|({BOLD_PATTERN})"
 """Combined regex for all header marker types."""
 
-# Map pattern to header level
+# "numeric" levels are read from the actual "#" count in the text; BOLD_PATTERN (-1) is a non-numbered bold marker.
 PATTERN_TO_LEVEL = {
-    HEADER_PATTERN: "numeric",  # Will be extracted from actual text
+    HEADER_PATTERN: "numeric",
     HEADER_BOLD_PATTERN: 2,
-    BOLD_PATTERN: -1,  # Bold marker (non-numbered)
+    BOLD_PATTERN: -1,
 }
 
-# List markers for detection
 LIST_MARKERS = {"*", "-", "•", "+"}
 """Set of bullet point markers to detect lists."""
-
-
-# ============================================================================
-# Phase 1: Data Structures
-# ============================================================================
 
 
 @dataclass
@@ -93,11 +83,6 @@ class MarkdownSection:
         return asdict(self)
 
 
-# ============================================================================
-# Phase 1: Helper Functions
-# ============================================================================
-
-
 def extract_title(line: str, level: int) -> Optional[str]:
     """Extract title text from a header line.
 
@@ -121,11 +106,9 @@ def extract_title(line: str, level: int) -> Optional[str]:
     """
     cleaned = line.strip()
 
-    # Remove heading markers (#, ##, ###)
     if level in [1, 2, 3]:
         cleaned = re.sub(r"^#{1,3}\s*", "", cleaned)
 
-    # Remove bold markers (** at start and end)
     if level == -1 or "**" in cleaned:
         cleaned = re.sub(r"^\*\*", "", cleaned)
         cleaned = re.sub(r"\*\*\s*$", "", cleaned)
@@ -158,20 +141,16 @@ def get_header_level(line: str) -> int:
     """
     stripped = line.strip()
 
-    # Check for # markers (H1, H2, H3)
     match = re.match(r"^(#{1,3})", stripped)
     if match:
         return len(match.group(1))
 
-    # Check for bold markers
     if re.match(BOLD_PATTERN, stripped):
         return -1
 
-    # Check for ## ** pattern
     if re.match(HEADER_BOLD_PATTERN, stripped):
         return 2
 
-    # No marker found
     return -2
 
 
@@ -235,14 +214,10 @@ def map_line_to_token_position(text: str, line_idx: int) -> tuple:
     for i, line in enumerate(lines):
         if i == line_idx:
             return (char_pos, char_pos + len(line))
+        # +1 for newline
         char_pos += len(line) + 1  # +1 for newline
 
     return (None, None)
-
-
-# ============================================================================
-# Phase 2: MarkdownSpanRuler Class
-# ============================================================================
 
 
 class MarkdownSpanRuler:
@@ -275,9 +250,9 @@ class MarkdownSpanRuler:
         self.nlp = nlp
         self.doc_sections: List[MarkdownSection] = []
 
-        # Register Doc extension for storing parsed sections
         from spacy.tokens import Doc
 
+        # set_extension raises if the extension is already registered.
         if not Doc.has_extension("sections"):
             Doc.set_extension("sections", default=[])
 
@@ -307,15 +282,13 @@ class MarkdownSpanRuler:
         lines = text.split("\n")
         sections: List[MarkdownSection] = []
 
-        # Find all section boundary lines (headers)
         boundaries = self._find_boundaries(lines)
 
-        # If there's text before the first boundary, emit it as a preamble section
+        # Text before the first boundary becomes a preamble section (title=None, level=-2)
         if boundaries and boundaries[0] > 0:
             preamble_lines = lines[0 : boundaries[0]]
             preamble_text = "\n".join(preamble_lines).strip()
             if preamble_text:
-                # Build preamble section with title=None, level=-2
                 preamble_section = self._build_section(
                     lines=lines,
                     start_line=0,
@@ -326,21 +299,18 @@ class MarkdownSpanRuler:
                 )
                 sections.append(preamble_section)
 
-        # Extract sections between boundaries
         for i, boundary_idx in enumerate(boundaries):
             # End of current section is one line before next boundary
             if i + 1 < len(boundaries):
                 current_end = boundaries[i + 1] - 1
             else:
-                # Last section goes to end of text
                 current_end = len(lines) - 1
 
-            # Extract section starting at boundary
             section = self._extract_section(lines, boundary_idx, current_end)
             if section:
                 sections.append(section)
 
-        # Add any trailing content after last header (if no headers at all)
+        # Trailing content after the last header (only when there are no headers at all)
         if not boundaries and lines:
             content = "\n".join(lines).strip()
             if content:
@@ -354,7 +324,6 @@ class MarkdownSpanRuler:
                 )
                 sections.append(section)
 
-        # Store in instance and attach to doc
         self.doc_sections = sections
         doc = self.nlp(text)
         doc._.sections = sections
@@ -436,14 +405,11 @@ class MarkdownSpanRuler:
         if start >= len(lines):
             return None
 
-        # Get header line and determine level
         header_line = lines[start]
         level = get_header_level(header_line)
 
-        # Extract title from header
         title = extract_title(header_line, level)
 
-        # Build content from start to end (include all lines)
         content_lines = lines[start : end + 1]
         content = "\n".join(content_lines)
 

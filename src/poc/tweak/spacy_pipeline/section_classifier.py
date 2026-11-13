@@ -146,7 +146,6 @@ class SectionClassifierComponent:
         self._name = name
         self.classifier = SectionClassifier()
 
-        # Register Doc extension for classified sections if not present
         if not Doc.has_extension("classified_sections"):
             Doc.set_extension("classified_sections", default=[])
 
@@ -197,17 +196,14 @@ class SectionClassifierComponent:
             >>> section, classification = doc._.classified_sections[0]
             >>> assert classification.section_type.value == "skills"
         """
-        # Get sections from doc extension (handle None/missing gracefully)
         sections = doc._.sections if doc._.sections else []
 
-        # Classify each section and store tuples
         classified_sections: List[Tuple[MarkdownSection, SectionClassification]] = []
 
         for section in sections:
             classification = self.classifier.classify(section)
             classified_sections.append((section, classification))
 
-        # Store classified sections in doc extension
         doc._.classified_sections = classified_sections
 
         return doc

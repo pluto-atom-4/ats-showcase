@@ -57,11 +57,8 @@ from src.poc.tweak.patterns import (
 if TYPE_CHECKING:
     from spacy.language import Language
 
-# ============================================================================
-# Issue #365: Word-boundary keyword matching helper
-# ============================================================================
 
-
+# Leading-only word boundary (Issue #365): stems like 'qualif' still match, but 'our' no longer hits 'HOURLY'.
 @lru_cache(maxsize=512)
 def _compile_keyword_pattern(keyword: str) -> "re.Pattern[str]":
     r"""Compile and cache regex pattern for word-boundary keyword matching.
@@ -80,7 +77,6 @@ def _compile_keyword_pattern(keyword: str) -> "re.Pattern[str]":
         Pattern is cached per keyword to avoid recompiling on every match.
         Max cache size is 512 to balance memory and performance.
     """
-    # Escape special regex characters in keyword
     escaped = re.escape(keyword)
     # Leading-only boundary: (?<!\w) prevents mid-word matches
     pattern_str = r"(?<!\w)" + escaped
@@ -228,11 +224,6 @@ class KeywordMatch:
     position: int
 
 
-# ============================================================================
-# Phase 2: Confidence Scoring Functions
-# ============================================================================
-
-
 def calculate_confidence(match_count: int, source: Literal["title", "content"], section_type: SectionType) -> float:
     """Calculate confidence score for a matched classification.
 
@@ -290,13 +281,12 @@ def calculate_confidence(match_count: int, source: Literal["title", "content"], 
         # SKIP sections: lower base confidence, slower growth
         if source == "title":
             return min(1.0, 0.5 + (match_count * 0.25))
-        else:  # source == "content"
+        else:
             return min(1.0, 0.4 + (match_count * 0.15))
     else:
-        # All other section types: higher base, standard growth
         if source == "title":
             return min(1.0, 0.6 + (match_count * 0.2))
-        else:  # source == "content"
+        else:
             return min(1.0, 0.5 + (match_count * 0.15))
 
 
@@ -349,11 +339,9 @@ def fallback_confidence(source: Literal["title", "content"], has_content_text: b
     if source == "title":
         # Title-based: no keywords matched, default to OTHER with low confidence
         return (SectionType.OTHER, 0.3)
-    else:  # source == "content"
-        # Content-based: depends on whether content is present
+    else:
         if has_content_text:
-            # Content exists, no keywords matched: default to DESCRIPTION
-            # (body text is typically descriptive)
+            # Content exists, no keywords matched: default to DESCRIPTION (body text is typically descriptive)
             return (SectionType.DESCRIPTION, 0.2)
         else:
             # No content at all: UNLABELED (no information for classification)
@@ -525,11 +513,6 @@ class SectionClassification:
         sorted_types = tuple(sorted(type_classifications, key=lambda tc: tc.confidence, reverse=True))
         labels = frozenset(tc.section_type for tc in sorted_types)
         return cls(all_types=sorted_types, labels=labels, is_skip=is_skip, keyword_matches=keyword_matches)
-
-
-# ============================================================================
-# Phase 3: SectionClassifier Class with Ruler Support (Issue #301)
-# ============================================================================
 
 
 def _clamp_confidence(value: float) -> float:
@@ -704,7 +687,6 @@ class SectionClassifier:
         if section is None:
             raise ValueError("section cannot be None")
 
-        # Extract normalized text for classification
         title_text = self._normalize_text(section.title) if section.title else ""
         content_text = self._normalize_text(section.content) if section.content else ""
 
@@ -712,7 +694,6 @@ class SectionClassifier:
         if title_text and section.level != -2:
             return self._classify_from_title(title_text, content_text)
         else:
-            # No title or untitled section: classify from content
             return self._classify_from_content(content_text)
 
     def _normalize_text(self, text: str) -> str:
@@ -762,32 +743,27 @@ class SectionClassifier:
             >>> len(result.keyword_matches) >= 1
             True
         """
-        # Initialize container for all matches (ruler + keyword)
         all_matches: dict[SectionType, Tuple[str, ...]] = {}
-        ruler_patterns_matched: dict[SectionType, str] = {}  # Track ruler pattern labels
+        ruler_patterns_matched: dict[SectionType, str] = {}
         keyword_match_list: List[KeywordMatch] = []
 
         # Step 1: Try ruler pattern matching first (Issue #301)
         ruler_matches = self._match_ruler_patterns(title_text, "title")
         for section_type, pattern_label in ruler_matches.items():
-            # Q3: Apply ruler matching to content-based classification too
-            # Q1: Apply ruler base + section adjustment (Option A)
+            # Q1: ruler confidence is the ruler base confidence plus the per-section adjustment.
             confidence = self._calculate_ruler_confidence(pattern_label)
             if section_type not in all_matches:
                 all_matches[section_type] = ()
             ruler_patterns_matched[section_type] = pattern_label
 
-        # Step 2: Check keyword categories (NO EARLY RETURN)
-        # SKIP sections
+        # No early return: every matching category is collected so a section can carry multiple types
         skip_matches = tuple(kw for kw in self.skip_keywords if _kw_in(kw, title_text))
         if skip_matches:
             if SectionType.SKIP not in all_matches:
                 all_matches[SectionType.SKIP] = skip_matches
             else:
-                # Merge with existing matches
                 all_matches[SectionType.SKIP] = tuple(set(all_matches[SectionType.SKIP]) | set(skip_matches))
 
-        # SKILLS sections
         skills_matches = tuple(kw for kw in SKILLS_KEYWORDS if _kw_in(kw, title_text))
         if skills_matches:
             if SectionType.SKILLS not in all_matches:
@@ -795,7 +771,6 @@ class SectionClassifier:
             else:
                 all_matches[SectionType.SKILLS] = tuple(set(all_matches[SectionType.SKILLS]) | set(skills_matches))
 
-        # QUALIFICATIONS sections
         qual_matches = tuple(kw for kw in QUALIFICATIONS_KEYWORDS if _kw_in(kw, title_text))
         if qual_matches:
             if SectionType.QUALIFICATIONS not in all_matches:
@@ -805,7 +780,6 @@ class SectionClassifier:
                     set(all_matches[SectionType.QUALIFICATIONS]) | set(qual_matches)
                 )
 
-        # RESPONSIBILITIES sections
         resp_matches = tuple(kw for kw in RESPONSIBILITIES_KEYWORDS if _kw_in(kw, title_text))
         if resp_matches:
             if SectionType.RESPONSIBILITIES not in all_matches:
@@ -815,7 +789,6 @@ class SectionClassifier:
                     set(all_matches[SectionType.RESPONSIBILITIES]) | set(resp_matches)
                 )
 
-        # KNOWLEDGE sections
         know_matches = tuple(kw for kw in KNOWLEDGE_KEYWORDS if _kw_in(kw, title_text))
         if know_matches:
             if SectionType.KNOWLEDGE not in all_matches:
@@ -823,7 +796,6 @@ class SectionClassifier:
             else:
                 all_matches[SectionType.KNOWLEDGE] = tuple(set(all_matches[SectionType.KNOWLEDGE]) | set(know_matches))
 
-        # DESCRIPTION sections
         desc_matches = tuple(kw for kw in DESCRIPTION_KEYWORDS if _kw_in(kw, title_text))
         if desc_matches:
             if SectionType.DESCRIPTION not in all_matches:
@@ -833,11 +805,9 @@ class SectionClassifier:
                     set(all_matches[SectionType.DESCRIPTION]) | set(desc_matches)
                 )
 
-        # Step 3: Build TypeClassification for each matched type
         type_classifications: List[TypeClassification] = []
 
         for section_type, matched_kws in all_matches.items():
-            # Use ruler confidence if pattern matched, else keyword confidence
             if section_type in ruler_patterns_matched:
                 pattern_label = ruler_patterns_matched[section_type]
                 confidence = self._calculate_ruler_confidence(pattern_label)
@@ -845,7 +815,6 @@ class SectionClassifier:
                     section_type=section_type, confidence=confidence, matched_keywords=(), pattern_label=pattern_label
                 )
             else:
-                # Keyword-only match
                 confidence = calculate_confidence(
                     match_count=len(matched_kws), source="title", section_type=section_type
                 )
@@ -854,22 +823,18 @@ class SectionClassifier:
                 )
             type_classifications.append(tc)
 
-            # Create KeywordMatch for each matched keyword with position
             for kw in matched_kws:
                 pos = calculate_position(kw, title_text)
                 km = KeywordMatch(keyword=kw, section_type=section_type, source="title", position=pos)
                 keyword_match_list.append(km)
 
-        # Step 4: Handle zero-match case: use fallback
         if not type_classifications:
             fallback_type, fallback_conf = fallback_confidence("title", bool(content_text.strip()))
             type_classifications.append(TypeClassification(fallback_type, fallback_conf, ()))
-            # No keyword matches for fallback case
 
-        # Step 5: Compute is_skip: True if SKIP is in matched types
+        # is_skip is True if SKIP is among the matched types
         is_skip = SectionType.SKIP in {tc.section_type for tc in type_classifications}
 
-        # Step 6: Build and return via factory
         return SectionClassification.from_type_classifications(
             type_classifications, is_skip=is_skip, keyword_matches=tuple(keyword_match_list)
         )
@@ -913,12 +878,10 @@ class SectionClassifier:
             >>> len(result.keyword_matches)
             0
         """
-        # Initialize container for all matches (ruler + keyword)
         all_matches: dict[SectionType, Tuple[str, ...]] = {}
-        ruler_patterns_matched: dict[SectionType, str] = {}  # Track ruler pattern labels
+        ruler_patterns_matched: dict[SectionType, str] = {}
         keyword_match_list: List[KeywordMatch] = []
 
-        # If no content, return early with fallback
         if not content_text:
             fallback_type, fallback_conf = fallback_confidence("content", False)
             type_classifications = [TypeClassification(fallback_type, fallback_conf, ())]
@@ -936,8 +899,7 @@ class SectionClassifier:
                 all_matches[section_type] = ()
             ruler_patterns_matched[section_type] = pattern_label
 
-        # Step 2: Check keyword categories (NO EARLY RETURN)
-        # SKIP keywords in content prefix
+        # No early return: every matching category is collected so a section can carry multiple types
         skip_matches = tuple(kw for kw in self.skip_keywords if _kw_in(kw, first_words))
         if skip_matches:
             if SectionType.SKIP not in all_matches:
@@ -945,7 +907,6 @@ class SectionClassifier:
             else:
                 all_matches[SectionType.SKIP] = tuple(set(all_matches[SectionType.SKIP]) | set(skip_matches))
 
-        # SKILLS keywords in content prefix
         skills_matches = tuple(kw for kw in SKILLS_KEYWORDS if _kw_in(kw, first_words))
         if skills_matches:
             if SectionType.SKILLS not in all_matches:
@@ -953,7 +914,6 @@ class SectionClassifier:
             else:
                 all_matches[SectionType.SKILLS] = tuple(set(all_matches[SectionType.SKILLS]) | set(skills_matches))
 
-        # QUALIFICATIONS keywords in content prefix
         qual_matches = tuple(kw for kw in QUALIFICATIONS_KEYWORDS if _kw_in(kw, first_words))
         if qual_matches:
             if SectionType.QUALIFICATIONS not in all_matches:
@@ -963,7 +923,6 @@ class SectionClassifier:
                     set(all_matches[SectionType.QUALIFICATIONS]) | set(qual_matches)
                 )
 
-        # RESPONSIBILITIES keywords in content prefix
         resp_matches = tuple(kw for kw in RESPONSIBILITIES_KEYWORDS if _kw_in(kw, first_words))
         if resp_matches:
             if SectionType.RESPONSIBILITIES not in all_matches:
@@ -973,7 +932,6 @@ class SectionClassifier:
                     set(all_matches[SectionType.RESPONSIBILITIES]) | set(resp_matches)
                 )
 
-        # KNOWLEDGE keywords in content prefix
         know_matches = tuple(kw for kw in KNOWLEDGE_KEYWORDS if _kw_in(kw, first_words))
         if know_matches:
             if SectionType.KNOWLEDGE not in all_matches:
@@ -981,7 +939,6 @@ class SectionClassifier:
             else:
                 all_matches[SectionType.KNOWLEDGE] = tuple(set(all_matches[SectionType.KNOWLEDGE]) | set(know_matches))
 
-        # DESCRIPTION keywords in content prefix
         desc_matches = tuple(kw for kw in DESCRIPTION_KEYWORDS if _kw_in(kw, first_words))
         if desc_matches:
             if SectionType.DESCRIPTION not in all_matches:
@@ -991,11 +948,9 @@ class SectionClassifier:
                     set(all_matches[SectionType.DESCRIPTION]) | set(desc_matches)
                 )
 
-        # Step 3: Build TypeClassification for each matched type
         result_classifications: List[TypeClassification] = []
 
         for section_type, matched_kws in all_matches.items():
-            # Use ruler confidence if pattern matched, else keyword confidence
             if section_type in ruler_patterns_matched:
                 pattern_label = ruler_patterns_matched[section_type]
                 confidence = self._calculate_ruler_confidence(pattern_label)
@@ -1003,7 +958,6 @@ class SectionClassifier:
                     section_type=section_type, confidence=confidence, matched_keywords=(), pattern_label=pattern_label
                 )
             else:
-                # Keyword-only match
                 confidence = calculate_confidence(
                     match_count=len(matched_kws), source="content", section_type=section_type
                 )
@@ -1012,23 +966,19 @@ class SectionClassifier:
                 )
             result_classifications.append(tc)
 
-            # Create KeywordMatch for each matched keyword with position
             for kw in matched_kws:
                 pos = calculate_position(kw, first_words)
                 km = KeywordMatch(keyword=kw, section_type=section_type, source="content", position=pos)
                 keyword_match_list.append(km)
 
-        # Step 4: Handle zero-match case: use fallback
         if not result_classifications:
             fallback_type, fallback_conf = fallback_confidence("content", bool(content_text.strip()))
             result_classifications.append(TypeClassification(fallback_type, fallback_conf, ()))
-            # No keyword matches for fallback case
 
-        # Step 5: Compute is_skip: True only if top-ranked type is SKIP (content path)
+        # is_skip is True only if the top-ranked type is SKIP (content path)
         sorted_result = sorted(result_classifications, key=lambda tc: tc.confidence, reverse=True)
         is_skip = bool(sorted_result) and sorted_result[0].section_type is SectionType.SKIP
 
-        # Step 6: Build and return via factory
         return SectionClassification.from_type_classifications(
             result_classifications, is_skip=is_skip, keyword_matches=tuple(keyword_match_list)
         )
@@ -1061,17 +1011,14 @@ class SectionClassifier:
             doc = nlp(text)
             matched_types: dict[SectionType, str] = {}
 
-            # Collect all ruler matches and filter by longest-span-wins logic
-            # (This simple implementation just returns first match per type)
+            # Simple implementation: first ruler match per type wins (no longest-span resolution)
             if hasattr(doc, "ents"):
                 for ent in doc.ents:
-                    # Map entity label to SectionType using RULER_LABEL_TO_SECTION_TYPE
                     from src.poc.tweak.patterns import RULER_LABEL_TO_SECTION_TYPE
 
                     label = ent.label_
                     if label in RULER_LABEL_TO_SECTION_TYPE:
                         section_type = RULER_LABEL_TO_SECTION_TYPE[label]
-                        # Store only if not already matched (first match wins simplified)
                         if section_type not in matched_types:
                             matched_types[section_type] = label
 
@@ -1094,21 +1041,13 @@ class SectionClassifier:
         """
         from src.poc.tweak.patterns import CONFIDENCE_ADJUSTMENT_BY_SECTION, RULER_BASE_CONFIDENCE
 
-        # Base confidence from ruler
         confidence = RULER_BASE_CONFIDENCE
 
-        # Apply section-specific adjustment
         if pattern_label in CONFIDENCE_ADJUSTMENT_BY_SECTION:
             adjustment = CONFIDENCE_ADJUSTMENT_BY_SECTION[pattern_label]
             confidence = confidence + adjustment
 
-        # Clamp to [0.0, 1.0]
         return _clamp_confidence(confidence)
-
-
-# ============================================================================
-# Phase 4: Module-Level Convenience Function
-# ============================================================================
 
 
 def classify_section(section: MarkdownSection, classifier: Optional[SectionClassifier] = None) -> SectionClassification:

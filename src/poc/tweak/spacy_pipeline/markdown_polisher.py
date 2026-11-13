@@ -177,14 +177,12 @@ class MarkdownPolisher(PipelineComponent):
     - tests/poc/tweak/spacy_pipeline/test_markdown_polisher.py: Unit tests
     """
 
-    # Rule names for reference and validation
     RULE_LINE_NORM = "line_norm"
     RULE_LIST_TIGHT = "list_tight"
     RULE_HEADER_FORMAT = "header_format"
     RULE_LIST_BLOCK = "list_block"
     RULE_CLEANUP = "cleanup"
 
-    # All valid rule names in standard order
     ALL_RULES = [
         RULE_LINE_NORM,
         RULE_LIST_TIGHT,
@@ -228,34 +226,22 @@ class MarkdownPolisher(PipelineComponent):
         if rules is None:
             self._enabled_rules = self.ALL_RULES.copy()
         else:
-            # Validate rule names
             invalid = [r for r in rules if r not in self.ALL_RULES]
             if invalid:
                 raise ValueError(f"Invalid rule names: {invalid}")
             self._enabled_rules = rules
 
-        # Pre-compile regex patterns for performance
-        # All patterns are compiled once in __init__ to avoid recompiling
-        # during process() calls
-
-        # Rule 2: List tightening
-        # Matches: "* item1\n\n* item2" and removes the double newline
+        # Compiled once here; process() runs them per call.
         self._re_list_tight = re.compile(r"(\n\* .+?)\n\n(?=\* )")
 
-        # Rule 3: Header formatting
-        # Adds newline before header if preceded by non-newline
+        # Bold-only header lines: used to add the blank line before and after them.
         self._re_header_before = re.compile(r"(?<=.)\n(\*\*.*?\*\*)")
-        # Adds newline after header if followed by non-newline
         self._re_header_after = re.compile(r"(\*\*.*?\*\*)\n(?=.)")
 
-        # Rule 4: List block separation
-        # Adds newline before first list item if preceded by text
+        # A list block needs a blank line before its first item and after its last.
         self._re_list_block_before = re.compile(r"(^[^*\n][^\n]*[^\n\s])\n(\* )", re.MULTILINE)
-        # Adds newline after last list item if followed by text
         self._re_list_block_after = re.compile(r"(\n\* [^\n]+)\n([^\n\*])")
 
-        # Rule 5: Global cleanup
-        # Matches 3+ newlines and replaces with exactly 2
         self._re_cleanup = re.compile(r"\n{3,}")
 
     def process(self, text: str) -> str:
@@ -438,9 +424,7 @@ class MarkdownPolisher(PipelineComponent):
             >>> result == "Overview\\n\\n**Key Point**\\n\\nDetails"
             True
         """
-        # Add blank line before header
         text = self._re_header_before.sub(r"\n\n\1", text)
-        # Add blank line after header
         text = self._re_header_after.sub(r"\1\n\n", text)
         return text
 
@@ -465,9 +449,7 @@ class MarkdownPolisher(PipelineComponent):
             >>> result.startswith("Requirements:\\n\\n*")
             True
         """
-        # Add blank line before first list item
         text = self._re_list_block_before.sub(r"\1\n\n\2", text)
-        # Add blank line after last list item
         text = self._re_list_block_after.sub(r"\1\n\n\2", text)
         return text
 

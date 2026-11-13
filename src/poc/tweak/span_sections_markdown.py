@@ -2,17 +2,13 @@ import re
 
 
 def split_markdown_to_sections(text):
-    # Regex patterns provided:
-    # 1. Starts with # or ## or ### (Note: ^# covers all of these)
-    # 2. Starts with ## **
-    # 3. A line that is ONLY bold text: **text**
+    # #/##/### headings, '## **' headings, and lines that are only bold text.
     header_patterns = [
-        r"^#{1,3}",  # #, ##, ###
-        r"^## \*\*",  # ## **
-        r"^\*\*.+\*\*\s*$",  # **Bold Title** (as a standalone line)
+        r"^#{1,3}",
+        r"^## \*\*",
+        r"^\*\*.+\*\*\s*$",
     ]
 
-    # Combine patterns into one regex
     combined_pattern = "|".join(header_patterns)
 
     lines = text.splitlines()
@@ -20,23 +16,18 @@ def split_markdown_to_sections(text):
     current_section = []
 
     for line in lines:
-        # Check if the current line matches any of the start patterns
         if re.match(combined_pattern, line.strip()):
-            # If we have content in the current_section buffer, save it
             if current_section:
                 sections.append("\n".join(current_section).strip() + "\n")
                 current_section = []
 
         current_section.append(line)
 
-    # Add the last section remaining in the buffer
     if current_section:
         sections.append("\n".join(current_section).strip() + "\n")
 
     return sections
 
-
-# --- Example Usage ---
 
 markdown_input = """## **Preferred Qualifications:**
 
@@ -83,7 +74,6 @@ Please do not include any personal medical information in your request."""
 
 result = split_markdown_to_sections(markdown_input)
 
-# Displaying the results
 for i, section in enumerate(result, 1):
     print(f"- section {i}")
     print("```")

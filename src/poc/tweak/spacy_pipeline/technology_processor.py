@@ -74,8 +74,6 @@ class TechnologyProcessor:
         self._name = name
         self.min_confidence = min_confidence
 
-        # Ensure entity_ruler exists (D5 decision: explicit pre-registration in batch_processor.py)
-        # This check is defensive; actual registration happens in run_batch()
         if "entity_ruler" not in nlp.pipe_names:
             logger.warning(
                 "entity_ruler not found in pipeline. "
@@ -83,7 +81,6 @@ class TechnologyProcessor:
                 "See batch_processor.py run_batch() for setup."
             )
 
-        # Register Doc extension for technologies if not present
         if not Doc.has_extension("technologies"):
             Doc.set_extension("technologies", default=[])
 
@@ -109,22 +106,18 @@ class TechnologyProcessor:
         Raises:
             TypeError: If doc is not a spaCy Doc
         """
-        # Get classified sections from doc extension (handle None/missing gracefully)
         classified_sections = doc._.classified_sections if doc._.classified_sections else []
 
-        # Extract technologies from sections
         technologies: List[Dict[str, Any]] = []
-        seen_techs: set = set()  # Deduplicate technologies
+        seen_techs: set = set()
 
         for section, classification in classified_sections:
             try:
-                # Filter to SKILLS or KNOWLEDGE section types (B2 decision), gated by
-                # confidence threshold when multi-type data is available (Issue #348)
-                # Technologies are typically listed in skills or knowledge sections
+                # Issue #348: with multi-type data, gate on the winning SKILLS/KNOWLEDGE confidence against
+                # min_confidence; otherwise fall back to labels only.
                 all_types = getattr(classification, "all_types", None)
 
                 if not all_types:
-                    # Backward compatible: no confidence data, fall back to labels-only check
                     if (
                         SectionType.SKILLS not in classification.labels
                         and SectionType.KNOWLEDGE not in classification.labels
@@ -155,8 +148,6 @@ class TechnologyProcessor:
                         )
                         continue
 
-                # Extract TECH entities from doc (already processed by entity_ruler in pipeline)
-                # We filter by section here by checking the entity text position in section content
                 if section.content:
                     try:
                         section_doc = self.nlp(section.content)
@@ -164,7 +155,6 @@ class TechnologyProcessor:
                         logger.error(f"Failed to process section content: {e}")
                         continue
 
-                    # Extract all TECH entities and normalize to lowercase for deduplication
                     for ent in section_doc.ents:
                         if ent.label_ == "TECH":
                             tech_text = ent.text.lower()
@@ -174,10 +164,8 @@ class TechnologyProcessor:
 
             except Exception as e:
                 logger.error(f"Error extracting technologies from section '{section.title}': {e}")
-                # Continue with next section
                 continue
 
-        # Store extracted technologies in doc extension
         doc._.technologies = technologies
 
         return doc
@@ -194,15 +182,10 @@ class TechnologyProcessor:
         """
         patterns = []
         for term in TECH_TERMS:
-            # Check if it's a multi-word phrase
             if " " in term:
-                # Phrase pattern: Case-insensitive by using LOWER
-                # 'computer vision' -> [{'LOWER': 'computer'}, {'LOWER': 'vision'}]
                 tokens = term.lower().split()
                 patterns.append({"label": "TECH", "pattern": [{"LOWER": t} for t in tokens]})
             else:
-                # Single word pattern: Simple case-insensitive token match
-                # 'PyTorch' -> {'LOWER': 'pytorch'}
                 patterns.append({"label": "TECH", "pattern": [{"LOWER": term.lower()}]})
         return patterns
 

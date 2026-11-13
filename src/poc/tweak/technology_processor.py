@@ -8,7 +8,6 @@ The canonical location is: src.poc.tweak.spacy_pipeline.technology_processor
 Issue #321: Implement technology processor for batch pipeline.
 """
 
-# Re-export from canonical location
 from src.poc.tweak.spacy_pipeline.technology_processor import TechnologyProcessor
 
 __all__ = [
