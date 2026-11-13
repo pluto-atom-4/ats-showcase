@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 _token_counter = TokenCounter()
 
+# Price per 1M tokens; divided by 1_000_000 at use.
 MODEL_PRICING = {
     "claude-3-5-sonnet-20241022": {
         "input": 0.003,
@@ -57,6 +58,7 @@ class LLMProvider:
             Dict with 'input_tokens', 'output_tokens', 'total_cost_usd'
         """
         input_tokens = _token_counter.count_tokens(prompt)
+        # Upper bound: real output length is unknown before the call.
         output_tokens = max_output_tokens
 
         pricing = MODEL_PRICING.get(self.model, MODEL_PRICING["claude-3-5-sonnet-20241022"])

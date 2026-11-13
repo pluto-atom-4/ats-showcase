@@ -266,6 +266,7 @@ class DataPurger:
 
             self.conn.execute("BEGIN TRANSACTION")
             try:
+                # Child tables first, jobs last; src never enables PRAGMA foreign_keys.
                 total = 0
                 cursor.execute("DELETE FROM job_assessments WHERE job_id = ?", (job_id,))
                 total += cursor.rowcount
@@ -437,6 +438,7 @@ class DataPurger:
                 logger.info("No assessments with NULL job_id found")
                 return 0, []
 
+            # Maps (title, company, location) to the rowid of the first record kept.
             seen_jobs = {}
             duplicates = []
             for rowid, title, company, location in null_records:

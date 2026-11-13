@@ -35,6 +35,7 @@ class Database:
 
     def _create_tables(self) -> None:
         """Create all necessary tables."""
+        # TODO: Implement table creation from SQL schema; SCHEMA is not applied here.
         pass
 
     def close(self) -> None:

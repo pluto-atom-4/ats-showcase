@@ -10,6 +10,7 @@ class IntegrityIssue:
     """Single integrity anomaly detected during checks."""
 
     issue_type: str
+    # One of 'error', 'warning', 'info'.
     severity: str
     table: str
     record_id: str

@@ -44,6 +44,7 @@ class AssessmentStore:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_job_assessments_job_id ON job_assessments(job_id)")
             self.conn.commit()
         except sqlite3.OperationalError as e:
+            # Re-creating an existing index is harmless; only other errors warrant a warning.
             if "already exists" in str(e).lower():
                 logger.debug(f"Index already exists: {e}")
             else:
@@ -881,6 +882,7 @@ class AssessmentStore:
 
     def _fetch_jobs_for_filter_stats(self, cursor: sqlite3.Cursor) -> list[Any]:
         """Fetch jobs for filter stats, trying multiple query variants."""
+        # Tried in order: job_reviews.crawled_at, jobs.crawled_at via join, then NULL.
         queries = [
             """SELECT jr.job_id, jr.status, jr.crawled_at,
                CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed

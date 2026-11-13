@@ -199,6 +199,7 @@ class PreCommitSetup:
             self._print_step("4", "Testing hooks on all files")
             if not self.run_all_hooks():
                 self._print_warning("\n⚠️  Some formatting needed. Review changes and commit.")
+                # Setup itself succeeded; hook failures are left for the user to review.
                 return 0
 
         self._print_footer(

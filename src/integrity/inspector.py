@@ -518,8 +518,6 @@ class IntegrityChecker:
 
         return recommendations
 
-    # Duplicate inspection (issue #786): read-only, advisory only
-
     _JOB_LIST_KEYS = ("jobs", "items", "results", "data")
 
     @classmethod

@@ -280,6 +280,7 @@ class ATPDashboard(Screen[None]):
                         description=job.description or "",
                     )
 
+                    # Interactive review happens in the review phase, not during crawl.
                     self.state.increment_phase_progress("crawl")
                     await asyncio.sleep(0.01)
 
@@ -386,6 +387,7 @@ class ATPDashboard(Screen[None]):
                         self.state.update_job(job_id, status="rejected")
                         rejected_count += 1
                     else:
+                        # skip or escape
                         self.state.update_job(job_id, status="pending_review")
                 else:
                     self.state.update_job(job_id, status="confirmed")
@@ -420,6 +422,7 @@ class ATPDashboard(Screen[None]):
 
             for job_id, job_data in self.state.jobs.items():
                 try:
+                    # Rejected jobs were filtered during interactive review.
                     if job_data.get("status") == "rejected":
                         logger.debug(f"Skipping rejected job {job_id}")
                         self.state.increment_phase_progress("assess", tokens=0)

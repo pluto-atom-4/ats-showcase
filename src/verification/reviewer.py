@@ -122,6 +122,7 @@ class JobReviewer:
             self.conn.commit()
             logger.info("Added crawled_at column to job_reviews")
         except sqlite3.OperationalError:
+            # Column already exists
             pass
 
         try:
@@ -129,6 +130,7 @@ class JobReviewer:
             self.conn.commit()
             logger.info("Added preprocessed_at column to job_reviews")
         except sqlite3.OperationalError:
+            # Column already exists
             pass
 
         try:
@@ -136,6 +138,7 @@ class JobReviewer:
             self.conn.commit()
             logger.info("Added preprocessing_version column to job_reviews")
         except sqlite3.OperationalError:
+            # Column already exists
             pass
 
     def _close_db(self) -> None:
@@ -168,6 +171,7 @@ class JobReviewer:
             return
         cursor = self.conn.cursor()
 
+        # Carry over timeline fields: INSERT OR REPLACE below would otherwise wipe them.
         cursor.execute(
             "SELECT crawled_at, preprocessed_at FROM job_reviews WHERE job_id = ?",
             (job_id,),
@@ -684,6 +688,7 @@ class JobReviewer:
         """
         import typer
 
+        # Backward compat: a single path becomes a one-element list.
         if isinstance(extracted_files, (str, Path)):
             extracted_files = [Path(extracted_files)]
         else:
@@ -717,12 +722,14 @@ class JobReviewer:
         typer.echo(f"\n👀 Starting job review ({total_jobs} jobs total)\n")
 
         job_counter = 0
+        # Re-review shows all jobs regardless of review or assessment status.
         effective_mode = "all" if allow_re_review else mode
         effective_skip_rejected = False if allow_re_review else skip_rejected
         effective_skip_assessed = False if allow_re_review else skip_assessed
         for extracted_path, extracted_jobs in all_extracted_jobs:
             source_name = extracted_path.stem
             for idx, job in enumerate(extracted_jobs):
+                # Fallback id is <file stem>_<1-based index>; must match the preprocessed job_id.
                 job_id = job.get("id", f"{source_name}_{idx + 1}")
                 preprocessed = preprocessed_map.get(job_id, {})
 

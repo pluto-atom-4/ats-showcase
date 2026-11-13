@@ -45,6 +45,7 @@ class JobStore:
             self.conn.commit()
             logger.info("Added preprocessing_version column to job_reviews")
         except sqlite3.OperationalError:
+            # Column already exists
             pass
 
     def add_job(
@@ -249,6 +250,7 @@ class JobStore:
                     cursor.execute(f"ALTER TABLE cost_tracking ADD COLUMN {col_name} {col_type}")
                     logger.info(f"Added column {col_name} to cost_tracking")
                 except sqlite3.OperationalError:
+                    # Column already exists
                     pass
 
         self.conn.commit()
@@ -351,7 +353,7 @@ class JobStore:
         if report.total_jobs_v2_0 > 0:
             report.avg_tokens_per_job_v2_0 = report.total_tokens_v2_0 / report.total_jobs_v2_0
 
-        # Assumed input price: $0.003 per 1M tokens
+        # Hardcoded placeholder rate; not read from SUPPORTED_MODELS.
         token_rate = 0.003 / 1_000_000
         if report.total_tokens_v1_0 > 0 and report.total_tokens_v2_0 > 0:
             tokens_saved = report.total_tokens_v1_0 - report.total_tokens_v2_0
