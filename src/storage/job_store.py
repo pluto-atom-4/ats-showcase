@@ -4,6 +4,7 @@ import logging
 import sqlite3
 from typing import Any, Dict, List, Optional
 
+from src.config.models import DEFAULT_MODEL, get_model_pricing
 from src.storage._init_helpers import initialize_db_common
 from src.storage.cost_models import (
     CostComparisonReport,
@@ -352,8 +353,8 @@ class JobStore:
         if report.total_jobs_v2_0 > 0:
             report.avg_tokens_per_job_v2_0 = report.total_tokens_v2_0 / report.total_jobs_v2_0
 
-        # Hardcoded placeholder rate in $ per token; not read from SUPPORTED_MODELS.
-        token_rate = 0.003 / 1_000_000
+        # Single flat rate: jobs carry no per-model context, so savings assume DEFAULT_MODEL.
+        token_rate = get_model_pricing(DEFAULT_MODEL)[0] / 1_000_000
         if report.total_tokens_v1_0 > 0 and report.total_tokens_v2_0 > 0:
             tokens_saved = report.total_tokens_v1_0 - report.total_tokens_v2_0
             report.estimated_savings_usd = tokens_saved * token_rate
