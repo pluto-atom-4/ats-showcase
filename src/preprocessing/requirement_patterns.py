@@ -28,7 +28,7 @@ class RequirementPattern(TypedDict):
 
 
 REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
-    # Tier 1: high confidence (0.90-0.95), mandatory language
+    # Tier 1: mandatory language
     {
         "trigger": "required",
         "regex": r"\brequired\b",
@@ -83,7 +83,7 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.83,
         "priority": 1,
     },
-    # Tier 2: medium confidence (0.65-0.80), softer requirements
+    # Tier 2: softer requirements
     {
         "trigger": "should",
         "regex": r"\bshould\s+(?:have|know|be|possess)",
@@ -108,7 +108,7 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.80,
         "priority": 2,
     },
-    # Tier 3: lower confidence (0.40-0.55), nice-to-have and aspirational
+    # Tier 3: nice-to-have and aspirational
     {
         "trigger": "nice to have",
         "regex": r"\bnice\s+to\s+have\b",

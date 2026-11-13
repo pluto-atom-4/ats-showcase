@@ -12,7 +12,7 @@ from spacy.language import Language
 from spacy.tokens import Doc
 
 # Pattern definitions from Issue #248, organized by confidence tier
-# Patterns use [\w\s\-] for word chars, spaces and hyphens, and are matched with re.IGNORECASE.
+# Patterns allow word chars, spaces and hyphens (some also '.' or ':') and are matched with re.IGNORECASE.
 TIER_1_PATTERNS: list[dict[str, Any]] = [
     {
         "trigger_word": "required",

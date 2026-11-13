@@ -29,6 +29,7 @@ def normalize_requirement(req: str) -> str:
 
     req = re.sub(r"\s+with\s+the\s+development\s+of\s+", " with ", req, flags=re.IGNORECASE)
 
+    # Empty results are dropped by normalize_requirements.
     if req.lower() == "experience in development":
         return ""
 
@@ -40,7 +41,6 @@ def normalize_requirement(req: str) -> str:
     req = re.sub(r"\s+,\s+", ", ", req)
 
     # Leave "M.S. or Ph.D." alone; otherwise drop (e.g. ...), (HIL) and trailing parentheticals.
-    # (Preferred) was stripped above and is re-added at the end.
     if "M.S. or Ph.D." not in req:
         req = re.sub(r"\s*\(\s*e\.g\..*?\)\s*", " ", req)
         req = re.sub(r"\s*\(HIL\)", "", req)

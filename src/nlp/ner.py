@@ -542,6 +542,7 @@ class JobNERExtractor:
             """Build list of dicts with value and confidence."""
             result: list[dict[str, float | str]] = []
             for val in sorted(values):
+                # Normalized values no longer equal the original keys, so average confidence over substring matches.
                 val_lower = val.lower()
                 matching_confs = [
                     conf_dict.get(v, (v, 0.5, None))[1]
