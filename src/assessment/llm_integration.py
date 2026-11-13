@@ -10,35 +10,23 @@ import anthropic
 from anthropic.types import Message
 
 from src.assessment.prompt_builder import PromptBuilder
+from src.config.models import DEFAULT_MODEL, get_model_pricing
 from src.tokenization.counter import TokenCounter
 
 logger = logging.getLogger(__name__)
 
 _token_counter = TokenCounter()
 
-# Hazard: values differ from SUPPORTED_MODELS per-1M prices (sonnet 3.0/15.0) yet are
-# divided by 1_000_000 at use, so costs come out 1000x lower.
-MODEL_PRICING = {
-    "claude-3-5-sonnet-20241022": {
-        "input": 0.003,
-        "output": 0.015,
-    },
-    "claude-3-5-haiku-20241022": {
-        "input": 0.00080,
-        "output": 0.004,
-    },
-}
-
 
 class LLMProvider:
     """Claude API client with rate limiting, retries, and cost tracking."""
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "claude-3-5-sonnet-20241022"):
+    def __init__(self, api_key: Optional[str] = None, model: str = DEFAULT_MODEL):
         """Initialize LLM provider.
 
         Args:
             api_key: Anthropic API key (defaults to ANTHROPIC_API_KEY env var)
-            model: Claude model to use (default: claude-3-5-sonnet-20241022)
+            model: Claude model to use (default: DEFAULT_MODEL)
         """
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not self.api_key:
@@ -62,14 +50,13 @@ class LLMProvider:
         # Upper bound: real output length is unknown before the call.
         output_tokens = max_output_tokens
 
-        pricing = MODEL_PRICING.get(self.model, MODEL_PRICING["claude-3-5-sonnet-20241022"])
-        input_cost = (input_tokens * pricing["input"]) / 1_000_000
-        output_cost = (output_tokens * pricing["output"]) / 1_000_000
+        input_price, output_price = get_model_pricing(self.model)
+        total_cost = (input_tokens / 1_000_000) * input_price + (output_tokens / 1_000_000) * output_price
 
         return {
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
-            "total_cost_usd": input_cost + output_cost,
+            "total_cost_usd": total_cost,
         }
 
     def _call_api_with_retries(self, prompt: str, max_retries: int) -> tuple[Message, int]:
@@ -169,8 +156,8 @@ class LLMProvider:
 
             actual_input = message.usage.input_tokens
             actual_output = message.usage.output_tokens
-            pricing = MODEL_PRICING.get(self.model, MODEL_PRICING["claude-3-5-sonnet-20241022"])
-            actual_cost = (actual_input * pricing["input"] + actual_output * pricing["output"]) / 1_000_000
+            input_price, output_price = get_model_pricing(self.model)
+            actual_cost = (actual_input / 1_000_000) * input_price + (actual_output / 1_000_000) * output_price
 
             logger.info(
                 f"Assessment complete: score={assessment.get('overall_score', '?')}, "

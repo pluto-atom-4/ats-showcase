@@ -6,7 +6,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from anthropic import APIStatusError, AuthenticationError, RateLimitError
 
-from src.assessment.llm_integration import LLMProvider
+from src.assessment.llm_integration import LLMProvider, _token_counter
+from src.config.models import DEFAULT_MODEL
 
 
 class TestLLMProviderInit:
@@ -16,15 +17,15 @@ class TestLLMProviderInit:
         """Initialize with explicit API key."""
         provider = LLMProvider(api_key="sk-test-key-12345")  # pragma: allowlist secret
         assert provider.api_key == "sk-test-key-12345"  # pragma: allowlist secret
-        assert provider.model == "claude-3-5-sonnet-20241022"
+        assert provider.model == DEFAULT_MODEL
 
     def test_init_custom_model(self) -> None:
         """Initialize with custom model."""
         provider = LLMProvider(
             api_key="sk-test-key",  # pragma: allowlist secret
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5-20251001",
         )
-        assert provider.model == "claude-3-5-haiku-20241022"
+        assert provider.model == "claude-haiku-4-5-20251001"
 
     def test_init_missing_api_key(self) -> None:
         """Raises error if no API key provided or in env."""
@@ -66,23 +67,30 @@ class TestEstimateCost:
 
         assert estimate2["total_cost_usd"] > estimate1["total_cost_usd"]
 
-    def test_estimate_cost_sonnet_pricing(self) -> None:
-        """Estimate uses Sonnet pricing by default."""
+    @patch.object(_token_counter, "count_tokens", return_value=1000)
+    def test_estimate_cost_sonnet_exact(self, _mock_count) -> None:
+        """1000 in / 100 out on claude-sonnet-5 ($3.00/$15.00 per 1M) is $0.0045."""
+        provider = LLMProvider(api_key="sk-test", model="claude-sonnet-5")
+
+        estimate = provider.estimate_cost("prompt", max_output_tokens=100)
+
+        assert estimate["total_cost_usd"] == pytest.approx(0.0045)
+
+    @patch.object(_token_counter, "count_tokens", return_value=1000)
+    def test_estimate_cost_haiku_exact(self, _mock_count) -> None:
+        """1000 in / 100 out on claude-haiku-4-5 ($0.80/$4.00 per 1M) is $0.0012."""
+        provider = LLMProvider(api_key="sk-test", model="claude-haiku-4-5-20251001")
+
+        estimate = provider.estimate_cost("prompt", max_output_tokens=100)
+
+        assert estimate["total_cost_usd"] == pytest.approx(0.0012)
+
+    def test_estimate_cost_unsupported_model_raises(self) -> None:
+        """Unknown model id fails loudly instead of falling back to a default price."""
         provider = LLMProvider(api_key="sk-test", model="claude-3-5-sonnet-20241022")
-        prompt = "Test prompt" * 100
 
-        estimate = provider.estimate_cost(prompt)
-
-        assert estimate["total_cost_usd"] > 0
-
-    def test_estimate_cost_haiku_pricing(self) -> None:
-        """Estimate uses Haiku pricing when specified."""
-        provider = LLMProvider(api_key="sk-test", model="claude-3-5-haiku-20241022")
-        prompt = "Test prompt" * 100
-
-        estimate = provider.estimate_cost(prompt)
-
-        assert estimate["total_cost_usd"] > 0
+        with pytest.raises(ValueError, match="Invalid model"):
+            provider.estimate_cost("prompt")
 
     def test_estimate_cost_empty_prompt(self) -> None:
         """Estimate handles empty prompt."""
@@ -215,6 +223,55 @@ class TestAssessJobMocking:
         provider.assess_job("CV", "Job", use_examples=True)
 
         mock_client.messages.create.assert_called_once()
+
+
+class TestAssessJobCostExact:
+    """Actual cost from API usage uses SUPPORTED_MODELS per-1M prices."""
+
+    @patch("src.assessment.llm_integration.anthropic.Anthropic")
+    def test_actual_cost_sonnet_exact(self, mock_anthropic_class) -> None:
+        """1000 in / 100 out on claude-sonnet-5 is $0.0045 actual."""
+        mock_client = MagicMock()
+        mock_anthropic_class.return_value = mock_client
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text='{"overall_score": 75}')]
+        mock_message.usage.input_tokens = 1000
+        mock_message.usage.output_tokens = 100
+        mock_client.messages.create.return_value = mock_message
+
+        provider = LLMProvider(api_key="sk-test", model="claude-sonnet-5")
+        result = provider.assess_job("CV", "Job")
+
+        assert result["cost_tracking"]["actual_cost_usd"] == pytest.approx(0.0045)
+
+    @patch("src.assessment.llm_integration.anthropic.Anthropic")
+    def test_actual_cost_haiku_exact(self, mock_anthropic_class) -> None:
+        """1000 in / 100 out on claude-haiku-4-5 is $0.0012 actual."""
+        mock_client = MagicMock()
+        mock_anthropic_class.return_value = mock_client
+        mock_message = MagicMock()
+        mock_message.content = [MagicMock(text='{"overall_score": 75}')]
+        mock_message.usage.input_tokens = 1000
+        mock_message.usage.output_tokens = 100
+        mock_client.messages.create.return_value = mock_message
+
+        provider = LLMProvider(api_key="sk-test", model="claude-haiku-4-5-20251001")
+        result = provider.assess_job("CV", "Job")
+
+        assert result["cost_tracking"]["actual_cost_usd"] == pytest.approx(0.0012)
+
+    @patch("src.assessment.llm_integration.anthropic.Anthropic")
+    def test_assess_job_unsupported_model_raises_before_call(self, mock_anthropic_class) -> None:
+        """Unsupported model raises ValueError before any API request is sent."""
+        mock_client = MagicMock()
+        mock_anthropic_class.return_value = mock_client
+
+        provider = LLMProvider(api_key="sk-test", model="claude-3-5-sonnet-20241022")
+
+        with pytest.raises(ValueError, match="Invalid model"):
+            provider.assess_job("CV", "Job")
+
+        mock_client.messages.create.assert_not_called()
 
 
 class TestAssessJobErrors:
