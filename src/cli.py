@@ -2055,10 +2055,10 @@ def _initialize_assessor_and_validate(model: Optional[str]) -> Any:
         typer.Exit: On validation failure or API key missing
     """
     from src.assessment.assessor import Assessor
-    from src.config.models import get_model_display_name
+    from src.config.models import DEFAULT_MODEL, get_model_display_name
 
     try:
-        assessor = Assessor(model=model or "claude-3-5-sonnet-20241022")
+        assessor = Assessor(model=model or DEFAULT_MODEL)
         model_display = get_model_display_name(assessor.model)
         typer.echo(f"🤖 Using {model_display} model\n")
         return assessor
