@@ -27,12 +27,8 @@ class RequirementPattern(TypedDict):
     priority: int
 
 
-# =============================================================================
-# HARDCODED TRIGGER PATTERNS (Tier-Based)
-# =============================================================================
-
 REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
-    # TIER 1: High-confidence (0.90-0.95) - Mandatory language
+    # Tier 1: high confidence (0.90-0.95), mandatory language
     {
         "trigger": "required",
         "regex": r"\brequired\b",
@@ -87,7 +83,7 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.83,
         "priority": 1,
     },
-    # TIER 2: Medium-confidence (0.65-0.80) - Softer requirements
+    # Tier 2: medium confidence (0.65-0.80), softer requirements
     {
         "trigger": "should",
         "regex": r"\bshould\s+(?:have|know|be|possess)",
@@ -112,7 +108,7 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.80,
         "priority": 2,
     },
-    # TIER 3: Lower-confidence (0.40-0.55) - Nice-to-have, aspirational
+    # Tier 3: lower confidence (0.40-0.55), nice-to-have and aspirational
     {
         "trigger": "nice to have",
         "regex": r"\bnice\s+to\s+have\b",
@@ -131,7 +127,7 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.45,
         "priority": 3,
     },
-    # BULLET-SPECIFIC PATTERNS (extracted from bullets)
+    # Bullet-specific patterns, extracted from bullets
     {
         "trigger": "years_in_bullet",
         "regex": r"\b(\d+\+?)\s+years?\b",
@@ -156,9 +152,7 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.92,
         "priority": 2,
     },
-    # =============================================================================
-    # PHASE C EXPANSION: Education Patterns (4 patterns)
-    # =============================================================================
+    # Education patterns
     {
         "trigger": "degree abbreviation",
         "regex": r"\b(?:BS\+|MS\+|BA\+|MA\+|BS|MS|BA|MA|PhD)\b",
@@ -183,9 +177,7 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.78,
         "priority": 2,
     },
-    # =============================================================================
-    # PHASE C EXPANSION: Location/On-site Patterns (2 patterns)
-    # =============================================================================
+    # Location/on-site patterns
     {
         "trigger": "on-site location",
         "regex": r"\b(?:on-site|on site|office|in-office|remote|hybrid|office-based)\b",
@@ -198,9 +190,7 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.75,
         "priority": 2,
     },
-    # =============================================================================
-    # PHASE C EXPANSION: Soft Skill Patterns (4 patterns)
-    # =============================================================================
+    # Soft skill patterns
     {
         "trigger": "communication skills",
         "regex": (
@@ -236,14 +226,12 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
     },
 )
 
-# Precompile all patterns for efficiency
 COMPILED_PATTERNS: tuple[tuple[RequirementPattern, re.Pattern[str]], ...] = tuple(
     (pattern, re.compile(pattern["regex"], re.IGNORECASE)) for pattern in REQUIREMENT_PATTERNS
 )
 
 MAX_SENTENCE_CHARS: int = 2000
 
-# Precompile negation patterns
 _NEGATION_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
     re.compile(pattern, re.IGNORECASE)
     for pattern in [
@@ -255,7 +243,6 @@ _NEGATION_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
     ]
 )
 
-# Precompile adjustment patterns
 _PARENTHETICAL_PATTERN: re.Pattern[str] = re.compile(r"\(.*?\)")
 _CONDITIONAL_PATTERN: re.Pattern[str] = re.compile(r"\bif\b", re.IGNORECASE)
 _NICE_TO_HAVE_PATTERN: re.Pattern[str] = re.compile(r"nice\s+to\s+have", re.IGNORECASE)
@@ -375,22 +362,17 @@ def classify_sentence(sentence: str) -> SentenceMatch | None:
     if not sentence.strip():
         return None
 
-    # Truncate if too long
     truncated = sentence[:MAX_SENTENCE_CHARS]
 
-    # Try each pattern
     best_match: tuple[RequirementPattern, float] | None = None
 
     for pattern, compiled_regex in COMPILED_PATTERNS:
         if compiled_regex.search(truncated):
-            # Found a match
             confidence = pattern["confidence"]
 
-            # Check negations
             if has_negation_context(truncated, pattern["trigger"]):
-                return None  # Negation found, skip entirely
+                return None
 
-            # Apply context adjustments
             confidence = apply_confidence_adjustments(confidence, truncated)
 
             if confidence > 0:

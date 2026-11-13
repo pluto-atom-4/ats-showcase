@@ -67,7 +67,6 @@ class SemanticChunker:
         if not sentences:
             return [text] if text.strip() else []
 
-        # Get requirement spans if needed
         requirement_spans: list[dict[str, Any]] = []
         if self.preserve_requirement_spans and doc is not None:
             requirement_spans = getattr(doc._, "requirement_spans", [])
@@ -103,21 +102,17 @@ class SemanticChunker:
 
             word_count = len(sentence.split())
 
-            # Check if adding this sentence would exceed target
             if current_word_count + word_count > (self.target_chunk_size / 4) and current_chunk:
                 chunk_text = " ".join(current_chunk)
 
-                # Check if finalizing would split a requirement span
                 if self.preserve_requirement_spans and requirement_spans:
                     if self._would_split_requirement_span(chunk_text, requirement_spans):
-                        # Can't finalize yet—keep current chunk, force add sentence anyway
-                        # (safety net: if chunk gets too large, will finalize on next iteration)
-                        if current_word_count < self.target_chunk_size:  # Only if not already huge
+                        # Finalizing would split a requirement span: keep adding unless the chunk is already huge.
+                        if current_word_count < self.target_chunk_size:
                             current_chunk.append(sentence)
                             current_word_count += word_count
                             continue
 
-                # Finalize chunk (split approved or no span preservation)
                 chunks.append(chunk_text)
                 current_chunk = [sentence]
                 current_word_count = word_count
@@ -169,7 +164,6 @@ class SemanticChunker:
         if not requirement_spans or not chunk_text:
             return False
 
-        # For each requirement span, check if it would be split
         for span in requirement_spans:
             span_text = span.get("span_text", "")
             if not span_text:
@@ -179,19 +173,13 @@ class SemanticChunker:
             normalized_span_text = re.sub(r"\s+", " ", span_text).strip()
             normalized_chunk_text = re.sub(r"\s+", " ", chunk_text).strip()
 
-            # Find if this span is partially in chunk_text
-            # If span starts before end but ends after, it would be split
             if normalized_span_text in normalized_chunk_text:
-                # Span is completely within chunk, no split
                 continue
 
-            # Bug #1 fix: Check for partial span existence (span boundary overlap)
-            # Problem: substring find() misses split spans like "Python and Docker"
-            # split into "Python and" + "Docker" (complete text not found)
-            # Solution: Detect if span words appear partially with word boundaries
+            # Bug #1 fix: a plain substring find misses spans split across chunks ("Python and Docker").
+            # Check for a partial match on word boundaries instead.
             words = normalized_span_text.split()
             if len(words) > 1:
-                # Multi-word span: check if first word exists (word boundary) but span is incomplete
                 first_word = words[0]
                 # Use word boundary regex to avoid false positives (e.g., "Python" in "Cython")
                 first_word_pattern = r"\b" + re.escape(first_word) + r"\b"

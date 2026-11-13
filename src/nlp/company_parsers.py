@@ -30,7 +30,6 @@ class BlueOriginParser(CompanyParser):
         """Parse Blue Origin's structured bullet format."""
         requirements = set()
 
-        # Extract minimum qualifications section
         min_qual = self.extract_section(
             text,
             r"(?:##\s+)?(?:minimum|required)\s+(?:qualifications?|experience)[\s\n:]*(.+?)(?=\n##|Preferred|---|\Z)",
@@ -57,11 +56,9 @@ class BlueOriginParser(CompanyParser):
                 domain = domain.strip().rstrip(".,;")
                 requirements.add(f"{years}+ years of experience in {domain}")
 
-        # Security clearance (Blue Origin: standard background check)
         if re.search(r"background\s+check|security\s+clearance", text, re.IGNORECASE):
             requirements.add("Blue's Standard Background Check")
 
-        # Citizenship
         if re.search(r"U\.S\.\s+(?:citizen|national)", text, re.IGNORECASE):
             requirements.add("U.S. citizen, national, permanent resident, refugee, or asylee status")
 
@@ -152,7 +149,6 @@ class GenericParser(CompanyParser):
         """Generic requirement extraction."""
         requirements = set()
 
-        # Try both minimum and basic qualifications
         for section_label in [r"basic\s+qualifications", r"minimum\s+qualifications"]:
             section = self.extract_section(
                 text, rf"(?:##\s+)?(?:{section_label})[\s\n:]*(.+?)(?=\n##|Preferred|---|\Z)"
@@ -166,10 +162,7 @@ class GenericParser(CompanyParser):
                         requirements.add(bullet)
                 break
 
-        # Years of experience (only add if in section with domain context)
-        # Skip generic "X+ years of experience" without context
-
-        # Degree
+        # Generic "X+ years of experience" lines are deliberately skipped: no domain context.
         if re.search(r"degree|bachelor|master", text, re.IGNORECASE):
             if not any("degree" in req.lower() for req in requirements):
                 requirements.add("Bachelor's Degree or equivalent")
@@ -177,7 +170,6 @@ class GenericParser(CompanyParser):
         return requirements
 
 
-# Registry of company-specific parsers
 COMPANY_PARSERS: Dict[str, CompanyParser] = {
     "blue origin": BlueOriginParser(),
     "boeing": BoeingParser(),

@@ -22,11 +22,6 @@ from storage.export import ExportConfig, MarkdownExporter
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
-# TYPE DEFINITIONS
-# ============================================================================
-
-
 class ResultItem(TypedDict):
     """Result item for assessed job."""
 
@@ -36,11 +31,6 @@ class ResultItem(TypedDict):
     entity_score: float
     cost: float
     tokens: int
-
-
-# ============================================================================
-# CONFIG LOADING UTILITIES
-# ============================================================================
 
 
 def load_companies_config(config: Optional[str] = None, config_dir: Optional[str] = None) -> dict[str, Any]:
@@ -63,13 +53,11 @@ def load_companies_from_file(config_path: Path) -> dict[str, Any]:
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in config: {e}") from e
 
-    # Explicitly verify config_data is a dictionary before reading it
     if not isinstance(config_data, dict):
         raise ValueError("Invalid config structure: expected a JSON object root.")
 
     companies = config_data.get("companies", {})
 
-    # Verify the 'companies' key yields a dictionary block
     if not isinstance(companies, dict):
         raise ValueError("Invalid config structure: 'companies' key must be an object.")
 
@@ -126,11 +114,6 @@ app = typer.Typer(
     help="ATS Showcase: Intelligent job assessment with AI",
     invoke_without_command=False,
 )
-
-
-# ============================================================================
-# PHASE HANDLERS
-# ============================================================================
 
 
 def _load_crawl_config(config: Optional[str], config_dir: Optional[str]) -> dict[str, Any]:
@@ -855,7 +838,6 @@ def _run_phase_export() -> float:
     phase_start = time.time()
 
     try:
-        # Settings
         min_score = 0
         max_score = 100
         sort_by = "score"
@@ -864,7 +846,6 @@ def _run_phase_export() -> float:
         include_stats = True
         output = "data/assessments/report.md"
 
-        # Load store
         db_path = "data/ats_playground.db"
         store = AssessmentStore(db_path)
         total = store.count_assessments()
@@ -873,7 +854,6 @@ def _run_phase_export() -> float:
             typer.echo("⚠️  No assessments found. Run assess-jobs first.", err=True)
             raise typer.Exit(1)
 
-        # Create config
         config = ExportConfig(
             min_score=min_score,
             max_score=max_score,
@@ -883,7 +863,6 @@ def _run_phase_export() -> float:
             include_stats=include_stats,
         )
 
-        # Generate and save
         exporter = MarkdownExporter(store, config)
         report_content = exporter.generate_report()
 
@@ -902,11 +881,6 @@ def _run_phase_export() -> float:
     typer.echo(f"⏱️  Phase 5 took {phase_time:.2f}s\n")
 
     return phase_time
-
-
-# ============================================================================
-# MAIN WORKFLOW HELPERS
-# ============================================================================
 
 
 def _try_run_tui_mode(
@@ -1058,11 +1032,6 @@ def _run_text_workflow(
         raise typer.Exit(1) from None
 
 
-# ============================================================================
-# MAIN COMMANDS
-# ============================================================================
-
-
 @app.command()
 def all(
     cv: str = typer.Option(..., help="Path to CV file (JSON)"),
@@ -1105,10 +1074,8 @@ def all(
         python -m src.cli all --cv data/cv.json --config-dir ./config --tui
         python -m src.cli all --cv data/cv.json --config config/companies.json --up-to review
     """
-    # Validate phase
     _validate_up_to_phase(up_to)
 
-    # Determine TUI mode and try to run
     if _should_use_tui(tui, no_tui):
         if _try_run_tui_mode(config, config_dir, cv, headless, up_to, interactive):
             return
@@ -1129,11 +1096,6 @@ def all(
         up_to,
         start_time,
     )
-
-
-# ============================================================================
-# CRAWL COMMANDS
-# ============================================================================
 
 
 def _load_and_validate_config(config: Optional[str], config_dir: Optional[str]) -> dict[str, Any]:
@@ -1236,10 +1198,8 @@ def crawl(
     logger.info("Crawling companies from config")
     typer.echo("🌐 Crawling in progress...\n")
 
-    # Load and validate config
     companies = _load_and_validate_config(config, config_dir)
 
-    # Filter enabled companies
     enabled_companies = _prepare_enabled_companies(companies)
 
     crawler = Crawler(headless=headless, timeout_ms=timeout)
@@ -1258,11 +1218,6 @@ def crawl(
             await crawler.close()
 
     asyncio.run(run_crawl())
-
-
-# ============================================================================
-# PREPROCESS COMMANDS
-# ============================================================================
 
 
 def _validate_and_load_job_files(extracted_dir: Path) -> List[Path]:
@@ -1345,8 +1300,7 @@ def _preprocess_single_job(
         # Build clean text from job fields using clean_html (Issue #230 Phase 4)
         clean_text = _build_preprocess_clean_text(job_dict)
 
-        # Process text with spaCy to extract requirement spans (Phase 8b)
-        # This sets doc._.requirements and doc._.requirement_spans for chunking
+        # Sets doc._.requirements and doc._.requirement_spans, which chunking reads (Phase 8b).
         doc = preprocessor.nlp(clean_text)
         if preprocessor.categorizer_strategy == "custom":
             doc = preprocessor.apply_custom_spans(doc)
@@ -1356,29 +1310,23 @@ def _preprocess_single_job(
         token_count = sum(counter.count_tokens(c) for c in chunks)
         estimated_cost = counter.estimate_cost(token_count)
 
-        # Extract entities
         skills, technologies, requirements = preprocessor.extract_entities(clean_text)
 
-        # Extract trigger-based requirements (Phase 8) from doc._.requirements
         trigger_requirements_json = None
         trigger_requirements_list = None
         if extract_requirements:
-            # Get requirements from doc instead of re-processing
             requirements_data = getattr(doc._, "requirements", None)
             if requirements_data:
-                # Use data directly; avoid unnecessary JSON roundtrip
                 trigger_requirements_list = requirements_data
                 trigger_requirements_json = json.dumps(requirements_data, ensure_ascii=False)
 
         # Extract sectioned requirements (Issue #281 S5) for v3.0
         sectioned_requirements_dict = _build_sectioned_requirements(preprocessor, clean_text)
 
-        # Normalize preprocessing_version to v-prefixed format
         normalized_version = (
             preprocessing_version if preprocessing_version.startswith("v") else f"v{preprocessing_version}"
         )
 
-        # Generate or use existing job ID
         job_id = job.id or generate_job_id(
             company=job.company,
             title=job.title,
@@ -1406,12 +1354,11 @@ def _preprocess_single_job(
             sectioned_requirements=sectioned_requirements_dict,
         )
 
-        # Display estimates if requested
+        # Only the first 3 jobs are echoed.
         if show_estimates and job_index <= 3:
             typer.echo(f"   Job {job_index}: {job.title[:40]}...")
             typer.echo(f"      Tokens: {token_count} | Cost: ${estimated_cost:.4f}")
 
-        # Display requirements if requested
         if show_requirements and trigger_requirements_list:
             typer.echo(f"   Requirements: {len(trigger_requirements_list)} extracted")
             top_5 = sorted(trigger_requirements_list, key=lambda r: r.get("confidence", 0), reverse=True)[:5]
@@ -1678,7 +1625,6 @@ def preprocess(
         typer.echo(f"   Valid versions: {', '.join(VALID_PREPROCESSING_VERSIONS)}", err=True)
         raise typer.Exit(1)
 
-    # Check if doing selective re-preprocessing
     is_selective_reprocess = (
         re_preprocess_only_v1
         or filter_by_age is not None
@@ -1687,7 +1633,6 @@ def preprocess(
         or filter_by_tokens_above is not None
     )
 
-    # Initialize components
     chunker = SemanticChunker(target_chunk_size=400)
     counter = TokenCounter()
     pricing_date = date_class.today().isoformat()
@@ -1720,12 +1665,10 @@ def preprocess(
         # Phase 3C: Selective re-preprocessing from database
         store = JobStore()
         try:
-            # Parse company filter
             company_names = None
             if filter_by_company:
                 company_names = [c.strip() for c in filter_by_company.split(",")]
 
-            # Get jobs matching filter criteria
             jobs_to_process = store.get_jobs_for_reprocessing(
                 version="1.0" if re_preprocess_only_v1 else preprocessing_version,
                 min_age_days=filter_by_age,
@@ -1759,7 +1702,6 @@ def preprocess(
                 typer.echo(f"   Score: <{filter_by_score_below} (future feature)")
             typer.echo()
 
-            # Estimate costs
             if show_estimates or dry_run:
                 estimated_total_tokens = 0
                 for job in jobs_to_process:
@@ -1783,7 +1725,6 @@ def preprocess(
                 typer.echo(f"\nWould re-process {len(jobs_to_process)} jobs in batches of {batch_size}")
                 raise typer.Exit(0)
 
-            # Confirm before proceeding
             typer.echo(f"About to re-process {len(jobs_to_process)} jobs")
             if not typer.confirm("Proceed with re-preprocessing?"):
                 typer.echo("Cancelled.")
@@ -1791,7 +1732,6 @@ def preprocess(
 
             typer.echo()
 
-            # Process jobs in batches
             for batch_start in range(0, len(jobs_to_process), batch_size):
                 batch_end = min(batch_start + batch_size, len(jobs_to_process))
                 batch = jobs_to_process[batch_start:batch_end]
@@ -1803,22 +1743,19 @@ def preprocess(
                     job_id = job.get("job_id", "")
                     title = job.get("title", "N/A")
 
-                    # Skip if job_id is missing
                     if not job_id:
                         logger.warning("Skipping job with missing job_id")
                         failed_count += 1
                         continue
 
                     try:
-                        # Mock preprocessing for now - real implementation would re-run preprocessing
+                        # Placeholder: does not actually re-run preprocessing.
                         tokens_before = job.get("tokens", 0)
-                        # Estimate savings from boilerplate removal (~30% reduction)
+                        # Assumed ~30% token reduction from boilerplate removal, not measured.
                         tokens_after = int(tokens_before * 0.70)
 
-                        # Update version in database
                         store.update_preprocessing_version(job_id, preprocessing_version)
 
-                        # Log reprocessing metrics (Phase 3A)
                         cost_before = counter.estimate_cost(tokens_before, output_tokens=300)
                         cost_after = counter.estimate_cost(tokens_after, output_tokens=300)
                         store.log_reprocessing_metrics(
@@ -1860,7 +1797,7 @@ def preprocess(
                 pricing_date,
                 show_estimates,
                 extract_requirements=extract_requirements,
-                show_requirements=show_estimates,  # Show requirements if showing estimates
+                show_requirements=show_estimates,
                 preprocessing_version=preprocessing_version,
             )
             all_preprocessed.extend(preprocessed_jobs)
@@ -1869,7 +1806,6 @@ def preprocess(
             total_cost += sum(j.estimated_cost for j in preprocessed_jobs)
             all_requirements_extracted.extend(file_requirements)
 
-    # Display summary
     typer.echo("\n✅ Preprocessing complete!\n")
     typer.echo("📊 Summary:")
     typer.echo(f"   Total jobs: {len(all_preprocessed) + failed_count}")
@@ -1891,18 +1827,12 @@ def preprocess(
         _save_preprocessed_jobs(all_preprocessed, output_file)
         _update_job_timelines(all_preprocessed)
 
-        # Export requirements JSON if requested
         if extract_requirements and export_requirements_json and "all_requirements_extracted" in locals():
             export_path = Path(export_requirements_json)
             export_path.parent.mkdir(parents=True, exist_ok=True)
             with open(export_path, "w") as f:
                 json.dump(all_requirements_extracted, f, indent=2)
             typer.echo(f"   ✓ Exported {len(all_requirements_extracted)} requirements to: {export_path}")
-
-
-# ============================================================================
-# REVIEW COMMANDS
-# ============================================================================
 
 
 # Default cost limit: $0.10 (roughly 30k tokens on Sonnet)
@@ -1924,7 +1854,6 @@ def _resolve_extracted_files(merge_all: bool, extracted: Optional[str], extracte
         typer.Exit: If no files found or invalid configuration.
     """
     if merge_all:
-        # Auto-discover all company files
         extracted_files = sorted(extracted_dir.glob("*_jobs.json"))
         extracted_files = [f for f in extracted_files if "preprocessed" not in f.name]
         if not extracted_files:
@@ -1962,7 +1891,6 @@ def _recalculate_costs_for_model(model: str, preprocessed: str, stats: Any) -> f
     model_display = get_model_display_name(resolved_model)
     typer.echo(f"\n💰 Recalculating costs for {model_display} model...")
 
-    # Create counter with specified model to recalculate costs
     counter = TokenCounter(model=resolved_model)
     recalc_cost = 0.0
 
@@ -1971,10 +1899,9 @@ def _recalculate_costs_for_model(model: str, preprocessed: str, stats: Any) -> f
             preprocessed_jobs = json.load(f)
 
         for job in preprocessed_jobs:
-            # Only recalculate for confirmed jobs
             if job.get("status") == "confirmed":
                 tokens = job.get("token_count", 0)
-                # Use default output_tokens (300) for recalculation
+                # Assumes 300 output tokens per job.
                 job_cost = counter.estimate_cost(tokens, output_tokens=300)
                 recalc_cost += job_cost
 
@@ -2061,7 +1988,6 @@ def review(
                 skip_assessed=skip_assessed,
             )
 
-        # Validate mode
         if mode not in ("new-only", "all"):
             typer.echo(f"❌ Invalid mode: {mode}. Must be 'new-only' or 'all'", err=True)
             raise typer.Exit(1)
@@ -2077,22 +2003,15 @@ def review(
         )
         logger.info(f"Review complete: {stats.confirmed} confirmed, {stats.rejected} rejected")
 
-        # Recalculate costs if model specified
         if model:
             stats.total_cost = _recalculate_costs_for_model(model, preprocessed, stats)
 
-        # Check cost limit warning
         _check_cost_threshold(stats.total_cost, cost_limit)
 
     except Exception as e:
         logger.error(f"Review failed: {e}", exc_info=True)
         typer.echo(f"\n❌ Review failed: {e}", err=True)
         raise typer.Exit(1) from None
-
-
-# ============================================================================
-# ASSESS COMMANDS
-# ============================================================================
 
 
 def _load_cv_text(cv_path: str) -> str:
@@ -2214,7 +2133,6 @@ def _is_raw_html(text: str) -> bool:
     """
     if not text:
         return True
-    # Check for HTML entities and tags
     html_patterns = ["&lt;", "&gt;", "&amp;", "<html", "<div", "<p>", "<span", "<a href"]
     return any(pattern in text.lower() for pattern in html_patterns)
 
@@ -2235,12 +2153,10 @@ def _validate_preprocessed_jobs(jobs: List[dict[str, Any]]) -> None:
         clean_text = job.get("clean_text", "")
         token_count = job.get("token_count", 0)
 
-        # Check if clean_text is missing or contains raw HTML
         if not clean_text or _is_raw_html(clean_text):
             unpreprocessed.append(job_id)
             continue
 
-        # Check if token_count is valid
         if not isinstance(token_count, int) or token_count <= 0:
             unpreprocessed.append(job_id)
 
@@ -2354,7 +2270,6 @@ def _filter_jobs_by_date(jobs: List[dict[str, Any]], since: Optional[str]) -> Li
     if since is None:
         return jobs
 
-    # Validate date format
     try:
         from datetime import datetime
 
@@ -2618,38 +2533,28 @@ def assess(
     logger.info(f"Starting job assessment with CV: {cv}")
 
     try:
-        # Load CV text
         cv_text = _load_cv_text(cv)
 
-        # Initialize assessor
         assessor = _initialize_assessor_and_validate(model)
 
-        # Get confirmed jobs
         confirmed_jobs = _get_and_validate_jobs()
 
-        # Validate job statuses
         _validate_job_statuses(confirmed_jobs, skip_unconfirmed)
 
-        # Validate jobs are preprocessed
         _validate_preprocessed_jobs(confirmed_jobs)
 
-        # Initialize assessment store
         assessment_store = AssessmentStore()
 
-        # Apply filters in sequence
         confirmed_jobs = _filter_jobs_by_mode(confirmed_jobs, mode, assessment_store)
         confirmed_jobs = _filter_jobs_by_score_threshold(confirmed_jobs, score_threshold, assessment_store)
         confirmed_jobs = _filter_jobs_by_date(confirmed_jobs, since)
 
-        # Apply job limit
         if limit:
             confirmed_jobs = confirmed_jobs[:limit]
             typer.echo(f"📊 Applied job limit: assessing {len(confirmed_jobs)} jobs\n")
 
-        # Verify cost
         _verify_assessment_cost(confirmed_jobs, cv_text, verify_cost)
 
-        # Assess each job
         successful = 0
         failed_jobs: list[dict[str, Any]] = []
         results: list[dict[str, Any]] = []
@@ -2670,7 +2575,6 @@ def assess(
                 if error:
                     failed_jobs.append(error)
 
-        # Display summary
         _display_assessment_summary(results, failed_jobs, total_cost, total_tokens, successful, len(confirmed_jobs))
 
         logger.info(
@@ -2683,11 +2587,6 @@ def assess(
         logger.error(f"Assessment failed: {e}", exc_info=True)
         typer.echo(f"\n❌ Assessment failed: {e}", err=True)
         raise typer.Exit(1) from None
-
-
-# ============================================================================
-# EXPORT COMMANDS
-# ============================================================================
 
 
 def _validate_score_range(min_score: int, max_score: int) -> None:
@@ -2826,13 +2725,10 @@ def export(
         uv run python -m src.cli export --from-date 2026-05-01 --to-date 2026-05-31 --min-score 75
     """
     try:
-        # Validate score inputs
         _validate_score_range(min_score, max_score)
 
-        # Parse and validate dates
         date_from, date_to = _parse_date_filters(from_date, to_date)
 
-        # Load assessment store
         db_path = "data/ats_playground.db"
         store = AssessmentStore(db_path)
         total = store.count_assessments()
@@ -2844,7 +2740,6 @@ def export(
             )
             raise typer.Exit(1)
 
-        # Create export config
         config = ExportConfig(
             min_score=min_score,
             max_score=max_score,
@@ -2856,15 +2751,12 @@ def export(
             date_to=date_to,
         )
 
-        # Build filter message and echo
         filter_msg = _build_filter_message(min_score, max_score, from_date, to_date)
         typer.echo(f"📊 Generating report ({filter_msg})...")
 
-        # Generate and save report
         exporter = MarkdownExporter(store, config)
         output_path = _generate_and_save_report(exporter, output, template)
 
-        # Display summary
         filtered_in_range = len(store.get_assessments_by_score(min_score, max_score))
         _display_export_summary(output_path, filtered_in_range, total, template)
 
@@ -3019,11 +2911,6 @@ def view(
         raise typer.Exit(1) from None
 
 
-# ============================================================================
-# UTILITY COMMANDS
-# ============================================================================
-
-
 def _validate_and_parse_purge_dates(
     before_date: Optional[str], after_date: Optional[str]
 ) -> Tuple[Optional[date], Optional[date]]:
@@ -3045,7 +2932,6 @@ def _validate_and_parse_purge_dates(
         typer.echo("❌ Specify at least one date filter (--before-date or --after-date)", err=True)
         raise typer.Exit(1)
 
-    # Parse dates
     before_parsed: Optional[date] = None
     after_parsed: Optional[date] = None
 
@@ -3058,7 +2944,6 @@ def _validate_and_parse_purge_dates(
         typer.echo(f"❌ {e}", err=True)
         raise typer.Exit(1) from e
 
-    # Validate date range
     if before_parsed and after_parsed and after_parsed >= before_parsed:
         typer.echo(
             "❌ Invalid range: after_date must be before before_date",
@@ -3123,7 +3008,6 @@ def _perform_purge_and_show_results(
     if dry_run:
         typer.echo("ℹ️  Use --no-dry-run --confirm to actually delete these assessments")
     else:
-        # Perform actual delete
         result = store.purge_by_date(
             before_date=before_date,
             after_date=after_date,
@@ -3152,10 +3036,8 @@ def purge(
         uv run python -m src.cli purge --before-date 2026-04-01 --no-dry-run --confirm
     """
     try:
-        # Validate and parse dates
         _validate_and_parse_purge_dates(before_date, after_date)
 
-        # Load store
         db_path = "data/ats_playground.db"
         store = AssessmentStore(db_path)
         total = store.count_assessments()
@@ -3164,7 +3046,6 @@ def purge(
             typer.echo("⚠️  No assessments in database", err=True)
             raise typer.Exit(1)
 
-        # Dry run to show what would be deleted
         result = store.purge_by_date(
             before_date=before_date,
             after_date=after_date,
@@ -3177,10 +3058,8 @@ def purge(
             typer.echo("ℹ️  No assessments match the date filter")
             raise typer.Exit(0)
 
-        # Show preview
         _show_purge_preview(affected_count, total, before_date, after_date)
 
-        # Safety check and perform operation
         if not dry_run:
             if not confirm:
                 typer.echo("❌ Destructive operation requires --confirm flag", err=True)
@@ -3188,7 +3067,6 @@ def purge(
                 typer.echo(f"   Example: {example}", err=True)
                 raise typer.Exit(1)
 
-            # Final confirmation
             if not _confirm_destructive_operation():
                 raise typer.Exit(1)
 
@@ -3215,22 +3093,17 @@ def query(
 ) -> None:
     """Search stored assessments by keyword, score, and/or company."""
     try:
-        # Validate: need at least keyword or company
         if not keyword and not company:
             typer.echo("❌ Specify --keyword and/or --company", err=True)
             raise typer.Exit(1)
 
-        # Load assessment store
         db_path = "data/ats_playground.db"
         store = AssessmentStore(db_path)
 
-        # Set defaults
         min_s = min_score if min_score is not None else 0
         max_s = max_score if max_score is not None else 100
 
-        # Search
         if keyword:
-            # Keyword + optional company search
             filter_info = f"'{keyword}' (score {min_s}-{max_s}"
             if company:
                 filter_info += f", company={company}"
@@ -3238,7 +3111,6 @@ def query(
             typer.echo(f"🔍 Searching for {filter_info}...\n")
             results = store.search_by_keyword(keyword, min_score=min_s, max_score=max_s, company=company, limit=limit)
         else:
-            # Company-only search (no keyword)
             filter_info = f"(company={company}, score {min_s}-{max_s}, limit {limit})"
             typer.echo(f"🔍 Listing jobs at {filter_info}...\n")
             results = store.get_assessments_by_score(min_score=min_s, max_score=max_s, company=company)
@@ -3250,11 +3122,9 @@ def query(
             return
 
         if json_output:
-            # JSON output
             output = json.dumps(results, indent=2, default=str)
             typer.echo(output)
         else:
-            # Table output
             typer.echo(f"Found {len(results)} results:\n")
             typer.echo("Rank │ Company          │ Title                    │ Score │ Tech │ Senior")
             typer.echo("─────┼──────────────────┼──────────────────────────┼───────┼──────┼───────")
@@ -3268,7 +3138,6 @@ def query(
 
                 typer.echo(f" {idx:2d}  │ {company} │ {title} │ {overall:3d}   │ {tech:3d}  │ {seniority:3d}")
 
-            # Stats
             typer.echo("")
             avg_score = sum(r.get("overall_score", 0) for r in results) / len(results)
             typer.echo(f"📊 Average score: {avg_score:.1f}")
@@ -3335,7 +3204,6 @@ def cost_analysis(
             output_data = report.to_dict()
             output_text = json.dumps(output_data, indent=2)
         elif format == "csv":
-            # CSV format
             lines = [
                 "Metric,Value",
                 f"v1.0 Jobs,{report.total_jobs_v1_0}",
@@ -3355,7 +3223,6 @@ def cost_analysis(
             ]
             output_text = "\n".join(lines)
         else:
-            # Table format (default)
             lines = [
                 "📊 Cost Analysis Report (v1.0 vs v2.0)",
                 "=" * 50,
@@ -3402,10 +3269,6 @@ def cost_analysis(
         raise typer.Exit(1) from None
 
 
-# ============================================================================
-# INTEGRITY COMMANDS
-# ============================================================================
-
 integrity_app = typer.Typer(
     name="integrity",
     help="Database integrity checking and repair",
@@ -3449,7 +3312,6 @@ def check(
         report = checker.run_full_check()
 
         if format == "json":
-            # JSON format
             output_data = {
                 "timestamp": report.timestamp.isoformat(),
                 "total_checks": report.total_checks,
@@ -3471,7 +3333,6 @@ def check(
             }
             output_text = json.dumps(output_data, indent=2, default=str)
         else:
-            # Markdown format (default)
             output_text = _generate_integrity_markdown(report)
 
         if output:
@@ -3482,7 +3343,6 @@ def check(
         else:
             typer.echo(output_text)
 
-        # Summary (only for non-JSON formats)
         if format != "json":
             typer.echo("")
             typer.echo("📊 Scan Results:")
@@ -3602,11 +3462,6 @@ def inspect_duplicates(
         raise typer.Exit(1) from None
 
 
-# ============================================================================
-# INTEGRITY PURGE HELPERS
-# ============================================================================
-
-
 def _map_issue_type_to_purger_method(purger: DataPurger, issue_type: str, dry_run: bool) -> Tuple[int, List[str]]:
     """Map issue type to purger method and execute.
 
@@ -3679,12 +3534,10 @@ def _perform_integrity_purge(
         typer.echo("❌ Actual deletion requires --force flag", err=True)
         raise typer.Exit(1)
 
-    # Backup if requested
     if backup_dir:
         backup_path = Path(backup_dir) / f"integrity_backup_{issue_type}"
         backup_path.mkdir(parents=True, exist_ok=True)
 
-        # Create a simple CSV backup of the deleted IDs
         backup_file = backup_path / f"{issue_type}.txt"
         backup_file.write_text("\n".join(affected_ids), encoding="utf-8")
         typer.echo(f"✅ Backed up {count} records to {backup_file}")
@@ -3801,12 +3654,10 @@ def repair(
 
         results = []
 
-        # Rebuild FTS index
         fts_count, _ = purger.purge_fts_orphans(dry_run=dry_run)
         if fts_count > 0:
             results.append(("FTS orphans", fts_count))
 
-        # Soft-delete malformed recommendations
         malformed_count, _ = purger.purge_malformed_recommendations(dry_run=dry_run)
         if malformed_count > 0:
             results.append(("Malformed recommendations", malformed_count))
@@ -3815,7 +3666,6 @@ def repair(
             typer.echo("ℹ️  No safe repairs needed")
             raise typer.Exit(0)
 
-        # Show results
         if dry_run:
             typer.echo("🔧 [DRY RUN] Would repair:")
             for issue_type, count in results:

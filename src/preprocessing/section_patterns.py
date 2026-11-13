@@ -41,10 +41,7 @@ class SectionLabel(StrEnum):
 
 
 SECTION_RULER_PATTERNS: tuple[dict[str, Any], ...] = (
-    # =================================================================
-    # TARGET SECTIONS (extract requirements from these)
-    # =================================================================
-    # TOKEN PATTERNS (Multi-word headers - tokenized to match spaCy output)
+    # Target sections: requirements are extracted from these.
     {
         "label": SectionLabel.KNOWLEDGE_SKILLS.value,
         "pattern": [
@@ -72,7 +69,7 @@ SECTION_RULER_PATTERNS: tuple[dict[str, Any], ...] = (
             {"LOWER": "do"},
         ],
     },
-    # TOKEN PATTERNS (Single-word headers, backward compatible)
+    # Token patterns for single-word headers.
     {
         "label": SectionLabel.REQUIREMENTS.value,
         "pattern": [
@@ -116,9 +113,7 @@ SECTION_RULER_PATTERNS: tuple[dict[str, Any], ...] = (
         "pattern": r"(?i)(?:required\s+)?(?:professional\s+)?experience(?:\s+(?:section|level|required))?(?:\s*$|\n)",
         "type": "regex",
     },
-    # =================================================================
-    # FILTER SECTIONS (skip extraction from these)
-    # =================================================================
+    # Filter sections: extraction skips these.
     {
         "label": SectionLabel.BENEFITS.value,
         "pattern": [
@@ -201,7 +196,7 @@ DEFAULT_TARGET_SECTIONS: frozenset[SectionLabel] = frozenset(
         SectionLabel.EXPERIENCE,
         SectionLabel.KNOWLEDGE_SKILLS,
         SectionLabel.IN_OFFICE,
-        # WHAT_YOU_DO intentionally excluded: responsibilities, not requirements (boost: -0.05)
+        # WHAT_YOU_DO is intentionally excluded: responsibilities, not requirements.
     }
 )
 

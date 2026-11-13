@@ -12,8 +12,7 @@ from spacy.language import Language
 from spacy.tokens import Doc
 
 # Pattern definitions from Issue #248, organized by confidence tier
-# Note: Patterns use [\w\s\-] to match word chars, spaces, and hyphens
-# Case-insensitive matching via re.IGNORECASE flag
+# Patterns use [\w\s\-] for word chars, spaces and hyphens, and are matched with re.IGNORECASE.
 TIER_1_PATTERNS: list[dict[str, Any]] = [
     {
         "trigger_word": "required",
@@ -181,18 +180,13 @@ def _apply_confidence_adjustments(
     """
     adjusted = base_confidence
 
-    # Check for negation patterns (within a local context window, not entire sentence)
-    # Use span offsets directly instead of substring search to avoid -1 edge case
-    # when text spans sentence boundary. This accesses the original doc text.
-    # Note: full_sentence may be shorter than matched text, so use full doc.text offsets.
-    # For now, use full_sentence with fallback bounds if not found.
+    # Negation is checked in a local window around the match, falling back to the full sentence.
     offset_in_sentence = full_sentence.find(text)
     if offset_in_sentence >= 0:
         text_start = max(0, offset_in_sentence - 50)
         text_end = min(len(full_sentence), offset_in_sentence + len(text) + 50)
         local_context = full_sentence[text_start:text_end]
     else:
-        # Text not found in sentence (spans boundary). Use full_sentence as context.
         local_context = full_sentence
 
     # Pattern 1: Negation before trigger word (e.g., "not required", "no experience")
@@ -213,22 +207,18 @@ def _apply_confidence_adjustments(
     if re.search(negation_after_pattern, local_context, re.IGNORECASE):
         return 0.0
 
-    # Check for parenthetical context
     if "(" in text or ")" in text:
         adjusted -= 0.10
 
-    # Check for conditional context
     if re.search(r"\bif\b", full_sentence, re.IGNORECASE):
         adjusted -= 0.15
 
-    # Check for "nice to have" in sentence
     if re.search(r"nice\s+to\s+have", full_sentence, re.IGNORECASE):
         adjusted -= 0.25
 
     return max(0.0, min(1.0, adjusted))
 
 
-# Register custom attribute if not already registered (module-level)
 if not Doc.has_extension("requirements"):
     Doc.set_extension("requirements", default=None)
 
@@ -252,33 +242,27 @@ def requirement_filter(doc: Doc) -> Doc:
     # Precompute sentence boundaries for O(log n) lookup (Flaw #3 fix)
     sent_ranges = _build_sentence_char_ranges(doc)
 
-    # Try each pattern
     for pattern in ALL_PATTERNS:
         regex_str: str = pattern["regex"]
         trigger_word: str = pattern["trigger_word"]
         base_confidence: float = pattern["confidence"]
 
-        # Find all matches
         for match in re.finditer(regex_str, text, re.IGNORECASE):
             matched_text = match.group(1)
             span_start = match.start(1)
             span_end = match.end(1)
 
-            # Extract sentence containing this match (O(log n) lookup via bisect)
             sent_range = _find_sentence_for_offset(span_start, sent_ranges)
             full_sentence = text[sent_range[0] : sent_range[1]] if sent_range else text
 
-            # Apply confidence adjustments
             adjusted_confidence = _apply_confidence_adjustments(base_confidence, matched_text, full_sentence)
 
             # Skip if confidence is 0 (negation case)
             if adjusted_confidence <= 0.0:
                 continue
 
-            # Calculate token count
             token_cnt = _token_count(matched_text)
 
-            # Create requirement entry
             requirement: dict[str, Any] = {
                 "text": matched_text,
                 "span": (span_start, span_end),
@@ -296,7 +280,6 @@ def requirement_filter(doc: Doc) -> Doc:
         if req_text not in seen:
             seen[req_text] = req
         elif req["confidence"] > seen[req_text]["confidence"]:
-            # Higher confidence: always replace
             seen[req_text] = req
         elif req["confidence"] == seen[req_text]["confidence"]:
             # Tied confidence: prefer better casing (more capitals)

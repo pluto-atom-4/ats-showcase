@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 class HTMLCleaner:
     """Convert HTML to clean text for preprocessing."""
 
-    # Common boilerplate patterns in job postings
     BOILERPLATE_PATTERNS = [
         r"equal\s+opportunity\s+employer",
         r"EEO\s*statement",
@@ -76,7 +75,6 @@ class HTMLCleaner:
         if not html or not isinstance(html, str):
             return ""
 
-        # Delegate to new unified clean_html() function
         return clean_html(html, include_section_headers=True)
 
     def _clean_with_markitdown(self, html: str) -> str:

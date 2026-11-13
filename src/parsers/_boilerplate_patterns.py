@@ -18,9 +18,6 @@ from typing import Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
-# ============================================================================
-# RAW PATTERN STRINGS (7 Categories)
-# ============================================================================
 
 # Category 1: Legal/compliance patterns
 LEGAL_COMPLIANCE_PATTERNS = [
@@ -70,7 +67,7 @@ COMPANY_BOILERPLATE_PATTERNS = [
 TIME_REFERENCE_PATTERNS = [
     r"(?i)full[\s-]?time",
     r"(?i)part[\s-]?time",
-    r"(?i)\bcontract\b(?!or|ing)",  # Matches "contract" but not "contractor", "contracting"
+    r"(?i)\bcontract\b(?!or|ing)",
     r"(?i)temporary",
     r"(?i)permanent",
     r"(?i)interim",
@@ -95,13 +92,13 @@ SALARY_BENEFITS_PATTERNS = [
 
 # Category 6: Special formatting (HTML artifacts)
 SPECIAL_FORMATTING_PATTERNS = [
-    r"&nbsp;+",  # Non-breaking spaces
-    r"&amp;",  # HTML ampersand
-    r"&lt;|&gt;",  # Angle brackets
-    r"&quot;",  # HTML quotes
-    r"&#\d+;",  # Numeric entities
-    r"\s{2,}",  # Multiple spaces
-    r"\n{2,}",  # Multiple newlines
+    r"&nbsp;+",
+    r"&amp;",
+    r"&lt;|&gt;",
+    r"&quot;",
+    r"&#\d+;",
+    r"\s{2,}",
+    r"\n{2,}",
 ]
 
 # Category 7: Navigation text
@@ -118,9 +115,7 @@ NAVIGATION_PATTERNS = [
     r"(?i)read\s+more",
 ]
 
-# ============================================================================
-# PRE-COMPILED PATTERNS (One-time cost at module load)
-# ============================================================================
+# Compiled once at module load.
 
 _COMPILED_PATTERNS: Dict[str, List[re.Pattern[str]]] = {
     "legal_compliance": [re.compile(p, re.IGNORECASE | re.MULTILINE) for p in LEGAL_COMPLIANCE_PATTERNS],
@@ -131,11 +126,6 @@ _COMPILED_PATTERNS: Dict[str, List[re.Pattern[str]]] = {
     "special_formatting": [re.compile(p, re.MULTILINE) for p in SPECIAL_FORMATTING_PATTERNS],
     "navigation": [re.compile(p, re.IGNORECASE | re.MULTILINE) for p in NAVIGATION_PATTERNS],
 }
-
-
-# ============================================================================
-# PUBLIC API
-# ============================================================================
 
 
 def get_compiled_patterns() -> Dict[str, List[re.Pattern[str]]]:
@@ -198,7 +188,6 @@ def remove_boilerplate_fast(text: str, skip_categories: Optional[Set[str]] = Non
         for compiled_pattern in pattern_list:
             cleaned = compiled_pattern.sub("", cleaned)
 
-    # Clean up extra whitespace
     cleaned = re.sub(r"\s{2,}", " ", cleaned)
     cleaned = cleaned.strip()
 
@@ -224,17 +213,14 @@ def remove_html_entities(text: str) -> str:
     if not text:
         return ""
 
-    # Remove non-breaking spaces
     text = text.replace("&nbsp;", " ")
 
-    # Remove HTML entities
     text = text.replace("&amp;", "&")
     text = text.replace("&lt;", "<")
     text = text.replace("&gt;", ">")
     text = text.replace("&quot;", '"')
     text = text.replace("&apos;", "'")
 
-    # Remove numeric entities
     text = re.sub(r"&#\d+;", "", text)
 
     return text
@@ -254,10 +240,8 @@ def _normalize_whitespace(text: str) -> str:
     if not text:
         return ""
 
-    # Collapse multiple spaces
     text = re.sub(r" {2,}", " ", text)
 
-    # Collapse multiple newlines
     text = re.sub(r"\n{2,}", "\n", text)
 
     return text.strip()
