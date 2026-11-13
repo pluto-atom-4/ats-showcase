@@ -1300,7 +1300,7 @@ def _preprocess_single_job(
         # Build clean text from job fields using clean_html (Issue #230 Phase 4)
         clean_text = _build_preprocess_clean_text(job_dict)
 
-        # The chunker reads requirements from doc, avoiding a second NLP pass or a JSON round trip.
+        # The chunker reads doc._.requirement_spans from this same doc.
         doc = preprocessor.nlp(clean_text)
         if preprocessor.categorizer_strategy == "custom":
             doc = preprocessor.apply_custom_spans(doc)
@@ -1317,6 +1317,7 @@ def _preprocess_single_job(
         if extract_requirements:
             requirements_data = getattr(doc._, "requirements", None)
             if requirements_data:
+                # Keep the list; a JSON round trip is only needed for storage.
                 trigger_requirements_list = requirements_data
                 trigger_requirements_json = json.dumps(requirements_data, ensure_ascii=False)
 

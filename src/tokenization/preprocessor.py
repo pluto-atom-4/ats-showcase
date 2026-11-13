@@ -625,7 +625,7 @@ class Preprocessor:
         Returns:
             True if entity should be skipped, False otherwise
         """
-        # Requirements may be up to 100 chars, skills and technologies up to 70.
+        # Requirement phrases run longer than skill and technology names, hence 100 vs 70 chars.
         max_length = 100 if entity_type == "requirements" else 70
         if len(entity_clean) < 2 or len(entity_clean) > max_length:
             return True

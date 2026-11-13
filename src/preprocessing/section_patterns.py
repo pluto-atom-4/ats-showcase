@@ -42,6 +42,7 @@ class SectionLabel(StrEnum):
 
 SECTION_RULER_PATTERNS: tuple[dict[str, Any], ...] = (
     # Target sections: requirements are extracted from these.
+    # Multi-word headers: tokens must match spaCy's tokenization.
     {
         "label": SectionLabel.KNOWLEDGE_SKILLS.value,
         "pattern": [
@@ -69,7 +70,7 @@ SECTION_RULER_PATTERNS: tuple[dict[str, Any], ...] = (
             {"LOWER": "do"},
         ],
     },
-    # Token patterns must match spaCy's tokenization; these cover single-word headers.
+    # Single-word headers: token patterns, plus one regex for technical skills.
     {
         "label": SectionLabel.REQUIREMENTS.value,
         "pattern": [

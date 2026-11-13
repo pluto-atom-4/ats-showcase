@@ -99,8 +99,7 @@ class JobNERExtractor:
             "System modeling": [r"system.*model|model.*system"],
             "Hardware-in-the-loop testing": [r"hardware.?in.?loop|HIL.*test"],
             "Vehicle test campaigns": [r"vehicle.*test.*campaign|test.*campaign"],
-            # Software/Systems domain: kept narrow. 'architectural' is omitted (a software.*architecture pattern
-            # matches phrases, not skills), as are generic terms (agile, DevOps, CI/CD, best practices).
+            # Software/Systems domain: kept narrow; generic terms (agile, DevOps, CI/CD) mostly appear as preferences.
             "Hands-on software development": [r"hands.?on.*development"],
             "Binary data transformation": [r"binary.*data.*transformation"],
             "Integrity check implementation": [r"integrity\s+check"],
