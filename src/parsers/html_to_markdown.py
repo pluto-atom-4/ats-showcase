@@ -320,7 +320,7 @@ def _synthesize_bold_subsection_headers(lines: List[str]) -> None:
                 continue
             label = match.group(1).strip()
             trailing = stripped[match.end() :].strip()
-            # Both branches are no-ops: trailing text is a separator or inline content, and the label is used either way.
+            # Both branches are no-ops: trailing text is a separator or inline content; the label is used either way.
             if trailing and trailing.startswith(("—", "-", ":", ",")):
                 pass
             elif trailing:
