@@ -293,7 +293,7 @@ Textual's `@work` decorator makes this natural. Urwid forces manual asyncio inte
 
 Dashboard updates every 0.5s for smooth rendering:
 - Progress bar: 10.5 jobs/min crawl = 1 job per 6 seconds → visual feedback
-- Cost tracker: Each job processed → cost increments by ~$0.002 → user sees accumulation
+- Cost tracker: Each job processed → cost increments by the per-job LLM cost (see `src/config/models.py`) → user sees accumulation
 - Phase transitions: crawl → preprocess → assess → export → visual feedback
 
 Textual's event-driven model (widgets observe StateManager) prevents manual refresh bugs. Urwid's `invalidate()` model is error-prone (easy to forget, causes flicker).
@@ -473,7 +473,7 @@ Example:
 ```
 Extracted job: "Senior Python Developer..."
 Estimated tokens: 650
-Estimated cost: $0.002
+Estimated cost: $0.00195 (example rate: $3/1M input)
 Proceed? [y/n]
 ```
 
@@ -487,7 +487,7 @@ Example:
 ```
 Job: "Senior Python Developer..."
 Estimated tokens: 650 → Actual tokens: 673 (difference: +3.5%)
-Estimated cost: $0.002 → Actual cost: $0.002 (rounding hides small differences)
+Estimated cost: $0.00195 → Actual cost: $0.00202 (example rate: $3/1M input)
 ```
 
 ### Storage Pattern
@@ -620,6 +620,8 @@ uv run python -m src.cli assess --cv data/cv.json &
 ---
 
 ## 6. Claude 3.5 Sonnet (Not Batch API)
+
+> Historical record. Model names and rates below are superseded: see `src/config/models.py` (default `claude-sonnet-5`, rates in USD per 1M tokens).
 
 ### Decision
 
