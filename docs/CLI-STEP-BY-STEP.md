@@ -497,11 +497,11 @@ By default, cost estimates are based on the model used during preprocessing (typ
 # See costs for Haiku (cheapest)
 uv run python -m src.cli review --merge-all --model haiku
 
-# Output includes recalculated cost estimates
+# Output includes recalculated cost estimates (example output; rates in src/config/models.py)
 💰 Recalculating costs for Haiku model...
 ✅ Recalculated costs using Haiku:
    Original estimate: $0.0234
-   Haiku estimate:    $0.0031  (87% savings!)
+   Haiku estimate:    $0.0062  (73% savings!)
 ```
 
 **Use case**: "Before reviewing, show me how much Haiku would cost vs Sonnet"
@@ -529,13 +529,13 @@ uv run python -m src.cli review --merge-all --cost-limit 0.05
 ### Command
 
 ```bash
-# Default: Sonnet (balanced cost/quality, $3/$15 per 1M tokens)
+# Default: Sonnet (balanced cost/quality; rates in src/config/models.py)
 uv run python -m src.cli assess --cv data/cv.json
 
-# Budget mode: Haiku (95% cost savings, $0.80/$4 per 1M tokens)
+# Budget mode: Haiku (lowest per-token rate of the supported models)
 uv run python -m src.cli assess --cv data/cv.json --model haiku
 
-# Premium: Opus (best accuracy, $15/$75 per 1M tokens)
+# Premium: Opus (best accuracy, highest per-token rate)
 uv run python -m src.cli assess --cv data/cv.json --model opus
 
 # Advanced: Filters + model selection with full model ID
@@ -559,6 +559,8 @@ uv run python -m src.cli assess \
 | `--since` | None | Re-assess jobs after ISO date (2026-07-01) |
 
 ### Model Comparison
+
+Rates are USD per 1M tokens; `src/config/models.py` is the source of truth.
 
 | Model | Alias | Cost (input/output per 1M) | Speed | Accuracy | Use Case |
 |-------|-------|---------------------------|-------|----------|----------|
@@ -1491,7 +1493,7 @@ CV INPUT:
                              ↓
 PHASE 4 (ASSESS):
   ┌──────────────────────────────────┐
-  │ Claude 3.5 Sonnet API            │
+  │ Claude Sonnet 5 API              │
   │ Multi-category scoring           │
   │ Cost tracking                    │
   └──────────────────────────────────┘
@@ -1549,8 +1551,8 @@ Per job:
 
 26 jobs:
   Total tokens:      49,400
-  Cost at $0.003/1K: $0.15
-  (Claude 3.5 Sonnet pricing)
+  Cost at $3/1M (example rate): $0.15
+  (example rate: Sonnet input price; see src/config/models.py)
 ```
 
 ---
