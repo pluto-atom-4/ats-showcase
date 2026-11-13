@@ -8,17 +8,13 @@ from spacy.util import filter_spans
 from .patterns import SKILL_VERBS
 
 _SKILL_VERB_SET = frozenset(SKILL_VERBS)
-# Tokens that may sit between a verb and its object ('ship TO the market', 'ship THE platform').
 _CONNECTOR_POS = ("ADP", "DET", "PART")
 
 logger = logging.getLogger(__name__)
 
-# POS tags that can form a noun run (a head object or a coordinated conjunct).
 _NOUN_RUN_POS = ("ADJ", "NOUN", "PROPN")
-# Conjunctions that can join conjuncts ("data and ML", "data or ML").
 _JOIN_CONJUNCTIONS = ("and", "or")
-# Tech terms spaCy tags VERB because they share a spelling with a verb (#604). "Go" in a
-# language list ("Python, Java, and Go services") is the language, so it is a noun-run token.
+# Tech terms spaCy tags VERB (spelled like a verb, #604); "Go" in a language list is a noun-run token.
 _TECH_TERMS_TAGGED_VERB = frozenset({"Go"})
 
 
@@ -43,46 +39,9 @@ def _has_spaced_dash(span: Span) -> bool:
     return any(_is_spaced_dash(tok) for tok in span)
 
 
-# --- Coordination extension (#509) ---------------------------------------------
-#
-# The Matcher finds a HEAD: action verb, optional connector, noun run, with at
-# most one hyphen join (see SkillExtractor patterns). _coordinated_end() then
-# grows the head through a chain of conjuncts. Matcher token patterns cannot
-# repeat a multi-token group, so one walker covers "A and B", "A or B",
-# "A, B, and C", "A, B and C" and chains of any length.
-#
-# Intended spans (HEAD ends where the list starts; [...] is the added tail):
-#   "lead data [or ML teams]"                 -> "lead data or ml teams"
-#   "lead data [, platform, and ML teams]"    -> "lead data, platform, and ml teams"
-#   "lead data [, platform and ML teams]"     -> "lead data, platform and ml teams"
-#   "lead data [and ML or cloud teams]"       -> mixed and/or chain merges
-#   "build or develop data pipelines"         -> "develop data pipelines" (no merge:
-#                                                "or" is followed by a VERB)
-#   "lead data science, platform teams"       -> "lead data science" (bare comma)
-#   "design systems, platforms, and develop"  -> "design systems" + "develop ..."
-#                                                (tail commits only at the conjunct
-#                                                before the VERB, which is rejected)
-#
-# A conjunct commits the span end only when a conjunction ("and"/"or", optionally
-# after a comma) precedes it. Bare-comma conjuncts are tentative: they are kept
-# only if a later conjunction-led conjunct commits.
-#
-# --- Verb tagged NOUN (#511) ----------------------------------------------------
-#
-# spaCy sometimes tags a coordinated skill verb as NOUN with dep 'conj':
-#   "manage Kafka clusters on GCP and ship Terraform modules"
-# The Matcher needs VERB, so such a token never starts a match. The guard below
-# lets it start its own match when ALL of these hold:
-#   - tag NOUN and dep conj (or dep compound directly after and/or, #604), and the lemma is in SKILL_VERBS;
-#   - an object noun group follows (optionally after one connector).
-# "the ship and crew" fails the dep test (ship is not conj) and "and crew" has no
-# verb lemma, so noun coordination is not matched. A skill verb must also govern the
-# coordination up the parse: "Our team includes the design and build managers" has
-# the same tags but is ruled by "includes", so it is not matched.
-#
-# A verb-tagged-NOUN conjunct that passes the guard is never merged into the
-# preceding span: _conjunct_end() refuses it, so it becomes its own match, the same
-# as a VERB conjunct ("design systems and develop platforms").
+# --- Verb tagged NOUN (#511)
+# spaCy sometimes tags a coordinated skill verb NOUN (dep conj), so the Matcher never starts on it; the guard does.
+# _conjunct_end() refuses it, so it is never merged into the preceding span.
 
 
 def _is_verb_tagged_noun(tok: Token) -> bool:
@@ -115,14 +74,9 @@ def _verb_start_end(doc: Doc, start: int) -> int | None:
     return _noun_run_end(doc, obj)
 
 
-# --- Participle inside a noun run (#523) ----------------------------------------
-#
-# spaCy tags a participle that modifies a noun as VERB (dep amod), e.g. "distributed"
-# in "design high-performance distributed systems". Such a token is part of the run
-# when a noun-run token follows it. It is not a run start on its own (no noun in front
-# of it) and a trailing participle is not absorbed. Other participles keep their
-# tags: "We build and deploy distributed systems" tags "distributed" ADJ, and a
-# participle with dep acl ("systems used internally") is a clause, not a modifier.
+# --- Participle inside a noun run (#523)
+# A participle tagged VERB (dep amod) joins the run only when a noun-run token follows; a trailing one is not absorbed.
+# A participle with dep acl ("systems used internally") is a clause, not a modifier.
 
 
 def _is_amod_participle(tok: Token) -> bool:
@@ -147,13 +101,9 @@ def _noun_run_end(doc: Doc, start: int) -> int | None:
     return end
 
 
-# --- Skill verb tagged ADJ after a comma or conjunction (#604) ------------------
-#
-# spaCy tags "lead" as ADJ in "design systems and lead teams" and "design fast, lead
-# teams". The Matcher needs VERB, so such a token never starts a match. It starts its own
-# span when a comma or conjunction precedes it and a noun run follows. _conjunct_end()
-# refuses it, so the earlier span does not absorb it. "lead agile, platform teams" is
-# unaffected: its "lead" is sentence-led, not preceded by a comma or conjunction.
+# --- Skill verb tagged ADJ after a comma or conjunction (#604)
+# spaCy tags "lead" ADJ in "design systems and lead teams"; it starts its own span only after a comma or conjunction.
+# "lead agile, platform teams" is unaffected: its "lead" is sentence-led.
 
 
 def _is_skill_verb_adjective(tok: Token) -> bool:
@@ -227,14 +177,9 @@ def _participle_head_end(doc: Doc, head_end: int) -> int:
     return head_end
 
 
-# --- Glued compound tails (#556) -----------------------------------------------
-#
-# A glued compound can hold a function word between two hyphens: "state-of-the-art",
-# "end-to-end" (matched by the ADP pattern in SkillExtractor). Its participle second
-# half, "data-driven", is tagged VERB and would start a match as a skill verb ("drive"),
-# yielding "driven platform". A participle glued after a hyphen is never a head verb,
-# so such a match is dropped. The full span "design data-driven platforms" comes from
-# the participle hyphen pattern.
+# --- Glued compound tails (#556)
+# "data-driven" is tagged VERB and would start a match as a skill verb ("drive"); a participle glued after a hyphen
+# is never a head verb, so that match is dropped.
 
 
 def _is_glued_participle_head(doc: Doc, start: int) -> bool:
@@ -247,13 +192,9 @@ def _is_glued_participle_head(doc: Doc, start: int) -> bool:
     )
 
 
-# --- Participial "built with <tech>" (#551) -------------------------------------
-#
-# "Built with Go and gRPC." names a stack; it is not a skill verb phrase. The Matcher's
-# action verb matches lemma "build" whatever its tag, and the optional connector takes
-# "with", so "Built with Go" (extended to "... and gRPC") was emitted. A past-tense or
-# participle skill verb followed by "with" is dropped. The base form "Build scalable
-# APIs with Python" (tag VB/VBP) and a participle not followed by "with" are unchanged.
+# --- Participial "built with <tech>" (#551)
+# "Built with Go and gRPC" names a stack, not a skill phrase: a participle skill verb before "with" is dropped.
+# The base form "Build scalable APIs with Python" (VB/VBP) is unchanged.
 
 
 def _is_participial_with_head(doc: Doc, start: int) -> bool:
@@ -263,24 +204,6 @@ def _is_participial_with_head(doc: Doc, start: int) -> bool:
 
 def _is_join_conjunction(tok: Token) -> bool:
     return tok.pos_ == "CCONJ" and tok.lower_ in _JOIN_CONJUNCTIONS
-
-
-# --- Bare comma inside an adjective list (#557) ----------------------------------
-#
-# "design fault-tolerant, low-latency services": the bare comma separates premodifiers
-# of one head noun, so the comma is part of the noun run. Under the #509 rule a bare
-# comma is punctuation, which cut the run at "fault-tolerant". The adjective-list
-# branch below is the exception, and it applies only when BOTH hold:
-#   - the token before the comma is adjectival: an ADJ, an amod participle, or a glued
-#     compound whose first half is one ("high-performance", "data-driven");
-#   - the comma list continues through ADJ-led segments and ends at a plain noun head.
-# A participle segment before a comma ("distributed," in "fault-tolerant, distributed,
-# scalable services") is an adjective segment (#585); a VBN compound ("data-driven,") counts as adjectival.
-# A segment is a plain head only when its last token is a NOUN/PROPN not glued to a
-# hyphen before it, so "low-latency" alone is not a head and "low-latency services" is.
-# A noun before the comma ("design systems, platform teams") keeps the #509 rule.
-# The list commits only at a plain-noun head; a trailing clause ("..., building APIs")
-# is not absorbed. A conjunction closes the list ("..., low-latency, and scalable services").
 
 
 def _is_glued_hyphen(doc: Doc, i: int) -> bool:
@@ -321,7 +244,6 @@ def _ends_adjectival_modifier(doc: Doc, comma: int) -> bool:
         return False
     if _is_adjectival(doc[before]) or _is_verb_led_adverb(doc, before):
         return True
-    # Glued compound before the comma: "high-performance" (NOUN after ADJ), "data-driven".
     return _is_glued_hyphen(doc, before - 1) and before >= 2 and _is_adjectival(doc[before - 2])
 
 
@@ -350,6 +272,9 @@ def _adjective_pair_end(doc: Doc, conj: int) -> int | None:
     return pair_end
 
 
+# --- Bare comma inside an adjective list (#557)
+# "design fault-tolerant, low-latency services": the comma joins premodifiers of one head noun; a trailing clause is
+# not absorbed and "and" closes the list. Token before the comma: adjectival, glued adjective, or verb-led ADV (#588).
 def _adjective_list_end(doc: Doc, comma: int, *, adverb_led: bool = False) -> int | None:
     """End (exclusive) of an adjective list after the bare comma at ``comma``, or None (#557).
 
@@ -392,8 +317,7 @@ def _adjective_list_end(doc: Doc, comma: int, *, adverb_led: bool = False) -> in
     return best
 
 
-# Verbs spaCy tags VERB that premodify a noun in an ADV-led list ("develop quickly, secure APIs").
-# Not skill verbs, so the Matcher never starts a match on them (#599).
+# VERB-tagged premodifiers in an ADV-led list ("develop quickly, secure APIs"), not skill verbs (#599).
 _ADVERB_LIST_VERB_ADJECTIVES = frozenset({"secure"})
 
 
@@ -405,7 +329,6 @@ def _adverb_led_list_end(doc: Doc, start: int) -> int | None:
         return None
     seg = start + 3
     if seg < len(doc) and doc[seg].pos_ == "VERB" and doc[seg].lemma_ in _ADVERB_LIST_VERB_ADJECTIVES:
-        # Single verb-tagged premodifier before a noun head ("secure APIs").
         run_end = _noun_run_end(doc, seg + 1)
         if run_end is None or not _is_plain_noun_head(doc, seg + 1, run_end):
             return None
@@ -413,14 +336,9 @@ def _adverb_led_list_end(doc: Doc, start: int) -> int | None:
     return _adjective_list_end(doc, start + 2, adverb_led=True)
 
 
-# --- Verb list before an object (#604) --------------------------------------------
-#
-# "design, build, and maintain fault-tolerant, low-latency services": the skill verb is
-# followed by a comma list of verbs, not an object. The Matcher needs a noun run right
-# after the verb, so it finds nothing. _verb_list_end() walks the verb list and returns
-# the end of the object noun run. Later verbs need only be VERB-tagged ("maintain" is not
-# in SKILL_VERBS); the head verb must be a skill verb. The span end is then extended by
-# _coordinated_end() as for any head.
+# --- Verb list before an object (#604)
+# "design, build, and maintain ... services": the skill verb is followed by a comma list of verbs, so no match starts.
+# Later verbs need only be VERB-tagged; the head verb must be a skill verb.
 
 
 def _verb_list_end(doc: Doc, start: int) -> int | None:
@@ -442,6 +360,9 @@ def _verb_list_end(doc: Doc, start: int) -> int | None:
     return _noun_run_end(doc, last + 1)
 
 
+# --- Coordination extension (#509)
+# _coordinated_end() walks "A and B" / "A, B, and C" chains; bare-comma conjuncts stay only if a later one commits.
+# "lead data science, platform teams" -> "lead data science"; "or" followed by a VERB never merges.
 def _coordinated_end(doc: Doc, head_end: int) -> int:
     """Return the end of the coordinated span that starts at a head ending at ``head_end``.
 
@@ -460,12 +381,11 @@ def _coordinated_end(doc: Doc, head_end: int) -> int:
     bare_comma_conjunct = False
     while cursor < len(doc):
         if doc[cursor].text == ",":
-            # ", and X" / ", or X" commits; a bare ", X" is tentative.
             after_comma = cursor + 1
             commits = after_comma < len(doc) and _is_join_conjunction(doc[after_comma])
             if not commits:
-                # A bare comma may open an adjective list at the head or after a
-                # conjunction-led conjunct (#557). Never after a bare noun conjunct (#509).
+                # A bare comma may open an adjective list at the head or after a conjunction-led conjunct (#557);
+                # never after a bare noun conjunct (#509).
                 if not bare_comma_conjunct:
                     list_end = _adjective_list_end(doc, cursor)
                     if list_end is not None:
@@ -494,11 +414,9 @@ def _coordinated_end(doc: Doc, head_end: int) -> int:
 
 class SkillExtractor:
     def __init__(self, model_name="en_core_web_md", nlp=None):
-        # Reuse a pre-loaded pipeline when given; otherwise load the model.
         if nlp is not None:
             self.nlp = nlp
         else:
-            # Load spaCy model with error handling
             try:
                 self.nlp = spacy.load(model_name)
             except OSError:
@@ -509,35 +427,27 @@ class SkillExtractor:
                 raise
         self.matcher = Matcher(self.nlp.vocab)
 
-        # 2. Define the Matcher Patterns
-        # Logic: [Action Verb] + [Optional Preposition/Article] + [Descriptive Nouns/Adjectives]
         def noun_group() -> dict:
-            # The Meat: A sequence of Nouns, Adjectives, or Proper Nouns
-            # (e.g., "novel deep learning architectures")
-            # Note: ADP excluded from this group (prepositions shouldn't appear as descriptors)
+            # ADP excluded: prepositions are not descriptors.
             return {"POS": {"IN": ["ADJ", "NOUN", "PROPN"]}, "OP": "+"}
 
         def action_verb() -> dict:
-            # The Action: Must be a verb and its base form must be in our list
             return {"POS": "VERB", "LEMMA": {"IN": SKILL_VERBS}}
 
         def connector() -> dict:
-            # Optional: Connector words like "with", "the", "of"
-            # (e.g., "partner WITH", "lead THE")
             return {"POS": {"IN": ["ADP", "DET", "PART"]}, "OP": "?"}
 
         pattern = [action_verb(), connector(), noun_group()]
 
-        # Coordinated objects ("lead data science and platform teams") are not matched
-        # here: _coordinated_end() extends each head through and/or/serial conjuncts (#509).
+        # Coordinated objects are not matched here: _coordinated_end() extends each head through
+        # and/or/serial conjuncts (#509).
 
-        # Hyphenated compounds: "high-performance" is tokenized [high, -, performance]
-        # and the "-" is PUNCT, which would stop the noun run at "high". These variants
-        # let one intra-word hyphen join two noun runs; spaced dashes are rejected in
-        # extract() via _has_spaced_dash(). Only one hyphen join per run is matched.
+        # "high-performance" is tokenized [high, -, performance]; the PUNCT "-" would stop the noun run, so
+        # one hyphen join is allowed.
+        # Spaced dashes are rejected in extract() via _has_spaced_dash().
         hyphen_pattern = [action_verb(), connector(), noun_group(), {"ORTH": "-"}, noun_group()]
         # Function word inside a glued compound (#556): "state-of-the-art" (ADP + DET) and
-        # "end-to-end" (ADP only). The DET and its hyphen are optional; each hyphen is glued.
+        # "end-to-end" (ADP only); the DET and its hyphen are optional.
         hyphen_adp_pattern = [
             action_verb(),
             connector(),
@@ -560,16 +470,13 @@ class SkillExtractor:
             noun_group(),
         ]
         # Participle-led head (#558): "Design distributed systems" at the start of a sentence.
-        # spaCy tags the sentence-initial imperative NOUN (npadvmod) and the participle VERB
-        # (amod), so no action verb starts a match. The head is a skill-verb lemma tagged NOUN
-        # at a sentence start, followed by a participle modifier and a noun run. The participle
-        # must not itself be a skill verb: "Lead managed services" keeps the participle head.
+        # spaCy tags the imperative NOUN and the participle VERB, so no action verb starts a match; the
+        # participle must not be a skill verb itself.
         participle_head_pattern = [
             {"POS": "NOUN", "LEMMA": {"IN": SKILL_VERBS}, "IS_SENT_START": True},
             {"TAG": {"IN": ["VBN", "VBG"]}, "DEP": "amod", "LEMMA": {"NOT_IN": SKILL_VERBS}},
             noun_group(),
         ]
-        # Add patterns to matcher
         self.matcher.add(
             "SKILL_PHRASE",
             [pattern, hyphen_pattern, hyphen_adp_pattern, hyphen_participle_pattern, participle_head_pattern],
@@ -583,8 +490,6 @@ class SkillExtractor:
             return []
 
         try:
-            # 3. Find matches in the document
-            # 'as_spans=True' returns spaCy Span objects instead of ID tuples
             matches = list(self.matcher(doc, as_spans=True))
             # Verb-tagged-NOUN starts (#511) are matched by the guard, not the Matcher.
             for i in range(len(doc)):
@@ -600,8 +505,8 @@ class SkillExtractor:
                 adj_verb_end = _skill_verb_adjective_end(doc, i)
                 if adj_verb_end is not None:
                     matches.append(doc[i:adj_verb_end])
-            # Drop hyphen-variant matches whose "-" is spaced punctuation; the plain
-            # pattern still yields the non-hyphenated prefix for those sentences.
+            # Drop hyphen-variant matches whose "-" is spaced punctuation; the plain pattern still yields the
+            # non-hyphenated prefix.
             matches = [
                 m
                 for m in matches
@@ -609,32 +514,23 @@ class SkillExtractor:
                 and not _is_glued_participle_head(doc, m.start)
                 and not _is_participial_with_head(doc, m.start)
             ]
-            # Extend each head through its coordinated conjuncts (#509). The extended
-            # span contains the head, so filter_spans keeps it over the bare head.
+            # Extend each head through its coordinated conjuncts (#509); the extended span contains the
+            # head, so filter_spans keeps it.
             extended = [doc[m.start : _coordinated_end(doc, _participle_head_end(doc, m.end))] for m in matches]
 
-            # 4. Best Practice: Filter Overlaps
-            # If the matcher finds "design architectures" and "design deep learning architectures",
-            # filter_spans will only keep the longest one.
             unique_spans = filter_spans(matches + extended)
 
-            # Clean the text: strip whitespace and convert to lowercase
             results = [span.text.replace("\n", " ").strip().lower() for span in unique_spans]
 
-            # Deduplicate and return
             return sorted(set(results))
         except Exception as e:
             logger.error(f"Matcher extraction failed: {e}")
             return []
 
 
-# --- Implementation Example ---
-
 if __name__ == "__main__":
-    # Example input from the Carbon Robotics JD
     carbon_jd_bullets = """[PASTE THE JOB DESCRIPTION HERE]"""
 
-    # Initialize and Run
     extractor = SkillExtractor()
     skills = extractor.extract(carbon_jd_bullets)
 

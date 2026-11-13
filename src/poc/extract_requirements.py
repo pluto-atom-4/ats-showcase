@@ -18,7 +18,7 @@ import spacy
 from pydantic import BaseModel, Field
 from spacy.language import Language
 
-# Import Phase 8a/8b components
+# Side-effect imports: register the requirement_filter and span_categorizer pipes.
 import src.preprocessing.requirement_filter  # noqa: F401
 import src.preprocessing.span_categorizer  # noqa: F401
 
@@ -66,13 +66,11 @@ class RequirementExtractor:
         self.max_requirements = max_requirements
         self.spacy_model_name = spacy_model
 
-        # Load spaCy model
         try:
             self.nlp: Language = spacy.load(spacy_model)
         except OSError as e:
             raise RuntimeError(f"Failed to load spaCy model '{spacy_model}': {e}") from e
 
-        # Add Phase 8a and 8b components if not already present
         if "requirement_filter" not in self.nlp.pipe_names:
             self.nlp.add_pipe("requirement_filter", last=True)
         if "span_categorizer" not in self.nlp.pipe_names:
@@ -119,12 +117,10 @@ class RequirementExtractor:
         Returns:
             List of sentences classified as containing requirements
         """
-        # Process text through spaCy + Phase 8a
         doc = self.nlp(markdown_text)
 
         requirement_sentences: List[str] = []
 
-        # Filter requirements by confidence threshold
         if doc._.requirements:  # type: ignore
             high_confidence_reqs = [
                 req
@@ -132,15 +128,12 @@ class RequirementExtractor:
                 if req["confidence"] >= self.min_confidence
             ]
 
-            # Build set of sentences that contain high-confidence requirements
             requirement_sentence_chars = set()
             for req in high_confidence_reqs:
                 span_start, span_end = req["span"]
                 requirement_sentence_chars.add((span_start, span_end))
 
-            # Extract sentences containing requirements
             for sent in doc.sents:
-                # Check if any part of this sentence contains a requirement
                 sentence_contains_requirement = False
                 for req_start, _req_end in requirement_sentence_chars:
                     if sent.start_char <= req_start < sent.end_char:
@@ -164,15 +157,12 @@ class RequirementExtractor:
         Returns:
             List of requirement spans with boundaries and metadata
         """
-        # Process through Phase 8a + 8b
         doc = self.nlp(markdown_text)
 
         requirement_spans: List[Dict[str, Any]] = []
 
-        # Phase 8b populates requirement_spans with expanded boundaries
         if doc._.requirement_spans:  # type: ignore
             for span_dict in doc._.requirement_spans:  # type: ignore
-                # Filter by confidence
                 if span_dict["confidence"] >= self.min_confidence:
                     requirement_spans.append(span_dict)
 
@@ -191,24 +181,20 @@ class RequirementExtractor:
         Returns:
             Normalized list of unique requirements
         """
-        # Deduplicate by normalized text (case-insensitive)
         seen: Dict[str, Dict[str, Any]] = {}
 
         for req in requirement_spans:
             normalized_key = req["text"].lower().strip()
 
-            # Keep highest confidence version
             if normalized_key not in seen or req["confidence"] > seen[normalized_key]["confidence"]:
                 seen[normalized_key] = req
 
-        # Convert to list and sort by confidence (descending)
         normalized_reqs = sorted(
             seen.values(),
             key=lambda r: r["confidence"],
             reverse=True,
         )
 
-        # Limit to max_requirements
         normalized_reqs = normalized_reqs[: self.max_requirements]
 
         logger.info(f"Normalized to {len(normalized_reqs)} unique requirements")
@@ -230,10 +216,8 @@ class RequirementExtractor:
         Returns:
             RequirementExtractionOutput with JSON schema
         """
-        # Extract company name
         company = self.extract_company(markdown_text)
 
-        # Convert requirements to RequirementModel objects
         requirement_models = []
         for req in normalized_reqs:
             requirement_models.append(
@@ -245,7 +229,6 @@ class RequirementExtractor:
                 )
             )
 
-        # Build metadata
         metadata = {
             "sentences_analyzed": sentence_count,
             "requirements_extracted": len(requirement_models),
@@ -273,25 +256,20 @@ class RequirementExtractor:
         """
         logger.info("Starting requirement extraction pipeline")
 
-        # Phase 1: Markdown parsing (extract company)
         company = self.extract_company(markdown_text)
         logger.info(f"Phase 1: Extracted company = {company}")
 
-        # Phase 2: Sentence classification
         doc = self.nlp(markdown_text)
         sentence_count = len(list(doc.sents))
         requirement_sentences = self.classify_sentences(markdown_text)
         logger.info(f"Phase 2: Classified {sentence_count} sentences, {len(requirement_sentences)} with requirements")
 
-        # Phase 3: Span extraction (Phase 8b)
         requirement_spans = self.extract_spans(markdown_text)
         logger.info(f"Phase 3: Extracted {len(requirement_spans)} spans")
 
-        # Phase 4: Normalization
         normalized_reqs = self.normalize(requirement_spans)
         logger.info(f"Phase 4: Normalized to {len(normalized_reqs)} unique requirements")
 
-        # Phase 5: JSON output
         output = self.to_json(normalized_reqs, markdown_text, sentence_count)
         logger.info(f"Phase 5: Generated JSON output with {output.requirements_count} requirements")
 

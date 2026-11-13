@@ -12,19 +12,13 @@ logger = logging.getLogger(__name__)
 def _generate_patterns():
     patterns = []
     for term in TECH_TERMS:
-        # Check if it's a multi-word phrase
         if " " in term or "-" in term:
-            # Phrase pattern: Case-insensitive by using the text logic
-            # 'computer vision' -> [{'LOWER': 'computer'}, {'LOWER': 'vision'}]
-            # spaCy splits intra-word hyphens into 3 tokens, so emit '-' too:
-            # 'anchor-free' -> [{'LOWER': 'anchor'}, {'LOWER': '-'}, {'LOWER': 'free'}]
+            # spaCy splits intra-word hyphens into 3 tokens, so emit "-" too: "anchor-free" -> anchor, -, free.
             tokens = re.findall(r"[^\s-]+|-", term.lower())
             patterns.append({"label": "TECH", "pattern": [{"LOWER": t} for t in tokens]})
         else:
-            # Single word pattern: Simple case-insensitive token match
-            # 'PyTorch' -> {'LOWER': 'pytorch'}
             patterns.append({"label": "TECH", "pattern": [{"LOWER": term.lower()}]})
-    # Vue.js: tokenizer may keep it whole or split on the dot
+    # Vue.js: tokenizer may keep it whole or split on the dot.
     patterns.append({"label": "TECH", "pattern": [{"LOWER": "vue.js"}]})
     patterns.append({"label": "TECH", "pattern": [{"LOWER": "vue"}, {"ORTH": "."}, {"LOWER": "js"}]})
     return patterns
@@ -34,28 +28,21 @@ AMBIGUOUS_TERMS = frozenset({"go", "spring", "vue", "lightning"})
 _PREV_CUES = frozenset({"with", "in", "using", "use", "built", "written", "proficient", "experience", "of", "on"})
 _NEXT_CUES = frozenset({"boot", "framework", "mvc", "cloud", "data", "security", "lang", "js"})
 _LIST_JOINERS = frozenset({",", "and", "&", "/", "or"})
-# Terms whose common English meaning ("lightning strike") makes a preceding cue
-# ("with", "experience", "of") too weak to prove tech usage. For these, only a
-# following cue (_LIGHTNING_NEXT_CUES), a "built with X." sentence end (#513), or an
-# adjacent TECH term counts as evidence.
+# Terms whose common English meaning ("lightning strike") makes a preceding cue too weak: only a following
+# cue (_LIGHTNING_NEXT_CUES), a "built with X." sentence end (#513), or an adjacent TECH term counts.
 _PREV_CUE_INSUFFICIENT = frozenset({"lightning"})
-# Next cues specific to lightning (#513). The shared _NEXT_CUES ("data", "cloud", ...)
-# collide with the common English phrase ("Lightning data storms").
+# Next cues specific to lightning (#513); the shared _NEXT_CUES ("data", "cloud") collide with "Lightning data storms".
 _LIGHTNING_NEXT_CUES = frozenset({"trainer", "module", "fabric", "datamodule", "callback", "callbacks"})
 _SENTENCE_END = frozenset({".", "!", "?"})
-# Negation (#497). spaCy splits "don't"/"doesn't" into "do" + "n't", so "n't" is
-# listed explicitly. "nice to have" is deliberately NOT a cue (optional, not absent).
+# Negation (#497). spaCy splits "don't" into "do" + "n't", so "n't" is listed explicitly; "nice to have" is
+# deliberately not a cue (optional, not absent).
 _NEGATION_CUES = frozenset({"no", "not", "without", "never", "lacking", "nor", "n't"})
-# A contrast word between a cue and an entity ends the negation scope, so
-# "No prior experience needed, but Kubernetes is required." keeps kubernetes.
+# A contrast word ends the negation scope: "No prior experience needed, but Kubernetes is required." keeps kubernetes.
 _CONTRAST_RESET = frozenset({"but", "however", "though", "yet"})
-# Clause separators that also end a negation scope (list joiners are handled separately).
 _CLAUSE_STOPS = frozenset({";", ":"})
 # "not only" / "not just" ("not merely") are affirmative idioms, not negation cues (#516).
 _NOT_ONLY_NEXT = frozenset({"only", "just"})
 # Multi-word TECH terms that also emit their first token as its own term (#504).
-# "PyTorch Lightning" yields "pytorch lightning" plus "pytorch" (as before this term
-# existed), but never a standalone "lightning": the longer match wins the overlap.
 _COMPOUND_HEADS = {"pytorch lightning": "pytorch"}
 
 
@@ -184,7 +171,6 @@ def _negated_flags(doc, candidates, tech_tokens):
 class TechExtractor:
     def __init__(self, nlp):
         self.nlp = nlp
-        # Check if entity_ruler already exists
         if "entity_ruler" not in nlp.pipe_names:
             self.ruler = nlp.add_pipe("entity_ruler", before="ner")
         else:
@@ -193,8 +179,6 @@ class TechExtractor:
 
     def extract(self, doc):
         try:
-            # Extract all TECH entities and normalize to lowercase for deduplication
-            # This handles case-insensitive matching results (PyTorch vs pytorch)
             tech_ents = [ent for ent in doc.ents if ent.label_ == "TECH"]
             heads = [doc[ent.start : ent.start + 1] for ent in tech_ents if ent.text.lower() in _COMPOUND_HEADS]
             tech_ents = sorted(tech_ents + heads, key=lambda span: span.start)
@@ -209,6 +193,7 @@ class TechExtractor:
             ]
             all_tech_tokens = {i for ent in tech_ents for i in range(ent.start, ent.end)}
             negated = _negated_flags(doc, candidates, all_tech_tokens)
+            # Lowercased so case variants (PyTorch, pytorch) collapse to one entry.
             techs_lower = {
                 ent.text.lower() for ent, is_negated in zip(candidates, negated, strict=True) if not is_negated
             }
@@ -219,21 +204,16 @@ class TechExtractor:
 
 
 def main():
-    # Load spaCy model
     nlp = spacy.load("en_core_web_md")
 
-    # Initialize modules
     tech_engine = TechExtractor(nlp)
 
     text = """[PASTE THE JOB DESCRIPTION HERE]"""
 
-    # Process text
     doc = nlp(text)
 
-    # Run extractions
     results = {"technologies": tech_engine.extract(doc)}
 
-    # Post-process: Remove common noise/duplicates
     print(json.dumps(results, indent=2))
 
 

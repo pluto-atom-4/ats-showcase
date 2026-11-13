@@ -22,12 +22,8 @@ class RequirementPattern(TypedDict):
     priority: int
 
 
-# =============================================================================
-# HARDCODED TRIGGER PATTERNS (Tier-Based)
-# =============================================================================
-
 REQUIREMENT_PATTERNS: List[RequirementPattern] = [
-    # TIER 1: High-confidence (0.90-0.95) - Mandatory language
+    # Priority 1: mandatory language
     {
         "trigger": "required",
         "regex": r"\brequired\b",
@@ -82,7 +78,7 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.83,
         "priority": 1,
     },
-    # TIER 2: Medium-confidence (0.65-0.80) - Softer requirements
+    # Priority 2: softer requirements
     {
         "trigger": "should",
         "regex": r"\bshould\s+(?:have|know|be|possess)",
@@ -107,7 +103,7 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.80,
         "priority": 2,
     },
-    # TIER 3: Lower-confidence (0.40-0.55) - Nice-to-have, aspirational
+    # Priority 3: nice-to-have, aspirational
     {
         "trigger": "nice to have",
         "regex": r"\bnice\s+to\s+have\b",
@@ -126,7 +122,7 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.45,
         "priority": 3,
     },
-    # BULLET-SPECIFIC PATTERNS (extracted from bullets)
+    # Bullet-specific patterns; priorities 1-2
     {
         "trigger": "years_in_bullet",
         "regex": r"\b(\d+\+?)\s+years?\b",
@@ -151,9 +147,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.92,
         "priority": 2,
     },
-    # =============================================================================
-    # PHASE C EXPANSION: Education Patterns (4 patterns)
-    # =============================================================================
     {
         "trigger": "degree abbreviation",
         "regex": r"\b(?:BS\+|MS\+|BA\+|MA\+|BS|MS|BA|MA|PhD)\b",
@@ -178,9 +171,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.78,
         "priority": 2,
     },
-    # =============================================================================
-    # PHASE C EXPANSION: Location/On-site Patterns (2 patterns)
-    # =============================================================================
     {
         "trigger": "on-site location",
         "regex": r"\b(?:on-site|on site|office|in-office|remote|hybrid|office-based)\b",
@@ -193,9 +183,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.75,
         "priority": 2,
     },
-    # =============================================================================
-    # PHASE C EXPANSION: Soft Skill Patterns (4 patterns)
-    # =============================================================================
     {
         "trigger": "communication skills",
         "regex": r"\b(?:communicat(?:e|ion|or)|written|verbal|presentation)\s+(?:skills?|abilities?)\b",

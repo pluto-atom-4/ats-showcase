@@ -44,7 +44,7 @@ def extract_company_name_enhanced(markdown: str) -> Optional[str]:
         match = re.search(pattern, markdown, re.MULTILINE | re.IGNORECASE)
         if match:
             company = match.group(1).strip()
-            if company and len(company) > 1:  # Filter out single-char matches
+            if company and len(company) > 1:
                 return company
 
     return None

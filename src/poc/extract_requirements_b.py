@@ -34,11 +34,6 @@ __all__ = [
 ]
 
 
-# =============================================================================
-# OUTPUT MODELS
-# =============================================================================
-
-
 class SimpleRequirementExtractionOutput(BaseModel):
     """Minimal output schema (company + requirements list only)."""
 
@@ -48,11 +43,6 @@ class SimpleRequirementExtractionOutput(BaseModel):
         default_factory=dict,
         description="Pipeline metadata (sentences analyzed, patterns matched, etc.)",
     )
-
-
-# =============================================================================
-# CORE FUNCTIONS
-# =============================================================================
 
 
 def load_spacy_model(model_name: str = "en_core_web_sm") -> Language:
@@ -115,18 +105,14 @@ def extract_requirements_standalone(
     """
     logger.info("Starting standalone requirement extraction pipeline")
 
-    # Stage 1: Load model
     nlp = load_spacy_model("en_core_web_md")
 
-    # Stage 1.5: Normalize bullet points
     normalized_markdown = normalize_bullet_points(markdown)
     logger.info("Normalized bullet points")
 
-    # Stage 2: Split sentences
     sentences = split_sentences(normalized_markdown, nlp)
     logger.info(f"Split into {len(sentences)} sentences")
 
-    # Stage 3: Classify sentences
     candidate_requirements = []
     for sentence in sentences:
         req_info = classify_sentence_as_requirement(sentence, nlp)
@@ -135,7 +121,6 @@ def extract_requirements_standalone(
 
     logger.info(f"Classified {len(candidate_requirements)} requirements (confidence >= {min_confidence})")
 
-    # Stage 4: Deduplicate by normalized text
     seen_normalized: Dict[str, Dict[str, Any]] = {}
     for req in candidate_requirements:
         norm_key = req["text"].lower().strip()
@@ -144,7 +129,6 @@ def extract_requirements_standalone(
         elif req["confidence"] > seen_normalized[norm_key]["confidence"]:
             seen_normalized[norm_key] = req
 
-    # Sort by confidence descending
     unique_reqs = sorted(
         seen_normalized.values(),
         key=lambda r: r["confidence"],
@@ -153,11 +137,9 @@ def extract_requirements_standalone(
 
     logger.info(f"Deduplicated to {len(unique_reqs)} unique requirements")
 
-    # Stage 5: Extract company
     company = extract_company_name(markdown)
     logger.info(f"Extracted company: {company}")
 
-    # Build output
     metadata = {
         "sentences_analyzed": len(sentences),
         "requirements_extracted": len(unique_reqs),
@@ -173,11 +155,6 @@ def extract_requirements_standalone(
         requirements=[r["text"] for r in unique_reqs],
         metadata=metadata,
     )
-
-
-# =============================================================================
-# CONVENIENCE INTERFACE
-# =============================================================================
 
 
 def extract_requirements_b(
@@ -199,7 +176,6 @@ def extract_requirements_b(
 
 
 if __name__ == "__main__":
-    # Simple CLI for testing
     import json
     import sys
 

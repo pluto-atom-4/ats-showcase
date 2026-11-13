@@ -11,26 +11,13 @@ Issue #265: Redesigned to support multi-word section headers via regex patterns.
 
 from typing import Any, Dict, List
 
-# =============================================================================
-# SECTION RULER PATTERNS (SpanRuler)
-# =============================================================================
-# Hybrid approach: token-based patterns for single-word headers,
-# regex-based patterns for multi-word headers and special chars.
-#
-# Pattern dict structure: {"label": str, "pattern": str | List[Dict]}
-# - Token pattern: List of token attribute dicts (spaCy format)
-# - Regex pattern: Single regex string (requires type: "regex")
-
+# Regex entries need "type": "regex" (a bare string is not a token pattern).
 SECTION_RULER_PATTERNS: List[Dict[str, Any]] = [
-    # =================================================================
-    # TARGET SECTIONS (extract requirements from these)
-    # =================================================================
-    # TOKEN PATTERNS (Multi-word headers - tokenized to match spaCy output)
     {
         "label": "SECTION_KNOWLEDGE_SKILLS",
         "pattern": [
             {"LOWER": "knowledge"},
-            {"IS_PUNCT": True, "OP": "?"},  # optional comma
+            {"IS_PUNCT": True, "OP": "?"},
             {"LOWER": "skills"},
             {"LOWER": {"IN": ["&", "and"]}},
             {"LOWER": "abilities"},
@@ -49,7 +36,8 @@ SECTION_RULER_PATTERNS: List[Dict[str, Any]] = [
         "pattern": [
             {"LOWER": "what"},
             {"LOWER": {"IN": ["you'll", "you"]}},
-            {"IS_PUNCT": False, "OP": "?"},  # optional 'll or will
+            # "you'll" tokenizes as [you, 'll]; this optional token is the 'll or "will", which is not punctuation.
+            {"IS_PUNCT": False, "OP": "?"},
             {"LOWER": "do"},
         ],
     },
@@ -98,8 +86,6 @@ SECTION_RULER_PATTERNS: List[Dict[str, Any]] = [
         "type": "regex",
     },
     # =================================================================
-    # FILTER SECTIONS (skip extraction from these)
-    # =================================================================
     {
         "label": "SECTION_BENEFITS",
         "pattern": [
@@ -121,39 +107,25 @@ SECTION_RULER_PATTERNS: List[Dict[str, Any]] = [
 ]
 
 
-# =============================================================================
-# CONFIDENCE ADJUSTMENTS BY SECTION
-# =============================================================================
-# Applied to base pattern confidence when extracting from specific sections.
-# Range: -0.50 to +0.50. Final confidence clamped to [0.0, 1.0].
-
+# Added to base pattern confidence; range -0.50 to +0.50, final confidence clamped to [0.0, 1.0].
 CONFIDENCE_ADJUSTMENT_BY_SECTION: Dict[str, float] = {
-    # High priority sections (explicit requirements)
     "SECTION_REQUIREMENTS": 0.15,
     "SECTION_QUALIFICATIONS": 0.10,
     "SECTION_TECHNICAL_SKILLS": 0.12,
-    "SECTION_KNOWLEDGE_SKILLS": 0.12,  # NEW: explicit "Skills & Abilities" section
-    # Medium priority sections
+    "SECTION_KNOWLEDGE_SKILLS": 0.12,
     "SECTION_EXPERIENCE": 0.08,
-    "SECTION_IN_OFFICE": 0.08,  # NEW: location/on-site requirement
+    "SECTION_IN_OFFICE": 0.08,
     "SECTION_EDUCATION": 0.05,
-    # Lower priority sections
     "SECTION_PREFERRED_SKILLS": -0.15,
     "SECTION_NICE_TO_HAVE": -0.25,
-    "SECTION_WHAT_YOU_DO": -0.05,  # NEW: responsibilities, not requirements
-    # Filter sections (exclude from extraction)
+    "SECTION_WHAT_YOU_DO": -0.05,
     "SECTION_BENEFITS": -0.50,
     "SECTION_COMPENSATION": -0.50,
     "SECTION_HIRING_PROCESS": -0.50,
 }
 
 
-# =============================================================================
-# SECTION DISPLAY NAMES (Human-Readable Labels)
-# =============================================================================
-
 SECTION_DISPLAY_NAMES: Dict[str, str] = {
-    # Token-based patterns
     "SECTION_REQUIREMENTS": "Requirements",
     "SECTION_QUALIFICATIONS": "Qualifications",
     "SECTION_TECHNICAL_SKILLS": "Technical Skills",
@@ -165,18 +137,13 @@ SECTION_DISPLAY_NAMES: Dict[str, str] = {
     "SECTION_KNOWLEDGE_SKILLS": "Knowledge, Skills & Abilities",
     "SECTION_IN_OFFICE": "In Office Requirements",
     "SECTION_WHAT_YOU_DO": "What You'll Do",
-    # Filter sections
     "SECTION_BENEFITS": "Benefits",
     "SECTION_COMPENSATION": "Compensation",
     "SECTION_HIRING_PROCESS": "Hiring Process",
 }
 
 
-# =============================================================================
-# DEFAULT TARGET SECTIONS (Extract Requirements From These)
-# =============================================================================
-# Excludes filter sections automatically.
-
+# SECTION_WHAT_YOU_DO is intentionally excluded (responsibilities, not requirements; penalty -0.05).
 DEFAULT_TARGET_SECTIONS: List[str] = [
     "SECTION_REQUIREMENTS",
     "SECTION_QUALIFICATIONS",
@@ -185,7 +152,6 @@ DEFAULT_TARGET_SECTIONS: List[str] = [
     "SECTION_NICE_TO_HAVE",
     "SECTION_EDUCATION",
     "SECTION_EXPERIENCE",
-    "SECTION_KNOWLEDGE_SKILLS",  # NEW: from regex pattern
-    "SECTION_IN_OFFICE",  # NEW: from regex pattern
-    # SECTION_WHAT_YOU_DO intentionally excluded (responsibilities, penalty -0.05)
+    "SECTION_KNOWLEDGE_SKILLS",
+    "SECTION_IN_OFFICE",
 ]
