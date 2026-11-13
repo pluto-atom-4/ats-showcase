@@ -5,9 +5,11 @@ import re
 import tempfile
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from src.cli import app
+from src.config.models import DEFAULT_MODEL, get_model_pricing
 from src.storage.job_store import JobStore
 
 runner = CliRunner()
@@ -297,3 +299,34 @@ class TestCostAnalysisCommand:
                 output = output[json_start:]
             output_data = json.loads(output)
             assert output_data["migration_progress_percent"] == 25.0
+
+    def test_cost_analysis_token_rate_matches_default_model_pricing(self) -> None:
+        """Token rate line reflects DEFAULT_MODEL input pricing, not a hardcoded rate."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = str(Path(tmpdir) / "test.db")
+
+            store = JobStore(db_path)
+            store.add_job(
+                job_id="job_v1",
+                title="Python Developer",
+                company="Tech Corp",
+                preprocessing_version="v1.0",
+                tokens=1000,
+            )
+            store.add_job(
+                job_id="job_v2",
+                title="Senior Developer",
+                company="Tech Corp",
+                preprocessing_version="v2.0",
+                tokens=650,
+            )
+            store.close()
+
+            result = runner.invoke(app, ["cost-analysis", "--db", db_path])
+
+            assert result.exit_code == 0
+            clean_output = strip_ansi(result.stdout)
+            match = re.search(r"Token rate used:\s+\$([\d.]+) per 1M tokens", clean_output)
+            assert match is not None
+            expected_rate, _ = get_model_pricing(DEFAULT_MODEL)
+            assert float(match.group(1)) == pytest.approx(expected_rate)
