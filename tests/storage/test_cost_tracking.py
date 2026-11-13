@@ -7,6 +7,7 @@ from typing import Generator
 
 import pytest
 
+from src.config.models import DEFAULT_MODEL, get_model_pricing
 from src.storage.cost_models import CostComparisonReport
 from src.storage.job_store import JobStore
 
@@ -294,12 +295,14 @@ class TestJobStoreCostTracking:
 
         report = store.get_cost_comparison_report()
 
-        # Token rate is $0.003 per 1M tokens; 5 jobs at 1000 tokens (v1.0) vs 650 (v2.0).
+        # 5 jobs at 1000 tokens (v1.0) vs 650 (v2.0); DEFAULT_MODEL input price is $3.00/1M.
         v1_total = 5 * 1000
         v2_total = 5 * 650
         tokens_saved = v1_total - v2_total
-        expected_savings = tokens_saved * (0.003 / 1_000_000)
+        rate_per_token = get_model_pricing(DEFAULT_MODEL)[0] / 1_000_000
+        expected_savings = tokens_saved * rate_per_token
 
+        assert expected_savings == pytest.approx(0.00525, abs=1e-12)
         assert report.estimated_savings_usd == pytest.approx(expected_savings, abs=1e-8)
 
         store.close()
