@@ -264,7 +264,6 @@ class IntegrityChecker:
         issues: List[IntegrityIssue] = []
         try:
             cursor = self.conn.cursor()
-            # Check if jobs table exists
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='jobs'")
             if not cursor.fetchone():
                 logger.info("Skipping status inconsistency check (jobs table not found)")
@@ -309,13 +308,11 @@ class IntegrityChecker:
         try:
             cursor = self.conn.cursor()
 
-            # Check if job_reviews table exists
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='job_reviews'")
             if not cursor.fetchone():
                 logger.info("job_reviews table not found, skipping anomaly check")
                 return issues
 
-            # Check for NULL job_ids
             cursor.execute("SELECT COUNT(*) FROM job_reviews WHERE job_id IS NULL")
             null_count = cursor.fetchone()[0]
 
@@ -333,7 +330,6 @@ class IntegrityChecker:
                     )
                 )
 
-            # Check for reviews referencing non-existent job_assessments
             cursor.execute(
                 """
                 SELECT COUNT(DISTINCT r.job_id)
@@ -398,7 +394,6 @@ class IntegrityChecker:
         issues: List[IntegrityIssue] = []
         try:
             cursor = self.conn.cursor()
-            # Check for NULL job_ids in FTS
             query = """
                 SELECT COUNT(*)
                 FROM job_assessments_fts
@@ -466,7 +461,6 @@ class IntegrityChecker:
         logger.info("Starting full integrity check")
         self.issues = []
 
-        # Run all checks
         self.issues.extend(self.check_orphaned_assessments())
         self.issues.extend(self.check_orphaned_preprocessed())
         self.issues.extend(self.check_invalid_scores())
@@ -480,7 +474,6 @@ class IntegrityChecker:
         self.issues.extend(self.check_null_job_ids())
         self.issues.extend(self.check_job_reviews_anomalies())
 
-        # Aggregate results
         summary_by_type: dict[str, int] = {}
         for issue in self.issues:
             summary_by_type[issue.issue_type] = summary_by_type.get(issue.issue_type, 0) + 1
@@ -525,9 +518,7 @@ class IntegrityChecker:
 
         return recommendations
 
-    # ------------------------------------------------------------------
     # Duplicate inspection (issue #786): read-only, advisory only
-    # ------------------------------------------------------------------
 
     _JOB_LIST_KEYS = ("jobs", "items", "results", "data")
 

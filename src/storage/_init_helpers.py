@@ -28,14 +28,11 @@ def initialize_db_common(
     Raises:
         sqlite3.OperationalError: If table creation fails
     """
-    # Create parent directory if needed
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
-    # Connect to database
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
 
-    # Execute all table creation statements
     cursor = conn.cursor()
     for table_name, sql in tables_dict.items():
         try:

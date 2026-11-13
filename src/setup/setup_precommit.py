@@ -181,31 +181,26 @@ class PreCommitSetup:
         """
         self._print_header("🚀 Pre-commit Setup for ATS Showcase")
 
-        # Step 1: Check prerequisites
         self._print_step("1", "Checking prerequisites")
         if not self.check_git_installed():
             return 1
         if not self.check_pre_commit_installed():
             return 1
 
-        # Step 2: Validate config
         self._print_step("2", "Validating configuration")
         if not self.validate_config():
             return 1
 
-        # Step 3: Install hooks
         self._print_step("3", "Installing hooks")
         if not self.install_hooks():
             return 1
 
-        # Step 4: Run hooks (optional)
         if not skip_full_run:
             self._print_step("4", "Testing hooks on all files")
             if not self.run_all_hooks():
                 self._print_warning("\n⚠️  Some formatting needed. Review changes and commit.")
-                return 0  # Not a critical failure
+                return 0
 
-        # Success
         self._print_footer(
             "✨ Pre-commit setup complete!\n"
             "\n📋 Next steps:"
@@ -218,7 +213,6 @@ class PreCommitSetup:
         )
         return 0
 
-    # Helper methods for output formatting
     def _print_header(self, text: str) -> None:
         """Print section header."""
         print(f"\n{Colors.BOLD}{Colors.BLUE}{'=' * 60}{Colors.RESET}")

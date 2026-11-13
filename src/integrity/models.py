@@ -9,12 +9,12 @@ from typing import Dict, List, Optional
 class IntegrityIssue:
     """Single integrity anomaly detected during checks."""
 
-    issue_type: str  # 'orphaned_assessment', 'invalid_score', 'malformed_json', etc.
-    severity: str  # 'error', 'warning', 'info'
-    table: str  # 'assessments', 'preprocessed_jobs', 'cost_tracking', etc.
-    record_id: str  # job_id, assessment_id, or primary key
-    details: str  # Error message or anomaly description
-    suggested_action: str  # 'Delete orphaned record', 'Set recommendations to NULL', etc.
+    issue_type: str
+    severity: str
+    table: str
+    record_id: str
+    details: str
+    suggested_action: str
 
 
 @dataclass

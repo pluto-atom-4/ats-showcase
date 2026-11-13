@@ -21,7 +21,6 @@ def migrate_jobs_table_add_crawled_at(conn: sqlite3.Connection) -> bool:
     """
     cursor = conn.cursor()
 
-    # Check if crawled_at already exists
     cursor.execute("PRAGMA table_info(jobs)")
     columns = {row[1] for row in cursor.fetchall()}
 
@@ -34,13 +33,10 @@ def migrate_jobs_table_add_crawled_at(conn: sqlite3.Connection) -> bool:
         return False
 
     try:
-        # Add crawled_at column (allow NULL temporarily)
         cursor.execute("ALTER TABLE jobs ADD COLUMN crawled_at DATETIME")
 
-        # Copy data from crawled_date
         cursor.execute("UPDATE jobs SET crawled_at = crawled_date WHERE crawled_at IS NULL")
 
-        # Create index on crawled_at for query performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_crawled_at ON jobs(crawled_at DESC)")
 
         conn.commit()
@@ -76,7 +72,6 @@ def migrate_cost_tracking_add_reprocessing_columns(conn: sqlite3.Connection) -> 
     """
     cursor = conn.cursor()
 
-    # Check if migration already applied
     cursor.execute("PRAGMA table_info(cost_tracking)")
     columns = {row[1] for row in cursor.fetchall()}
 
@@ -85,7 +80,6 @@ def migrate_cost_tracking_add_reprocessing_columns(conn: sqlite3.Connection) -> 
         return False
 
     try:
-        # Add new columns for re-preprocessing tracking
         cursor.execute("ALTER TABLE cost_tracking ADD COLUMN preprocessing_version_before TEXT")
         cursor.execute("ALTER TABLE cost_tracking ADD COLUMN preprocessing_version_after TEXT")
         cursor.execute("ALTER TABLE cost_tracking ADD COLUMN tokens_before INTEGER")
@@ -94,7 +88,6 @@ def migrate_cost_tracking_add_reprocessing_columns(conn: sqlite3.Connection) -> 
         cursor.execute("ALTER TABLE cost_tracking ADD COLUMN estimated_cost_after REAL")
         cursor.execute("ALTER TABLE cost_tracking ADD COLUMN is_re_preprocessing BOOLEAN DEFAULT FALSE")
 
-        # Create index on is_re_preprocessing for faster queries
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_cost_reprocessing ON cost_tracking(is_re_preprocessing)")
 
         conn.commit()

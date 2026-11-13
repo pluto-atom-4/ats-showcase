@@ -169,5 +169,5 @@ class QualityComparisonReport:
             "improvement_rate": round(self.improvement_rate, 2),
             "avg_score_delta": round(self.avg_score_delta, 2),
             "regression_risk_jobs_count": len(self.regression_risk_jobs),
-            "regression_risk_jobs": self.regression_risk_jobs[:20],  # Show top 20 regressions
+            "regression_risk_jobs": self.regression_risk_jobs[:20],
         }

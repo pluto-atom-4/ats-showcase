@@ -35,12 +35,6 @@ class Database:
 
     def _create_tables(self) -> None:
         """Create all necessary tables."""
-        # TODO: Implement table creation from SQL schema
-        # Tables needed:
-        # - jobs (job postings)
-        # - preprocessed_jobs (cleaned/chunked versions)
-        # - assessments (CV match results)
-        # - cost_tracking (token and cost logs)
         pass
 
     def close(self) -> None:
@@ -74,7 +68,6 @@ class Database:
         return cursor
 
 
-# Schema definitions as SQL strings
 SCHEMA = {
     "jobs": """
         CREATE TABLE IF NOT EXISTS jobs (

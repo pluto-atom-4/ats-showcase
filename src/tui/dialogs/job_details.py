@@ -57,11 +57,9 @@ class JobDetailsPanel(Static):
         """Render job assessment details."""
         lines = [f"[b]Job Assessment: {self.job_data.get('title', 'Unknown')}[/b]"]
 
-        # Overall score
         overall = self.job_data.get("overall_score", 0)
         lines.append(f"\n[b]Overall Match Score:[/b] {overall:.0f}/100")
 
-        # Category scores
         lines.append("\n[b]Category Breakdown:[/b]")
         tech_score = self.job_data.get("tech_score", 0)
         lines.append(f"  • Technical Skills: {tech_score:.0f}/100")
@@ -72,18 +70,16 @@ class JobDetailsPanel(Static):
         location_score = self.job_data.get("location_score", 0)
         lines.append(f"  • Location Match: {location_score:.0f}/100")
 
-        # Assessment summary from Claude
         summary = self.job_data.get("assessment_summary", "")
         if summary:
             lines.append("\n[b]Assessment Summary:[/b]")
             summary_text = truncate(summary, max_len=500)
             lines.append(f"  {summary_text}")
 
-        # Recommendations
         recommendations = self.job_data.get("recommendations", [])
         if recommendations:
             lines.append("\n[b]Recommendations:[/b]")
-            for rec in recommendations[:5]:  # Show top 5
+            for rec in recommendations[:5]:
                 lines.append(f"  • {rec}")
 
         return "\n".join(lines)

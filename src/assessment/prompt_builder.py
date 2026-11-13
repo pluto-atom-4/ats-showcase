@@ -6,7 +6,6 @@ from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# System prompt for job assessment
 SYSTEM_PROMPT = """You are an expert recruiter and technical interviewer.
 
 Your task: Assess how well a candidate's CV matches a job posting.
@@ -59,7 +58,6 @@ class PromptBuilder:
 
         skills, tech, requirements = extracted_entities
 
-        # Format entities
         entity_section = ""
         if skills or tech or requirements:
             entity_section = "\n## Job Requirements (Extracted)\n"
@@ -70,13 +68,11 @@ class PromptBuilder:
             if requirements:
                 entity_section += f"\n**Other Requirements:** {', '.join(requirements)}"
 
-        # Format chunks
         chunks_section = ""
         if chunks:
             chunks_section = "\n### Job Description (Semantic Chunks)\n\n"
             chunks_section += "\n".join(f"- {chunk}" for chunk in chunks)
         else:
-            # If no chunks, include full job description
             chunks_section = f"\n### Job Description\n\n{job_description}"
 
         prompt = f"""{SYSTEM_PROMPT}
@@ -162,7 +158,6 @@ JSON:"""
             chunks_section = "\n### Job Description (Semantic Chunks)\n\n"
             chunks_section += "\n".join(f"- {chunk}" for chunk in chunks[:3])
         else:
-            # If no chunks, include full job description
             chunks_section = f"\n### Job Description\n\n{job_description}"
 
         prompt = f"""{SYSTEM_PROMPT}

@@ -29,7 +29,6 @@ class JobStore:
 
     def _initialize_db(self) -> None:
         """Initialize database and schema."""
-        # Use common initialization helper with job-related schemas
         tables = {"job_reviews": JOBS_TABLE_SQL}
         self.conn = initialize_db_common(self.db_path, tables)
         logger.info("Initialized job store database")
@@ -41,13 +40,12 @@ class JobStore:
             return
         cursor = self.conn.cursor()
 
-        # Add preprocessing_version column if missing (Phase 2)
         try:
             cursor.execute("ALTER TABLE job_reviews ADD COLUMN preprocessing_version TEXT DEFAULT 'v2.0'")
             self.conn.commit()
             logger.info("Added preprocessing_version column to job_reviews")
         except sqlite3.OperationalError:
-            pass  # Column already exists
+            pass
 
     def add_job(
         self,
@@ -75,7 +73,6 @@ class JobStore:
         if not self.conn:
             return
 
-        # Normalize version to v-prefixed format
         version_query = preprocessing_version if preprocessing_version.startswith("v") else f"v{preprocessing_version}"
 
         cursor = self.conn.cursor()
@@ -118,7 +115,6 @@ class JobStore:
             ValueError: If version not valid
             sqlite3.OperationalError: If job_id not found
         """
-        # Normalize version
         clean_version = version.replace("v", "")
         if clean_version not in VALID_PREPROCESSING_VERSIONS:
             raise ValueError(f"Invalid preprocessing version: {version}. Must be one of {VALID_PREPROCESSING_VERSIONS}")
@@ -126,7 +122,6 @@ class JobStore:
         if not self.conn:
             raise RuntimeError("Database connection not available")
 
-        # Format for storage
         version_query = version if version.startswith("v") else f"v{version}"
 
         cursor = self.conn.cursor()
@@ -154,7 +149,6 @@ class JobStore:
         Raises:
             ValueError: If version not valid
         """
-        # Normalize and validate version
         clean_version = version.replace("v", "")
         if clean_version not in VALID_PREPROCESSING_VERSIONS:
             raise ValueError(f"Invalid preprocessing version: {version}. Must be one of {VALID_PREPROCESSING_VERSIONS}")
@@ -162,7 +156,6 @@ class JobStore:
         if not self.conn:
             return []
 
-        # Format for query
         version_query = version if version.startswith("v") else f"v{version}"
 
         cursor = self.conn.cursor()
@@ -196,9 +189,8 @@ class JobStore:
 
         stats: Dict[str, int] = {}
         for row in cursor.fetchall():
-            version = row[0] or "unknown"  # Handle NULL
+            version = row[0] or "unknown"
             count = row[1]
-            # Normalize version (remove 'v' prefix for return)
             clean_version = version.replace("v", "")
             stats[clean_version] = count
 
@@ -236,10 +228,8 @@ class JobStore:
 
         cursor = self.conn.cursor()
 
-        # Create cost_tracking table if it doesn't exist
         cursor.execute(COST_TRACKING_TABLE_SQL)
 
-        # Check and add missing columns
         cursor.execute("PRAGMA table_info(cost_tracking)")
         columns = {row[1] for row in cursor.fetchall()}
 
@@ -259,7 +249,7 @@ class JobStore:
                     cursor.execute(f"ALTER TABLE cost_tracking ADD COLUMN {col_name} {col_type}")
                     logger.info(f"Added column {col_name} to cost_tracking")
                 except sqlite3.OperationalError:
-                    pass  # Column already exists
+                    pass
 
         self.conn.commit()
 
@@ -294,7 +284,6 @@ class JobStore:
 
         cursor = self.conn.cursor()
 
-        # Normalize versions
         version_before_normalized = version_before if version_before.startswith("v") else f"v{version_before}"
         version_after_normalized = version_after if version_after.startswith("v") else f"v{version_after}"
 
@@ -343,14 +332,12 @@ class JobStore:
         cursor = self.conn.cursor()
         report = CostComparisonReport()
 
-        # Count jobs by version
         cursor.execute("SELECT COUNT(*) FROM job_reviews WHERE preprocessing_version = 'v1.0'")
         report.total_jobs_v1_0 = cursor.fetchone()[0] or 0
 
         cursor.execute("SELECT COUNT(*) FROM job_reviews WHERE preprocessing_version = 'v2.0'")
         report.total_jobs_v2_0 = cursor.fetchone()[0] or 0
 
-        # Calculate tokens by version
         cursor.execute("SELECT SUM(tokens) FROM job_reviews WHERE preprocessing_version = 'v1.0'")
         result = cursor.fetchone()
         report.total_tokens_v1_0 = result[0] or 0
@@ -359,19 +346,17 @@ class JobStore:
         result = cursor.fetchone()
         report.total_tokens_v2_0 = result[0] or 0
 
-        # Calculate averages
         if report.total_jobs_v1_0 > 0:
             report.avg_tokens_per_job_v1_0 = report.total_tokens_v1_0 / report.total_jobs_v1_0
         if report.total_jobs_v2_0 > 0:
             report.avg_tokens_per_job_v2_0 = report.total_tokens_v2_0 / report.total_jobs_v2_0
 
-        # Estimate total savings (assuming $0.003 per 1M tokens for input)
+        # Assumed input price: $0.003 per 1M tokens
         token_rate = 0.003 / 1_000_000
         if report.total_tokens_v1_0 > 0 and report.total_tokens_v2_0 > 0:
             tokens_saved = report.total_tokens_v1_0 - report.total_tokens_v2_0
             report.estimated_savings_usd = tokens_saved * token_rate
 
-        # Get re-preprocessing metrics
         cursor.execute(
             """SELECT job_id, preprocessing_version_before, preprocessing_version_after,
                       tokens_before, tokens_after, estimated_cost_before, estimated_cost_after
@@ -429,7 +414,6 @@ class JobStore:
         Raises:
             ValueError: If version not valid
         """
-        # Normalize and validate version
         clean_version = version.replace("v", "")
         if clean_version not in VALID_PREPROCESSING_VERSIONS:
             raise ValueError(f"Invalid preprocessing version: {version}. Must be one of {VALID_PREPROCESSING_VERSIONS}")
@@ -437,38 +421,29 @@ class JobStore:
         if not self.conn:
             return []
 
-        # Format for query
         version_query = version if version.startswith("v") else f"v{version}"
 
-        # Build query dynamically based on filters
         query = "SELECT * FROM job_reviews WHERE preprocessing_version = ?"
         params: List[Any] = [version_query]
 
-        # Age filter: jobs preprocessed at least min_age_days ago
         if min_age_days is not None and min_age_days > 0:
             query += f" AND datetime(preprocessed_at) <= datetime('now', '-{min_age_days} days')"
 
-        # Score filter: only jobs with low scores (potential improvement candidates)
         if max_score is not None:
-            # Note: This requires a joined assessments table or score column
-            # For now, we note that future implementation will add assessment score tracking
+            # Score filtering is not implemented: no score column is joined here
             pass
 
-        # Token filter: only high-token jobs (most savings potential)
         if min_tokens is not None and min_tokens > 0:
             query += " AND tokens >= ?"
             params.append(min_tokens)
 
-        # Company filter: restrict to specific companies
         if company_names is not None and len(company_names) > 0:
             placeholders = ", ".join("?" * len(company_names))
             query += f" AND company IN ({placeholders})"
             params.extend(company_names)
 
-        # Order by oldest first (prioritize older jobs)
         query += " ORDER BY preprocessed_at ASC"
 
-        # Apply batch limit for safety
         if limit is not None and limit > 0:
             query += f" LIMIT {limit}"
 
@@ -488,7 +463,6 @@ class JobStore:
 
         cursor = self.conn.cursor()
 
-        # Create quality_tracking table if it doesn't exist
         cursor.execute(QUALITY_TRACKING_TABLE_SQL)
 
         self.conn.commit()
@@ -520,7 +494,6 @@ class JobStore:
 
         cursor = self.conn.cursor()
 
-        # Normalize versions
         version_before_normalized = (
             preprocessing_version_before
             if preprocessing_version_before.startswith("v")
@@ -578,7 +551,6 @@ class JobStore:
         new_score = row[4]
         delta = row[5]
 
-        # Create quality metric
         metric = QualityImpactMetrics(
             job_id=job_id,
             preprocessing_version_before=version_before,
@@ -589,7 +561,6 @@ class JobStore:
         )
         report.quality_metrics.append(metric)
 
-        # Track improvements and declines
         if delta > 0:
             report.score_improved += 1
             if delta > report.max_score_improvement:
@@ -598,7 +569,6 @@ class JobStore:
             report.score_declined += 1
             if abs(delta) > abs(report.max_score_decline):
                 report.max_score_decline = delta
-            # Flag regressions (score decline >= 10 points)
             if abs(delta) >= 10:
                 regression_risk_jobs.append(job_id)
         else:
@@ -626,7 +596,6 @@ class JobStore:
         cursor = self.conn.cursor()
         report = QualityComparisonReport()
 
-        # Get all quality tracking records
         query = """SELECT job_id, preprocessing_version_before, preprocessing_version_after,
                           previous_assessment_score, new_assessment_score, score_delta, timestamp
                    FROM quality_tracking
@@ -641,7 +610,6 @@ class JobStore:
         if not rows:
             return QualityComparisonReport()
 
-        # Track metrics
         total_scores_before = 0
         total_scores_after = 0
         regression_risk_jobs: List[str] = []
@@ -651,7 +619,6 @@ class JobStore:
             total_scores_before += score_before
             total_scores_after += score_after
 
-        # Calculate totals and averages
         report.total_comparisons = len(rows)
         if report.total_comparisons > 0:
             report.avg_score_before = total_scores_before / report.total_comparisons

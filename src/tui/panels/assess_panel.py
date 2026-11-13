@@ -41,19 +41,15 @@ class AssessPanel(BasePanelWidget):
 
     def compose(self) -> ComposeResult:
         """Render assess panel with table and expandable details."""
-        # Header with progress
         yield Static(id="assess-header")
 
-        # Search and filter inputs
         with Vertical(id="search-filter-bar"):
             yield SearchInput(id="job-search")
             yield FilterBar(id="job-filter")
 
-        # Job table
         self.job_table = JobTable(self.state, id="assess-table")
         yield self.job_table
 
-        # Details panel (hidden by default, shown when row expanded)
         self.details_panel = JobDetailsPanel("", {})
         self.details_panel.styles.display = "none"
         yield self.details_panel
@@ -74,10 +70,8 @@ class AssessPanel(BasePanelWidget):
         if self.job_table is None:
             return
 
-        # Filter jobs that have been assessed (have overall_score)
         assessed_jobs = [job for job in self.state.jobs.values() if job.get("overall_score") is not None]
 
-        # Sort by score descending
         assessed_jobs.sort(key=lambda j: j.get("overall_score", 0), reverse=True)
 
         self.job_table.update_rows(assessed_jobs)
@@ -113,7 +107,6 @@ class AssessPanel(BasePanelWidget):
     def on_filter_bar_filter_changed(self, message: FilterBar.FilterChanged) -> None:
         """Handle filter bar changes (status:confirmed, status:rejected, etc)."""
         if self.job_table:
-            # Parse filter string (e.g., "status:confirmed")
             filter_str = message.filters.strip()
             if filter_str.startswith("status:"):
                 status = filter_str.replace("status:", "").strip()

@@ -110,7 +110,7 @@ class JobReviewDialog(ModalScreen[Optional[str]]):
         super().__init__()
         self.job_id = job_id
         self.job_data = job_data
-        self.decision: Optional[str] = None  # "confirm" | "reject" | "skip"
+        self.decision: Optional[str] = None
 
     def on_mount(self) -> None:
         """Set focus to first button after compose completes."""
@@ -122,7 +122,6 @@ class JobReviewDialog(ModalScreen[Optional[str]]):
             confirm_btn = self.query_one("#confirm", Button)
             confirm_btn.focus()
         except Exception:
-            # If focus fails, let Textual handle default focus
             pass
 
     def _extract_entities(self) -> tuple[list[str], list[str], list[str]]:

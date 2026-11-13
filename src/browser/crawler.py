@@ -141,14 +141,12 @@ class Crawler:
                 logger.warning("No title found in container")
                 return None
 
-            # Convert relative URLs to absolute
             if link and base_url:
                 link = urljoin(base_url, link)
 
             description = ""
             requirements = None
 
-            # Fetch detail page if enabled
             fetch_detail = crawler_config.get("fetch_detail")
             logger.debug(f"fetch_detail={fetch_detail}, link exists={link is not None}")
             if fetch_detail and link:
@@ -157,7 +155,6 @@ class Crawler:
             else:
                 logger.debug(f"Skipping detail fetch (fetch_detail={fetch_detail}, link={link is not None})")
 
-            # Generate stable, unique job ID
             generated_id = generate_job_id(
                 company=company_name,
                 title=title,
@@ -243,27 +240,21 @@ class Crawler:
             description = ""
             requirements = None
 
-            # Try to extract description
             desc_selector = selectors.get("description_selector")
             if desc_selector:
                 desc_elem = await detail_page.query_selector(desc_selector)
                 if desc_elem:
-                    # Check if element is an iframe
                     tag_name = await desc_elem.evaluate("el => el.tagName.toLowerCase()")
                     if tag_name == "iframe":
-                        # For iframe: query selector within the frame
                         inner_selector = selectors.get("inner_description_selector")
                         if inner_selector:
                             description = await self._fetch_iframe_via_frame(detail_page, inner_selector)
                         else:
-                            # Fallback: get all text from iframe body
                             description = await self._fetch_iframe_via_frame(detail_page, None)
                     else:
-                        # Regular element - extract HTML (converted to markdown below)
                         desc_html = await desc_elem.inner_html()
                         description = desc_html.strip() if desc_html else ""
 
-            # Try to extract requirements
             req_selector = selectors.get("requirements_selector")
             if req_selector:
                 req_elem = await detail_page.query_selector(req_selector)
@@ -302,15 +293,12 @@ class Crawler:
             Raw HTML or plain text content from iframe, or empty string if extraction fails
         """
         try:
-            # Wait for iframe to load
             await page.wait_for_load_state("networkidle")
             await page.wait_for_timeout(500)
 
-            # Get all frames from page
             frames = page.frames
             logger.debug(f"Found {len(frames)} frames on page")
 
-            # Try each frame to find content
             for i, frame in enumerate(frames):
                 try:
                     if inner_selector:
@@ -338,13 +326,10 @@ class Crawler:
         if not elem:
             return ""
 
-        # Fallback chain: innerHTML → outerHTML → innerText
         content: str | None = await elem.inner_html()
         if not content or len(content.strip()) < 50:
-            # Fallback: try outerHTML (includes element wrapper)
             content = await elem.evaluate("el => el.outerHTML")
         if not content or len(content.strip()) < 50:
-            # Last resort: plain text
             content = await elem.text_content()
 
         content_str = content.strip() if content else ""
@@ -355,14 +340,10 @@ class Crawler:
 
     async def _extract_from_frame_body(self, frame: Any, frame_index: int) -> str:
         """Extract content from frame body using fallback chain."""
-        # Get raw HTML from frame body (preferred for preprocessing)
-        # Fallback chain: innerHTML → outerHTML → innerText
         content: str | None = await frame.evaluate("() => document.body.innerHTML")
         if not content or len(content.strip()) < 100:
-            # Fallback: try outerHTML (includes body tag)
             content = await frame.evaluate("() => document.body.outerHTML")
         if not content or len(content.strip()) < 100:
-            # Last resort: plain text content
             content = await frame.evaluate("() => document.body.innerText")
 
         if isinstance(content, str):

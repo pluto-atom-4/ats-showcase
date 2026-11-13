@@ -24,7 +24,6 @@ class DataPurger:
         try:
             cursor = self.conn.cursor()
 
-            # Find orphaned records
             query = """
                 SELECT a.job_id
                 FROM job_assessments a
@@ -42,7 +41,6 @@ class DataPurger:
                 logger.info(f"[DRY RUN] Would delete {len(orphaned)} orphaned assessments")
                 return len(orphaned), orphaned
 
-            # Actual deletion with transaction
             self.conn.execute("BEGIN TRANSACTION")
             try:
                 cursor.execute(
@@ -195,7 +193,6 @@ class DataPurger:
         try:
             cursor = self.conn.cursor()
 
-            # Count orphaned FTS entries
             query = """
                 SELECT COUNT(*)
                 FROM job_assessments_fts f
@@ -215,7 +212,6 @@ class DataPurger:
 
             self.conn.execute("BEGIN TRANSACTION")
             try:
-                # Delete orphaned FTS entries
                 cursor.execute(
                     """
                     DELETE FROM job_assessments_fts
@@ -224,12 +220,11 @@ class DataPurger:
                 )
                 deleted_count = cursor.rowcount
 
-                # Rebuild FTS index to optimize
                 cursor.execute("REINDEX job_assessments_fts")
 
                 self.conn.commit()
 
-                # Vacuum to reclaim space (must be outside transaction)
+                # VACUUM cannot run inside a transaction
                 self.conn.execute("VACUUM")
 
                 logger.info(f"Deleted {deleted_count} orphaned FTS entries and rebuilt index")
@@ -247,14 +242,12 @@ class DataPurger:
         try:
             cursor = self.conn.cursor()
 
-            # Verify job exists
             cursor.execute("SELECT id FROM jobs WHERE id = ?", (job_id,))
             if not cursor.fetchone():
                 logger.warning(f"Job {job_id} does not exist")
                 return 0, []
 
             if dry_run:
-                # Count affected records
                 cursor.execute("SELECT COUNT(*) FROM job_assessments WHERE job_id = ?", (job_id,))
                 assessments = cursor.fetchone()[0]
                 cursor.execute("SELECT COUNT(*) FROM preprocessed_jobs WHERE job_id = ?", (job_id,))
@@ -273,7 +266,6 @@ class DataPurger:
 
             self.conn.execute("BEGIN TRANSACTION")
             try:
-                # Delete in order of foreign key dependencies and count
                 total = 0
                 cursor.execute("DELETE FROM job_assessments WHERE job_id = ?", (job_id,))
                 total += cursor.rowcount
@@ -340,13 +332,11 @@ class DataPurger:
         try:
             cursor = self.conn.cursor()
 
-            # Check if job_reviews table exists
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='job_reviews'")
             if not cursor.fetchone():
                 logger.info("job_reviews table not found, nothing to purge")
                 return 0, []
 
-            # Find orphaned records
             query = """
                 SELECT job_id FROM job_reviews
                 WHERE job_id IS NULL
@@ -388,7 +378,6 @@ class DataPurger:
         try:
             cursor = self.conn.cursor()
 
-            # Count current entries
             cursor.execute("SELECT COUNT(*) FROM job_assessments")
             total_count = cursor.fetchone()[0]
 
@@ -398,10 +387,8 @@ class DataPurger:
 
             self.conn.execute("BEGIN TRANSACTION")
             try:
-                # Delete all FTS entries
                 cursor.execute("DELETE FROM job_assessments_fts")
 
-                # Re-populate from main table
                 cursor.execute(
                     """
                     INSERT INTO job_assessments_fts
@@ -411,7 +398,6 @@ class DataPurger:
                     """
                 )
 
-                # Optimize FTS index
                 cursor.execute("REINDEX job_assessments_fts")
 
                 self.conn.commit()
@@ -438,7 +424,6 @@ class DataPurger:
         try:
             cursor = self.conn.cursor()
 
-            # Find assessments with NULL job_id
             query = """
                 SELECT rowid, title, company, location
                 FROM job_assessments
@@ -452,8 +437,7 @@ class DataPurger:
                 logger.info("No assessments with NULL job_id found")
                 return 0, []
 
-            # Group by title/company/location to find duplicates
-            seen_jobs = {}  # (title, company, location) -> rowid
+            seen_jobs = {}
             duplicates = []
             for rowid, title, company, location in null_records:
                 key = (title, company, location)
@@ -473,7 +457,6 @@ class DataPurger:
             try:
                 updated_count = 0
 
-                # First, delete duplicate assessments
                 if duplicates:
                     cursor.execute(
                         "DELETE FROM job_assessments WHERE rowid IN ({})".format(",".join("?" * len(duplicates))),
@@ -481,7 +464,6 @@ class DataPurger:
                     )
                     logger.info(f"Deleted {len(duplicates)} duplicate assessments")
 
-                # Then, regenerate job_id for unique assessments
                 for (title, company, location), rowid in seen_jobs.items():
                     new_job_id = generate_job_id(
                         company=company or "Unknown",

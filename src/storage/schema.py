@@ -4,7 +4,6 @@ This module centralizes all table schema definitions to avoid duplication
 across JobStore, AssessmentStore, and other storage modules.
 """
 
-# Job Reviews Table
 JOBS_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS job_reviews (
     job_id TEXT PRIMARY KEY,
@@ -22,7 +21,6 @@ CREATE TABLE IF NOT EXISTS job_reviews (
 )
 """
 
-# Job Assessments Table
 ASSESSMENT_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS job_assessments (
     job_id TEXT PRIMARY KEY,
@@ -44,14 +42,12 @@ CREATE TABLE IF NOT EXISTS job_assessments (
 )
 """
 
-# Job Assessments Full-Text Search Index
 ASSESSMENT_FTS_SQL = """
 CREATE VIRTUAL TABLE IF NOT EXISTS job_assessments_fts USING fts5(
     job_id, title, company, summary, recommendations
 )
 """
 
-# Cost Tracking Table
 COST_TRACKING_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS cost_tracking (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,7 +68,6 @@ CREATE TABLE IF NOT EXISTS cost_tracking (
 )
 """
 
-# Quality Tracking Table (Phase 3B)
 QUALITY_TRACKING_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS quality_tracking (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

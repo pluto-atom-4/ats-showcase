@@ -27,7 +27,6 @@ class PreprocessPanel(BasePanelWidget):
 
         lines.append(self.render_phase_metrics())
 
-        # Show preprocessing-specific stats
         if metrics.processed_items > 0:
             avg_tokens = metrics.total_tokens / metrics.processed_items
             lines.append(f"Avg tokens/job: {avg_tokens:.0f}")
