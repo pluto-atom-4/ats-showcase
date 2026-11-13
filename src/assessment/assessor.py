@@ -6,6 +6,7 @@ from typing import List, Tuple
 from src.assessment.data_reshaper import DataReshaper
 from src.assessment.llm_integration import LLMProvider
 from src.assessment.types import AssessmentResult, EntityScore
+from src.config.models import DEFAULT_MODEL
 from src.tokenization.counter import TokenCounter
 from src.tokenization.preprocessor import Preprocessor
 
@@ -19,13 +20,13 @@ class Assessor:
 
     def __init__(
         self,
-        model: str = "claude-3-5-sonnet-20241022",
+        model: str = DEFAULT_MODEL,
         use_examples: bool = False,
     ):
         """Initialize assessor with LLM provider and preprocessors.
 
         Args:
-            model: Claude model to use (default: Sonnet 3.5)
+            model: Claude model to use (default: DEFAULT_MODEL)
             use_examples: Include few-shot examples in prompt (better accuracy, more tokens)
         """
         self.llm_provider = LLMProvider(model=model)
