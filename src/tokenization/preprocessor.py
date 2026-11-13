@@ -22,13 +22,8 @@ logger = logging.getLogger(__name__)
 class Preprocessor:
     """Preprocess text using spaCy for NLP tasks."""
 
-    # Section names (or substrings thereof) excluded from entity extraction
-    # by `_extract_entities_by_section` -- benefits, legal/compliance
-    # boilerplate, hiring-process logistics, etc. Exposed as a class
-    # attribute so it stays a single source of truth: other tooling (e.g.
-    # `.claude/scripts/analyze_sections.py`) should reference
-    # `Preprocessor.SKIP_SECTIONS` directly rather than re-declaring its own
-    # copy that can silently drift out of sync.
+    # Section names (or substrings) skipped by _extract_entities_by_section. Single source of truth:
+    # other tooling (e.g. .claude/scripts/analyze_sections.py) should reference Preprocessor.SKIP_SECTIONS, not copy it.
     SKIP_SECTIONS: Set[str] = {
         "benefits",
         "compensation",
@@ -179,14 +174,13 @@ class Preprocessor:
             )
             raise
 
-        # Add requirement_filter component for trigger-based requirement extraction (Phase 8a)
         if self.extract_requirements:
             try:
-                # Import the component to register it via decorator
+                # Importing registers the component via its decorator.
                 import src.preprocessing.requirement_filter  # noqa: F401
 
                 if "requirement_filter" not in self.nlp.pipe_names:
-                    # Add component before 'ner' if it exists, otherwise at end
+                    # Placed before 'ner' when present, otherwise appended.
                     anchor = "ner" if "ner" in self.nlp.pipe_names else None
                     if anchor:
                         self.nlp.add_pipe("requirement_filter", before=anchor)
@@ -194,11 +188,10 @@ class Preprocessor:
                         self.nlp.add_pipe("requirement_filter")
                     logger.info("Added requirement_filter component to pipeline")
 
-                # Add span_categorizer component for span extraction (Phase 8b)
                 import src.preprocessing.span_categorizer  # noqa: F401
 
                 if "span_categorizer" not in self.nlp.pipe_names:
-                    # Add component after requirement_filter
+                    # Must run after requirement_filter, which populates doc._.requirements.
                     self.nlp.add_pipe("span_categorizer", after="requirement_filter")
                     logger.info("Added span_categorizer component to pipeline")
             except ValueError as e:
@@ -210,7 +203,7 @@ class Preprocessor:
 
         # POC regex-only sentence splitter (Issue #638). Additive: writes only doc._.poc_sentences.
         if self.enable_poc_sentence_splitter:
-            # Import registers the factory via decorator
+            # Importing registers the factory via its decorator.
             import src.poc.sentence_splitter  # noqa: F401
 
             if "poc_sentence_splitter" not in self.nlp.pipe_names:
@@ -281,19 +274,16 @@ class Preprocessor:
         requirements: set[str] = set()
 
         try:
-            # Phase 10: Check if text is markdown
             is_md = self._is_markdown(text)
 
             if is_md:
                 logger.debug("Text is markdown format, using entity-aware section extraction")
-                # Use section-based method for intelligent extraction
                 md_skills, md_technologies, md_requirements = self._extract_entities_by_section(text)
                 skills.update(md_skills)
                 technologies.update(md_technologies)
                 requirements.update(md_requirements)
 
-                # For markdown: exclude benefits/compensation sections from full-text extraction
-                # Remove sections with headers containing: Benefits, Compensation, Salary, About, Culture, etc.
+                # For markdown, drop benefits/compensation/about/culture sections from full-text extraction.
                 skip_pattern_str = (
                     r"^#{1,3}\s+.*?"
                     r"(benefits|compensation|salary|pay|about|culture|company|how to apply)"
@@ -302,35 +292,29 @@ class Preprocessor:
                 text_to_extract = re.sub(skip_pattern_str, "", text, flags=re.MULTILINE | re.IGNORECASE | re.DOTALL)
                 text_to_clean = text_to_extract if text_to_extract.strip() else text
             else:
-                # Phase 1: Smart filtering pipeline
-                # 1. Extract job section (ignore boilerplate sections)
-                # Fallback to original text if no job section found
+                # Plain text: restrict to the job section, falling back to the full text when none is found.
                 job_section = self._extract_job_section(text)
                 text_to_clean = job_section if job_section.strip() else text
 
-            # 2. Remove boilerplate (salary, legal, location metadata)
+            # Remove boilerplate (salary, legal, location metadata)
             cleaned_text = self._remove_boilerplate(text_to_clean)
 
-            # 3. Extract entities from cleaned text
+            # Extract entities from the cleaned text
             doc = self.nlp(cleaned_text)
             tech_keywords = self._get_tech_keywords()
 
             # Extract from NER (named entities) - always do this for comprehensive extraction
             self._extract_from_ner(doc, tech_keywords, technologies, requirements)
 
-            # Extract from POS tags and noun compounds, capturing POS info for optimization
             entity_pos_tags: dict[str, str] = {}
             self._extract_from_tokens(doc, tech_keywords, skills, technologies, entity_pos_tags)
 
-            # Extract soft skills from text
-            # For markdown: include soft skills from skills sections (_extract_entities_by_section)
-            # For plain text: extract soft skills from full text
+            # Markdown gets soft skills per skills section (_extract_entities_by_section); plain text uses full text.
             soft_skills_set: set[str] = set()
             if not is_md:
                 self._extract_soft_skills(doc, soft_skills_set)
 
-            # Reclassify technical compounds (Phase 4)
-            # Move compound phrases from skills to technologies
+            # Reclassify technical compounds: move compound phrases from skills to technologies.
             skills_list = list(skills) + list(soft_skills_set)
             reclassified_skills: list[str] = []
             for skill in skills_list:
@@ -339,8 +323,7 @@ class Preprocessor:
                 else:
                     reclassified_skills.append(skill)
 
-            # 5. Filter entities (remove noise, duplicates, short fragments)
-            # Pass pre-computed POS tags to avoid double NLP processing (Phase 3 optimization)
+            # Filter noise, duplicates and short fragments; pass pre-computed POS tags to avoid a second NLP pass.
             skills = set(
                 self._filter_entities(reclassified_skills, entity_type="skills", entity_pos_tags=entity_pos_tags)
             )
@@ -386,16 +369,13 @@ class Preprocessor:
             return None
 
         try:
-            # Process text through spaCy pipeline (includes requirement_filter)
             doc = self.nlp(text)
 
-            # Extract requirements from Doc._.requirements attribute
             requirements_data = getattr(doc._, "requirements", None)
 
             if not requirements_data:
                 return None
 
-            # Convert to JSON string for storage
             return json.dumps(requirements_data, ensure_ascii=False)
 
         except Exception as e:
@@ -470,7 +450,6 @@ class Preprocessor:
             if not token_text:
                 continue
 
-            # Check if token matches tech keywords
             if token_text.lower() in tech_keywords:
                 technologies.add(token_text)
                 entity_pos_tags[token_text] = token.pos_
@@ -478,11 +457,9 @@ class Preprocessor:
                 technologies.add(token.text)
                 entity_pos_tags[token.text] = token.pos_
 
-            # Extract noun compounds as skills
             if token.pos_ in ("NOUN", "PROPN") and token.dep_ in ("compound", "nmod", "attr") and len(token_text) > 3:
                 parent = token.head
                 if parent.pos_ in ("NOUN", "PROPN"):
-                    # Collect only meaningful tokens (not punctuation or conjunctions)
                     phrase_tokens = [
                         child.text
                         for child in doc
@@ -494,10 +471,8 @@ class Preprocessor:
                         phrase = " ".join(phrase_tokens)
                         if len(phrase) > 3 and "job" not in phrase.lower():
                             skills.add(phrase)
-                            # Store POS tag of first meaningful token in phrase
                             entity_pos_tags[phrase] = "NOUN"
 
-            # Extract adjectives (with POS tag for later filtering)
             if token.pos_ == "ADJ" and len(token_text) > 4:
                 if token_text.lower() not in exclude_skills:
                     skills.add(token_text)
@@ -525,7 +500,6 @@ class Preprocessor:
         try:
             doc = self.nlp(text)
 
-            # Terms to preserve (never remove as stopwords)
             preserve_terms = {
                 "require",
                 "required",
@@ -541,11 +515,7 @@ class Preprocessor:
 
             filtered_tokens = []
             for token in doc:
-                # Keep if:
-                # 1. Not a stopword
-                # 2. Is a stopword but in preserve list
-                # 3. Is named entity
-                # 4. Is punctuation (keep for structure)
+                # Keep tokens that are non-stopwords, preserved terms, named entities or punctuation.
                 if not token.is_stop or token.lemma_.lower() in preserve_terms or token.ent_type_ or token.is_punct:
                     filtered_tokens.append(token.text)
 
@@ -568,8 +538,7 @@ class Preprocessor:
 
         import re
 
-        # Job requirement section headers (in priority order)
-        # Match headers that are followed by colon or newline (to avoid matching mid-sentence)
+        # Job section headers in priority order; must be followed by a colon or newline to avoid mid-sentence matches.
         job_section_headers = [
             (
                 r"(?i)(qualifications|requirements|what we're looking for|what we need|"
@@ -582,7 +551,7 @@ class Preprocessor:
             r"(?i)(skills|technical skills|core skills|desired skills)(?:\s*[:|\n])",
         ]
 
-        # Cutoff markers (stop extraction after these)
+        # Cutoff markers: extraction stops at these.
         cutoff_markers = [
             "equal opportunity",
             "affirmative action",
@@ -595,7 +564,6 @@ class Preprocessor:
             "compensation",
         ]
 
-        # Find first job section marker
         first_match = None
         for pattern in job_section_headers:
             match = re.search(pattern, text)
@@ -607,17 +575,14 @@ class Preprocessor:
             logger.debug("No formal job section found, will use full text")
             return ""
 
-        # Start extraction after the header
         start_idx = first_match.end()
 
-        # Find first cutoff marker
         cutoff_idx = len(text)
         for marker in cutoff_markers:
             idx = text.lower().find(marker)
             if idx != -1 and idx > start_idx:
                 cutoff_idx = min(cutoff_idx, idx)
 
-        # Extract section between markers
         section = text[start_idx:cutoff_idx]
         logger.debug(f"Extracted job section: {len(section)} chars from {len(text)}")
         return section
@@ -629,14 +594,14 @@ class Preprocessor:
 
         import re
 
-        # Patterns to remove
+        # Salary, location metadata, legal, compliance and benefits lines.
         boilerplate_patterns = [
-            r"salary.*?(\n|$)",  # Salary mentions
-            r"\$[\d,]+.*?(?:year|hour|annually)",  # Salary ranges
-            r"(?:remote|on-site|location).*?(?:\n|$)",  # Location metadata
-            r"(?:equal opportunity|affirmative action|fcra|dbids).*?(?:\n|$)",  # Legal
-            r"(?:background check|export control).*?(?:\n|$)",  # Compliance
-            r"(?:benefits|compensation|401\(k\)|health insurance).*?(?:\n|$)",  # Benefits
+            r"salary.*?(\n|$)",
+            r"\$[\d,]+.*?(?:year|hour|annually)",
+            r"(?:remote|on-site|location).*?(?:\n|$)",
+            r"(?:equal opportunity|affirmative action|fcra|dbids).*?(?:\n|$)",
+            r"(?:background check|export control).*?(?:\n|$)",
+            r"(?:benefits|compensation|401\(k\)|health insurance).*?(?:\n|$)",
         ]
 
         cleaned = text
@@ -660,17 +625,14 @@ class Preprocessor:
         Returns:
             True if entity should be skipped, False otherwise
         """
-        # Length validation (Phase 1: conservative)
-        # Requirements can be longer phrases (100 chars), skills/tech shorter (70 chars)
+        # Requirement phrases run longer than skill and technology names, hence 100 vs 70 chars.
         max_length = 100 if entity_type == "requirements" else 70
         if len(entity_clean) < 2 or len(entity_clean) > max_length:
             return True
 
-        # Skip markdown header artifacts (e.g. stray "# Requirements" fragments)
         if entity_clean.startswith("#"):
             return True
 
-        # Skip boilerplate keywords
         if any(kw in entity_lower for kw in boilerplate_keywords):
             return True
 
@@ -690,11 +652,9 @@ class Preprocessor:
         Returns:
             True if entity is numeric or cost-related, False otherwise
         """
-        # Skip pure numbers or numbers with decimals
         if re.match(r"^\d+(\.\d+)?$", entity_clean):
             return True
 
-        # Skip salary/cost ranges with $ or commas
         if "$" in entity_clean or ("range" in entity_lower and ":" in entity_clean):
             return True
 
@@ -710,7 +670,6 @@ class Preprocessor:
         Returns:
             True if entity should be skipped, False otherwise
         """
-        # Skip items ending with colon (artifacts)
         if entity_clean.rstrip().endswith(":"):
             return True
 
@@ -718,7 +677,6 @@ class Preprocessor:
         if entity_clean.endswith("'s") or entity_clean.endswith("'"):
             return True
 
-        # Skip articles at start (the, a, an)
         if words and words[0] in ("the", "a", "an"):
             return True
 
@@ -740,11 +698,9 @@ class Preprocessor:
             if entity_lower in ("one", "review", "oversees"):
                 return True
 
-        # Skip incomplete phrases
         if entity_clean in ("s of Service", "Oversees"):
             return True
 
-        # Skip generic phrases
         if entity_clean in ("each year", "U.S. National"):
             return True
 
@@ -792,7 +748,6 @@ class Preprocessor:
         Returns:
             True if entity should be skipped, False otherwise
         """
-        # Skip policy/benefit/regulation keywords
         policy_patterns = {
             "alcohol",
             "commercial motor",
@@ -805,7 +760,6 @@ class Preprocessor:
         if any(pattern in entity_lower for pattern in policy_patterns):
             return True
 
-        # Skip responsibility phrases (action verbs)
         if len(words) >= 2:
             action_verbs = {"optimize", "prepare", "manage", "oversee"}
             if words[0] in action_verbs:
@@ -822,12 +776,10 @@ class Preprocessor:
         Returns:
             True if entity should be skipped, False otherwise
         """
-        # Skip location/proper nouns
         location_nouns = {"seattle", "rocky", "road test"}
         if entity_lower in location_nouns:
             return True
 
-        # Skip unclear abbreviations
         if entity_lower in ("hdhp", "blue's"):
             return True
 
@@ -845,12 +797,10 @@ class Preprocessor:
         Returns:
             True if entity is a company name, False otherwise
         """
-        # Check if exact match (word-boundary matching)
         if is_company_keyword(entity_lower, word_boundary=True):
             return True
 
-        # Check if contains company name as substring (for compound entities)
-        # Example: "% Carbon Robotics" contains "carbon robotics"
+        # Substring match for compound entities, e.g. "% Carbon Robotics" contains "carbon robotics".
         company_keywords = get_company_keywords()
         if any(company in entity_lower for company in company_keywords):
             return True
@@ -868,7 +818,6 @@ class Preprocessor:
         Returns:
             True if entity should be skipped, False otherwise
         """
-        # Check each category in sequence
         return (
             self._is_numeric_or_cost(entity_clean, entity_lower)
             or self._is_possessive_or_article(entity_clean, words)
@@ -904,7 +853,6 @@ class Preprocessor:
         Returns:
             True if entity should be skipped, False otherwise
         """
-        # Skip numbers and percentages
         if re.match(r"^\d+[\d\.,\-]*%?$|^\$[\d,]+", entity_clean):
             return True
 
@@ -912,17 +860,13 @@ class Preprocessor:
         if "%" in entity_clean or re.search(r"\d+[\–-]\d+\s*%?|\d{3,}", entity_clean):
             return True
 
-        # Skip very generic single-word skills
         if len(words) == 1 and entity_lower in generic_skills:
             return True
 
-        # Phase 3 optimization: Filter single adjectives not in soft_skills (Phase 1 taxonomy)
-        # Only filter if we have POS tag info available to avoid false positives
+        # Single adjectives are filtered only when a POS tag is available, to avoid false positives.
         soft_skills = get_all_soft_skills()
         if pos_tag == "ADJ" and len(words) == 1:
-            # Single adjective: only keep if it's in soft skills vocabulary or is a
-            # known tech keyword (e.g. "Agile", "Lean" -- spaCy tags these ADJ in
-            # attributive position, e.g. "Agile methodology")
+            # Keep a single adjective only if it is a soft skill or tech keyword; spaCy tags "Agile" and "Lean" as ADJ.
             if entity_lower not in soft_skills and entity_lower not in (tech_keywords or set()):
                 return True
 
@@ -930,7 +874,6 @@ class Preprocessor:
         if self._is_company_name(entity_lower):
             return True
 
-        # Skip nonsense phrases (articles + generic words)
         if entity_lower.startswith(("an ", "a ", "the ")):
             if len(words) <= 3 and any(word in generic_skills for word in words[1:]):
                 return True
@@ -997,10 +940,11 @@ class Preprocessor:
         Returns:
             True if entity contains HTML artifacts, False otherwise
         """
+        # Named and numeric entities, and tags.
         html_entity_patterns = [
-            r"&\w+;",  # &nbsp; &amp; etc.
-            r"&#\d+;",  # Numeric entities
-            r"<.*?>",  # HTML tags
+            r"&\w+;",
+            r"&#\d+;",
+            r"<.*?>",
         ]
 
         for pattern in html_entity_patterns:
@@ -1029,37 +973,27 @@ class Preprocessor:
         """
         words = entity.split()
 
-        # Check for excessive case transitions (handles both spaced and camelCase)
         if Preprocessor._has_excessive_case_transitions(entity):
             return True
 
-        # Check for unclosed punctuation
         if Preprocessor._has_unclosed_punctuation(entity):
             return True
 
-        # Check for HTML artifacts
         if Preprocessor._has_html_entity_artifacts(entity):
             return True
 
-        # Single word: check for camelCase fragment patterns
         if len(words) <= 1:
-            # Already checked case transitions above, so if we get here, it's normal
             return False
 
-        # Check for articles at start with capitalized second word (fragment pattern)
         if len(words) >= 2 and words[0].lower() in ("the", "a", "an"):
             if words[1][0].isupper() and len(words) <= 3:
-                # "the Hiring Manager" pattern - likely fragment
                 return True
 
-        # Check for oddly spaced words (e.g., "science and years" with separators)
-        # Only flag if we have 4+ words with separator in the middle (real oddity)
-        # Skip extraction artifacts like "software development , Python" (3 words with comma)
+        # Flag 4+ words with a conjunction or comma in the middle (e.g. "computer science and years").
+        # Shorter phrases pass.
         if len(words) >= 4:
-            # Check for internal conjunctions/commas between real words
-            for w in words[1:-1]:  # Skip first and last
+            for w in words[1:-1]:
                 if w.lower() in ("and", "or", ","):
-                    # Real oddity: conjunction between real words
                     return True
 
         return False
@@ -1115,7 +1049,6 @@ class Preprocessor:
             "degree",
         }
 
-        # Generic/low-signal skills that are too broad
         generic_skills: Set[str] = {
             "company",
             "data",
@@ -1166,7 +1099,6 @@ class Preprocessor:
         }
 
         # Company names, publications, brands (Issue #194 Phase 7: use expanded taxonomy)
-        # Get company names from centralized module for consistency
         company_names: Set[str] = get_company_keywords()
 
         filtered: set[str] = set()
@@ -1176,21 +1108,17 @@ class Preprocessor:
             words = entity_lower.split()
 
             # Phase 6: Enhanced fragment detection (Issue #193 Phase 3)
-            # Detect multi-word fragments from HTML parsing issues
             if self._is_suspicious_multi_word_fragment(entity_clean):
                 logger.debug(f"Filtered suspicious fragment: {entity_clean}")
                 continue
 
-            # Check common validation rules
             if self._should_skip_entity_common(entity_clean, entity_lower, entity_type, boilerplate_keywords):
                 continue
 
-            # Entity-type specific filtering
             if entity_type == "requirements":
                 if self._should_skip_requirement(entity_clean, entity_lower, words):
                     continue
             elif entity_type == "skills":
-                # Get pre-computed POS tag for this entity (Phase 3 optimization)
                 pos_tag = entity_pos_tags.get(entity_clean, None)
                 if self._should_skip_skill(
                     entity_clean,
@@ -1229,15 +1157,16 @@ class Preprocessor:
         if re.search(r"^##\s+", text, re.MULTILINE):
             return True
 
+        # Headers, lists, bold, inline code and code blocks.
         markdown_indicators = [
-            r"^#+\s+",  # Headers (# ## ###)
-            r"^[\*\-\+]\s+",  # Unordered lists
-            r"^\d+\.\s+",  # Ordered lists
+            r"^#+\s+",
+            r"^[\*\-\+]\s+",
+            r"^\d+\.\s+",
             r"^\*\*[^\*]+\*\*",  # Bold-formatted headers at line start (Issue #241)
-            r"\*\*.*?\*\*",  # Bold (inline)
-            r"__.*?__",  # Bold (underscore)
-            r"`.*?`",  # Inline code
-            r"```.*?```",  # Code blocks
+            r"\*\*.*?\*\*",
+            r"__.*?__",
+            r"`.*?`",
+            r"```.*?```",
         ]
 
         for pattern in markdown_indicators:
@@ -1299,9 +1228,7 @@ class Preprocessor:
                 repaired_lines.append(line)
                 continue
 
-            # Check for embedded dividers
             if "---" in stripped:
-                # Split on divider and reconstruct with isolated dividers
                 parts = stripped.split("---")
                 for i, part in enumerate(parts):
                     part = part.strip()
@@ -1310,12 +1237,9 @@ class Preprocessor:
                     # Skip pure Workday refs or IDs
                     if part and not re.match(r"^(?:R\d+|\w+\d+)\s*$", part):
                         repaired_lines.append(part)
-                    # Add divider after each part except the last
                     if i < len(parts) - 1:
                         repaired_lines.append("---")
-                # Only add final divider if:
-                # 1. Original line ended with "---" (last part is empty)
-                # 2. We haven't already added a divider in the loop (check last repaired_lines line)
+                # Add a final divider only if the line ended with "---" and the loop did not already add one.
                 if len(parts) > 1 and not parts[-1].strip():
                     if not repaired_lines or repaired_lines[-1].strip() != "---":
                         repaired_lines.append("---")
@@ -1324,7 +1248,6 @@ class Preprocessor:
 
         result = "\n".join(repaired_lines)
 
-        # Log if repairs were made
         if result != text:
             logger.debug("Repaired malformed dividers in markdown sections")
 
@@ -1354,10 +1277,8 @@ class Preprocessor:
                     current_content = []
                 continue
 
-            # Check for markdown headers (## format)
             header_match = re.match(r"^#+\s+(.+)$", line)
             # Check for bold-formatted headers at line start: **Header** (Issue #241)
-            # Handles: **Responsibilities**, **Skills include**, **Label** — description
             bold_header_match = re.match(r"^\*\*([^\*]+)\*\*", line)
 
             if header_match:
@@ -1368,7 +1289,6 @@ class Preprocessor:
                 header_text = header_match.group(1).strip().lower()
                 current_section = self._classify_section_from_header(header_text)
             elif bold_header_match:
-                # Extract text from bold header
                 if current_content:
                     sections[current_section] = "\n".join(current_content).strip()
                     current_content = []
@@ -1376,8 +1296,7 @@ class Preprocessor:
                 header_text = bold_header_match.group(1).strip().lower()
                 current_section = self._classify_section_from_header(header_text)
 
-                # If bold header is not the entire line, add remaining text as content
-                # E.g., "**Label** — description" -> treat "— description" as content
+                # If the bold header is not the whole line, the remainder (e.g. "— description") becomes content.
                 remaining = line[bold_header_match.end() :].strip()
                 if remaining:
                     current_content.append(remaining)
@@ -1695,10 +1614,8 @@ class Preprocessor:
             is_skills_section, is_req_section, is_description_section = self._determine_section_type(
                 section_name, skills_section_keywords, req_section_keywords
             )
-            # "responsibilities" doesn't substring-match any req_section_keywords
-            # entry ("responsibility" isn't a substring of "responsibilities"),
-            # so fold it in explicitly here -- matching the special-casing
-            # already done in _extract_noun_compounds and _route_list_item_by_section.
+            # Keep in sync with the "responsibilities" cases in _extract_noun_compounds and _route_list_item_by_section.
+            # "responsibilities" does not substring-match "responsibility", so fold it in explicitly.
             if section_name == "responsibilities":
                 is_req_section = True
 

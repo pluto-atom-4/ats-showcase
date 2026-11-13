@@ -171,25 +171,22 @@ def is_technical_compound(phrase: str) -> bool:
 
     words = phrase_lower.split()
 
-    # Tier 1: Exact match against known compounds (80%+ confidence)
+    # Tier 1: exact match against known compounds
     if phrase_lower in TECHNICAL_COMPOUND_PATTERNS:
         return True
 
-    # Tier 2: Check for multi-word tech compounds (60-75% confidence)
-    # Only applies to 2+ word phrases to avoid false positives on single words
+    # Tier 2: multi-word tech compounds; single words are excluded to avoid false positives
     if len(words) >= 2:
         for kw in MULTI_WORD_KEYWORDS:
             if kw in phrase_lower:
                 return True
 
     # Tier 3: Pattern-based detection for Issue #191 compounds (50-60% confidence)
-    # Check for known compound patterns even if not exact match
-    # If phrase contains Issue #191 keywords AND is multi-word, likely compound
+    # A multi-word phrase containing an Issue #191 keyword is likely a compound.
     if len(words) >= 2:
         for kw in ISSUE_191_KEYWORDS:
             if kw in phrase_lower:
-                # Validate: don't match single words (e.g., "software" alone)
-                # Only match when part of a phrase (e.g., "software development")
+                # Only match as part of a phrase (e.g. "software development"), not the keyword alone.
                 if phrase_lower != kw and phrase_lower != kw.lower():
                     return True
 
@@ -317,11 +314,11 @@ def get_confidence_score(phrase: str) -> float:
 
     words = phrase_lower.split()
 
-    # Tier 1: Exact match (80-95% confidence)
+    # Tier 1: exact match
     if phrase_lower in TECHNICAL_COMPOUND_PATTERNS:
         return 0.95
 
-    # Tier 2: Multi-word with tech keyword (60-75% confidence)
+    # Tier 2: multi-word with a tech keyword
     if len(words) >= 2:
         for kw in MULTI_WORD_KEYWORDS:
             if kw in phrase_lower:

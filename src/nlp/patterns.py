@@ -8,7 +8,7 @@ TECH_PATTERNS = {
     # Languages
     "Java": [r"\bJava\b(?!\s*Script)"],
     "C++": [r"\bC\+\+\b"],
-    "C": [r"\bC\b(?!\+)"],  # C but not C++
+    "C": [r"\bC\b(?!\+)"],
     "C#": [r"\bC#\b"],
     "Python": [r"\bPython\b"],
     "JavaScript": [r"\bJavaScript\b", r"\bJS\b"],
@@ -68,8 +68,7 @@ TECH_PATTERNS = {
     "ARM": [r"\bARM\b"],
 }
 
-# Skill keyphrases (extracted directly from job requirements)
-# Note: Multi-domain (aerospace, ASIC/hardware, software/systems, defense)
+# Skill keyphrases extracted directly from job requirements; multi-domain.
 SKILL_KEYPHRASES = {
     # Aerospace/Software Leadership (Blue Origin)
     "Guidance and Control",
@@ -190,7 +189,6 @@ SKILL_KEYWORDS = {
     "autonomy",
 }
 
-# Requirement keywords (years of experience, degrees, etc.)
 REQUIREMENT_PATTERNS = {
     "years_experience": r"(\d+)\+?\s+years\s+(?:of\s+)?experience",
     "degree": r"(?:BS|MS|B\.S\.|M\.S\.|PhD|Ph\.D\.)",
@@ -198,10 +196,10 @@ REQUIREMENT_PATTERNS = {
     "citizen_status": r"(?:U\.S\.\s+citizen|permanent\s+resident|refugee|asylee)",
 }
 
-# Context patterns (find skills in bullet points)
+# Bullet lines starting with "*", then with "•" or "-".
 SKILL_EXTRACTION_PATTERNS = [
-    r"(?:^|\n)\*\s+(.+?)(?:\n|\Z)",  # Bullet points with *
-    r"(?:^|\n)(?:•|-)\s+(.+?)(?:\n|\Z)",  # Bullet points with • or -
+    r"(?:^|\n)\*\s+(.+?)(?:\n|\Z)",
+    r"(?:^|\n)(?:•|-)\s+(.+?)(?:\n|\Z)",
 ]
 
 
@@ -224,15 +222,12 @@ def extract_requirement_spans(text: str) -> dict[str, list[str]]:
         "citizen_status": [],
     }
 
-    # Years of experience
     for match in re.finditer(REQUIREMENT_PATTERNS["years_experience"], text):
         reqs["years_experience"].append(match.group(0))
 
-    # Degrees
     for match in re.finditer(REQUIREMENT_PATTERNS["degree"], text):
         reqs["degrees"].append(match.group(0))
 
-    # Citizen status
     for match in re.finditer(REQUIREMENT_PATTERNS["citizen_status"], text):
         reqs["citizen_status"].append(match.group(0))
 
@@ -243,13 +238,11 @@ def extract_skill_candidates(text: str) -> Set[str]:
     """Extract skill candidates from bullet points."""
     candidates = set()
 
-    # Extract all bullet point lines
     for pattern in SKILL_EXTRACTION_PATTERNS:
         for match in re.finditer(pattern, text, re.MULTILINE):
             line = match.group(1).strip()
-            # Remove trailing punctuation and numbers
             line = re.sub(r"[\d\*\-\•]$", "", line).strip()
-            if len(line) > 5:  # Skip short lines
+            if len(line) > 5:
                 candidates.add(line)
 
     return candidates

@@ -50,7 +50,6 @@ MAX_COMPARE_CHARS: int = 500
 DEFAULT_MIN_CONFIDENCE: float = 0.50
 DEFAULT_MAX_REQUIREMENTS: int = 20
 
-# Precompiled normalization regexes for dedup
 _PARENTHETICAL_PATTERN = re.compile(r"\s*\(.*?\)\s*$")
 _WORKING_WITH_PATTERN = re.compile(r"working\s+with\s+and/or\s+", re.IGNORECASE)
 _WORKING_PATTERN = re.compile(r"working\s+with\s+", re.IGNORECASE)
@@ -59,7 +58,7 @@ _HANDS_ON_PATTERN = re.compile(r"\bhands-?on\s+", re.IGNORECASE)
 _YEARS_PATTERN = re.compile(r"(\d+)\+?\s+years?\s+(?:of\s+)?experience\s+", re.IGNORECASE)
 _WHITESPACE_PATTERN = re.compile(r"\s+")
 
-# Module-level cached sentencizer (initialized lazily)
+# Cached sentencizer, initialized lazily.
 _SENTENCIZER: Language | None = None
 
 
@@ -107,7 +106,6 @@ def _normalize_requirement_for_comparison(req: str) -> str:
     # Standardize years patterns
     req = _YEARS_PATTERN.sub(r"\1+ years of experience ", req)
 
-    # Collapse multiple spaces
     req = _WHITESPACE_PATTERN.sub(" ", req).strip()
 
     return req
@@ -152,12 +150,10 @@ def _find_matching_requirement(
         target_lower = normalized_target.lower()
         candidate_lower = normalized_candidate.lower()
 
-        # Base fuzzy ratio
         ratio = SequenceMatcher(None, target_lower, candidate_lower).ratio()
 
         # Boost score for substring matches
         if target_lower in candidate_lower or candidate_lower in target_lower:
-            # Scale based on length overlap
             overlap_len = min(len(target_lower), len(candidate_lower))
             union_len = max(len(target_lower), len(candidate_lower))
             substring_score = overlap_len / union_len if union_len > 0 else 0
@@ -524,16 +520,13 @@ def _build_result(
     Returns:
         SectionedResult
     """
-    # Cap at max_requirements
     unique_reqs = unique_reqs[:max_requirements]
 
-    # Count by section
     requirements_by_section: dict[str, int] = {}
     for req in unique_reqs:
         section = req["source_section"].value
         requirements_by_section[section] = requirements_by_section.get(section, 0) + 1
 
-    # Build items
     requirement_items = tuple(
         RequirementItem(
             text=r["text"],
@@ -547,7 +540,6 @@ def _build_result(
         for r in unique_reqs
     )
 
-    # Build metadata
     metadata: dict[str, Any] = {
         "sections_detected": len(target),
         "requirements_extracted": len(requirement_items),
@@ -626,7 +618,6 @@ def extract_sectioned(
     Returns:
         SectionedResult with requirements, sections_detected, and metadata
     """
-    # Validate and detect
     validation_result = _validate_and_detect(text, detector)
     if validation_result is None:
         return SectionedResult(
@@ -638,13 +629,11 @@ def extract_sectioned(
 
     text, detector = validation_result
 
-    # Set defaults
     if confidence_adjustments is None:
         confidence_adjustments = CONFIDENCE_ADJUSTMENT_BY_SECTION
     if display_names is None:
         display_names = SECTION_DISPLAY_NAMES
 
-    # Detect sections
     detected = detector.detect(text)
     if not detected:
         return SectionedResult(
@@ -663,7 +652,6 @@ def extract_sectioned(
             metadata={"target_sections": 0},
         )
 
-    # Process sections
     candidate_requirements: list[dict[str, Any]] = []
     sentencizer = _get_sentencizer()
 
@@ -684,7 +672,6 @@ def extract_sectioned(
             )
             candidate_requirements.extend(section_candidates)
 
-    # Deduplicate and finalize
     unique_reqs = _dedup_candidates(candidate_requirements, dedup_threshold)
     unique_reqs = sorted(
         unique_reqs,

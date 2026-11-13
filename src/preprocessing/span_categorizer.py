@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     )
     from src.preprocessing.span_types import SpanPattern
 
-# Register custom attribute if not already registered
 if not Doc.has_extension("requirement_spans"):
     Doc.set_extension("requirement_spans", default=None)
 
@@ -106,7 +105,6 @@ def _extract_span_boundaries(
     Returns:
         Tuple of (start_token_idx, end_token_idx) or (None, None) if invalid
     """
-    # Validate input offsets
     if char_start < 0 or char_end < 0:
         return (None, None)
     if char_start >= char_end:
@@ -114,7 +112,6 @@ def _extract_span_boundaries(
     if char_start >= len(doc.text):
         return (None, None)
 
-    # Find token indices corresponding to character offsets
     start_token_idx = None
     end_token_idx = None
 
@@ -203,14 +200,12 @@ def _expand_span(
     # Skip articles at start
     current_start = _skip_initial_articles(doc, start_idx)
 
-    # Scan forward from initial end for boundary conditions
     current_end = end_idx
     while current_end < len(doc):  # Bug #4 fix: removed -1 to include last token
         token = doc[current_end]
         next_token = doc[current_end + 1] if current_end + 1 < len(doc) else None
         next_token_text = next_token.text if next_token else None
 
-        # Check stop conditions
         if _should_stop_at_token(token.text, token.pos_, next_token_text, rules):
             break
 
@@ -229,7 +224,6 @@ def _expand_span(
             current_end += 1
             continue
 
-        # Continue accumulating
         current_end += 1
 
     # Trim trailing hard boundary tokens
@@ -307,11 +301,9 @@ def categorize_spans(
         doc._.requirement_spans = requirement_spans
         return doc
 
-    # Process each requirement from Phase 8a
     for requirement in doc._.requirements:
         char_start, char_end = requirement["span"]
 
-        # Map character offsets to token indices
         start_token_idx, end_token_idx = _extract_span_boundaries(
             doc,
             char_start,
@@ -321,7 +313,6 @@ def categorize_spans(
         if start_token_idx is None or end_token_idx is None:
             continue
 
-        # Expand span using boundary rules
         expanded_start, expanded_end = _expand_span(
             doc,
             start_token_idx,
@@ -329,20 +320,17 @@ def categorize_spans(
             rules,
         )
 
-        # Create spaCy Span object
         try:
             span = doc[expanded_start : expanded_end + 1]
         except (IndexError, ValueError):
             continue
 
-        # Determine span type and conjunct count
         token_indices = list(range(expanded_start, expanded_end + 1))
         span_type, conjunct_count = _get_span_type_and_conjunct_count(
             token_indices,
             doc,
         )
 
-        # Create enriched requirement dict
         enriched_req = _create_requirement_span_dict(
             span,
             requirement,

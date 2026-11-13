@@ -14,7 +14,7 @@ Phase 7 (Issue #194) taxonomy includes:
 
 # Company keywords organized by industry source
 COMPANY_KEYWORDS = {
-    # Aerospace/Defense (7 terms)
+    # Aerospace/Defense
     "aerospace_defense": {
         "boeing",
         "lockheed",
@@ -24,7 +24,7 @@ COMPANY_KEYWORDS = {
         "northrop grumman",
         "general dynamics",
     },
-    # Technology Giants (9 terms)
+    # Technology Giants
     "technology": {
         "apple",
         "google",
@@ -36,12 +36,12 @@ COMPANY_KEYWORDS = {
         "nvidia",
         "ibm",
     },
-    # Space/Advanced Technology (2 terms)
+    # Space/Advanced Technology
     "space_tech": {
         "spacex",
         "blue origin",
     },
-    # Universities & Academic Institutions (8 terms)
+    # Universities & Academic Institutions
     "universities": {
         "uw",
         "mit",
@@ -52,7 +52,7 @@ COMPANY_KEYWORDS = {
         "princeton",
         "yale",
     },
-    # Robotics & Robotics Manufacturing (6 terms)
+    # Robotics & Robotics Manufacturing
     "robotics_manufacturing": {
         "carbon",
         "universal",
@@ -61,7 +61,7 @@ COMPANY_KEYWORDS = {
         "boston dynamics",
         "isac",
     },
-    # Staffing & Recruitment Agencies (5 terms)
+    # Staffing & Recruitment Agencies
     "staffing_agencies": {
         "heidrick",
         "recruiter",
@@ -69,20 +69,20 @@ COMPANY_KEYWORDS = {
         "talent",
         "agency",
     },
-    # Consulting & Professional Services (4 terms)
+    # Consulting & Professional Services
     "consulting": {
         "consulting",
         "accenture",
         "deloitte",
         "pwc",
     },
-    # Government & Regulatory Bodies (3 terms)
+    # Government & Regulatory Bodies
     "government": {
         "government",
         "federal",
         "department of",
     },
-    # Financial & Business Services (3 terms)
+    # Financial & Business Services
     "financial_services": {
         "goldman",
         "jpmorgan",
@@ -90,7 +90,6 @@ COMPANY_KEYWORDS = {
     },
 }
 
-# Flat set of all company names for quick lookups
 COMPANY_NAMES = set()
 for category_companies in COMPANY_KEYWORDS.values():
     COMPANY_NAMES.update(category_companies)
@@ -113,12 +112,9 @@ def is_company_keyword(text: str, word_boundary: bool = True) -> bool:
     text_lower = text.lower().strip()
 
     if word_boundary:
-        # Word-boundary matching: exact match on whitespace boundaries
-        # "Carbon Robotics" matches "carbon robotics" but not "scar bon"
         return text_lower in COMPANY_NAMES
 
     else:
-        # Substring matching: "Carbon Robotics" contains "carbon"
         for company in COMPANY_NAMES:
             if company in text_lower:
                 return True

@@ -51,15 +51,13 @@ def _is_heading_like(text: str, start: int, end: int) -> bool:
     Returns:
         True if the span appears to be a section header, False otherwise.
     """
-    # Find line boundaries
-    line_start = text.rfind("\n", 0, start) + 1  # +1 so rfind(-1) → 0
+    line_start = text.rfind("\n", 0, start) + 1  # +1 so rfind(-1) -> 0
     line_end = text.find("\n", end)
     if line_end == -1:
         line_end = len(text)
 
     # Check prefix: only whitespace and header markers allowed
     prefix = text[line_start:start]
-    # Strip whitespace, markdown markers, bullets, numbers, and other header artifacts
     prefix_stripped = prefix.strip(_HEADER_PREFIX_CHARS)
     if prefix_stripped != "":
         return False
@@ -179,7 +177,6 @@ class SectionDetector:
         self._target_sections = frozenset(target_sections) if target_sections is not None else DEFAULT_TARGET_SECTIONS
         self._promote_headings = promote_headings
 
-        # Initialize blank spaCy pipeline with SpanRuler
         self._nlp: Language = spacy.blank("en")
         ruler = self._nlp.add_pipe("span_ruler", config={"spans_key": SPANS_KEY})
         # Deep copy patterns to avoid mutating shared module-level data
@@ -199,16 +196,13 @@ class SectionDetector:
         Raises:
             No exceptions raised; invalid spans are skipped with debug logging.
         """
-        # Handle empty or whitespace-only input
         if not text or not text.strip():
             return []
 
-        # Truncate if needed
         if len(text) > MAX_INPUT_CHARS:
             logger.warning(f"Input text ({len(text)} chars) exceeds MAX_INPUT_CHARS ({MAX_INPUT_CHARS}); truncating.")
             text = text[:MAX_INPUT_CHARS]
 
-        # Run spaCy pipeline to extract spans
         doc = self._nlp(text)
         spans = doc.spans.get(SPANS_KEY, [])
 
@@ -225,14 +219,12 @@ class SectionDetector:
         if self._promote_headings:
             filtered_spans: list[tuple[SectionLabel, int, int, str]] = []
             for label, start, end, header_text in kept_spans:
-                # Check if span is heading-like using full text and char offsets
                 if _is_heading_like(text, start, end):
                     filtered_spans.append((label, start, end, header_text))
                 else:
                     logger.debug(f"Filtering out non-heading span: {label.value} ({start}, {end}) = '{header_text}'")
             kept_spans = filtered_spans
 
-        # Build DetectedSection objects with content boundaries
         detected_sections: list[DetectedSection] = []
         for idx, (label, header_start, header_end, header_text) in enumerate(kept_spans):
             content_start = header_end

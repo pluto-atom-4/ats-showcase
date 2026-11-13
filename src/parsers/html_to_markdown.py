@@ -50,8 +50,7 @@ def _normalize_html_before_extraction(html: str) -> str:
     # Remove Workday metadata attributes (data-*, aria-*)
     html = re.sub(r'\s+(?:data-|aria-)[a-z\-]+=(?:"[^"]*"|\'[^\']*\'|[^\s>]+)', "", html)
 
-    # Convert dt/dd pairs to div+p structure (forces newlines)
-    # <dt>Label</dt><dd>Value</dd> -> <div><p>Label</p><p>Value</p></div>
+    # Convert <dt>Label</dt><dd>Value</dd> to <div><p>Label</p><p>Value</p></div> so each lands on its own line.
     html = re.sub(
         r"<dt>([^<]+)</dt>\s*<dd>([^<]+)</dd>",
         r"<div><p>\1</p><p>\2</p></div>",
@@ -59,18 +58,15 @@ def _normalize_html_before_extraction(html: str) -> str:
         flags=re.IGNORECASE,
     )
 
-    # Remove Workday ID refs from content (e.g., :R69380)
-    # Match in various contexts: ":R\d+", ":word\d+" (but NOT ":\d+" which could be "5:")
+    # Remove Workday ID refs (e.g. ":R69380"); pure-digit refs go only at 4+ digits, so ":1" to ":999" survive.
     html = re.sub(r":\s*R\d+", "", html)
     html = re.sub(r":\s*[A-Za-z]+\d+", "", html)
-    # Only remove pure digit refs like ":123" if they look like IDs (4+ digits)
     html = re.sub(r":\s*\d{4,}", "", html)
 
-    # Also remove leading colons that might be orphaned
+    # Drop colons left orphaned by the removals above.
     html = re.sub(r">:\s*", "> ", html)
 
-    # Remove empty elements (only matched paired tags for same element, not unrelated tags)
-    # Match: <tag>   </tag> or <tag />
+    # Remove empty paired tags; the backreference avoids matching unrelated tags.
     html = re.sub(r"<(\w+)[^>]*>\s*</\1>", "", html, flags=re.IGNORECASE)
 
     return html
@@ -101,7 +97,6 @@ def html_to_markdown(html: str) -> str:
     if not html:
         return html
 
-    # Phase 1: Normalize HTML structure before processing
     normalized_html = _normalize_html_before_extraction(html)
 
     tmp_path: str = ""
@@ -157,16 +152,13 @@ def _html_to_markdown_via_beautifulsoup(html: str) -> str:
         logger.error("BeautifulSoup not available for fallback")
         raise
 
-    # Phase 1: Normalize HTML structure (handle Workday patterns)
     normalized_html = _normalize_html_before_extraction(html)
 
     soup = BeautifulSoup(normalized_html, "lxml")
 
-    # Remove script and style tags
     for script in soup(["script", "style"]):
         script.decompose()
 
-    # Extract text
     text = soup.get_text()
     return _postprocess_markdown_text(text)
 
@@ -183,27 +175,22 @@ def _postprocess_markdown_text(text: str) -> str:
     Returns:
         Cleaned and normalized text
     """
-    # Strip and collapse lines
     lines = (line.strip() for line in text.splitlines())
     chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
     text = "\n".join(chunk for chunk in chunks if chunk)
 
-    # Normalize whitespace
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r" {2,}", " ", text)
 
-    # Phase 1 enhancements: Clean up Workday artifacts
-    # Remove standalone Workday ID refs (e.g., lines with just ":R69380" or similar)
+    # Drop standalone Workday ID refs (lines that are just ":R69380" or similar).
     text_lines = text.split("\n")
     cleaned_lines = []
     for line in text_lines:
         stripped = line.strip()
-        # Skip lines that are only Workday refs or orphaned colons
         if stripped and re.match(r"^:?\s*R\d+\s*$", stripped):
             logger.debug(f"Skipping orphaned Workday ref: '{stripped}'")
             continue
         if stripped and re.match(r"^:?\s*\w+\d+\s*$", stripped):
-            # Only skip if it looks like a pure ID (not important content)
             if not any(c.isalpha() for c in stripped if c.lower() not in "rid"):
                 logger.debug(f"Skipping orphaned ID-like ref: '{stripped}'")
                 continue
@@ -212,15 +199,13 @@ def _postprocess_markdown_text(text: str) -> str:
     text = "\n".join(cleaned_lines)
 
     # Normalize em-dashes/en-dashes: ensure they don't concatenate text
-    # Replace em-dash/en-dash with newline if between words (forces separation)
     text = re.sub(r"(\w)([—–])(\w)", r"\1\n\2\3", text)
 
     return text.strip()
 
 
-# Standalone lines matching these phrases (case-insensitive, after
-# stripping bold markers / trailing colon) are synthesized into
-# "## " section headers when the source HTML lacks real heading tags.
+# Standalone lines matching these become "## " headers when the HTML lacks real heading tags.
+# Matching is case-insensitive, after stripping bold markers and a trailing colon, with curly apostrophes normalized.
 _SECTION_HEADER_KEYWORDS = frozenset(
     {
         # qualifications
@@ -327,24 +312,18 @@ def _synthesize_bold_subsection_headers(lines: List[str]) -> None:
         if not stripped or stripped.startswith("#"):
             continue
 
-        # Extract bold label (bold-only or bold at line start)
         label = _extract_bold_label(stripped)
         if label is None:
-            # Phase 11: Check for bold at line start with trailing text
-            # E.g., "**Responsibilities** include" or "**Label** — description"
+            # Bold at line start with trailing text, e.g. "**Responsibilities** include" or "**Label** — description".
             match = re.match(r"^\*\*([^\*]+)\*\*", stripped)
             if not match:
                 continue
             label = match.group(1).strip()
-            # Check if there's trailing text after bold
             trailing = stripped[match.end() :].strip()
+            # Both branches are no-ops: trailing text is a separator or inline content; the label is used either way.
             if trailing and trailing.startswith(("—", "-", ":", ",")):
-                # Trailing text is just a separator/delimiter, not real content
-                # Treat entire line as header
                 pass
             elif trailing:
-                # Trailing text is real content (e.g., "include but are not limited to")
-                # This is a section header with inline content
                 pass
 
         j = i + 1
@@ -410,7 +389,6 @@ def _process_divider_parts(parts: List[str], result: List[str]) -> None:
             continue
 
         result.append(part)
-        # Add divider after each part except the last
         if i < len(parts) - 1:
             result.append("---")
 
@@ -442,15 +420,12 @@ def _normalize_divider_lines(lines: List[str]) -> List[str]:
             result.append(line)
             continue
 
-        # Check for embedded dividers (text + dashes or dashes + text)
-        # Patterns: "text---", "---text", ":R69380---", "---:R69380", ":---"
+        # Embedded dividers: "text---", "---text", ":R69380---", "---:R69380", ":---".
         if "---" in stripped:
             parts = stripped.split("---")
             _process_divider_parts(parts, result)
 
-            # Only add final divider if:
-            # 1. Original line ended with "---" (last part is empty)
-            # 2. We haven't already added a divider in the loop (check last result line)
+            # Add a final divider only if the line ended with "---" and the loop did not already add one.
             if len(parts) > 1 and not parts[-1].strip():
                 if not result or result[-1].strip() != "---":
                     result.append("---")
@@ -479,10 +454,9 @@ def _insert_section_dividers(lines: List[str]) -> List[str]:
     Returns:
         List with dividers inserted before headers and isolated on own lines
     """
-    # Phase 2: Normalize embedded dividers first
+    # Normalize embedded dividers first, then drop consecutive duplicates.
     normalized_lines = _normalize_divider_lines(lines)
 
-    # Phase 3: Post-normalization deduplication (safeguard against consecutive dividers)
     deduplicated: List[str] = []
     for line in normalized_lines:
         if line.strip() == "---" and deduplicated and deduplicated[-1].strip() == "---":
@@ -501,7 +475,6 @@ def _insert_section_dividers(lines: List[str]) -> List[str]:
                 result.append("---")
         result.append(line)
 
-    # Validate that all dividers are isolated
     for i, line in enumerate(result):
         stripped = line.strip()
         if "---" in stripped and stripped != "---":
@@ -608,8 +581,7 @@ def clean_html(
     if include_section_headers:
         markdown = add_markdown_section_headers(markdown)
 
-    # Step 3: Insert section dividers (part of header synthesis)
-    # (Already included in add_markdown_section_headers)
+    # Step 3 (section dividers) is folded into add_markdown_section_headers.
 
     # Step 4: Remove boilerplate using pre-compiled patterns
     cleaned = _boilerplate_patterns.remove_boilerplate_fast(markdown, skip_categories=skip_boilerplate_categories)
@@ -620,9 +592,7 @@ def clean_html(
     # Step 6: Normalize whitespace
     cleaned = _boilerplate_patterns._normalize_whitespace(cleaned)
 
-    # Step 7 (Phase 2): Repair embedded dividers broken by boilerplate removal
-    # Boilerplate removal's aggressive whitespace collapse can embed dividers in text
-    # Re-apply _normalize_divider_lines to fix any malformed dividers
+    # Step 7: Repair dividers that boilerplate removal's whitespace collapse may have embedded in text.
     cleaned_lines = cleaned.split("\n")
     repaired_lines = _normalize_divider_lines(cleaned_lines)
     cleaned = "\n".join(repaired_lines)

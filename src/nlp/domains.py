@@ -72,10 +72,7 @@ def detect_domain(job_description: str) -> Domain:
     return Domain.GENERAL
 
 
-# ============================================================================
-# AEROSPACE DOMAIN KEYPHRASES
-# ============================================================================
-
+# Aerospace domain keyphrases
 AEROSPACE_KEYPHRASES = {
     # Core G&C concepts
     "Guidance and Control",
@@ -110,9 +107,7 @@ AEROSPACE_KEYPHRASES = {
     "Vehicle test campaigns",
 }
 
-# ============================================================================
-# SOFTWARE DOMAIN KEYPHRASES (Boeing, distributed systems)
-# ============================================================================
+# Software domain keyphrases (Boeing, distributed systems)
 
 SOFTWARE_KEYPHRASES = {
     # Architecture & design
@@ -160,10 +155,7 @@ SOFTWARE_KEYPHRASES = {
     "Technology evaluation",
 }
 
-# ============================================================================
-# DEFENSE DOMAIN KEYPHRASES (military, classified systems)
-# Overlaps with software but includes defense-specific concepts
-# ============================================================================
+# Defense domain keyphrases (military, classified systems); overlaps software but adds defense-specific concepts
 
 DEFENSE_KEYPHRASES = {
     # Architecture & design
@@ -216,9 +208,7 @@ DEFENSE_KEYPHRASES = {
     "Cross-functional communication",
 }
 
-# ============================================================================
-# HARDWARE DOMAIN KEYPHRASES (ASIC, FPGA, chip design)
-# ============================================================================
+# Hardware domain keyphrases (ASIC, FPGA, chip design)
 
 HARDWARE_KEYPHRASES = {
     # Design & verification
@@ -245,9 +235,7 @@ HARDWARE_KEYPHRASES = {
     "Technical oversight",
 }
 
-# ============================================================================
-# GENERAL/CROSS-DOMAIN KEYPHRASES
-# ============================================================================
+# General/cross-domain keyphrases
 
 GENERAL_KEYPHRASES = {
     "Technical leadership",

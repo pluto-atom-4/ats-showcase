@@ -24,7 +24,6 @@ class NarrativeRequirementExtractor:
         """
         requirements = set()
 
-        # Requirement trigger patterns (words/phrases that indicate requirements)
         requirement_triggers = [
             r"experience\s+(?:with|in|using|involving|developing|designing)",
             r"ability\s+to\s+(?:work|develop|design|manage|lead|test|implement)",
@@ -40,7 +39,6 @@ class NarrativeRequirementExtractor:
 
         doc = self.nlp(text)
 
-        # Extract sentences
         sentences = list(doc.sents)
 
         for sent in sentences:
@@ -50,11 +48,9 @@ class NarrativeRequirementExtractor:
             if len(sent_text) < 15 or sent_text.startswith(("•", "*", "-", "●")):
                 continue
 
-            # Check if sentence contains requirement trigger
             has_trigger = any(re.search(trigger, sent_text, re.IGNORECASE) for trigger in requirement_triggers)
 
             if has_trigger:
-                # Extract requirement from sentence
                 req = self._extract_requirement_from_sentence(sent)
                 if req and 15 < len(req) < 200:
                     requirements.add(req)
@@ -71,13 +67,10 @@ class NarrativeRequirementExtractor:
         """
         text = sent.text.strip()
 
-        # Remove parenthetical clarifications at end
         text = re.sub(r"\s*\([^)]*\)\s*$", "", text)
 
-        # Remove trailing punctuation
         text = re.sub(r"[,;.!?]+$", "", text)
 
-        # Collapse multiple spaces
         text = re.sub(r"\s+", " ", text)
 
         return text if text else ""

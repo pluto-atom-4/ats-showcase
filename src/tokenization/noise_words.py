@@ -12,9 +12,8 @@ from skill extraction:
 - Filler Words: really, very, just, only, also, even, still, yet, already
 """
 
-# Noise words organized into 8 categories with 120+ terms total
 NOISE_WORDS_BY_CATEGORY = {
-    # 1. Articles & Determiners (15 terms)
+    # Articles & Determiners
     "articles_determiners": {
         "the",
         "a",
@@ -32,7 +31,7 @@ NOISE_WORDS_BY_CATEGORY = {
         "their",
         "some",
     },
-    # 2. Prepositions (20 terms)
+    # Prepositions
     "prepositions": {
         "in",
         "on",
@@ -55,7 +54,7 @@ NOISE_WORDS_BY_CATEGORY = {
         "among",
         "through",
     },
-    # 3. Conjunctions (12 terms)
+    # Conjunctions
     "conjunctions": {
         "and",
         "or",
@@ -70,7 +69,7 @@ NOISE_WORDS_BY_CATEGORY = {
         "while",
         "since",
     },
-    # 4. Pronouns (12 terms)
+    # Pronouns
     "pronouns": {
         "i",
         "you",
@@ -85,7 +84,7 @@ NOISE_WORDS_BY_CATEGORY = {
         "which",
         "who",
     },
-    # 5. Generic Verbs (15 terms)
+    # Generic Verbs
     "generic_verbs": {
         "do",
         "make",
@@ -103,7 +102,7 @@ NOISE_WORDS_BY_CATEGORY = {
         "keep",
         "try",
     },
-    # 6. Numbers & Measurements (18 terms)
+    # Numbers & Measurements
     "numbers_measurements": {
         "one",
         "two",
@@ -124,7 +123,7 @@ NOISE_WORDS_BY_CATEGORY = {
         "plus",
         "minus",
     },
-    # 7. Generic Nouns (18 terms)
+    # Generic Nouns
     "generic_nouns": {
         "thing",
         "stuff",
@@ -145,7 +144,7 @@ NOISE_WORDS_BY_CATEGORY = {
         "range",
         "value",
     },
-    # 8. Filler Words (18 terms)
+    # Filler Words
     "filler_words": {
         "really",
         "very",
@@ -167,7 +166,6 @@ NOISE_WORDS_BY_CATEGORY = {
     },
 }
 
-# Flat set of all noise words for quick lookups
 NOISE_WORDS = set()
 for category_words in NOISE_WORDS_BY_CATEGORY.values():
     NOISE_WORDS.update(category_words)

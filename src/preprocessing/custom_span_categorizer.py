@@ -21,21 +21,17 @@ from src.preprocessing.span_types import (
     SpanPattern,
 )
 
-# Constants
 MAX_PATTERN_LENGTH = 500
 MAX_TEXT_LENGTH = 200_000
 
-# Register custom extension at module level
 if not Doc.has_extension("custom_spans"):
     Doc.set_extension("custom_spans", default=None)
 
 
-# Quantifier that makes a group repeatable: +, *, {n,}, {n,m}, plus an
-# optional lazy (?) or possessive (+) suffix. Exact {n} is not flagged.
+# Group quantifier: +, *, {n,} or {n,m} with an optional lazy or possessive suffix; exact {n} is not flagged.
 _REPEAT_AFTER_GROUP = re.compile(r"(?:[+*]|\{\d*,\d*\})[?+]?")
 
-# Group header that is not part of the alternation body: (?:, (?=, (?!,
-# (?<=, (?<!, (?P<name>, scoped inline flags such as (?i: or (?-i:.
+# Group header outside the alternation body: (?:, (?=, (?!, (?<=, (?<!, (?P<name>, scoped inline flags like (?i:.
 _GROUP_HEADER = re.compile(r"\?(?:P<\w+>|<[=!]|[=!:]|[aiLmsux]*(?:-[imsx]+)?:)")
 
 # Inline flag group that enables case-insensitive matching somewhere.
@@ -165,8 +161,7 @@ def _has_quantified_group_wrapper(pattern: str) -> bool:
             repeated = _REPEAT_AFTER_GROUP.match(pattern, end) is not None
             if repeated and body_quantified:
                 return True
-            # The closed group is a quantified item if it is repeated, and
-            # otherwise carries its body's quantified-ness to the parent.
+            # A closed group is a quantified item if repeated, else it passes its body's quantified-ness to the parent.
             frames[-1][0] = body_quantified or repeated
         elif kind == "repeat":
             frames[-1][0] = True
@@ -222,12 +217,10 @@ def validate_pattern(pattern: str) -> None:
     if len(pattern) > MAX_PATTERN_LENGTH:
         raise ValueError(f"Pattern exceeds max length {MAX_PATTERN_LENGTH}: {len(pattern)}")
 
-    # Strip lazy quantifiers (? directly after +, *, or })
-    # to detect nested quantifiers properly
+    # Strip lazy quantifiers so nested quantifiers are detected properly.
     stripped = re.sub(r"([+*}])\?", r"\1", pattern)
 
-    # Check for nested quantifiers: [+*}] followed optionally by )
-    # then another quantifier [+*{]
+    # Nested quantifiers: [+*}] optionally followed by ) then another [+*{].
     redos_pattern = r"[+*}]\)?[+*{]"
     if re.search(redos_pattern, stripped):
         raise ValueError(f"Pattern contains ReDoS-prone nested quantifiers: {pattern}")
@@ -272,14 +265,11 @@ class CustomSpanCategorizer:
         self.patterns: list[tuple[SpanPattern, re.Pattern[str]]] = []
 
         for sp in patterns:
-            # Skip patterns with None regex
             if sp.pattern is None:
                 continue
 
-            # Validate pattern (raises ValueError if invalid)
             validate_pattern(sp.pattern)
 
-            # Compile and store
             compiled = re.compile(sp.pattern)
             self.patterns.append((sp, compiled))
 
@@ -306,7 +296,6 @@ class CustomSpanCategorizer:
 
         for pattern_obj, compiled_regex in self.patterns:
             for match in compiled_regex.finditer(text):
-                # Skip zero-length matches
                 if match.start() == match.end():
                     continue
 
@@ -322,7 +311,6 @@ class CustomSpanCategorizer:
                 )
                 results.append(span)
 
-        # Sort by start position, then end position
         results.sort(key=lambda s: (s.start_char, s.end_char))
 
         return results
@@ -376,7 +364,6 @@ def load_patterns(path: str | Path) -> list[SpanPattern]:
         pattern_str = obj.get("pattern")
         metadata = obj.get("metadata", {})
 
-        # Parse boundary_rules if present
         boundary_rules = DEFAULT_RULES
         if "boundary_rules" in obj:
             br_obj = obj["boundary_rules"]
@@ -389,7 +376,6 @@ def load_patterns(path: str | Path) -> list[SpanPattern]:
                 stop_words=stop_words,
             )
 
-        # Validate pattern if provided
         if pattern_str is not None:
             validate_pattern(pattern_str)
 
@@ -447,7 +433,6 @@ class SpanCategorizerComponent:
         """
         spans = self.categorizer.categorize(doc.text)
 
-        # Convert to list of dicts for serialization
         spans_list = [
             {
                 "category": s.category,

@@ -13,7 +13,7 @@ Phase 5 (Issue #192) additions focus on aerospace/defense/manufacturing domains:
 """
 
 TECH_KEYWORDS = {
-    # Programming Languages (13)
+    # Programming Languages
     "languages": {
         "python",
         "javascript",
@@ -29,7 +29,7 @@ TECH_KEYWORDS = {
         "scala",
         "kotlin",
     },
-    # Web Frameworks & Libraries (13)
+    # Web Frameworks & Libraries
     "web": {
         "react",
         "vue",
@@ -45,7 +45,7 @@ TECH_KEYWORDS = {
         "svelte",
         "astro",
     },
-    # Cloud & Infrastructure (20)
+    # Cloud & Infrastructure
     "infrastructure": {
         "aws",
         "gcp",
@@ -68,7 +68,7 @@ TECH_KEYWORDS = {
         "harbor",
         "quay",
     },
-    # Databases & Data (16)
+    # Databases & Data
     "databases": {
         "postgresql",
         "mysql",
@@ -87,7 +87,7 @@ TECH_KEYWORDS = {
         "clickhouse",
         "dvc",
     },
-    # Hardware/FPGA/Embedded & Engineering Tools (31) - CRITICAL for ATS domain
+    # Hardware/FPGA/Embedded & Engineering Tools - CRITICAL for ATS domain
     "hardware": {
         "verilog",
         "systemverilog",
@@ -121,7 +121,7 @@ TECH_KEYWORDS = {
         "cordic",
         "mac",
     },
-    # ML/AI Frameworks (20)
+    # ML/AI Frameworks
     "ml_ai": {
         "tensorflow",
         "pytorch",
@@ -144,7 +144,7 @@ TECH_KEYWORDS = {
         "llm",
         "timm",
     },
-    # DevOps, Tools & Protocols (28)
+    # DevOps, Tools & Protocols
     "tools": {
         "jira",
         "confluence",
@@ -174,7 +174,7 @@ TECH_KEYWORDS = {
         "erp",
         "mrp",
     },
-    # Methodologies & Practices (8)
+    # Methodologies & Practices
     "methodologies": {
         "agile",
         "scrum",
@@ -185,7 +185,7 @@ TECH_KEYWORDS = {
         "lean",
         "xp",
     },
-    # Robotics & Emerging (5)
+    # Robotics & Emerging
     "robotics": {
         "ros",
         "ros2",
@@ -193,7 +193,7 @@ TECH_KEYWORDS = {
         "moveit",
         "webots",
     },
-    # Other Critical Tools (8)
+    # Other Critical Tools
     "other": {
         "protobuf",
         "json",

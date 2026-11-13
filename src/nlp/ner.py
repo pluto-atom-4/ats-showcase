@@ -46,29 +46,27 @@ class JobNERExtractor:
         self.company_name = company_name
         self.parser = get_parser(company_name) if company_name else None
         self.narrative_extractor = NarrativeRequirementExtractor(self.nlp)
-        # Pre-compile matchers for reuse (not recreated per-job)
         self.keyphrase_matcher = PhraseMatcher(self.nlp.vocab)
         self.skill_matcher = PhraseMatcher(self.nlp.vocab)
 
     def _init_matchers(self, job_description: str) -> None:
         """Load keyphrases and patterns into pre-initialized matchers."""
-        # Get keyphrases (domain parameter is not currently used for filtering)
         keyphrases = get_keyphrases_auto(job_description)
 
-        # Clear and re-add patterns for domain-specific keyphrases
         try:
             self.keyphrase_matcher.remove("KEYPHRASE")
         except (ValueError, KeyError):
-            pass  # Pattern doesn't exist yet
+            # Pattern doesn't exist yet.
+            pass
         keyphrase_patterns = [self.nlp.make_doc(kp) for kp in keyphrases]
         if keyphrase_patterns:
             self.keyphrase_matcher.add("KEYPHRASE", keyphrase_patterns)
 
-        # Clear and re-add patterns for skill keywords
         try:
             self.skill_matcher.remove("SKILL")
         except (ValueError, KeyError):
-            pass  # Pattern doesn't exist yet
+            # Pattern doesn't exist yet.
+            pass
         skill_patterns = [self.nlp.make_doc(skill) for skill in SKILL_KEYWORDS]
         if skill_patterns:
             self.skill_matcher.add("SKILL", skill_patterns)
@@ -78,7 +76,6 @@ class JobNERExtractor:
         inferred = set()
         detected_domain = detect_domain(text)
 
-        # Map patterns to skill phrases (domain-aware)
         skill_mappings = {
             # Aerospace domain
             "Guidance and Control": [r"guidance\s+and\s+control|G&C", r"guidance.*control"],
@@ -104,29 +101,25 @@ class JobNERExtractor:
             "System modeling": [r"system.*model|model.*system"],
             "Hardware-in-the-loop testing": [r"hardware.?in.?loop|HIL.*test"],
             "Vehicle test campaigns": [r"vehicle.*test.*campaign|test.*campaign"],
-            # Software/Systems domain (be conservative to avoid false positives)
-            # "Software architecture": [r"software.*architecture"],  # Too broad - matches "architectural"
-            "Hands-on software development": [r"hands.?on.*development"],  # Specific phrase
-            # "Systems maintenance": [r"system.*maintenance"],  # Too broad
-            "Binary data transformation": [r"binary.*data.*transformation"],  # Specific
-            "Integrity check implementation": [r"integrity\s+check"],  # Specific
-            "Time-series data analytics": [r"time.?series.*data|data.*time.?series"],  # Specific
-            "Storage architecture design": [r"storage.*architecture"],  # Less likely to false match
+            # Software/Systems domain: kept narrow; generic terms (agile, DevOps, CI/CD) mostly appear as preferences.
+            "Hands-on software development": [r"hands.?on.*development"],
+            "Binary data transformation": [r"binary.*data.*transformation"],
+            "Integrity check implementation": [r"integrity\s+check"],
+            "Time-series data analytics": [r"time.?series.*data|data.*time.?series"],
+            "Storage architecture design": [r"storage.*architecture"],
             "Sensor data calibration": [r"calibration.*sensor|sensor.*calibration"],
             "Sensor data synchronization": [r"synchronization.*sensor|sensor.*sync"],
-            "Technology evaluation": [r"evaluat.*(?:technology|emerging)"],  # More specific context
-            "Code reviews": [r"code\s+review"],  # Exact phrase
-            "Design walkthroughs": [r"design\s+walkthrough"],  # Exact phrase
-            # "Technical coaching": [r"coaching"],  # Too generic
-            "Project management": [r"project.*management"],  # Less risky
-            "Problem decomposition": [r"problem\s+decomposition"],  # Exact
-            # "Technical communication": [r"technical.*communication"],  # Too broad
-            "Engineering data interpretation": [r"engineering\s+data"],  # Less generic
-            "Engineering drawing interpretation": [r"engineering\s+drawing"],  # Specific
-            "Quantitative analysis": [r"quantitative\s+analysis"],  # Exact
-            "Statistical analysis": [r"statistical\s+analysis"],  # Exact
-            "Data collection": [r"data\s+collection"],  # Exact
-            "Data preparation": [r"data\s+preparation"],  # Exact
+            "Technology evaluation": [r"evaluat.*(?:technology|emerging)"],
+            "Code reviews": [r"code\s+review"],
+            "Design walkthroughs": [r"design\s+walkthrough"],
+            "Project management": [r"project.*management"],
+            "Problem decomposition": [r"problem\s+decomposition"],
+            "Engineering data interpretation": [r"engineering\s+data"],
+            "Engineering drawing interpretation": [r"engineering\s+drawing"],
+            "Quantitative analysis": [r"quantitative\s+analysis"],
+            "Statistical analysis": [r"statistical\s+analysis"],
+            "Data collection": [r"data\s+collection"],
+            "Data preparation": [r"data\s+preparation"],
             "Cloud service deployment": [r"cloud.*deployment|deploy.*cloud"],
             "Software documentation": [r"software.*documentation"],
             "Software design": [r"software.*design|design.*software"],
@@ -140,10 +133,6 @@ class JobNERExtractor:
             "Integration testing": [r"integration.*test"],
             "Performance testing": [r"performance.*test"],
             "Security testing": [r"security.*test"],
-            # Note: These are often in "Preferred" or context; be conservative
-            # "Agile development": [r"agile.*development"],  # Too broad
-            # "DevOps practices": [r"DevOps|devops"],  # Often preference
-            # "CI/CD implementation": [r"CI/CD|CI.?CD"],  # Often preference
             "Deployment automation": [r"deployment.*automat|automat.*deploy"],
             "Infrastructure management": [r"infrastructure.*management"],
             "Configuration management": [r"configuration.*management|SCM"],
@@ -151,13 +140,6 @@ class JobNERExtractor:
             "Stakeholder management": [r"stakeholder.*management"],
             "Technical documentation": [r"technical.*documentation"],
             "Knowledge transfer": [r"knowledge.*transfer"],
-            # Removed: too generic, appear in preferences not skills
-            # "Best practices implementation": [r"best.*practice"],
-            # "Standards compliance": [r"standard.*compliance"],
-            # "Process improvement": [r"process.*improvement"],
-            # "Deployment automation": [r"deployment.*automat"],
-            # "Software design": [r"software.*design"],
-            # "System design": [r"system.*design"],
             # Defense/Software domain (less exact, more narrative)
             "Software architecture": [r"(?:design|architect).*software\s+system|software\s+(?:design|architect)"],
             "Systems maintenance": [r"maintain.*system|system.*maintain"],
@@ -229,7 +211,6 @@ class JobNERExtractor:
             Dict mapping tech -> (tech, confidence, method)
         """
         techs = extract_technologies(text)
-        # All tech extractions use pattern matching
         return {
             tech: (tech, get_confidence(ExtractionMethod.PATTERN_MATCH), ExtractionMethod.PATTERN_MATCH)
             for tech in techs
@@ -268,7 +249,6 @@ class JobNERExtractor:
         # Structured bullet requirements from company parser = high confidence
         for req in reqs:
             if req not in requirements_with_conf:
-                # Determine if this is from a structured section or pattern
                 is_structured = (
                     any(
                         pattern in req.lower()
@@ -299,13 +279,10 @@ class JobNERExtractor:
         narrative_reqs = self.extract_narrative_requirements(text)
 
         for req in narrative_reqs:
-            # Only add if not already covered by structured extraction
-            # Use word boundary check instead of substring to avoid false positives
-            # (e.g., 'C' != 'C++', 'Python' != 'Python3')
             if self._is_duplicate_requirement(req, requirements_with_conf):
                 continue
 
-            # Lower confidence for narrative to account for possible false positives
+            # Narrative matches get a fixed lower confidence (0.75) because they can be false positives.
             requirements_with_conf[req] = (req, 0.75, ExtractionMethod.FALLBACK)
 
     def _is_duplicate_requirement(
@@ -320,11 +297,10 @@ class JobNERExtractor:
         Returns:
             True if duplicate found, False otherwise
         """
+        # Exact match after normalization; a substring check would treat 'C' as a duplicate of 'C++'.
         req_lower = req.lower()
         for existing in requirements_with_conf:
             existing_lower = existing.lower()
-            # Check if they're very similar (word boundary or 80%+ match)
-            # For now, just check exact match after normalization
             if req_lower == existing_lower:
                 return True
         return False
@@ -345,7 +321,6 @@ class JobNERExtractor:
         if self.parser:
             requirements_with_conf = self._extract_structured_requirements(text)
 
-            # Add narrative requirements from prose (medium confidence)
             if include_narrative:
                 self._extract_narrative_and_merge(text, requirements_with_conf)
 
@@ -396,7 +371,6 @@ class JobNERExtractor:
             if domain:
                 domain = domain.strip()
                 domain = re.sub(r"[\.,;]*$", "", domain)
-                # Normalize specific domains
                 if "autonomy" in domain.lower() and "aerospace" in domain.lower():
                     domain = "autonomy or aerospace autonomy/GNC"
                 elif "autonomy" in domain.lower():
@@ -424,7 +398,6 @@ class JobNERExtractor:
             bullet = bullet.strip()
             # Keep requirement bullets (10-150 chars, not starting with years)
             if 10 < len(bullet) < 150 and not re.match(r"^\d+\+", bullet):
-                # Don’t duplicate years of experience
                 if "years of experience" not in bullet.lower():
                     bullets_reqs.add(bullet)
 
@@ -446,7 +419,6 @@ class JobNERExtractor:
         for bullet in pref_bullets:
             bullet = bullet.strip()
             if 10 < len(bullet) < 150:
-                # Add (Preferred) tag if not already there
                 if "(Preferred)" not in bullet:
                     bullet = f"{bullet} (Preferred)"
                 pref_reqs.add(bullet)
@@ -460,12 +432,10 @@ class JobNERExtractor:
             r"(?:M\.S\.|MS|Master|PhD|Ph\.D\.)\s+(?:or|\/)\s+(?:PhD|Ph\.D\.)", text, re.IGNORECASE
         )
         if advanced_degree_match:
-            # Check if marked as preferred
             context = text[max(0, advanced_degree_match.start() - 100) : advanced_degree_match.end() + 100]
             if "preferred" in context.lower():
                 degree_reqs.add("Advanced degree (M.S. or Ph.D.) in a relevant engineering field (Preferred)")
             else:
-                # If in preferred section, don’t add duplicate
                 if not any("Advanced degree" in req for req in degree_reqs):
                     degree_reqs.add("Advanced degree (M.S. or Ph.D.) in a relevant engineering field")
 
@@ -515,30 +485,30 @@ class JobNERExtractor:
         """Generic requirement extraction fallback."""
         requirements = set()
 
-        # 1. Years of experience (from basic/minimum qualifications section)
+        # Years of experience from qualification sections
         for section_label in [r"basic\s+qualifications", r"minimum\s+qualifications", r"required\s+skills"]:
             requirements.update(self._extract_years_from_section(text, section_label))
 
-        # 2. Extract other bullets from Basic/Minimum Qualifications section
+        # Other bullets from basic/minimum qualification sections
         for section_label in [r"basic\s+qualifications", r"minimum\s+qualifications", r"required\s+skills/experience"]:
             requirements.update(self._extract_qualification_bullets(text, section_label))
 
-        # 3. Extract from "Preferred Qualifications" section
+        # Preferred qualifications
         requirements.update(self._extract_preferred_qualifications(text))
 
-        # 4. Extract advanced degree requirements
+        # Advanced degree
         requirements.update(self._extract_advanced_degree(text))
 
-        # 5. Extract citizenship/export control
+        # Citizenship and export control
         requirements.update(self._extract_citizenship_requirement(text, requirements))
 
-        # 6. Extract background check & drug test
+        # Background check and drug test
         requirements.update(self._extract_background_check(text, requirements))
 
-        # 7. Extract coding assessments & challenges
+        # Coding assessments and challenges
         requirements.update(self._extract_coding_assessment(text, requirements))
 
-        # 8. Extract Bachelor’s degree requirement
+        # Bachelor's degree
         requirements.update(self._extract_bachelors_degree(text, requirements))
 
         return requirements
@@ -554,32 +524,27 @@ class JobNERExtractor:
 
     def extract_all_with_confidence(self, text: str) -> dict[str, Any]:
         """Extract all entities with confidence scores."""
-        # Initialize matchers based on job description domain
         self._init_matchers(text)
 
         skills_with_conf = self.extract_skills_with_confidence(text)
         techs_with_conf = self.extract_technologies_with_confidence(text)
         reqs_with_conf = self.extract_requirements_with_confidence(text)
 
-        # Extract just values for normalization
         skills = set(skills_with_conf.keys())
         techs = set(techs_with_conf.keys())
         reqs = set(reqs_with_conf.keys())
 
-        # Normalize
         skills = normalize_skills(skills)
         techs = normalize_technologies(techs)
         reqs = normalize_requirements(reqs)
 
-        # Build result with confidence scores
         def build_confident_list(
             values: set[str], conf_dict: Dict[str, tuple[str, float, ExtractionMethod]]
         ) -> list[dict[str, float | str]]:
             """Build list of dicts with value and confidence."""
             result: list[dict[str, float | str]] = []
             for val in sorted(values):
-                # Find confidence from original dict (before normalization)
-                # For now, use average confidence from matches
+                # Normalized values no longer equal the original keys, so average confidence over substring matches.
                 val_lower = val.lower()
                 matching_confs = [
                     conf_dict.get(v, (v, 0.5, None))[1]
@@ -604,14 +569,12 @@ class JobNERExtractor:
 
     def extract_all(self, text: str) -> dict[str, Any]:
         """Extract all entities from job description."""
-        # Initialize matchers based on job description domain
         self._init_matchers(text)
 
         skills = self.extract_skills(text)
         technologies = self.extract_technologies(text)
         requirements = self.extract_requirements(text)
 
-        # Normalize
         skills = normalize_skills(skills)
         technologies = normalize_technologies(technologies)
         requirements = normalize_requirements(requirements)

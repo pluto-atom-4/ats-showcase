@@ -11,9 +11,8 @@ This module provides soft skills categorized according to ESCO standards:
 - Customer & Relationship: Client focus, negotiation
 """
 
-# ESCO-aligned soft skills taxonomy with 68 terms across 8 categories
 SOFT_SKILLS_BY_CATEGORY = {
-    # 1. Communication & Presentation (10 terms)
+    # Communication & Presentation
     "communication": {
         "communication",
         "written communication",
@@ -26,7 +25,7 @@ SOFT_SKILLS_BY_CATEGORY = {
         "verbal",
         "articulate",
     },
-    # 2. Leadership & Management (10 terms)
+    # Leadership & Management
     "leadership": {
         "leadership",
         "project management",
@@ -39,7 +38,7 @@ SOFT_SKILLS_BY_CATEGORY = {
         "coaching",
         "training",
     },
-    # 3. Teamwork & Collaboration (9 terms)
+    # Teamwork & Collaboration
     "teamwork": {
         "teamwork",
         "collaboration",
@@ -51,7 +50,7 @@ SOFT_SKILLS_BY_CATEGORY = {
         "cooperation",
         "collaborative",
     },
-    # 4. Problem-Solving & Analysis (10 terms)
+    # Problem-Solving & Analysis
     "problem_solving": {
         "problem-solving",
         "problem solving",
@@ -64,7 +63,7 @@ SOFT_SKILLS_BY_CATEGORY = {
         "logical thinking",
         "troubleshooting",
     },
-    # 5. Organization & Planning (8 terms)
+    # Organization & Planning
     "organization": {
         "organizational",
         "organizational skills",
@@ -75,7 +74,7 @@ SOFT_SKILLS_BY_CATEGORY = {
         "multitasking",
         "prioritization",
     },
-    # 6. Emotional Intelligence (8 terms)
+    # Emotional Intelligence
     "emotional_intelligence": {
         "emotional intelligence",
         "empathy",
@@ -86,7 +85,7 @@ SOFT_SKILLS_BY_CATEGORY = {
         "adaptability",
         "resilience",
     },
-    # 7. Adaptability & Learning (8 terms)
+    # Adaptability & Learning
     "adaptability": {
         "adaptability",
         "flexibility",
@@ -97,7 +96,7 @@ SOFT_SKILLS_BY_CATEGORY = {
         "innovative",
         "creative",
     },
-    # 8. Customer & Relationship Management (7 terms)
+    # Customer & Relationship Management
     "customer_relations": {
         "customer service",
         "customer focus",
@@ -109,7 +108,6 @@ SOFT_SKILLS_BY_CATEGORY = {
     },
 }
 
-# Flat set of all soft skills for quick lookups
 SOFT_SKILLS = set()
 for category_skills in SOFT_SKILLS_BY_CATEGORY.values():
     SOFT_SKILLS.update(category_skills)

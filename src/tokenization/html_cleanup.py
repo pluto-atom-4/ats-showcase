@@ -66,7 +66,7 @@ COMPANY_BOILERPLATE_PATTERNS = [
 TIME_REFERENCE_PATTERNS = [
     r"(?i)full[\s-]?time",
     r"(?i)part[\s-]?time",
-    r"(?i)\bcontract\b(?!or|ing)",  # Matches "contract" but not "contractor", "contracting"
+    r"(?i)\bcontract\b(?!or|ing)",
     r"(?i)temporary",
     r"(?i)permanent",
     r"(?i)interim",
@@ -91,13 +91,13 @@ SALARY_BENEFITS_PATTERNS = [
 
 # Category 6: Special formatting (HTML artifacts)
 SPECIAL_FORMATTING_PATTERNS = [
-    r"&nbsp;+",  # Non-breaking spaces
-    r"&amp;",  # HTML ampersand
-    r"&lt;|&gt;",  # Angle brackets
-    r"&quot;",  # HTML quotes
-    r"&#\d+;",  # Numeric entities
-    r"\s{2,}",  # Multiple spaces
-    r"\n{2,}",  # Multiple newlines
+    r"&nbsp;+",
+    r"&amp;",
+    r"&lt;|&gt;",
+    r"&quot;",
+    r"&#\d+;",
+    r"\s{2,}",
+    r"\n{2,}",
 ]
 
 # Category 7: Navigation text
@@ -190,10 +190,8 @@ def remove_boilerplate(text: str) -> str:
 
     for _category, pattern_list in patterns.items():
         for pattern in pattern_list:
-            # Use DOTALL flag to handle multi-line patterns
             cleaned = re.sub(pattern, "", cleaned, flags=re.MULTILINE | re.IGNORECASE)
 
-    # Clean up extra whitespace
     cleaned = re.sub(r"\s{2,}", " ", cleaned)
     cleaned = cleaned.strip()
 
@@ -211,7 +209,6 @@ def get_boilerplate_keywords() -> Set[str]:
     Returns:
         Set of keywords extracted from all boilerplate patterns
     """
-    # Extract keywords from simpler patterns (non-regex)
     simple_keywords = [
         "salary",
         "benefits",
@@ -259,17 +256,14 @@ def remove_html_entities(text: str) -> str:
     if not text:
         return ""
 
-    # Remove non-breaking spaces
     text = text.replace("&nbsp;", " ")
 
-    # Remove HTML entities
     text = text.replace("&amp;", "&")
     text = text.replace("&lt;", "<")
     text = text.replace("&gt;", ">")
     text = text.replace("&quot;", '"')
     text = text.replace("&apos;", "'")
 
-    # Remove numeric entities
     text = re.sub(r"&#\d+;", "", text)
 
     return text

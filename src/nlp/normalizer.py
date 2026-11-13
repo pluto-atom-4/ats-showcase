@@ -6,61 +6,48 @@ from difflib import SequenceMatcher
 
 def normalize_requirement(req: str) -> str:
     """Clean and normalize requirement text."""
-    # Remove leading/trailing whitespace
     req = req.strip()
 
-    # Extract and preserve "(Preferred)" tag
+    # Strip the (Preferred) tag here and re-add it at the end.
     is_preferred = "(Preferred)" in req
     req = req.replace("(Preferred)", "").strip()
 
-    # Truncate at secondary clauses (keep primary requirement only)
-    # Remove location/project context
+    # Drop trailing location/project context so only the primary requirement remains.
     req = re.sub(r"\s+on\s+fast-paced\s+projects$", "", req, flags=re.IGNORECASE)
     req = re.sub(r"\s+on\s+military\s+installations?$", "", req, flags=re.IGNORECASE)
 
-    # Remove trailing list items (keep first item)
-    # Only remove "simulations" or "software" type trailing items, not core concepts like "implementation"
-    # "X, simulations, and software" → "X"
+    # Drop only trailing simulations/software items, not core concepts: "X, simulations, and software" -> "X".
     req = re.sub(r",\s+(?:simulations|software),\s+and\s+[^,\.]*$", "", req, flags=re.IGNORECASE)
     req = re.sub(r",\s+and\s+integrated\s+vehicle.*$", "", req, flags=re.IGNORECASE)
 
     # Handle "development, implementation, and testing" → "implementation and testing"
     if re.search(r"^Experience\s+in\s+development,\s+implementation,\s+and", req, re.IGNORECASE):
         req = re.sub(r"development,\s+", "", req, flags=re.IGNORECASE)
-        # Clean up "implementation, and" → "implementation and"
         req = re.sub(r",\s+and\s+", " and ", req, flags=re.IGNORECASE)
     elif re.search(r"^Experience\s+in\s+development\s+and", req, re.IGNORECASE):
         req = re.sub(r"development\s+and\s+", "", req, flags=re.IGNORECASE)
 
-    # Remove "the development of" from "with the development of"
     req = re.sub(r"\s+with\s+the\s+development\s+of\s+", " with ", req, flags=re.IGNORECASE)
 
-    # Remove "Experience in development" (fragment left from trimming)
+    # "Experience in development" is a fragment left from trimming; normalize_requirements drops the empty result.
     if req.lower() == "experience in development":
-        return ""  # Will be filtered out
+        return ""
 
     # Standardize phrasing patterns
     # "Demonstrated experience X" → "Experience X"
     req = re.sub(r"^Demonstrated\s+experience\s+(?:in|with|involving)\s+", "Experience in ", req, flags=re.IGNORECASE)
-    # "demonstrated ability to" → "Ability to"
     req = re.sub(r"^Demonstrated\s+ability\s+to\s+", "Ability to ", req, flags=re.IGNORECASE)
-    # "Experience in X as well as Y" → "Experience in X and Y"
     req = re.sub(r"\s+as\s+well\s+as\s+", " and ", req, flags=re.IGNORECASE)
-    # "Experience in X, Y, and Z" → standardize commas
     req = re.sub(r"\s+,\s+", ", ", req)
 
-    # Remove redundant parentheticals (keep "M.S. or Ph.D." and "Preferred" but remove others)
+    # Leave "M.S. or Ph.D." alone; otherwise drop (e.g. ...), (HIL) and trailing parentheticals.
     if "M.S. or Ph.D." not in req:
-        # Remove parentheticals like "(e.g., ...)" and "(HIL)"
         req = re.sub(r"\s*\(\s*e\.g\..*?\)\s*", " ", req)
         req = re.sub(r"\s*\(HIL\)", "", req)
-        # Remove trailing parentheticals
         req = re.sub(r"\s*\([^)]*\)\s*$", "", req)
 
-    # Collapse multiple spaces
     req = re.sub(r"\s+", " ", req)
 
-    # Re-add "(Preferred)" if present
     if is_preferred:
         req = f"{req} (Preferred)"
 
@@ -87,7 +74,6 @@ def deduplicate_requirements(requirements: set[str], similarity_threshold: float
 
             # If similarity is high, mark longer one as duplicate
             if ratio > similarity_threshold:
-                # Check if req is a substring of other (stronger signal)
                 if req.lower() in other.lower():
                     # req is shorter and contained in other, keep req, discard other
                     used_indices.add(j)
@@ -114,13 +100,10 @@ def deduplicate_requirements(requirements: set[str], similarity_threshold: float
 
 def normalize_requirements(requirements: set[str]) -> set[str]:
     """Normalize all requirements and deduplicate."""
-    # Normalize each
     normalized = {normalize_requirement(req) for req in requirements}
 
-    # Filter out empty strings
     normalized = {req for req in normalized if req.strip()}
 
-    # Deduplicate
     deduplicated = deduplicate_requirements(normalized, similarity_threshold=0.80)
 
     return deduplicated
@@ -128,8 +111,6 @@ def normalize_requirements(requirements: set[str]) -> set[str]:
 
 def normalize_skills(skills: set[str]) -> set[str]:
     """Normalize skill names (preserve exact format from extraction)."""
-    # Skills are already in correct format from extraction via keyphrases
-    # Only add normalization if needed (fallback keywords)
     normalized = set()
 
     # Known correctly-capitalized skills (multi-domain)
@@ -240,5 +221,4 @@ def normalize_skills(skills: set[str]) -> set[str]:
 
 def normalize_technologies(technologies: set[str]) -> set[str]:
     """Normalize technology names."""
-    # Most tech names have specific capitalization; keep as-is
     return technologies
