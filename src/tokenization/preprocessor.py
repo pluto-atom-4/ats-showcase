@@ -989,8 +989,8 @@ class Preprocessor:
             if words[1][0].isupper() and len(words) <= 3:
                 return True
 
-        # Flag 4+ words with a conjunction or comma in the middle.
-        # 3-word extraction artifacts like "software development , Python" pass.
+        # Flag 4+ words with a conjunction or comma in the middle (e.g. "computer science and years").
+        # Shorter phrases pass.
         if len(words) >= 4:
             for w in words[1:-1]:
                 if w.lower() in ("and", "or", ","):

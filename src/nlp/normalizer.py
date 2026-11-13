@@ -29,7 +29,7 @@ def normalize_requirement(req: str) -> str:
 
     req = re.sub(r"\s+with\s+the\s+development\s+of\s+", " with ", req, flags=re.IGNORECASE)
 
-    # Empty results are dropped by normalize_requirements.
+    # "Experience in development" is a fragment left from trimming; normalize_requirements drops the empty result.
     if req.lower() == "experience in development":
         return ""
 

@@ -56,6 +56,7 @@ class JobNERExtractor:
         try:
             self.keyphrase_matcher.remove("KEYPHRASE")
         except (ValueError, KeyError):
+            # Pattern doesn't exist yet.
             pass
         keyphrase_patterns = [self.nlp.make_doc(kp) for kp in keyphrases]
         if keyphrase_patterns:
@@ -64,6 +65,7 @@ class JobNERExtractor:
         try:
             self.skill_matcher.remove("SKILL")
         except (ValueError, KeyError):
+            # Pattern doesn't exist yet.
             pass
         skill_patterns = [self.nlp.make_doc(skill) for skill in SKILL_KEYWORDS]
         if skill_patterns:
