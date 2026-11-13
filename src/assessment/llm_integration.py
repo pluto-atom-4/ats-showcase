@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 _token_counter = TokenCounter()
 
-# Price per 1M tokens; divided by 1_000_000 at use.
+# Hazard: values differ from SUPPORTED_MODELS per-1M prices (sonnet 3.0/15.0) yet are
+# divided by 1_000_000 at use, so costs come out 1000x lower.
 MODEL_PRICING = {
     "claude-3-5-sonnet-20241022": {
         "input": 0.003,

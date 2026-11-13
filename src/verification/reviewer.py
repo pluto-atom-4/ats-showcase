@@ -122,7 +122,7 @@ class JobReviewer:
             self.conn.commit()
             logger.info("Added crawled_at column to job_reviews")
         except sqlite3.OperationalError:
-            # Column already exists
+            # Expected: column already exists; any other OperationalError is swallowed too.
             pass
 
         try:
@@ -130,7 +130,7 @@ class JobReviewer:
             self.conn.commit()
             logger.info("Added preprocessed_at column to job_reviews")
         except sqlite3.OperationalError:
-            # Column already exists
+            # Expected: column already exists; any other OperationalError is swallowed too.
             pass
 
         try:
@@ -138,7 +138,7 @@ class JobReviewer:
             self.conn.commit()
             logger.info("Added preprocessing_version column to job_reviews")
         except sqlite3.OperationalError:
-            # Column already exists
+            # Expected: column already exists; any other OperationalError is swallowed too.
             pass
 
     def _close_db(self) -> None:
@@ -729,7 +729,7 @@ class JobReviewer:
         for extracted_path, extracted_jobs in all_extracted_jobs:
             source_name = extracted_path.stem
             for idx, job in enumerate(extracted_jobs):
-                # Fallback id is <file stem>_<1-based index>; must match the preprocessed job_id.
+                # Fallback id is <file stem>_<1-based index>.
                 job_id = job.get("id", f"{source_name}_{idx + 1}")
                 preprocessed = preprocessed_map.get(job_id, {})
 
