@@ -7,6 +7,7 @@ import pytest
 
 from src.assessment.assessor import Assessor
 from src.assessment.types import AssessmentResult
+from src.config.models import DEFAULT_MODEL, SUPPORTED_MODELS
 
 
 @pytest.fixture
@@ -25,7 +26,8 @@ class TestAssessorInit:
     def test_init_with_defaults(self, mock_llm_class: MagicMock, mock_prep_class: MagicMock) -> None:
         """Initialize with default model."""
         assessor = Assessor()
-        assert assessor.model == "claude-3-5-sonnet-20241022"
+        assert assessor.model == DEFAULT_MODEL
+        assert assessor.model in SUPPORTED_MODELS
         assert assessor.use_examples is False
         assert assessor.llm_provider is not None
         assert assessor.preprocessor is not None
