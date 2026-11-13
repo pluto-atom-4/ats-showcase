@@ -3192,6 +3192,7 @@ def cost_analysis(
         uv run python -m src.cli cost-analysis --format json
         uv run python -m src.cli cost-analysis --output report.json --format json
     """
+    from src.config.models import DEFAULT_MODEL, get_model_pricing
     from src.storage.job_store import JobStore
 
     try:
@@ -3240,7 +3241,7 @@ def cost_analysis(
                 "",
                 "Cost Impact:",
                 f"  Estimated savings (USD):   ${report.estimated_savings_usd:.6f}",
-                "  Token rate used:           $0.003 per 1M tokens",
+                f"  Token rate used:           ${get_model_pricing(DEFAULT_MODEL)[0]:.2f} per 1M tokens",
                 "",
                 "Re-preprocessing Metrics:",
                 f"  Re-processing runs:        {len(report.reprocessing_runs)}",
