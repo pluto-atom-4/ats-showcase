@@ -180,7 +180,8 @@ def _apply_confidence_adjustments(
     """
     adjusted = base_confidence
 
-    # Negation is checked in a local window around the match, falling back to the full sentence.
+    # Window is 50 chars around the first occurrence of text; a repeated phrase may pick the wrong one.
+    # Falls back to the full sentence when text is not found.
     offset_in_sentence = full_sentence.find(text)
     if offset_in_sentence >= 0:
         text_start = max(0, offset_in_sentence - 50)

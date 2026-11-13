@@ -314,7 +314,7 @@ class Preprocessor:
             if not is_md:
                 self._extract_soft_skills(doc, soft_skills_set)
 
-            # Reclassify technical compounds (Phase 4): move compound phrases from skills to technologies.
+            # Reclassify technical compounds: move compound phrases from skills to technologies.
             skills_list = list(skills) + list(soft_skills_set)
             reclassified_skills: list[str] = []
             for skill in skills_list:
@@ -989,7 +989,8 @@ class Preprocessor:
             if words[1][0].isupper() and len(words) <= 3:
                 return True
 
-        # Flag 4+ words with a conjunction or comma in the middle; 3-word artifacts pass.
+        # Flag 4+ words with a conjunction or comma in the middle.
+        # 3-word extraction artifacts like "software development , Python" pass.
         if len(words) >= 4:
             for w in words[1:-1]:
                 if w.lower() in ("and", "or", ","):
@@ -1613,6 +1614,7 @@ class Preprocessor:
             is_skills_section, is_req_section, is_description_section = self._determine_section_type(
                 section_name, skills_section_keywords, req_section_keywords
             )
+            # Keep in sync with the "responsibilities" cases in _extract_noun_compounds and _route_list_item_by_section.
             # "responsibilities" does not substring-match "responsibility", so fold it in explicitly.
             if section_name == "responsibilities":
                 is_req_section = True

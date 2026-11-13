@@ -39,7 +39,8 @@ def normalize_requirement(req: str) -> str:
     req = re.sub(r"\s+as\s+well\s+as\s+", " and ", req, flags=re.IGNORECASE)
     req = re.sub(r"\s+,\s+", ", ", req)
 
-    # Keep "M.S. or Ph.D." and "Preferred" parentheticals; drop (e.g. ...), (HIL) and trailing ones.
+    # Leave "M.S. or Ph.D." alone; otherwise drop (e.g. ...), (HIL) and trailing parentheticals.
+    # (Preferred) was stripped above and is re-added at the end.
     if "M.S. or Ph.D." not in req:
         req = re.sub(r"\s*\(\s*e\.g\..*?\)\s*", " ", req)
         req = re.sub(r"\s*\(HIL\)", "", req)

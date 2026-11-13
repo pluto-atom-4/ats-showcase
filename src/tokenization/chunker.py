@@ -176,7 +176,7 @@ class SemanticChunker:
             if normalized_span_text in normalized_chunk_text:
                 continue
 
-            # Bug #1 fix: a plain substring find misses spans split across chunks ("Python and Docker").
+            # A plain substring find misses spans split across chunks ("Python and Docker").
             # Check for a partial match on word boundaries instead.
             words = normalized_span_text.split()
             if len(words) > 1:

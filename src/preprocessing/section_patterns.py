@@ -69,7 +69,7 @@ SECTION_RULER_PATTERNS: tuple[dict[str, Any], ...] = (
             {"LOWER": "do"},
         ],
     },
-    # Token patterns for single-word headers.
+    # Token patterns must match spaCy's tokenization; these cover single-word headers.
     {
         "label": SectionLabel.REQUIREMENTS.value,
         "pattern": [
@@ -196,7 +196,7 @@ DEFAULT_TARGET_SECTIONS: frozenset[SectionLabel] = frozenset(
         SectionLabel.EXPERIENCE,
         SectionLabel.KNOWLEDGE_SKILLS,
         SectionLabel.IN_OFFICE,
-        # WHAT_YOU_DO is intentionally excluded: responsibilities, not requirements.
+        # WHAT_YOU_DO is intentionally excluded: responsibilities, not requirements (adjustment -0.05).
     }
 )
 

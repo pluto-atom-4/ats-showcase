@@ -99,7 +99,8 @@ class JobNERExtractor:
             "System modeling": [r"system.*model|model.*system"],
             "Hardware-in-the-loop testing": [r"hardware.?in.?loop|HIL.*test"],
             "Vehicle test campaigns": [r"vehicle.*test.*campaign|test.*campaign"],
-            # Software/Systems domain: kept narrow; generic terms (agile, DevOps, CI/CD) mostly appear as preferences.
+            # Software/Systems domain: kept narrow. 'architectural' is omitted (a software.*architecture pattern
+            # matches phrases, not skills), as are generic terms (agile, DevOps, CI/CD, best practices).
             "Hands-on software development": [r"hands.?on.*development"],
             "Binary data transformation": [r"binary.*data.*transformation"],
             "Integrity check implementation": [r"integrity\s+check"],
@@ -295,6 +296,7 @@ class JobNERExtractor:
         Returns:
             True if duplicate found, False otherwise
         """
+        # Exact match after normalization; a substring check would treat 'C' as a duplicate of 'C++'.
         req_lower = req.lower()
         for existing in requirements_with_conf:
             existing_lower = existing.lower()

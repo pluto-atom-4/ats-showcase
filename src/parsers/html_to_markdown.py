@@ -58,10 +58,9 @@ def _normalize_html_before_extraction(html: str) -> str:
         flags=re.IGNORECASE,
     )
 
-    # Remove Workday ID refs (e.g. ":R69380"); a bare ":\d+" is kept since it could be a time like "5:".
+    # Remove Workday ID refs (e.g. ":R69380"); pure-digit refs go only at 4+ digits, so ":1" to ":999" survive.
     html = re.sub(r":\s*R\d+", "", html)
     html = re.sub(r":\s*[A-Za-z]+\d+", "", html)
-    # Pure-digit refs like ":1234" are removed only when they have 4+ digits.
     html = re.sub(r":\s*\d{4,}", "", html)
 
     # Drop colons left orphaned by the removals above.
@@ -206,6 +205,7 @@ def _postprocess_markdown_text(text: str) -> str:
 
 
 # Standalone lines matching these become "## " headers when the HTML lacks real heading tags.
+# Matching is case-insensitive, after stripping bold markers and a trailing colon, with curly apostrophes normalized.
 _SECTION_HEADER_KEYWORDS = frozenset(
     {
         # qualifications
@@ -580,6 +580,8 @@ def clean_html(
     # Step 2: Synthesize section headers (if enabled)
     if include_section_headers:
         markdown = add_markdown_section_headers(markdown)
+
+    # Step 3 (section dividers) is folded into add_markdown_section_headers.
 
     # Step 4: Remove boilerplate using pre-compiled patterns
     cleaned = _boilerplate_patterns.remove_boilerplate_fast(markdown, skip_categories=skip_boilerplate_categories)

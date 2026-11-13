@@ -157,12 +157,12 @@ class GenericParser(CompanyParser):
                 bullets = re.findall(r"[\*•\-]\s+(.+?)(?:\n|$)", section)
                 for bullet in bullets:
                     bullet = bullet.strip()
+                    # Bullets that are only "N+ years of experience" are skipped: no domain context.
                     is_only_years = re.match(r"^\d+\+?\s+years\s+of\s+experience\s*$", bullet, re.IGNORECASE)
                     if 10 < len(bullet) < 150 and not is_only_years:
                         requirements.add(bullet)
                 break
 
-        # Generic "X+ years of experience" lines are deliberately skipped: no domain context.
         if re.search(r"degree|bachelor|master", text, re.IGNORECASE):
             if not any("degree" in req.lower() for req in requirements):
                 requirements.add("Bachelor's Degree or equivalent")

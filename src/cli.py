@@ -327,7 +327,7 @@ def _preprocess_job_for_phase(
     """
     try:
         clean_text = _build_preprocess_clean_text(job)
-        # Get doc with requirement spans for chunking (Bug #1 fix)
+        # Get doc with requirement spans for chunking.
         doc = preprocessor.nlp(clean_text) if preprocessor else None
         chunks = chunker.chunk(clean_text, doc=doc)
         token_count = sum(counter.count_tokens(c) for c in chunks)
@@ -1300,12 +1300,12 @@ def _preprocess_single_job(
         # Build clean text from job fields using clean_html (Issue #230 Phase 4)
         clean_text = _build_preprocess_clean_text(job_dict)
 
-        # Sets doc._.requirements and doc._.requirement_spans, which chunking reads (Phase 8b).
+        # The chunker reads requirements from doc, avoiding a second NLP pass or a JSON round trip.
         doc = preprocessor.nlp(clean_text)
         if preprocessor.categorizer_strategy == "custom":
             doc = preprocessor.apply_custom_spans(doc)
 
-        # Process text with span preservation (Bug #1 fix: pass doc to chunker)
+        # Pass doc so chunking preserves requirement spans.
         chunks = chunker.chunk(clean_text, doc=doc)
         token_count = sum(counter.count_tokens(c) for c in chunks)
         estimated_cost = counter.estimate_cost(token_count)
@@ -1354,7 +1354,6 @@ def _preprocess_single_job(
             sectioned_requirements=sectioned_requirements_dict,
         )
 
-        # Only the first 3 jobs are echoed.
         if show_estimates and job_index <= 3:
             typer.echo(f"   Job {job_index}: {job.title[:40]}...")
             typer.echo(f"      Tokens: {token_count} | Cost: ${estimated_cost:.4f}")
