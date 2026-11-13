@@ -130,7 +130,6 @@ class JobReviewer:
             self.conn.commit()
             logger.info("Added preprocessed_at column to job_reviews")
         except sqlite3.OperationalError:
-            # Expected: column already exists; any other OperationalError is swallowed too.
             pass
 
         try:
@@ -138,7 +137,6 @@ class JobReviewer:
             self.conn.commit()
             logger.info("Added preprocessing_version column to job_reviews")
         except sqlite3.OperationalError:
-            # Expected: column already exists; any other OperationalError is swallowed too.
             pass
 
     def _close_db(self) -> None:
@@ -597,7 +595,6 @@ class JobReviewer:
         if not timestamp:
             return "not processed"
         try:
-            # Handle ISO format timestamps (with or without timezone)
             if "T" in timestamp:
                 dt_part = timestamp.split("T")[0]
                 time_part = timestamp.split("T")[1].split("+")[0].split("Z")[0][:5]
@@ -722,14 +719,13 @@ class JobReviewer:
         typer.echo(f"\n👀 Starting job review ({total_jobs} jobs total)\n")
 
         job_counter = 0
-        # Re-review shows all jobs regardless of review or assessment status.
+        # Re-review must see already-reviewed jobs, so skip flags are disabled.
         effective_mode = "all" if allow_re_review else mode
         effective_skip_rejected = False if allow_re_review else skip_rejected
         effective_skip_assessed = False if allow_re_review else skip_assessed
         for extracted_path, extracted_jobs in all_extracted_jobs:
             source_name = extracted_path.stem
             for idx, job in enumerate(extracted_jobs):
-                # Fallback id is <file stem>_<1-based index>.
                 job_id = job.get("id", f"{source_name}_{idx + 1}")
                 preprocessed = preprocessed_map.get(job_id, {})
 

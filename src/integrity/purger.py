@@ -438,7 +438,6 @@ class DataPurger:
                 logger.info("No assessments with NULL job_id found")
                 return 0, []
 
-            # Maps (title, company, location) to the rowid of the first record kept.
             seen_jobs = {}
             duplicates = []
             for rowid, title, company, location in null_records:

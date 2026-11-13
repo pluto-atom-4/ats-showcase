@@ -421,7 +421,7 @@ class ATPDashboard(Screen[None]):
 
             for job_id, job_data in self.state.jobs.items():
                 try:
-                    # Rejected jobs were filtered during interactive review.
+                    # Review leaves rejected jobs in state.jobs; skip them here.
                     if job_data.get("status") == "rejected":
                         logger.debug(f"Skipping rejected job {job_id}")
                         self.state.increment_phase_progress("assess", tokens=0)

@@ -326,7 +326,6 @@ class Crawler:
         if not elem:
             return ""
 
-        # innerHTML, then outerHTML, then text_content when the previous result is under 50 chars.
         content: str | None = await elem.inner_html()
         if not content or len(content.strip()) < 50:
             content = await elem.evaluate("el => el.outerHTML")
@@ -342,7 +341,6 @@ class Crawler:
     async def _extract_from_frame_body(self, frame: Any, frame_index: int) -> str:
         """Extract content from frame body using fallback chain."""
         # Raw body HTML is preferred because preprocessing converts HTML to markdown.
-        # Falls back to outerHTML, then innerText, when the previous result is under 100 chars.
         content: str | None = await frame.evaluate("() => document.body.innerHTML")
         if not content or len(content.strip()) < 100:
             content = await frame.evaluate("() => document.body.outerHTML")
