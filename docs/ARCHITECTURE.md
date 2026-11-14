@@ -19,7 +19,7 @@ ATS Showcase is an agentic AI workflow for job assessment. The system extracts j
 
 **Key metrics**:
 - Token reduction: 80–90% (preprocessing removes boilerplate, CSS, scripts)
-- LLM cost: ~$0.0006–0.0008 per job (Sonnet 3.5, batch processing)
+- LLM cost: per job, see `src/config/models.py` for current rates (default: `claude-sonnet-5`)
 - Latency: Crawl (100 jobs/min) → Assess (2–5 jobs/min depending on queue)
 - Database size: ~5 MB per 500 job assessments (SQLite)
 
@@ -229,7 +229,7 @@ Result: 80–90% token savings before LLM call
 
 **LLM cost per job**:
 ```
-Model: Claude 3.5 Sonnet
+Model: claude-sonnet-5 (`DEFAULT_MODEL`)
 Input prompt: ~400 tokens (fixed)
 Job text: ~700 tokens (preprocessed)
 CV excerpt: ~300 tokens (relevant sections only)
@@ -237,8 +237,8 @@ Total input: ~1400 tokens
 
 Output response: ~350 tokens
 
-Cost: (1400 * $0.003) + (350 * $0.015) = $0.0042 + $0.0053 = $0.0095
-  → Actual: ~$0.0006–0.0008 (batch pricing, model improvements)
+Cost (example rate: $3/1M input, $15/1M output): (1400 * $3/1M) + (350 * $15/1M) = $0.0042 + $0.00525 = $0.00945
+  → Current rates: see `src/config/models.py`; measured usage: `uv run python -m src.cli stats --show-token-usage`
 ```
 
 **Performance metrics**:
@@ -276,7 +276,7 @@ Batch processor handles this:
 - **Capacity**: ~100 jobs/day per account (API rate limit)
 - **Database**: SQLite, <5 MB per 500 jobs
 - **Memory**: ~500 MB (Playwright + spaCy model)
-- **Cost**: ~$0.06–0.08/day (for 100 jobs, ~$2/month)
+- **Cost**: per-job LLM cost × jobs/day, see `src/config/models.py` for current rates
 
 **Bottleneck**: Claude API rate limits, not compute.
 
@@ -431,7 +431,7 @@ ENTRYPOINT ["python", "-m", "src.cli"]
 A: SQLite sufficient for single-user, <5 MB datasets. Easier to ship, backup, and restore. Upgrade to Postgres for multi-user or >50k assessments.
 
 **Q: Why Claude instead of open-source LLM?**
-A: Claude Sonnet balances quality (good job-CV reasoning) and cost (~$0.0008/job). Open models require hosting, larger context, lower accuracy for this task.
+A: Claude Sonnet balances quality (good job-CV reasoning) and cost (see `src/config/models.py` for current rates). Open models require hosting, larger context, lower accuracy for this task.
 
 **Q: Why Playwright instead of simple HTTP?**
 A: Many job boards (LinkedIn, Indeed) require JavaScript execution. Playwright handles JavaScript rendering, form submission, pagination.
