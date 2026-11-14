@@ -2,6 +2,8 @@
 
 Research & implementation guide for optimal Claude API integration with preprocessed job data.
 
+> Model IDs and pricing below are dated research snapshots (superseded: see `src/config/models.py` for current IDs and rates, USD per 1M tokens).
+
 ---
 
 ## Overview
@@ -515,7 +517,7 @@ def estimate_cost(cv_text: str, job_text: str) -> dict:
     estimated_input = cv_tokens + job_tokens + prompt_overhead
     estimated_output = 200  # JSON response
 
-    # Claude 3.5 Sonnet: $3/1M input, $15/1M output
+    # Claude 3.5 Sonnet, example rate (superseded: see src/config/models.py): $3/1M input, $15/1M output
     input_cost = estimated_input * (3 / 1_000_000)
     output_cost = estimated_output * (15 / 1_000_000)
     total_cost = input_cost + output_cost
