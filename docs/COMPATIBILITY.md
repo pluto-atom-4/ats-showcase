@@ -201,7 +201,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
     wait=wait_exponential(multiplier=1, min=2, max=60)
 )
 def call_claude(client, messages):
-    return client.messages.create(model="claude-3-5-haiku-20241022", messages=messages)
+    return client.messages.create(model="claude-haiku-4-5-20251001", messages=messages)
 ```
 
 ### 8. **spaCy Model Download & Installation**
@@ -715,7 +715,7 @@ export PYTHONUSERBASE=/custom/python/base
 **Performance Characteristics**:
 - **Startup time**: ~1 second (spaCy model load + imports)
 - **Token reduction**: 80-90% (raw HTML → cleaned text → chunks)
-- **Cost per job**: ~$0.003 (Claude 3.5 Haiku, 100-token avg after preprocessing)
+- **Cost per job**: depends on model and token count; current rates (USD per 1M tokens) in `src/config/models.py`
 - **Processing speed**:
   - Crawling: 100+ jobs/min
   - Preprocessing: 200+ jobs/min
