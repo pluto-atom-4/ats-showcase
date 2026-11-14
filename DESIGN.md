@@ -27,7 +27,7 @@ PREPROCESS (MarkItDown + spaCy + tiktoken) → Clean chunks + token estimates
   ↓
 VERIFY (Interactive CLI, status tracking) → Confirmed jobs
   ↓
-ASSESS (Claude 3.5 Sonnet + rate limiting) → Scores + actual tokens/cost
+ASSESS (Claude, default `claude-sonnet-5`, + rate limiting) → Scores + actual tokens/cost
   ↓
 STORAGE (SQLite + FTS5) → Queryable database
   ↓
@@ -157,7 +157,7 @@ See CLAUDE.md and `.claude/rules/` for enforcement mechanisms.
 | HTML → Markdown | 3-tier: MarkItDown → BeautifulSoup → Original | Structure preservation + robustness (Issue #231) |
 | Tokenization | spaCy (sentences) + tiktoken (counting) | Semantic boundaries, cost estimation |
 | Database | SQLite + FTS5 | Serverless, full-text search, atomic writes |
-| LLM | Claude 3.5 Sonnet | Cost/quality balance: $0.003 per 1M input tokens |
+| LLM | Claude (default `claude-sonnet-5`) | Cost/quality balance: current rates in `src/config/models.py` |
 | CLI | Typer | Async-ready, typed commands, help text |
 | TUI | Textual + Rich | Async-first, responsive, light/dark theme |
 

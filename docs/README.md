@@ -122,7 +122,7 @@ ats-showcase/
 
 - **Token cost**: 80-90% reduction vs raw HTML → LLM
 - **Speed**: Crawl (100 jobs/min) → Assess (2-5 jobs/min)
-- **LLM cost**: ~$0.003 per job (Claude Haiku, optimized)
+- **LLM cost**: depends on model and token count; see `src/config/models.py` for current rates
 
 See [docs/PREPROCESS.md](./docs/PREPROCESS.md#token-cost-savings) for detailed breakdown.
 
