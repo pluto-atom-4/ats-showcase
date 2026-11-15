@@ -193,7 +193,7 @@ python -m src.setup.validate_nlp_setup
 - **🌐 Multi-site crawling** – Playwright with JavaScript rendering, CSS selector pooling, rate limiting
 - **🔄 Smart preprocessing (Issue #230 + #231)** – Consolidated `clean_html()` with 70+ boilerplate patterns; 3-tier fallback (MarkItDown → BeautifulSoup → Original HTML) ensures robustness; semantic chunking; 88% token reduction
 - **👀 User verification** – Interactive CLI review with cost estimates before expensive LLM calls
-- **🤖 LLM assessment** – Claude 3.5 Sonnet with batch processing, rate limiting, detailed scoring
+- **🤖 LLM assessment** – Claude Sonnet 5 (default) with batch processing, rate limiting, detailed scoring
 - **💾 Data persistence** – SQLite with FTS5 full-text search, structured export to Markdown
 - **📊 Cost analytics** – Real-time token tracking, per-job cost breakdown, total spend accounting
 - **📅 Date-range filtering** – Filter exports by assessment date, purge old records with safety confirmations
@@ -367,10 +367,10 @@ ATS Showcase cuts LLM costs **80–90%** through local preprocessing.
 
 ### Example: Assess 100 Jobs
 
-| Approach | Tokens/Job | Total Tokens | Cost (Claude 3.5) | Savings |
-|----------|-----------|--------------|-------------------|---------|
-| **Raw HTML → LLM** | ~6,000 | 600,000 | ~$0.60 | — |
-| **ATS Showcase** | ~700 | 70,000 | ~$0.07 | **88%** ✅ |
+| Approach | Tokens/Job | Total Tokens | Input Cost (Sonnet 5, $3/1M) | Savings |
+|----------|-----------|--------------|------------------------------|---------|
+| **Raw HTML → LLM** | ~6,000 | 600,000 | ~$1.80 | — |
+| **ATS Showcase** | ~700 | 70,000 | ~$0.21 | **88%** ✅ |
 
 **Breakdown:**
 - Crawl locally (0 tokens)
@@ -380,7 +380,7 @@ ATS Showcase cuts LLM costs **80–90%** through local preprocessing.
 - Show cost estimate to user
 - Send only clean chunks → LLM
 
-**Detailed analysis**: [docs/PREPROCESS.md](./docs/PREPROCESS.md#token-cost-savings) and [docs/ASSESS.md](./docs/ASSESS.md#cost-tracking)
+**Detailed analysis**: [docs/PREPROCESS.md](./docs/PREPROCESS.md#3-token-counting--cost-optimization) and [docs/ASSESS.md](./docs/ASSESS.md#cost-breakdown)
 
 ## 🧪 Testing
 
