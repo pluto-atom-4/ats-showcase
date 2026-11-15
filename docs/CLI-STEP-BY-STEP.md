@@ -1534,11 +1534,9 @@ SEARCH:
 | Crawl 26 jobs | Free | 30-60s |
 | Preprocess 26 | Free | <2s |
 | Review 26 | Free | 2-3m |
-| Assess 26 | $0.02 | 5-10m |
+| Assess 26 | ≥ $0.15 | 5-10m |
 | Export | Free | <1s |
-| **TOTAL** | **$0.02** | **10-15m** |
-
-vs. Traditional approach: **$0.47** (89% savings)
+| **TOTAL** | **≥ $0.15** | **10-15m** |
 
 ### Token Usage
 
