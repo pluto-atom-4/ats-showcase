@@ -314,7 +314,7 @@ def assess_command(
         help="Only assess verified jobs (default: confirmed only)",
     ),
     model: str = typer.Option(
-        "claude-3-5-sonnet-20241022",
+        "claude-sonnet-5",
         "--model",
         help="Claude model (sonnet|haiku|opus)",
     ),
@@ -832,7 +832,7 @@ uv run python -m src.cli review --merge-all --cost-limit 0.05  # Warn if > $0.05
 # Default: Sonnet (balanced cost/quality, $3/$15 per 1M tokens)
 uv run python -m src.cli assess --cv data/cv.json --confirmed-only
 
-# Budget mode: Haiku (95% cost savings, $0.80/$4 per 1M tokens)
+# Budget mode: Haiku (~95% cheaper than Opus, $0.80/$4 per 1M tokens)
 uv run python -m src.cli assess --cv data/cv.json --model haiku
 
 # Premium: Opus (best accuracy, $15/$75 per 1M tokens)
@@ -857,8 +857,8 @@ uv run python -m src.cli assess \
 - `--confirmed-only/--all` - Filter verified jobs (default: confirmed only)
 - `--model TEXT` - Claude model: haiku, sonnet, opus, or full ID (default: sonnet)
 - `--model TEXT` - Claude model selection
-  - `claude-haiku-4-5-20251001` - Budget ($0.80/$4 per 1M, 95% savings)
-  - `claude-sonnet-5` - Default ($3/$15 per 1M, 80% savings)
+  - `claude-haiku-4-5-20251001` - Budget ($0.80/$4 per 1M, ~95% cheaper than Opus)
+  - `claude-sonnet-5` - Default ($3/$15 per 1M, 80% cheaper than Opus)
   - `claude-opus-4-8` - Premium ($15/$75 per 1M, best accuracy)
 - `--mode TEXT` - 'new-only' (unassessed) or 'all' (default: new-only)
 - `--score-threshold FLOAT` - Re-assess jobs < threshold
@@ -1120,7 +1120,7 @@ uv run python -m src.cli review --interactive --allow-re-review
 # Location:    Remote
 # Prior decision: confirmed on 2026-07-01 14:22
 #
-# Tokens: 742 (estimated $0.002)
+# Tokens: 742 (estimated input cost $0.002)
 # ──────────────────────────────────────────────────────
 # [Confirm] [Reject] [Skip] [Re-review]: _
 ```
@@ -1161,7 +1161,7 @@ uv run python -m src.cli review --interactive
 #   Reviewed:     2026-07-01 14:22   (when status confirmed/rejected)
 #   Assessed:     not processed      (when Claude scored it)
 #
-# Tokens: 742 (estimated $0.002)
+# Tokens: 742 (estimated input cost $0.002)
 # ──────────────────────────────────────────────────────
 # [Confirm] [Reject] [Skip]:
 ```
@@ -1217,7 +1217,7 @@ uv run python -m src.cli all \
   --cv data/cv.json \
   --config config/companies.json
 
-# Budget mode: Haiku (95% cost savings)
+# Budget mode: Haiku (~95% cheaper than Opus)
 uv run python -m src.cli all \
   --cv data/cv.json \
   --config config/companies.json \
@@ -1300,7 +1300,7 @@ def validate_cv_file(cv_path: Path):
 │ Company: TechCorp                                │
 │ Requirements: 5+ years Python, AWS               │
 │                                                   │
-│ Token count: 450 / Cost: $0.0014                 │
+│ Token count: 450 / Input cost: $0.0014           │
 │                                                   │
 │ (c)onfirm / (r)eject / (e)dit / (s)kip / (q)uit? │
 └────────────────────────────────────────────────┘
@@ -1321,7 +1321,7 @@ Assessing 50 jobs for CV: john_smith
 ▓▓▓▓▓▓▓▓░░░░░░░░░░░ 40%
 
 [10/25] MES Programmer @ EngineerCorp
-  ✓ Score: 0.82 | Cost: $0.0007 | Latency: 1.2s
+  ✓ Score: 0.82 | Cost: $0.0050 | Latency: 1.2s
 
 [11/25] Manufacturing IT @ MfgCorp
   ✗ Error: Rate limited (retry 1/3)
@@ -1330,8 +1330,8 @@ Assessment complete:
   - Total: 50 jobs
   - Successful: 48 (96%)
   - Failed: 2 (4%)
-  - Total cost: $0.035
-  - Avg cost/job: $0.0007
+  - Total cost: $0.24
+  - Avg cost/job: $0.0050
 ```
 
 ## Testing CLI

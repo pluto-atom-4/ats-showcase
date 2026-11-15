@@ -56,31 +56,33 @@ STORAGE Phase
 
 **Estimated costs per job assessment** (based on preprocessed data from PREPROCESS phase):
 
-| Component | Input Tokens | Output Tokens | Approx Cost |
+| Component | Input Tokens | Output Tokens | Approx Cost (claude-sonnet-5) |
 |-----------|--------------|---------------|------------|
-| System prompt | 200 | 0 | $0.0001 |
-| Job posting (cleaned, chunked) | 400-600 | 0 | $0.0002-0.0003 |
-| CV context (preprocessed summary) | 300-500 | 0 | $0.0001-0.0002 |
-| Claude response (match result) | 0 | 100-150 | $0.0002-0.0003 |
-| **Total per job** | **900-1300** | **100-150** | **$0.0006-0.0008** |
+| System prompt | 200 | 0 | $0.0006 (input) |
+| Job posting (cleaned, chunked) | 400-600 | 0 | $0.0012-0.0018 (input) |
+| CV context (preprocessed summary) | 300-500 | 0 | $0.0009-0.0015 (input) |
+| Claude response (match result) | 0 | 100-150 | $0.0015-0.0023 (output) |
+| **Total per job** | **900-1300** | **100-150** | **$0.0042-0.0062** |
+
+Rates: $3 input / $15 output per 1M tokens.
 
 **Cost reduction vs. unoptimized approach**:
 - Raw HTML job posting: ~6000 tokens → ~500 tokens after preprocessing (91% reduction)
 - Raw CV PDF: ~4000 tokens → ~350 tokens after preprocessing (91% reduction)
 - **Token savings: 10,150 → 1,350 tokens per assessment (87% reduction)**
-- **Cost per assessment: $0.02-0.03 → $0.0006-0.0008 (97% cost reduction)**
+- **Input cost per assessment: ~$0.030 (10,150 tokens × $3/1M) → $0.0027-0.0039 (87-91% reduction)**
 
 ### Model Selection
 
-**Recommended**: Claude 3.5 Sonnet (cost-optimized balance)
+**Recommended**: `claude-sonnet-5` (cost-optimized balance)
 
 | Model | Input/1M tokens | Output/1M tokens | Latency | Use Case |
 |-------|-----------------|------------------|---------|----------|
-| Claude 3.5 Haiku | $0.80 | $4.00 | 500ms | High volume, tight budget |
-| **Claude 3.5 Sonnet** | **$3.00** | **$15.00** | **1-2s** | **Recommended: balanced** |
-| Claude 3 Opus | $15.00 | $75.00 | 2-3s | Complex analysis, precision critical |
+| `claude-haiku-4-5-20251001` | $0.80 | $4.00 | 500ms | High volume, tight budget |
+| **`claude-sonnet-5`** | **$3.00** | **$15.00** | **1-2s** | **Recommended: balanced** |
+| `claude-opus-4-8` | $15.00 | $75.00 | 2-3s | Complex analysis, precision critical |
 
-**Rationale**: Sonnet provides strong job-CV reasoning at ~8x lower cost than Opus, with acceptable latency for verification-first workflow.
+**Rationale**: Sonnet provides strong job-CV reasoning at ~5x lower cost than Opus ($3 vs $15 input, $15 vs $75 output per 1M), with acceptable latency for verification-first workflow.
 
 ## Implementation
 
@@ -99,7 +101,7 @@ class AssessmentClient:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "claude-3-5-sonnet-20241022",
+        model: str = "claude-sonnet-5",
         max_retries: int = 3,
         timeout_seconds: int = 30,
     ):
@@ -119,7 +121,7 @@ class AssessmentClient:
 
     def get_cost_estimate(self) -> dict:
         """Return cumulative cost estimate."""
-        # Claude 3.5 Sonnet pricing (as of 2024)
+        # claude-sonnet-5 pricing: $3 input / $15 output per 1M tokens
         input_cost_per_million = 3.00
         output_cost_per_million = 15.00
 
@@ -652,7 +654,7 @@ def test_assessment_client_invalid_response():
   - [ ] Test API connectivity: `python -c "from anthropic import Anthropic; Anthropic().models.list()"`
 
 - [ ] **Configuration**:
-  - [ ] Confirm model selection (Claude 3.5 Sonnet recommended)
+  - [ ] Confirm model selection (claude-sonnet-5 recommended)
   - [ ] Set retry policy (default: 3 retries with exponential backoff)
   - [ ] Configure timeout (default: 30 seconds)
 
@@ -677,7 +679,7 @@ def test_assessment_client_invalid_response():
 |--------|--------|------|
 | Latency per assessment | 1-2 seconds | Includes API call + parsing |
 | Throughput | 2-5 jobs/min | Limited by Claude rate limits |
-| Cost per assessment | $0.0006-0.0008 | After preprocessing optimization |
+| Cost per assessment | $0.0042-0.0062 | claude-sonnet-5 rates; after preprocessing optimization |
 | Error rate | <2% | Mostly transient (rate limits, network) |
 | Successful retry rate | >95% | Rate limits should resolve on retry |
 
@@ -687,7 +689,7 @@ def test_assessment_client_invalid_response():
 2. **Caching**: Consider caching assessments for duplicate job-CV pairs
 3. **Async processing**: Use job queue (Celery/RQ) for high-volume (100+ jobs/day)
 4. **Cost optimization**: Monitor token counts and adjust prompt size if >1500 tokens/request
-5. **A/B testing**: Compare Claude 3.5 Sonnet vs Opus on sample 50-job batch for ROI analysis
+5. **A/B testing**: Compare claude-sonnet-5 vs claude-opus-4-8 on sample 50-job batch for ROI analysis
 
 ---
 
