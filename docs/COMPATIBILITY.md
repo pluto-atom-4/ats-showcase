@@ -110,7 +110,7 @@ uv pip install lxml
 #### Token Counting Accuracy
 | LLM | Encoding | Tokens (9 chars) | Cost per 1M |
 |-----|----------|------------------|------------|
-| Claude (via gpt-4 enc) | gpt-4 | 3-4 | $0.80 |
+| Claude (via gpt-4 enc) | gpt-4 | 3-4 | $3.00 (claude-sonnet-5 input) |
 | OpenAI GPT-4o Mini | gpt-4o | 3-4 | $0.15 |
 | Mistral | mistral | 3-4 | $0.14 |
 
@@ -839,10 +839,10 @@ python -c "import ssl; print(f'OpenSSL: {ssl.OPENSSL_VERSION}')"
 
 ### 6. **tiktoken Encoding Compatibility (TOKEN COUNT ⚠️)**
 
-| Encoder | Claude 3.5 Sonnet | Token Accuracy | Notes |
+| Encoder | Claude Sonnet 5 | Token Accuracy | Notes |
 |---------|------------------|-----------------|-------|
 | **gpt-4** (tiktoken) | ✅ Compatible | 98-102% | Slight variance expected |
-| **claude-3.5-sonnet** (official) | ✅ Native | 100% | Authoritative; used only in LLM responses |
+| **claude-sonnet-5** (official) | ✅ Native | 100% | Authoritative; used only in LLM responses |
 
 **Details**: Project uses `tiktoken` (OpenAI's tokenizer) to estimate Claude token counts before API calls. This provides good accuracy (~98-102%) but may differ slightly from Claude's actual count due to:
 - Special tokens and prompt overhead
@@ -856,7 +856,7 @@ Actual (Claude): 655 tokens
 Difference: +0.77% (acceptable)
 ```
 
-**Cost Impact**: Negligible (~$0.000001 per job at current rates)
+**Cost Impact**: Negligible (~5 tokens × $3/1M ≈ $0.000015 per job at claude-sonnet-5 input rate)
 
 **Tracking**: Cost tracking table in storage logs both estimated and actual tokens for audit trail.
 
