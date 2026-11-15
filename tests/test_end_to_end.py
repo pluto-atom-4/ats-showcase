@@ -106,7 +106,7 @@ class TestFullPipeline:
         mock_prep_class.return_value = mock_prep
 
         mock_llm = MagicMock()
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": {"overall_score": 85},
             "cost_tracking": {
                 "estimated_input": 600,
@@ -180,7 +180,7 @@ class TestFullPipeline:
         mock_prep_class.return_value = mock_prep
 
         mock_llm = MagicMock()
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": {"overall_score": 80},
             "cost_tracking": {
                 "estimated_input": 600,
@@ -311,7 +311,7 @@ class TestCostTracking:
         mock_prep_class.return_value = mock_prep
 
         mock_llm = MagicMock()
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": {"overall_score": 75},
             "cost_tracking": {
                 "estimated_input": 600,
@@ -352,7 +352,7 @@ class TestCostTracking:
         mock_prep_class.return_value = mock_prep
 
         mock_llm = MagicMock()
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": {"overall_score": 75},
             "cost_tracking": {
                 "estimated_input": 600,
@@ -392,7 +392,7 @@ class TestCostTracking:
         mock_prep_class.return_value = mock_prep
 
         mock_llm = MagicMock()
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": {"overall_score": 75},
             "cost_tracking": {
                 "estimated_input": 600,
