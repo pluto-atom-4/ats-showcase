@@ -94,7 +94,7 @@ ATS Showcase provides a GitHub Copilot CLI plugin with 3 reusable skills for aut
 **Available Skills:**
 - `/ats-nlp-setup` — Configure NLP models and spaCy environment
 - `/ats-preprocessing` — Preprocess job postings locally with cost estimation (80–90% savings)
-- `/ats-assessment` — Assess job-to-CV matches using Claude 3.5 Sonnet
+- `/ats-assessment` — Assess job-to-CV matches using Claude Sonnet 5
 
 ### Prerequisites
 
@@ -126,7 +126,7 @@ gh copilot
 # Output: ✅ spaCy model 'en_core_web_md' is installed and valid
 
 > /ats-preprocessing --show-estimates
-# Output: Processing jobs... 650 tokens → $0.002 (89% savings)
+# Output: Processing jobs... 650 tokens → $0.00195 input cost (Sonnet, $3/1M)
 
 > /ats-assessment --cv cv.json --jobs jobs.json --min-score 75
 # Output: Assessing 10 jobs... [results with scores and recommendations]
@@ -176,14 +176,14 @@ Job 1: Senior Software Engineer
 Summary:
   Total tokens: 6,500
   Estimated cost: $0.02
-  💾 Savings: 89% ($0.18 saved per 100 jobs)
+  💾 Savings: vs. raw HTML (illustrative output)
 ```
 
 ---
 
 #### `/ats-assessment` — Job-to-CV Assessment
 
-Evaluate job matches using Claude 3.5 Sonnet with local preprocessing. Scores jobs by technical skills, seniority, location, and recommendations.
+Evaluate job matches using Claude Sonnet 5 with local preprocessing. Scores jobs by technical skills, seniority, location, and recommendations.
 
 **Options:**
 - `--cv FILE` — CV file (JSON or markdown)
