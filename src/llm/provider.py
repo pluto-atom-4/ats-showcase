@@ -1,5 +1,6 @@
 """Claude LLM provider for job assessments."""
 
+import functools
 import json
 import logging
 import os
@@ -14,8 +15,17 @@ from src.config.models import (
     validate_model,
 )
 from src.models.job import Assessment
+from src.tokenization.counter import TokenCounter
 
 logger = logging.getLogger(__name__)
+
+_RAW_MAX_OUTPUT_TOKENS = 500
+
+
+@functools.cache
+def _get_token_counter() -> TokenCounter:
+    # Lazy: loading the tiktoken encoding is slow and only the raw assess path needs it.
+    return TokenCounter()
 
 
 class AssessmentResult:
@@ -185,6 +195,100 @@ class LLMProvider:
                     return result_or_retry
 
         raise ValueError(f"Failed to assess job {job_id} after 3 attempts")
+
+    def assess_job_raw(
+        self,
+        cv_text: str,
+        job_description: str,
+        max_retries: int = 3,
+        use_examples: bool = False,
+    ) -> Dict[str, Any]:
+        """Assess CV fit for a job, returning the parsed assessment with estimated and actual token costs."""
+        # Lazy: src.assessment imports assessor, which will import this module once C3 lands.
+        from src.assessment.prompt_builder import PromptBuilder
+
+        if use_examples:
+            prompt = PromptBuilder.build_prompt_with_examples(cv_text, job_description)
+        else:
+            prompt = PromptBuilder.build_simple_prompt(cv_text, job_description)
+
+        # Estimate before the call: the actual output length is unknown until the response arrives.
+        estimated_input = _get_token_counter().count_tokens(prompt)
+        estimated_output = _RAW_MAX_OUTPUT_TOKENS
+        estimated_cost = self._cost_usd(estimated_input, estimated_output)
+        logger.info(f"Assessment estimate: {estimated_input} input tokens, ${estimated_cost:.6f}")
+
+        message, elapsed_ms, attempt = self._call_api_with_retries(prompt, max_retries)
+
+        response_text = self._clean_json_response(self._extract_response_text(message))
+        if not response_text:
+            raise ValueError("Unexpected response format: no text content")
+        try:
+            assessment: Dict[str, Any] = json.loads(response_text)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse assessment JSON: {e}\nResponse: {response_text}")
+            raise
+
+        actual_input = message.usage.input_tokens
+        actual_output = message.usage.output_tokens
+        actual_cost = self._cost_usd(actual_input, actual_output)
+        logger.info(
+            f"Assessment complete: score={assessment.get('overall_score', '?')}, "
+            f"actual tokens={actual_input + actual_output}, cost=${actual_cost:.6f}"
+        )
+
+        return {
+            "assessment": assessment,
+            "cost_tracking": {
+                "estimated_input": estimated_input,
+                "estimated_output": estimated_output,
+                "estimated_cost_usd": estimated_cost,
+                "actual_input": actual_input,
+                "actual_output": actual_output,
+                "actual_cost_usd": actual_cost,
+            },
+            "metadata": {
+                "model": self.model,
+                "api_call_time_ms": elapsed_ms,
+                "attempt": attempt,
+            },
+        }
+
+    def _cost_usd(self, input_tokens: int, output_tokens: int) -> float:
+        return (input_tokens / 1_000_000) * self.input_price_per_1m + (
+            output_tokens / 1_000_000
+        ) * self.output_price_per_1m
+
+    def _call_api_with_retries(self, prompt: str, max_retries: int) -> tuple[Any, int, int]:
+        import anthropic
+
+        for attempt in range(max_retries):
+            try:
+                start_time = time.time()
+                message = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=_RAW_MAX_OUTPUT_TOKENS,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                elapsed_ms = int((time.time() - start_time) * 1000)
+                return message, elapsed_ms, attempt + 1
+
+            except anthropic.AuthenticationError as e:
+                logger.error(f"Authentication failed: {e}")
+                raise
+
+            except anthropic.APIStatusError as e:
+                retryable = isinstance(e, anthropic.RateLimitError) or e.status_code in (500, 502, 503)
+                if not retryable or attempt == max_retries - 1:
+                    logger.error(f"API error {e.status_code} on attempt {attempt + 1}/{max_retries}: {e}")
+                    raise
+                backoff_seconds = 2**attempt
+                logger.warning(
+                    f"API error {e.status_code} (attempt {attempt + 1}/{max_retries}). Retrying in {backoff_seconds}s"
+                )
+                time.sleep(backoff_seconds)
+
+        raise RuntimeError("Unexpected: max_retries loop exhausted")
 
     def _extract_response_text(self, response: Any) -> str:
         """
