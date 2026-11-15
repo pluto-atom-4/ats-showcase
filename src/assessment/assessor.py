@@ -4,9 +4,9 @@ import logging
 from typing import List, Tuple
 
 from src.assessment.data_reshaper import DataReshaper
-from src.assessment.llm_integration import LLMProvider
 from src.assessment.types import AssessmentResult, EntityScore
 from src.config.models import DEFAULT_MODEL
+from src.llm.provider import LLMProvider
 from src.tokenization.counter import TokenCounter
 from src.tokenization.preprocessor import Preprocessor
 
@@ -29,7 +29,7 @@ class Assessor:
             model: Claude model to use (default: DEFAULT_MODEL)
             use_examples: Include few-shot examples in prompt (better accuracy, more tokens)
         """
-        self.llm_provider = LLMProvider(model=model)
+        self.llm_provider = LLMProvider(model_id=model)
         self.preprocessor = Preprocessor()
         self.data_reshaper = DataReshaper()
         self.use_examples = use_examples
@@ -82,7 +82,7 @@ class Assessor:
         baseline_tokens = self._estimate_baseline_tokens(cv_text, job_description)
         logger.debug(f"Baseline tokens (raw): {baseline_tokens}")
 
-        llm_result = self.llm_provider.assess_job(cv_text, job_description, use_examples=self.use_examples)
+        llm_result = self.llm_provider.assess_job_raw(cv_text, job_description, use_examples=self.use_examples)
 
         actual_input = llm_result["cost_tracking"]["actual_input"]
         savings_percent = (1.0 - (actual_input / baseline_tokens)) * 100 if baseline_tokens > 0 else 0.0
