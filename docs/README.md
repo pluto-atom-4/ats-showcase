@@ -124,7 +124,7 @@ ats-showcase/
 - **Speed**: Crawl (100 jobs/min) → Assess (2-5 jobs/min)
 - **LLM cost**: depends on model and token count; see `src/config/models.py` for current rates
 
-See [docs/PREPROCESS.md](./docs/PREPROCESS.md#token-cost-savings) for detailed breakdown.
+See [docs/PREPROCESS.md](./PREPROCESS.md#3-token-counting--cost-optimization) for detailed breakdown.
 
 ## Contributing & Feedback
 
