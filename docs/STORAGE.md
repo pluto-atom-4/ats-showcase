@@ -107,7 +107,7 @@ CREATE TABLE assessments (
     -- Cost tracking
     input_tokens INT NOT NULL,
     output_tokens INT NOT NULL,
-    model TEXT DEFAULT 'claude-3-5-sonnet-20241022',
+    model TEXT DEFAULT 'claude-sonnet-5',  -- Planned (#809); not in current job_assessments schema
     cost_usd REAL,  -- Calculated: (input/1M)*3.00 + (output/1M)*15.00
 
     -- Performance
@@ -289,7 +289,7 @@ class StorageClient:
                 gaps TEXT,
                 input_tokens INT NOT NULL,
                 output_tokens INT NOT NULL,
-                model TEXT DEFAULT 'claude-3-5-sonnet-20241022',
+                model TEXT DEFAULT 'claude-sonnet-5',  -- Planned (#809); not in current job_assessments schema
                 cost_usd REAL,
                 latency_ms REAL,
                 retry_count INT DEFAULT 0,
@@ -418,7 +418,7 @@ class StorageClient:
             json.dumps(assessment.get('strengths', [])),
             json.dumps(assessment.get('gaps', [])),
             assessment['input_tokens'], assessment['output_tokens'],
-            assessment.get('model', 'claude-3-5-sonnet-20241022'),
+            assessment.get('model', 'claude-sonnet-5'),
             assessment.get('cost_usd'), assessment.get('latency_ms'),
             assessment.get('retry_count', 0), assessment.get('status', 'completed'),
             assessment.get('error_message'), assessment['assessed_at']

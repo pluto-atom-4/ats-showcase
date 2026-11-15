@@ -31,7 +31,7 @@ Rejected Chunks → Skip LLM entirely
 **Cost Impact**:
 - Without verification: 100% of jobs sent to LLM (including garbage)
 - With verification: 70-90% of jobs confirmed (10-30% filtered)
-- Savings: $0.001-$0.003 per rejected job (token cost not wasted)
+- Savings: input cost avoided per rejected job at `DEFAULT_MODEL` (`claude-sonnet-5`) input rate of $3/1M tokens (e.g. ~$0.0015 for a 500-token chunk)
 
 ---
 
