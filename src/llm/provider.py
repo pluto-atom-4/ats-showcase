@@ -7,7 +7,6 @@ import os
 import time
 from typing import Any, Dict, List, Optional, Union
 
-from src.assessment.prompt_builder import PromptBuilder
 from src.config.models import (
     DEFAULT_MODEL,
     get_model_display_name,
@@ -205,6 +204,9 @@ class LLMProvider:
         use_examples: bool = False,
     ) -> Dict[str, Any]:
         """Assess CV fit for a job, returning the parsed assessment with estimated and actual token costs."""
+        # Lazy: src.assessment imports assessor, which will import this module once C3 lands.
+        from src.assessment.prompt_builder import PromptBuilder
+
         if use_examples:
             prompt = PromptBuilder.build_prompt_with_examples(cv_text, job_description)
         else:

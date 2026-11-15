@@ -1,4 +1,7 @@
 import json
+import subprocess
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -103,7 +106,9 @@ class TestAssessJobRawShape:
     def test_use_examples_selects_few_shot_prompt(self, provider: Any) -> None:
         provider.client.messages.create.return_value = _message(ASSESSMENT_JSON)
 
-        with patch("src.llm.provider.PromptBuilder.build_prompt_with_examples", return_value="p") as with_examples:
+        with patch(
+            "src.assessment.prompt_builder.PromptBuilder.build_prompt_with_examples", return_value="p"
+        ) as with_examples:
             provider.assess_job_raw(CV_TEXT, JOB_TEXT, use_examples=True)
 
         with_examples.assert_called_once_with(CV_TEXT, JOB_TEXT)
@@ -238,3 +243,28 @@ class TestAssessJobRawResponseParsing:
 
         with pytest.raises(ValueError, match="no text content"):
             provider.assess_job_raw(CV_TEXT, JOB_TEXT)
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _run_python(code: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+
+
+def test_provider_imports_in_fresh_interpreter() -> None:
+    result = _run_python("import src.llm.provider")
+    assert result.returncode == 0, result.stderr
+
+
+def test_provider_then_assessment_import_order_has_no_cycle() -> None:
+    # Simulates the C3 import order: provider loaded first, then the assessment package
+    result = _run_python("import src.llm.provider; import src.assessment; import src.assessment.assessor")
+    assert result.returncode == 0, result.stderr
