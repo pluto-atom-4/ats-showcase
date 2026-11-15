@@ -29,7 +29,7 @@ Structured Chunks Ready for VERIFY Phase
 **Cost Impact**:
 - Raw HTML: ~5,000-8,000 tokens per job posting
 - After preprocessing: ~500-800 tokens (82% reduction)
-- Savings: $0.034 per posting with Claude 3.5 Haiku
+- Savings: ~$0.0047 input cost per posting with Claude Haiku 4.5 ($0.80/1M input; illustrative midpoints 6,500 → 650 tokens)
 
 ---
 
@@ -251,7 +251,7 @@ def create_semantic_chunks(
     Returns:
         List of chunks with metadata
     """
-    enc = tiktoken.encoding_for_model('claude-3-5-haiku-20241022')
+    enc = tiktoken.get_encoding('cl100k_base')  # approximates Claude tokens, as in src/tokenization/counter.py
     chunks = []
     current_chunk = []
     current_tokens = 0
@@ -326,14 +326,16 @@ def classify_chunk_type(text: str, position: int, total_chunks: int) -> str:
 
 ### Accurate Token Counting with tiktoken
 
+tiktoken ships no Claude encodings, so the project counter uses `cl100k_base` as an approximation (see `src/tokenization/counter.py`). The example below mirrors that choice.
+
 ```python
 import tiktoken
 
 class TokenCounter:
     """Wrapper for consistent token counting across project."""
 
-    def __init__(self, model: str = 'claude-3-5-haiku-20241022'):
-        self.encoding = tiktoken.encoding_for_model(model)
+    def __init__(self, model: str = 'claude-haiku-4-5-20251001'):
+        self.encoding = tiktoken.get_encoding('cl100k_base')
         self.model = model
 
     def count_tokens(self, text: str) -> int:
@@ -348,12 +350,12 @@ class TokenCounter:
         """
         Estimate cost for tokens.
 
-        Claude 3.5 Haiku pricing:
+        Claude Haiku 4.5 pricing:
         - Input: $0.80 per 1M tokens
-        - Output: $4.00 per 1M tokens (estimate 20% output)
+        - Output: $4.00 per 1M tokens
         """
         rates = {
-            'claude-3-5-haiku-20241022': {
+            'claude-haiku-4-5-20251001': {
                 'input': 0.80e-6,  # per token
                 'output': 4.00e-6,
             }
@@ -382,24 +384,22 @@ total_cost = counter.estimate_cost(total_tokens)
 
 ### Cost Projection Example
 
-For a 500-job scraping run:
+Illustrative projection for a 500-job scraping run (Claude Haiku 4.5: $0.80/1M input, $4.00/1M output; output assumed to be 20% of input tokens):
 
 ```
 Raw HTML pipeline:
 - Average tokens per job: 6,000
-- Total tokens: 3,000,000
-- Input cost: $2.40
-- Estimated output: $0.48 (20% of input)
-- Total: $2.88 per run
+- Total input tokens: 3,000,000 → input cost: $2.40
+- Output tokens: 600,000 → output cost: $2.40
+- Total: $4.80 per run
 
 ✓ With preprocessing:
 - Average tokens per job: 800
-- Total tokens: 400,000
-- Input cost: $0.32
-- Estimated output: $0.06
-- Total: $0.38 per run
+- Total input tokens: 400,000 → input cost: $0.32
+- Output tokens: 80,000 → output cost: $0.32
+- Total: $0.64 per run
 
-Savings: 86.8% cost reduction ($2.50 saved per 500 jobs)
+Savings: 86.7% cost reduction ($4.16 saved per 500 jobs)
 ```
 
 ---
@@ -699,7 +699,7 @@ Before moving to VERIFY phase:
 | Problem | Symptom | Solution |
 |---------|---------|----------|
 | **spaCy model not loaded** | `OSError: can't find model 'en_core_web_sm'` | Run `python -m spacy download en_core_web_sm` |
-| **tiktoken mismatch** | Token counts differ from Claude API | Ensure tiktoken ≥ 0.8.0; use `claude-3-5-haiku-20241022` constant |
+| **tiktoken mismatch** | Token counts differ from Claude API | Ensure tiktoken ≥ 0.8.0; use `cl100k_base` as in `src/tokenization/counter.py` (approximate) |
 | **lxml not installed** | `FeatureNotFound: Couldn't find a tree builder` | Install: `pip install lxml` |
 | **MarkItDown import fails** | `ModuleNotFoundError: No module named 'markitdown'` | Install: `pip install markitdown[all]` OR use BeautifulSoup fallback |
 | **Sentence splitting too aggressive** | Chunks too small, many fragments | Increase `target_tokens` from 512 to 768 |
