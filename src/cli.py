@@ -2305,22 +2305,30 @@ def _filter_jobs_by_date(jobs: List[dict[str, Any]], since: Optional[str]) -> Li
     return jobs
 
 
-def _verify_assessment_cost(jobs: List[dict[str, Any]], cv_text: str, verify_cost: bool) -> bool:
+def _verify_assessment_cost(
+    jobs: List[dict[str, Any]], cv_text: str, verify_cost: bool, model: Optional[str] = None
+) -> bool:
     """Estimate and verify assessment cost.
 
     Args:
         jobs: List of jobs to assess
         cv_text: CV text content
         verify_cost: Whether to prompt user for confirmation
+        model: Model alias or ID for pricing, None for DEFAULT_MODEL
 
     Returns:
         True if should proceed, raises typer.Exit if user rejects
 
     Raises:
         typer.Exit: If user declines or cost estimation fails
+        ValueError: If model is unknown
     """
     if not verify_cost:
         return True
+
+    from src.config.models import DEFAULT_MODEL, get_model_pricing, resolve_model_alias
+
+    input_rate = get_model_pricing(resolve_model_alias(model or DEFAULT_MODEL))[0] / 1_000_000
 
     typer.echo("📋 Estimating costs before proceeding...\n")
     estimated_total = 0.0
@@ -2332,7 +2340,7 @@ def _verify_assessment_cost(jobs: List[dict[str, Any]], cv_text: str, verify_cos
 
             counter = TokenCounter()
             est_tokens = counter.count_tokens(cv_text + "\n" + job_desc) + 200
-            est_cost = est_tokens * 0.000003
+            est_cost = est_tokens * input_rate
             estimated_total += est_cost
         except Exception:
             estimated_total += 0.01
@@ -2553,7 +2561,7 @@ def assess(
             confirmed_jobs = confirmed_jobs[:limit]
             typer.echo(f"📊 Applied job limit: assessing {len(confirmed_jobs)} jobs\n")
 
-        _verify_assessment_cost(confirmed_jobs, cv_text, verify_cost)
+        _verify_assessment_cost(confirmed_jobs, cv_text, verify_cost, model)
 
         successful = 0
         failed_jobs: list[dict[str, Any]] = []
