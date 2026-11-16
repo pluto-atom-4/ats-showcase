@@ -4,13 +4,15 @@ Tests for Task 8: CLI integration for assess phase.
 References: docs/dev-note/preprocessor-llm-api-research.md (Part 2.1, 3.1, 4, 6)
 """
 
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
 
-from src.cli import app
+from src.cli import _assess_job_and_save, _assess_single_job, app
+from src.storage.assessment_store import AssessmentStore
 
 runner = CliRunner()
 
@@ -301,3 +303,71 @@ def test_assess_default_model_is_config_default() -> None:
         _initialize_assessor_and_validate(None)
 
         mock_assessor_cls.assert_called_once_with(model=DEFAULT_MODEL)
+
+
+def _fake_llm_assessment() -> SimpleNamespace:
+    return SimpleNamespace(
+        overall_score=70.0,
+        tech_score=65.0,
+        seniority_score=60.0,
+        location_score=50.0,
+        recommendations=["Highlight AWS work"],
+        summary="Reasonable fit.",
+        tokens_used=123,
+        actual_cost=0.0004,
+    )
+
+
+def test_assess_job_and_save_persists_provider_model(sample_preprocessed_job: dict[str, Any]) -> None:
+    """Helper must pass the provider's model into save_assessment."""
+    llm_provider = MagicMock()
+    llm_provider.model = "claude-test-model"
+    llm_provider.assess_job.return_value = _fake_llm_assessment()
+    store = MagicMock()
+
+    success, _, _, _ = _assess_job_and_save(sample_preprocessed_job, 1, 1, llm_provider, "cv text", store, {})
+
+    assert success is True
+    assert store.save_assessment.call_args.kwargs["model"] == "claude-test-model"
+
+
+def test_assess_job_and_save_writes_model_column(tmp_path: Any, sample_preprocessed_job: dict[str, Any]) -> None:
+    """Real temp DB row must hold the model that produced the assessment."""
+    llm_provider = MagicMock()
+    llm_provider.model = "claude-test-model"
+    llm_provider.assess_job.return_value = _fake_llm_assessment()
+    store = AssessmentStore(str(tmp_path / "assess.db"))
+
+    _assess_job_and_save(sample_preprocessed_job, 1, 1, llm_provider, "cv text", store, {})
+
+    row = store.get_assessment_by_id(sample_preprocessed_job["job_id"])
+    assert row is not None
+    assert row["model"] == "claude-test-model"
+
+
+def test_assess_single_job_persists_result_metadata_model(
+    mock_assessor_result: dict[str, Any], sample_preprocessed_job: dict[str, Any]
+) -> None:
+    """Single-job path must pass metadata.model from the assessor result into save_assessment."""
+    assessor = MagicMock()
+    assessor.assess_job.return_value = mock_assessor_result
+    store = MagicMock()
+
+    _assess_single_job(sample_preprocessed_job, "cv text", assessor, store, 1, 1)
+
+    assert store.save_assessment.call_args.kwargs["model"] == "claude-3-5-sonnet-20241022"
+
+
+def test_assess_single_job_writes_model_column(
+    tmp_path: Any, mock_assessor_result: dict[str, Any], sample_preprocessed_job: dict[str, Any]
+) -> None:
+    """Real temp DB row must hold metadata.model from the assessor result."""
+    assessor = MagicMock()
+    assessor.assess_job.return_value = mock_assessor_result
+    store = AssessmentStore(str(tmp_path / "assess.db"))
+
+    _assess_single_job(sample_preprocessed_job, "cv text", assessor, store, 1, 1)
+
+    row = store.get_assessment_by_id(sample_preprocessed_job["job_id"])
+    assert row is not None
+    assert row["model"] == "claude-3-5-sonnet-20241022"
