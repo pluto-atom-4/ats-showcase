@@ -51,7 +51,7 @@ class AssessmentStore:
                 logger.warning(f"Unexpected error creating index: {e}")
 
     def _run_migrations(self) -> None:
-        """Run schema migrations to add missing columns for quality tracking (Phase 3B)."""
+        """Add missing job_assessments columns (idempotent)."""
         if not self.conn:
             return
 
@@ -62,13 +62,14 @@ class AssessmentStore:
             ("preprocessing_quality_check", "BOOLEAN DEFAULT FALSE"),
             ("previous_assessment_score", "INTEGER"),
             ("score_delta", "INTEGER"),
+            ("model", "TEXT"),
         ]
 
         for col_name, col_type in columns_to_add:
             try:
                 cursor.execute(f"ALTER TABLE job_assessments ADD COLUMN {col_name} {col_type}")
                 self.conn.commit()
-                logger.info(f"Added column {col_name} to job_assessments (Phase 3B migration)")
+                logger.info(f"Added column {col_name} to job_assessments")
             except sqlite3.OperationalError as e:
                 if "already exists" in str(e).lower() or "duplicate column name" in str(e).lower():
                     logger.debug(f"Column {col_name} already exists")
@@ -99,6 +100,7 @@ class AssessmentStore:
         preprocessing_version: Optional[str] = None,
         preprocessing_quality_check: bool = False,
         previous_assessment_score: Optional[int] = None,
+        model: Optional[str] = None,
     ) -> None:
         """Save assessment to database with optional quality tracking (Phase 3B).
 
@@ -120,6 +122,7 @@ class AssessmentStore:
             preprocessing_version: Version of preprocessing used (v1.0, v2.0)
             preprocessing_quality_check: Whether this is a quality check re-assessment
             previous_assessment_score: Previous assessment score (for quality comparison)
+            model: Model ID that produced the assessment (NULL for rows saved before this column)
         """
         if not self.conn:
             return
@@ -136,9 +139,9 @@ class AssessmentStore:
                 seniority_score, location_score, recommendations, summary,
                 tokens_used, input_tokens, output_tokens, actual_cost, assessed_date,
                 preprocessing_version, preprocessing_quality_check,
-                previous_assessment_score, score_delta)
+                previous_assessment_score, score_delta, model)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP,
-                       ?, ?, ?, ?)""",
+                       ?, ?, ?, ?, ?)""",
             (
                 job_id,
                 title,
@@ -158,6 +161,7 @@ class AssessmentStore:
                 preprocessing_quality_check,
                 previous_assessment_score,
                 score_delta,
+                model,
             ),
         )
 
