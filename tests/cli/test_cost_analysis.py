@@ -4,20 +4,49 @@ import json
 import re
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 import pytest
 from typer.testing import CliRunner
 
 from src.cli import app
 from src.config.models import DEFAULT_MODEL, get_model_pricing
+from src.storage.assessment_store import AssessmentStore
 from src.storage.job_store import JobStore
 
 runner = CliRunner()
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
 
 
 def strip_ansi(text: str) -> str:
     """Remove ANSI escape sequences from text."""
     return re.sub(r"\x1b\[[0-9;]*m", "", text)
+
+
+def _printed_rate(output: str, version: str) -> float:
+    """Parse the blended token rate printed for a preprocessing version."""
+    match = re.search(rf"Token rate {re.escape(version)} \(blended\):\s+\$([\d.]+) per 1M tokens", output)
+    assert match is not None, f"no blended rate line for {version}"
+    return float(match.group(1))
+
+
+def _save_assessment(assessments: AssessmentStore, job_id: str, model: Optional[str]) -> None:
+    """Save a minimal assessment row so the job's model drives its blended rate."""
+    assessments.save_assessment(
+        job_id=job_id,
+        title="Synthetic Job",
+        company="Synthetic Co",
+        location=None,
+        overall_score=50.0,
+        tech_score=50.0,
+        seniority_score=50.0,
+        location_score=50.0,
+        recommendations=[],
+        summary="SYNTHETIC: assessment row for cost-analysis rate tests",
+        tokens_used=0,
+        actual_cost=0.0,
+        model=model,
+    )
 
 
 class TestCostAnalysisCommand:
@@ -300,33 +329,46 @@ class TestCostAnalysisCommand:
             output_data = json.loads(output)
             assert output_data["migration_progress_percent"] == 25.0
 
-    def test_cost_analysis_token_rate_matches_default_model_pricing(self) -> None:
-        """Token rate line reflects DEFAULT_MODEL input pricing, not a hardcoded rate."""
+    def test_cost_analysis_token_rate_matches_blended_model_pricing(self) -> None:
+        """Each version's printed rate is the token-weighted rate of the models assessing its jobs."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = str(Path(tmpdir) / "test.db")
 
             store = JobStore(db_path)
-            store.add_job(
-                job_id="job_v1",
-                title="Python Developer",
-                company="Tech Corp",
-                preprocessing_version="v1.0",
-                tokens=1000,
-            )
-            store.add_job(
-                job_id="job_v2",
-                title="Senior Developer",
-                company="Tech Corp",
-                preprocessing_version="v2.0",
-                tokens=650,
-            )
+            assessments = AssessmentStore(db_path)
+            # SYNTHETIC: v1.0 jobs assessed with Haiku, v2.0 job with DEFAULT_MODEL
+            store.add_job(job_id="job_v1_a", title="A", company="Tech Corp", preprocessing_version="v1.0", tokens=1000)
+            store.add_job(job_id="job_v1_b", title="B", company="Tech Corp", preprocessing_version="v1.0", tokens=2000)
+            store.add_job(job_id="job_v2", title="C", company="Tech Corp", preprocessing_version="v2.0", tokens=650)
+            _save_assessment(assessments, "job_v1_a", HAIKU_MODEL)
+            _save_assessment(assessments, "job_v1_b", HAIKU_MODEL)
+            _save_assessment(assessments, "job_v2", DEFAULT_MODEL)
+            assessments._close_db()
             store.close()
 
             result = runner.invoke(app, ["cost-analysis", "--db", db_path])
 
-            assert result.exit_code == 0
-            clean_output = strip_ansi(result.stdout)
-            match = re.search(r"Token rate used:\s+\$([\d.]+) per 1M tokens", clean_output)
-            assert match is not None
-            expected_rate, _ = get_model_pricing(DEFAULT_MODEL)
-            assert float(match.group(1)) == pytest.approx(expected_rate)
+        assert result.exit_code == 0
+        clean_output = strip_ansi(result.stdout)
+        expected_v1 = (1000 * get_model_pricing(HAIKU_MODEL)[0] + 2000 * get_model_pricing(HAIKU_MODEL)[0]) / 3000
+        expected_v2 = get_model_pricing(DEFAULT_MODEL)[0]
+        assert _printed_rate(clean_output, "v1.0") == pytest.approx(expected_v1, abs=0.005)
+        assert _printed_rate(clean_output, "v2.0") == pytest.approx(expected_v2, abs=0.005)
+
+    def test_cost_analysis_token_rate_without_assessments_uses_default_model(self) -> None:
+        """Jobs without assessment rows fall back to DEFAULT_MODEL input pricing for both rates."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = str(Path(tmpdir) / "test.db")
+
+            store = JobStore(db_path)
+            store.add_job(job_id="job_v1", title="A", company="Tech Corp", preprocessing_version="v1.0", tokens=1000)
+            store.add_job(job_id="job_v2", title="B", company="Tech Corp", preprocessing_version="v2.0", tokens=650)
+            store.close()
+
+            result = runner.invoke(app, ["cost-analysis", "--db", db_path])
+
+        assert result.exit_code == 0
+        clean_output = strip_ansi(result.stdout)
+        expected = get_model_pricing(DEFAULT_MODEL)[0]
+        assert _printed_rate(clean_output, "v1.0") == pytest.approx(expected, abs=0.005)
+        assert _printed_rate(clean_output, "v2.0") == pytest.approx(expected, abs=0.005)
