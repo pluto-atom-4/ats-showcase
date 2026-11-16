@@ -316,21 +316,19 @@ class JobStore:
         )
 
     def _blended_token_rates(self, cursor: sqlite3.Cursor) -> Tuple[float, float]:
-        """Token-weighted input rate (USD per 1M) for v1.0 and v2.0 jobs."""
-        version_filter = "IN ('v1.0', 'v2.0')"
         try:
             cursor.execute(
-                f"""SELECT jr.preprocessing_version, jr.tokens, ja.model
+                """SELECT jr.preprocessing_version, jr.tokens, ja.model
                     FROM job_reviews jr
                     LEFT JOIN job_assessments ja ON ja.job_id = jr.job_id
-                    WHERE jr.preprocessing_version {version_filter}"""
+                    WHERE jr.preprocessing_version IN ('v1.0', 'v2.0')"""
             )
             rows = cursor.fetchall()
         except sqlite3.OperationalError:
             # Old DBs predate job_assessments.model; use DEFAULT_MODEL for all rows.
             cursor.execute(
                 "SELECT preprocessing_version, tokens, NULL FROM job_reviews "
-                f"WHERE preprocessing_version {version_filter}"
+                "WHERE preprocessing_version IN ('v1.0', 'v2.0')"
             )
             rows = cursor.fetchall()
 
