@@ -51,7 +51,7 @@ class AssessmentStore:
                 logger.warning(f"Unexpected error creating index: {e}")
 
     def _run_migrations(self) -> None:
-        """Run schema migrations to add missing columns for quality tracking (Phase 3B)."""
+        """Add missing job_assessments columns (idempotent)."""
         if not self.conn:
             return
 
@@ -69,7 +69,7 @@ class AssessmentStore:
             try:
                 cursor.execute(f"ALTER TABLE job_assessments ADD COLUMN {col_name} {col_type}")
                 self.conn.commit()
-                logger.info(f"Added column {col_name} to job_assessments (Phase 3B migration)")
+                logger.info(f"Added column {col_name} to job_assessments")
             except sqlite3.OperationalError as e:
                 if "already exists" in str(e).lower() or "duplicate column name" in str(e).lower():
                     logger.debug(f"Column {col_name} already exists")
