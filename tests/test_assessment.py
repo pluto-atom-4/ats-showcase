@@ -1,8 +1,10 @@
 """Unit tests for Phase 4 LLM assessment."""
 
 import json
+import sqlite3
 import tempfile
 from pathlib import Path
+from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -445,3 +447,100 @@ class TestAssessmentStore:
         assert result is not None
         assert result["title"] == "Job"
         store2._close_db()
+
+
+class TestAssessmentStoreModelColumn:
+    """Test per-assessment model persistence (#809 D2)."""
+
+    @staticmethod
+    def _save(store: AssessmentStore, job_id: str, **extra) -> None:
+        store.save_assessment(
+            job_id=job_id,
+            title="Job",
+            company="Corp",
+            location="SF",
+            overall_score=80.0,
+            tech_score=85,
+            seniority_score=75,
+            location_score=75,
+            recommendations=[],
+            summary="",
+            tokens_used=650,
+            actual_cost=0.002,
+            **extra,
+        )
+
+    @staticmethod
+    def _model_of(db_path: str, job_id: str) -> Optional[str]:
+        conn = sqlite3.connect(db_path)
+        try:
+            row = conn.execute("SELECT model FROM job_assessments WHERE job_id = ?", (job_id,)).fetchone()
+        finally:
+            conn.close()
+        assert row is not None
+        stored: Optional[str] = row[0]
+        return stored
+
+    def test_model_round_trips(self, tmp_path):
+        """Model passed to save_assessment is stored on the row."""
+        db_path = str(tmp_path / "assess.db")
+        store = AssessmentStore(db_path=db_path)
+        self._save(store, "job_1", model="claude-sonnet-5")
+        store._close_db()
+
+        assert self._model_of(db_path, "job_1") == "claude-sonnet-5"
+
+    def test_omitted_model_stores_null(self, tmp_path):
+        """Omitting model keeps the call working and stores NULL."""
+        db_path = str(tmp_path / "assess.db")
+        store = AssessmentStore(db_path=db_path)
+        self._save(store, "job_1")
+        store._close_db()
+
+        assert self._model_of(db_path, "job_1") is None
+
+    def test_old_schema_gains_model_column_and_is_idempotent(self, tmp_path):
+        """DB created without model column gets it on open; old rows stay NULL; reopen is safe."""
+        db_path = str(tmp_path / "old.db")
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            """CREATE TABLE job_assessments (
+                job_id TEXT PRIMARY KEY, title TEXT, company TEXT, location TEXT,
+                overall_score REAL, tech_score REAL, seniority_score REAL, location_score REAL,
+                recommendations TEXT, summary TEXT, tokens_used INTEGER,
+                input_tokens INTEGER DEFAULT 0, output_tokens INTEGER DEFAULT 0,
+                actual_cost REAL, assessed_date TIMESTAMP
+            )"""
+        )
+        conn.execute(
+            "INSERT INTO job_assessments (job_id, title, overall_score, tokens_used, actual_cost) "
+            "VALUES ('old_job', 'Old', 70, 100, 0.001)"
+        )
+        conn.commit()
+        conn.close()
+
+        store = AssessmentStore(db_path=db_path)
+        store._close_db()
+        assert self._model_of(db_path, "old_job") is None
+
+        reopened = AssessmentStore(db_path=db_path)
+        self._save(reopened, "new_job", model="claude-haiku-4-5")
+        reopened._close_db()
+
+        conn = sqlite3.connect(db_path)
+        columns = [row[1] for row in conn.execute("PRAGMA table_info(job_assessments)")]
+        conn.close()
+        assert columns.count("model") == 1
+        assert self._model_of(db_path, "old_job") is None
+        assert self._model_of(db_path, "new_job") == "claude-haiku-4-5"
+
+    def test_fresh_db_has_model_column(self, tmp_path):
+        """Fresh DB gets the model column via the migration loop, not the CREATE TABLE SQL."""
+        db_path = str(tmp_path / "fresh.db")
+        store = AssessmentStore(db_path=db_path)
+        store._close_db()
+
+        conn = sqlite3.connect(db_path)
+        columns = [row[1] for row in conn.execute("PRAGMA table_info(job_assessments)")]
+        conn.close()
+        assert "model" in columns
