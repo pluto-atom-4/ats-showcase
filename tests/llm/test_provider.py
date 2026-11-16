@@ -268,3 +268,44 @@ def test_provider_then_assessment_import_order_has_no_cycle() -> None:
     # Simulates the C3 import order: provider loaded first, then the assessment package
     result = _run_python("import src.llm.provider; import src.assessment; import src.assessment.assessor")
     assert result.returncode == 0, result.stderr
+
+
+class TestInit:
+    def test_explicit_api_key_is_stored(self) -> None:
+        provider = LLMProvider(api_key="sk-test-key")  # pragma: allowlist secret
+
+        assert provider.api_key == "sk-test-key"  # pragma: allowlist secret
+        assert provider.model == "claude-sonnet-5"
+
+    def test_api_key_read_from_env(self) -> None:
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-env-key"}):  # pragma: allowlist secret
+            provider = LLMProvider()
+
+        assert provider.api_key == "sk-env-key"  # pragma: allowlist secret
+
+    def test_missing_api_key_raises(self) -> None:
+        with patch.dict("os.environ", {}, clear=True):
+            with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
+                LLMProvider()
+
+    def test_unsupported_model_rejected_at_init(self) -> None:
+        with pytest.raises(ValueError, match="Invalid model"):
+            LLMProvider(api_key="sk-test-key", model_id="claude-3-5-sonnet-20241022")  # pragma: allowlist secret
+
+
+class TestAssessJobRawEdgeCases:
+    @pytest.mark.parametrize(("cv_text", "job_text"), [("", JOB_TEXT), (CV_TEXT, "")])
+    def test_empty_cv_or_job_still_calls_api(self, provider: Any, cv_text: str, job_text: str) -> None:
+        provider.client.messages.create.return_value = _message(ASSESSMENT_JSON)
+
+        result = provider.assess_job_raw(cv_text, job_text)
+
+        provider.client.messages.create.assert_called_once()
+        assert result["assessment"] == ASSESSMENT
+
+    def test_partial_response_passed_through_unvalidated(self, provider: Any) -> None:
+        provider.client.messages.create.return_value = _message('{"overall_score": 50}')
+
+        result = provider.assess_job_raw(CV_TEXT, JOB_TEXT)
+
+        assert result["assessment"] == {"overall_score": 50}
