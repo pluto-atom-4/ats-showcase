@@ -204,6 +204,8 @@ class LLMProvider:
         use_examples: bool = False,
     ) -> Dict[str, Any]:
         """Assess CV fit for a job, returning the parsed assessment with estimated and actual token costs."""
+        if max_retries < 1:
+            raise ValueError("max_retries must be >= 1")
         # Lazy: src.assessment imports assessor, which will import this module once C3 lands.
         from src.assessment.prompt_builder import PromptBuilder
 

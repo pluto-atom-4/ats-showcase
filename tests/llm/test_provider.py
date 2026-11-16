@@ -193,6 +193,13 @@ class TestAssessJobRawRetries:
         assert provider.client.messages.create.call_count == 3
         assert [c.args[0] for c in _no_real_tokenizer_or_sleep.call_args_list] == [1, 2]
 
+    @pytest.mark.parametrize("max_retries", [0, -1])
+    def test_non_positive_max_retries_rejected_before_api_call(self, provider: Any, max_retries: int) -> None:
+        with pytest.raises(ValueError, match="max_retries must be >= 1"):
+            provider.assess_job_raw(CV_TEXT, JOB_TEXT, max_retries=max_retries)
+
+        provider.client.messages.create.assert_not_called()
+
     def test_authentication_error_not_retried(self, provider: Any, _no_real_tokenizer_or_sleep: MagicMock) -> None:
         provider.client.messages.create.side_effect = _api_error(AuthenticationError, 401)
 
