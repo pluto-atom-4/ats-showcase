@@ -632,7 +632,7 @@ uv run python -m src.cli assess --cv data/cv.json &
 Batch API is optimized for:
 - Large volumes of independent tasks
 - Latency-tolerant workflows (results in 24h)
-- Cost savings (50% cheaper: $0.003 → $0.0015 per 1M input tokens)
+- Cost savings (50% cheaper on Batch API: ~$1.50/1M input vs ~$3.00/1M sync, based on claude-sonnet-5 pricing in src/config/models.py)
 
 ATS Showcase needs:
 - Results immediately (for interactive verification)
@@ -644,14 +644,14 @@ ATS Showcase needs:
 ### Why 3.5 Sonnet?
 
 **Available Claude models (as of 2026-07):**
-- Claude 3.5 Sonnet: Fast, cost-effective ($0.003/1M input)
-- Claude Opus: More capable, slower, more expensive ($0.015/1M input)
-- Claude Haiku: Fastest, less capable ($0.00080/1M input)
+- Claude 3.5 Sonnet: Fast, cost-effective ($3.00/1M input; see SUPPORTED_MODELS in src/config/models.py)
+- Claude Opus: More capable, slower, more expensive ($15.00/1M input; see src/config/models.py)
+- Claude Haiku: Fastest, less capable ($0.80/1M input; see src/config/models.py)
 
 **Choice:** 3.5 Sonnet balances speed + accuracy + cost.
 - Fast enough: 2–5 jobs/min (acceptable for workflow)
 - Accurate: Good at CV matching, reasoning
-- Cost-effective: $0.003/1M (reasonable for user budget)
+- Cost-effective: $3.00/1M input (see src/config/models.py)
 
 ### Rate Limits
 
