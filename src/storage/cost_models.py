@@ -46,6 +46,8 @@ class CostComparisonReport:
     estimated_savings_usd: float = 0.0
     avg_tokens_per_job_v1_0: float = 0.0
     avg_tokens_per_job_v2_0: float = 0.0
+    weighted_token_rate_v1_0_usd_per_1m: float = 0.0
+    weighted_token_rate_v2_0_usd_per_1m: float = 0.0
     jobs_already_migrated: int = 0
     jobs_pending_migration: int = 0
     reprocessing_runs: List[ReprocessingMetrics] = field(default_factory=list)
@@ -81,6 +83,8 @@ class CostComparisonReport:
             "estimated_savings_usd": round(self.estimated_savings_usd, 6),
             "avg_tokens_per_job_v1_0": round(self.avg_tokens_per_job_v1_0, 2),
             "avg_tokens_per_job_v2_0": round(self.avg_tokens_per_job_v2_0, 2),
+            "weighted_token_rate_v1_0_usd_per_1m": round(self.weighted_token_rate_v1_0_usd_per_1m, 6),
+            "weighted_token_rate_v2_0_usd_per_1m": round(self.weighted_token_rate_v2_0_usd_per_1m, 6),
             "jobs_already_migrated": self.jobs_already_migrated,
             "jobs_pending_migration": self.jobs_pending_migration,
             "total_reprocessing_cost_saved": round(self.total_reprocessing_cost_saved, 6),

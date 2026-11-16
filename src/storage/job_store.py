@@ -2,7 +2,7 @@
 
 import logging
 import sqlite3
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.config.models import DEFAULT_MODEL, get_model_pricing
 from src.storage._init_helpers import initialize_db_common
@@ -315,6 +315,37 @@ class JobStore:
             f"${cost_before:.6f} → ${cost_after:.6f}"
         )
 
+    def _blended_token_rates(self, cursor: sqlite3.Cursor) -> Tuple[float, float]:
+        try:
+            cursor.execute(
+                """SELECT jr.preprocessing_version, jr.tokens, ja.model
+                    FROM job_reviews jr
+                    LEFT JOIN job_assessments ja ON ja.job_id = jr.job_id
+                    WHERE jr.preprocessing_version IN ('v1.0', 'v2.0')"""
+            )
+            rows = cursor.fetchall()
+        except sqlite3.OperationalError:
+            # Old DBs predate job_assessments.model; use DEFAULT_MODEL for all rows.
+            cursor.execute(
+                "SELECT preprocessing_version, tokens, NULL FROM job_reviews "
+                "WHERE preprocessing_version IN ('v1.0', 'v2.0')"
+            )
+            rows = cursor.fetchall()
+
+        default_rate = get_model_pricing(DEFAULT_MODEL)[0]
+        weighted_sum: Dict[str, float] = {"v1.0": 0.0, "v2.0": 0.0}
+        token_sum: Dict[str, int] = {"v1.0": 0, "v2.0": 0}
+        for version, tokens, model in rows:
+            job_tokens = tokens or 0
+            rate = get_model_pricing(model)[0] if model else default_rate
+            weighted_sum[version] += job_tokens * rate
+            token_sum[version] += job_tokens
+
+        def blended(version: str) -> float:
+            return weighted_sum[version] / token_sum[version] if token_sum[version] else 0.0
+
+        return blended("v1.0"), blended("v2.0")
+
     def get_cost_comparison_report(self, limit_days: Optional[int] = None) -> CostComparisonReport:
         """Generate cost analysis report for v1.0 vs v2.0 preprocessing.
 
@@ -353,11 +384,13 @@ class JobStore:
         if report.total_jobs_v2_0 > 0:
             report.avg_tokens_per_job_v2_0 = report.total_tokens_v2_0 / report.total_jobs_v2_0
 
-        # Single flat rate: jobs carry no per-model context, so savings assume DEFAULT_MODEL.
-        token_rate = get_model_pricing(DEFAULT_MODEL)[0] / 1_000_000
+        rate_v1_0, rate_v2_0 = self._blended_token_rates(cursor)
+        report.weighted_token_rate_v1_0_usd_per_1m = rate_v1_0
+        report.weighted_token_rate_v2_0_usd_per_1m = rate_v2_0
         if report.total_tokens_v1_0 > 0 and report.total_tokens_v2_0 > 0:
-            tokens_saved = report.total_tokens_v1_0 - report.total_tokens_v2_0
-            report.estimated_savings_usd = tokens_saved * token_rate
+            cost_v1_0 = report.total_tokens_v1_0 * rate_v1_0 / 1_000_000
+            cost_v2_0 = report.total_tokens_v2_0 * rate_v2_0 / 1_000_000
+            report.estimated_savings_usd = cost_v1_0 - cost_v2_0
 
         cursor.execute(
             """SELECT job_id, preprocessing_version_before, preprocessing_version_after,
