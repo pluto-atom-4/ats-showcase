@@ -3,13 +3,17 @@
 import sqlite3
 import tempfile
 from pathlib import Path
-from typing import Generator
+from typing import Generator, Optional
 
 import pytest
 
 from src.config.models import DEFAULT_MODEL, get_model_pricing
+from src.storage.assessment_store import AssessmentStore
 from src.storage.cost_models import CostComparisonReport
 from src.storage.job_store import JobStore
+
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
+SONNET_MODEL = "claude-sonnet-5"
 
 
 @pytest.fixture
@@ -306,3 +310,142 @@ class TestJobStoreCostTracking:
         assert report.estimated_savings_usd == pytest.approx(expected_savings, abs=1e-8)
 
         store.close()
+
+
+def _save_assessment(assessments: AssessmentStore, job_id: str, model: Optional[str]) -> None:
+    """Save a minimal assessment row for job_id with the given model."""
+    assessments.save_assessment(
+        job_id=job_id,
+        title="Synthetic Job",
+        company="Synthetic Co",
+        location=None,
+        overall_score=50.0,
+        tech_score=50.0,
+        seniority_score=50.0,
+        location_score=50.0,
+        recommendations=[],
+        summary="SYNTHETIC: assessment row for blended-rate tests",
+        tokens_used=0,
+        actual_cost=0.0,
+        model=model,
+    )
+
+
+class TestBlendedTokenRates:
+    """Blended per-version token rates in the cost comparison report."""
+
+    def test_mixed_models_per_version_rates_and_savings(self, temp_db: str) -> None:
+        """v1.0 rate follows its Haiku assessments; v2.0 rate follows its Sonnet assessments."""
+        # SYNTHETIC: jobs and assessment models for blended-rate coverage
+        store = JobStore(temp_db)
+        assessments = AssessmentStore(temp_db)
+        store.add_job(job_id="v1_a", title="A", preprocessing_version="v1.0", tokens=1000)
+        store.add_job(job_id="v1_b", title="B", preprocessing_version="v1.0", tokens=2000)
+        store.add_job(job_id="v2_a", title="C", preprocessing_version="v2.0", tokens=600)
+        _save_assessment(assessments, "v1_a", HAIKU_MODEL)
+        _save_assessment(assessments, "v1_b", HAIKU_MODEL)
+        _save_assessment(assessments, "v2_a", SONNET_MODEL)
+
+        report = store.get_cost_comparison_report()
+
+        rate_v1 = get_model_pricing(HAIKU_MODEL)[0]
+        rate_v2 = get_model_pricing(SONNET_MODEL)[0]
+        assert report.weighted_token_rate_v1_0_usd_per_1m == pytest.approx(rate_v1)
+        assert report.weighted_token_rate_v2_0_usd_per_1m == pytest.approx(rate_v2)
+
+        expected_savings = 3000 * rate_v1 / 1_000_000 - 600 * rate_v2 / 1_000_000
+        assert report.estimated_savings_usd == pytest.approx(expected_savings, abs=1e-12)
+
+        flat_default_savings = (3000 - 600) * get_model_pricing(DEFAULT_MODEL)[0] / 1_000_000
+        assert report.estimated_savings_usd != pytest.approx(flat_default_savings, abs=1e-12)
+
+        assessments._close_db()
+        store.close()
+
+    def test_token_weighted_blend_within_version(self, temp_db: str) -> None:
+        """v1.0 rate is the token-weighted mean of its jobs' model rates."""
+        # SYNTHETIC: two v1.0 jobs with different models and token counts
+        store = JobStore(temp_db)
+        assessments = AssessmentStore(temp_db)
+        store.add_job(job_id="v1_a", title="A", preprocessing_version="v1.0", tokens=1000)
+        store.add_job(job_id="v1_b", title="B", preprocessing_version="v1.0", tokens=3000)
+        _save_assessment(assessments, "v1_a", HAIKU_MODEL)
+        _save_assessment(assessments, "v1_b", SONNET_MODEL)
+
+        report = store.get_cost_comparison_report()
+
+        rate_h = get_model_pricing(HAIKU_MODEL)[0]
+        rate_s = get_model_pricing(SONNET_MODEL)[0]
+        expected = (1000 * rate_h + 3000 * rate_s) / (1000 + 3000)
+        assert report.weighted_token_rate_v1_0_usd_per_1m == pytest.approx(expected)
+
+        assessments._close_db()
+        store.close()
+
+    def test_null_model_falls_back_to_default_rate(self, temp_db: str) -> None:
+        """Jobs without an assessment row or with NULL model use DEFAULT_MODEL rate."""
+        # SYNTHETIC: one job with no assessment row, one with model=None
+        store = JobStore(temp_db)
+        assessments = AssessmentStore(temp_db)
+        store.add_job(job_id="v1_no_row", title="A", preprocessing_version="v1.0", tokens=1000)
+        store.add_job(job_id="v1_null", title="B", preprocessing_version="v1.0", tokens=1000)
+        store.add_job(job_id="v2_null", title="C", preprocessing_version="v2.0", tokens=500)
+        _save_assessment(assessments, "v1_null", None)
+        _save_assessment(assessments, "v2_null", None)
+
+        report = store.get_cost_comparison_report()
+
+        default_rate = get_model_pricing(DEFAULT_MODEL)[0]
+        assert report.weighted_token_rate_v1_0_usd_per_1m == pytest.approx(default_rate)
+        assert report.weighted_token_rate_v2_0_usd_per_1m == pytest.approx(default_rate)
+
+        assessments._close_db()
+        store.close()
+
+    def test_empty_v2_group_yields_zero_rate_and_savings(self, temp_db: str) -> None:
+        """Only v1.0 jobs present: v2.0 rate and savings are both 0.0."""
+        # SYNTHETIC: v1.0-only job set
+        store = JobStore(temp_db)
+        assessments = AssessmentStore(temp_db)
+        store.add_job(job_id="v1_a", title="A", preprocessing_version="v1.0", tokens=1000)
+        _save_assessment(assessments, "v1_a", HAIKU_MODEL)
+
+        report = store.get_cost_comparison_report()
+
+        assert report.weighted_token_rate_v2_0_usd_per_1m == 0.0
+        assert report.estimated_savings_usd == 0.0
+        assert report.weighted_token_rate_v1_0_usd_per_1m == pytest.approx(get_model_pricing(HAIKU_MODEL)[0])
+
+        assessments._close_db()
+        store.close()
+
+    def test_old_db_without_model_column_uses_default_rate(self, temp_db: str) -> None:
+        """job_assessments lacking a model column falls back to DEFAULT_MODEL rate without raising."""
+        # SYNTHETIC: legacy job_assessments table with no model column
+        store = JobStore(temp_db)
+        store.add_job(job_id="v1_a", title="A", preprocessing_version="v1.0", tokens=1000)
+        store.add_job(job_id="v2_a", title="B", preprocessing_version="v2.0", tokens=500)
+        assert store.conn is not None
+        store.conn.execute("CREATE TABLE job_assessments (job_id TEXT PRIMARY KEY, overall_score REAL)")
+        store.conn.execute("INSERT INTO job_assessments (job_id, overall_score) VALUES ('v1_a', 50)")
+        store.conn.commit()
+
+        report = store.get_cost_comparison_report()
+
+        default_rate = get_model_pricing(DEFAULT_MODEL)[0]
+        assert report.weighted_token_rate_v1_0_usd_per_1m == pytest.approx(default_rate)
+        assert report.weighted_token_rate_v2_0_usd_per_1m == pytest.approx(default_rate)
+
+        store.close()
+
+    def test_to_dict_includes_blended_rate_keys(self) -> None:
+        """to_dict exposes both weighted token rate fields."""
+        report = CostComparisonReport(
+            weighted_token_rate_v1_0_usd_per_1m=0.8,
+            weighted_token_rate_v2_0_usd_per_1m=3.0,
+        )
+
+        data = report.to_dict()
+
+        assert data["weighted_token_rate_v1_0_usd_per_1m"] == pytest.approx(0.8)
+        assert data["weighted_token_rate_v2_0_usd_per_1m"] == pytest.approx(3.0)
