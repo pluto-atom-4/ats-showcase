@@ -171,11 +171,11 @@ Processing 10 jobs...
 Job 1: Senior Software Engineer
   Raw HTML: 6,000 tokens
   Clean text: 650 tokens
-  Estimated cost: $0.002
+  Estimated cost: $0.002 (Sonnet, input only)
 
 Summary:
   Total tokens: 6,500
-  Estimated cost: $0.02
+  Estimated cost: $0.02 (Sonnet, $3/1M)
   💾 Savings: vs. raw HTML (illustrative output)
 ```
 
@@ -204,7 +204,7 @@ Job 1: Senior Software Engineer @ Google
   Location: 75/100 (Relocation available)
 
   Recommendation: ✅ APPLY NOW - Good fit
-  Cost: $0.002 (estimated: $0.002) ✅
+  Cost: $0.002 (Sonnet 5, estimated: $0.002) ✅
 
 Report saved: assessments/assessment-20260526.md
 ```
