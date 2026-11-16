@@ -246,7 +246,7 @@ class TestAssessmentIntegration:
         mock_preprocessor_class.return_value = mock_preprocessor
 
         mock_llm = MagicMock()
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": {"overall_score": 75},
             "cost_tracking": {
                 "estimated_input": 600,
@@ -288,7 +288,7 @@ class TestAssessmentIntegration:
 
         mock_llm = MagicMock()
         mock_assessment = {"overall_score": 82, "reasoning": "Good fit"}
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": mock_assessment,
             "cost_tracking": {
                 "estimated_input": 600,
@@ -329,7 +329,7 @@ class TestAssessmentIntegration:
         mock_preprocessor_class.return_value = mock_preprocessor
 
         mock_llm = MagicMock()
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": {"overall_score": 75},
             "cost_tracking": {
                 "estimated_input": 600,
@@ -374,7 +374,7 @@ class TestAssessmentIntegration:
             "actual_output": 150,
             "actual_cost_usd": 0.00185,
         }
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": {"overall_score": 75},
             "cost_tracking": mock_cost,
             "metadata": {
@@ -407,7 +407,7 @@ class TestAssessmentIntegration:
             "api_call_time_ms": 1200,
             "attempt": 1,
         }
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": {"overall_score": 75},
             "cost_tracking": {
                 "estimated_input": 600,
@@ -440,7 +440,7 @@ class TestAssessmentIntegration:
         mock_preprocessor_class.return_value = mock_preprocessor
 
         mock_llm = MagicMock()
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": {"overall_score": 75},
             "cost_tracking": {
                 "estimated_input": 600,
@@ -517,7 +517,7 @@ class TestEdgeCases:
         mock_preprocessor_class.return_value = mock_preprocessor
 
         mock_llm = MagicMock()
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": {"overall_score": 75},
             "cost_tracking": {
                 "estimated_input": 600,
@@ -552,7 +552,7 @@ class TestEdgeCases:
         mock_preprocessor_class.return_value = mock_preprocessor
 
         mock_llm = MagicMock()
-        mock_llm.assess_job.return_value = {
+        mock_llm.assess_job_raw.return_value = {
             "assessment": {"overall_score": 75},
             "cost_tracking": {
                 "estimated_input": 2000,
