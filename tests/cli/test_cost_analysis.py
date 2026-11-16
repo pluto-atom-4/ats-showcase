@@ -24,14 +24,12 @@ def strip_ansi(text: str) -> str:
 
 
 def _printed_rate(output: str, version: str) -> float:
-    """Parse the blended token rate printed for a preprocessing version."""
     match = re.search(rf"Token rate {re.escape(version)} \(blended\):\s+\$([\d.]+) per 1M tokens", output)
     assert match is not None, f"no blended rate line for {version}"
     return float(match.group(1))
 
 
 def _save_assessment(assessments: AssessmentStore, job_id: str, model: Optional[str]) -> None:
-    """Save a minimal assessment row so the job's model drives its blended rate."""
     assessments.save_assessment(
         job_id=job_id,
         title="Synthetic Job",
@@ -336,12 +334,12 @@ class TestCostAnalysisCommand:
 
             store = JobStore(db_path)
             assessments = AssessmentStore(db_path)
-            # SYNTHETIC: v1.0 jobs assessed with Haiku, v2.0 job with DEFAULT_MODEL
+            # SYNTHETIC: v1.0 mixes two models so the token weighting is observable
             store.add_job(job_id="job_v1_a", title="A", company="Tech Corp", preprocessing_version="v1.0", tokens=1000)
             store.add_job(job_id="job_v1_b", title="B", company="Tech Corp", preprocessing_version="v1.0", tokens=2000)
             store.add_job(job_id="job_v2", title="C", company="Tech Corp", preprocessing_version="v2.0", tokens=650)
             _save_assessment(assessments, "job_v1_a", HAIKU_MODEL)
-            _save_assessment(assessments, "job_v1_b", HAIKU_MODEL)
+            _save_assessment(assessments, "job_v1_b", DEFAULT_MODEL)
             _save_assessment(assessments, "job_v2", DEFAULT_MODEL)
             assessments._close_db()
             store.close()
@@ -350,7 +348,7 @@ class TestCostAnalysisCommand:
 
         assert result.exit_code == 0
         clean_output = strip_ansi(result.stdout)
-        expected_v1 = (1000 * get_model_pricing(HAIKU_MODEL)[0] + 2000 * get_model_pricing(HAIKU_MODEL)[0]) / 3000
+        expected_v1 = (1000 * get_model_pricing(HAIKU_MODEL)[0] + 2000 * get_model_pricing(DEFAULT_MODEL)[0]) / 3000
         expected_v2 = get_model_pricing(DEFAULT_MODEL)[0]
         assert _printed_rate(clean_output, "v1.0") == pytest.approx(expected_v1, abs=0.005)
         assert _printed_rate(clean_output, "v2.0") == pytest.approx(expected_v2, abs=0.005)
