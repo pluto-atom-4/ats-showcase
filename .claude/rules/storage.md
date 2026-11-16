@@ -10,55 +10,16 @@ SQLite schema, FTS5 full-text search, markdown export, query patterns.
 
 ## SQLite Schema
 
-**Main tables:**
+**Main tables** (authoritative DDL: `src/storage/schema.py`):
 
-```sql
--- Jobs with extracted data
-CREATE TABLE jobs (
-  job_id TEXT PRIMARY KEY,
-  company TEXT,
-  title TEXT,
-  location TEXT,
-  raw_html TEXT,
-  clean_text TEXT,
-  status TEXT, -- pending_review, confirmed, rejected
-  preprocessing_version TEXT, -- Phase 2: v1.0 (legacy) or v2.0 (new)
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP
-);
+| Table | Constant | Holds |
+|-------|----------|-------|
+| `job_reviews` | `JOBS_TABLE_SQL` | Crawled jobs: status, tokens, `estimated_cost`, `preprocessing_version` |
+| `job_assessments` | `ASSESSMENT_TABLE_SQL` | Scores, summary, token counts, `actual_cost`; `model` column added by `_run_migrations` in `assessment_store.py` (#809) |
+| `cost_tracking` | `COST_TRACKING_TABLE_SQL` | Per-phase tokens and cost, v1.0 vs v2.0 re-preprocessing deltas |
+| `quality_tracking` | `QUALITY_TRACKING_TABLE_SQL` | Assessment score deltas between preprocessing versions |
 
--- Assessment results
-CREATE TABLE assessments (
-  assessment_id TEXT PRIMARY KEY,
-  job_id TEXT FOREIGN KEY,
-  cv_id TEXT,
-  match_score INT,
-  categories JSONB, -- {tech_skills: 85, seniority: 90, ...}
-  reasoning TEXT,
-  created_at TIMESTAMP,
-  FOREIGN KEY(job_id) REFERENCES jobs(job_id)
-);
-
--- Cost tracking (for analytics)
-CREATE TABLE cost_tracking (
-  cost_id TEXT PRIMARY KEY,
-  job_id TEXT,
-  estimated_tokens INT,
-  actual_tokens INT,
-  estimated_cost FLOAT,
-  actual_cost FLOAT,
-  api_call_time_ms INT,
-  created_at TIMESTAMP,
-  FOREIGN KEY(job_id) REFERENCES jobs(job_id)
-);
-```
-
-**FTS5 index (full-text search):**
-```sql
-CREATE VIRTUAL TABLE jobs_fts USING fts5(
-  title, location, clean_text
-);
-```
+**FTS5 index (full-text search):** `job_assessments_fts` over `job_id, title, company, summary, recommendations` (`ASSESSMENT_FTS_SQL`).
 
 Queries complete in <100ms even with 1000+ jobs.
 
