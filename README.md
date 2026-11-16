@@ -7,7 +7,7 @@
 
 Agentic AI workflow for intelligent job assessment. Extract job postings from company websites, preprocess with NLP, verify with users, assess CV fit using Claude (Haiku/Sonnet/Opus), and store results in a queryable SQLite database.
 
-**Cost optimized**: 88% token reduction through local preprocessing with consolidated `clean_html()` function removing 70+ boilerplate patterns. Configurable LLM model (default Sonnet). ~$0.0001–0.0008 per assessment depending on model.
+**Cost optimized**: 88% token reduction through local preprocessing with consolidated `clean_html()` function removing 70+ boilerplate patterns. Configurable LLM model (default Sonnet). Cost depends on the model; see `SUPPORTED_MODELS` in `src/config/models.py` or run `uv run python -m src.cli stats --show-token-usage`.
 
 ## 🚀 Quick Start
 
@@ -471,7 +471,7 @@ echo $ANTHROPIC_API_KEY
 # Test connection
 uv run python -c "from anthropic import Anthropic; print(Anthropic().models.list())"
 
-# See: docs/ASSESS.md#error-handling
+# See: docs/ASSESS.md#3-error-handling-and-fallbacks
 ```
 
 **Database locked?**
@@ -497,7 +497,7 @@ uv run python src/storage/db.py --init
 | **Query** | <100 ms | SQLite FTS5 indexed search |
 | **Export** | <1 sec | Markdown generation |
 | **Database size** | ~5 MB | Per 500 assessments |
-| **LLM cost** | $0.00009–$0.00115/job | Haiku (cheapest) to Opus (best accuracy) |
+| **LLM cost** | See `SUPPORTED_MODELS` in `src/config/models.py` | Haiku (cheapest) to Opus (best accuracy) |
 
 See [ARCHITECTURE.md](./docs/ARCHITECTURE.md#performance) for scaling strategies.
 
