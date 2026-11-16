@@ -684,6 +684,7 @@ def _assess_job_and_save(
         summary=assessment.summary,
         tokens_used=assessment.tokens_used,
         actual_cost=assessment.actual_cost,
+        model=llm_provider.model,
     )
 
     overall_score = assessment.overall_score
@@ -2396,6 +2397,7 @@ def _assess_single_job(
             summary=result["assessment"].get("reasoning", ""),
             tokens_used=result["cost_tracking"].get("actual_input", 0),
             actual_cost=result["cost_tracking"].get("actual_cost_usd", 0.0),
+            model=result["metadata"].get("model"),
         )
 
         overall_score = result["assessment"].get("overall_score", 0)
