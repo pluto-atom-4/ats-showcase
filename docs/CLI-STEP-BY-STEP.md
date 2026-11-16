@@ -1364,7 +1364,7 @@ uv run python -m src.cli export --min-score 75
 # Show only top matches
 ```
 
-**Cost:** ~$0.01 for 100 jobs (vs $0.30 without filtering)
+**Cost:** Assessment cost drops roughly in proportion to the jobs skipped by score filtering.
 
 ---
 
