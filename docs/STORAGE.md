@@ -92,7 +92,8 @@ CREATE TABLE jobs (
 );
 
 -- Assessment results (from ASSESS phase)
-CREATE TABLE assessments (
+-- Simplified; src/storage/schema.py (ASSESSMENT_TABLE_SQL) is authoritative.
+CREATE TABLE job_assessments (
     assessment_id TEXT PRIMARY KEY,
     job_id TEXT NOT NULL,
     cv_id TEXT NOT NULL,
@@ -107,7 +108,7 @@ CREATE TABLE assessments (
     -- Cost tracking
     input_tokens INT NOT NULL,
     output_tokens INT NOT NULL,
-    model TEXT DEFAULT 'claude-sonnet-5',  -- Planned (#809); not in current job_assessments schema
+    model TEXT,  -- Added by migration in assessment_store.py::_run_migrations (#809); no column default
     cost_usd REAL,  -- Calculated: (input/1M)*3.00 + (output/1M)*15.00
 
     -- Performance
@@ -278,7 +279,7 @@ class StorageClient:
 
         # Assessments table
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS assessments (
+            CREATE TABLE IF NOT EXISTS job_assessments (
                 assessment_id TEXT PRIMARY KEY,
                 job_id TEXT NOT NULL,
                 cv_id TEXT NOT NULL,
@@ -289,7 +290,7 @@ class StorageClient:
                 gaps TEXT,
                 input_tokens INT NOT NULL,
                 output_tokens INT NOT NULL,
-                model TEXT DEFAULT 'claude-sonnet-5',  -- Planned (#809); not in current job_assessments schema
+                model TEXT,  -- Added by migration in assessment_store.py::_run_migrations (#809); no column default
                 cost_usd REAL,
                 latency_ms REAL,
                 retry_count INT DEFAULT 0,
@@ -347,19 +348,19 @@ class StorageClient:
         """)
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_assessments_job
-            ON assessments(job_id);
+            ON job_assessments(job_id);
         """)
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_assessments_cv
-            ON assessments(cv_id);
+            ON job_assessments(cv_id);
         """)
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_assessments_score
-            ON assessments(match_score DESC);
+            ON job_assessments(match_score DESC);
         """)
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_assessments_date
-            ON assessments(assessed_at DESC);
+            ON job_assessments(assessed_at DESC);
         """)
 
         self.conn.commit()
@@ -405,7 +406,7 @@ class StorageClient:
                        f"assess_{assessment['job_id']}_{assessment['cv_id']}"
 
         cursor.execute("""
-            INSERT INTO assessments (
+            INSERT INTO job_assessments (
                 assessment_id, job_id, cv_id, match_score, recommendation,
                 reasoning, strengths, gaps, input_tokens, output_tokens,
                 model, cost_usd, latency_ms, retry_count, status, error_message,
@@ -470,7 +471,7 @@ class StorageClient:
                 j.salary,
                 j.posting_url,
                 a.assessed_at
-            FROM assessments a
+            FROM job_assessments a
             JOIN jobs j ON a.job_id = j.job_id
             WHERE a.cv_id = ? AND a.match_score >= ?
             ORDER BY a.match_score DESC
@@ -488,7 +489,7 @@ class StorageClient:
         """Get cost summary for reporting."""
         cursor = self.conn.cursor()
 
-        query = "SELECT * FROM assessments WHERE 1=1"
+        query = "SELECT * FROM job_assessments WHERE 1=1"
         params = []
 
         if company_name:
@@ -542,7 +543,7 @@ def get_company_jobs(storage: StorageClient, company: str) -> List[Dict]:
     cursor.execute("""
         SELECT j.*, COUNT(a.assessment_id) as assessment_count
         FROM jobs j
-        LEFT JOIN assessments a ON j.job_id = a.job_id
+        LEFT JOIN job_assessments a ON j.job_id = a.job_id
         WHERE j.company_name = ?
         GROUP BY j.job_id
     """, (company,))
@@ -556,7 +557,7 @@ def get_match_distribution(storage: StorageClient, cv_id: str) -> Dict:
             recommendation,
             COUNT(*) as count,
             ROUND(AVG(match_score), 2) as avg_score
-        FROM assessments
+        FROM job_assessments
         WHERE cv_id = ?
         GROUP BY recommendation
         ORDER BY avg_score DESC
@@ -596,7 +597,7 @@ def get_recent_assessments(storage: StorageClient, days: int = 7) -> List[Dict]:
             a.output_tokens,
             a.cost_usd,
             a.assessed_at
-        FROM assessments a
+        FROM job_assessments a
         JOIN jobs j ON a.job_id = j.job_id
         WHERE a.assessed_at > ?
         ORDER BY a.assessed_at DESC
@@ -717,7 +718,7 @@ class MarkdownExporter:
                 j.requirements,
                 j.salary,
                 j.posting_url
-            FROM assessments a
+            FROM job_assessments a
             JOIN jobs j ON a.job_id = j.job_id
             WHERE a.cv_id = ?
             ORDER BY a.match_score DESC
@@ -797,7 +798,7 @@ class DataLifecycleManager:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
 
         cursor.execute("""
-            UPDATE assessments
+            UPDATE job_assessments
             SET status = 'archived'
             WHERE assessed_at < ? AND status != 'archived'
         """, (cutoff,))
@@ -820,7 +821,7 @@ class DataLifecycleManager:
 
         # Redact assessment reasoning (GDPR compliance)
         cursor.execute("""
-            UPDATE assessments
+            UPDATE job_assessments
             SET reasoning = '[redacted]', strengths = '[]', gaps = '[]'
             WHERE cv_id = ?
         """, (cv_id,))
@@ -838,7 +839,7 @@ class DataLifecycleManager:
                 COUNT(*) as count,
                 MIN(assessed_at) as oldest,
                 MAX(assessed_at) as newest
-            FROM assessments
+            FROM job_assessments
             GROUP BY status
         """)
 
@@ -867,12 +868,12 @@ class DataLifecycleManager:
 
 ```python
 # ❌ BAD: Loads all assessments then filters in Python
-assessments = cursor.execute("SELECT * FROM assessments").fetchall()
+assessments = cursor.execute("SELECT * FROM job_assessments").fetchall()
 strong = [a for a in assessments if a['match_score'] >= 0.8]  # Slow!
 
 # ✅ GOOD: Filter at database level (uses index)
 cursor.execute("""
-    SELECT * FROM assessments
+    SELECT * FROM job_assessments
     WHERE match_score >= 0.8
     ORDER BY match_score DESC
     LIMIT 10
@@ -880,8 +881,8 @@ cursor.execute("""
 
 # ❌ BAD: Multiple joins without indexes
 # ✅ GOOD: Ensure indexes on foreign keys (job_id, cv_id)
-CREATE INDEX idx_assessments_job ON assessments(job_id);
-CREATE INDEX idx_assessments_cv ON assessments(cv_id);
+CREATE INDEX idx_assessments_job ON job_assessments(job_id);
+CREATE INDEX idx_assessments_cv ON job_assessments(cv_id);
 ```
 
 ## Deployment Checklist
