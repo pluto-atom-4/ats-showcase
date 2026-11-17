@@ -9,16 +9,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from llm.provider import AssessmentResult, LLMProvider
+from llm.provider import LLMAssessmentResult, LLMProvider
 from storage.assessment_store import AssessmentStore
 
 
-class TestAssessmentResult:
-    """Test AssessmentResult class."""
+class TestLLMAssessmentResult:
+    """Test LLMAssessmentResult class."""
 
     def test_init(self):
         """Test initialization."""
-        result = AssessmentResult(
+        result = LLMAssessmentResult(
             job_id="job_1",
             overall_score=85.0,
             tech_score=90.0,
@@ -36,7 +36,7 @@ class TestAssessmentResult:
 
     def test_to_dict(self):
         """Test conversion to dict."""
-        result = AssessmentResult(
+        result = LLMAssessmentResult(
             job_id="job_1",
             overall_score=85.0,
             tech_score=90.0,
@@ -55,7 +55,7 @@ class TestAssessmentResult:
 
     def test_to_assessment_model(self):
         """Test conversion to Pydantic model."""
-        result = AssessmentResult(
+        result = LLMAssessmentResult(
             job_id="job_1",
             overall_score=85.0,
             tech_score=90.0,
