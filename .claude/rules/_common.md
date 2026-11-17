@@ -2,8 +2,6 @@
 
 Reusable error handling, verification commands, and patterns across all phases.
 
-**Include syntax:** <!-- @include ../.claude/rules/_common.md#section-name -->
-
 ---
 
 ## Error Handling Pattern

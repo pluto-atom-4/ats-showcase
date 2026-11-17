@@ -15,9 +15,9 @@ SQLite schema, FTS5 full-text search, markdown export, query patterns.
 | Table | Constant | Holds |
 |-------|----------|-------|
 | `job_reviews` | `JOBS_TABLE_SQL` | Crawled jobs: status, tokens, `estimated_cost`, `preprocessing_version` |
-| `job_assessments` | `ASSESSMENT_TABLE_SQL` | Scores, summary, token counts, `actual_cost`; `model` column added by `_run_migrations` in `assessment_store.py` (#809) |
+| `job_assessments` | `ASSESSMENT_TABLE_SQL` | Scores, summary, token counts, `actual_cost`; `preprocessing_version`, `preprocessing_quality_check`, `previous_assessment_score`, `score_delta` and `model` (#809) are added by `_run_migrations` in `assessment_store.py` |
 | `cost_tracking` | `COST_TRACKING_TABLE_SQL` | Per-phase tokens and cost, v1.0 vs v2.0 re-preprocessing deltas |
-| `quality_tracking` | `QUALITY_TRACKING_TABLE_SQL` | Assessment score deltas between preprocessing versions |
+| `quality_tracking` | `QUALITY_TRACKING_TABLE_SQL` | Score deltas per job between preprocessing versions (history rows; `job_assessments.score_delta` holds only the latest) |
 
 **FTS5 index (full-text search):** `job_assessments_fts` over `job_id, title, company, summary, recommendations` (`ASSESSMENT_FTS_SQL`).
 
@@ -37,8 +37,6 @@ New jobs (v2.0): `clean_text` cleaned with 7 boilerplate categories removed (leg
 4. **Version stats**: Track job counts and cost by preprocessing version
 
 ## Database Access Pattern
-
-<!-- @include ../.claude/rules/_common.md#database-access-pattern -->
 
 See [_common.md](_common.md#database-access-pattern) for detailed pattern.
 
