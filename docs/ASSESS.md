@@ -334,7 +334,7 @@ from datetime import datetime
 import csv
 
 @dataclass
-class AssessmentResult:
+class LLMAssessmentResult:
     job_id: str
     cv_id: str
     match_score: float
@@ -365,7 +365,7 @@ class BatchAssessor:
             show_progress: Print progress updates
 
         Returns:
-            List of AssessmentResult objects
+            List of LLMAssessmentResult objects
         """
         total = len(job_cv_pairs)
 
@@ -375,7 +375,7 @@ class BatchAssessor:
 
             assessment, metadata = self.client.assess_job_cv_match(job, cv_summary)
 
-            result = AssessmentResult(
+            result = LLMAssessmentResult(
                 job_id=job_id,
                 cv_id=cv_id,
                 match_score=assessment.get("match_score", 0.0),
@@ -466,7 +466,7 @@ class BatchAssessor:
 
         print("="*60)
 
-    def _estimate_result_cost(self, result: AssessmentResult) -> float:
+    def _estimate_result_cost(self, result: LLMAssessmentResult) -> float:
         """Estimate cost for single result."""
         input_cost = (result.input_tokens / 1_000_000) * 3.00
         output_cost = (result.output_tokens / 1_000_000) * 15.00
