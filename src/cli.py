@@ -2516,7 +2516,7 @@ def assess(
         help="Assess mode: 'new-only' (unassessed jobs) or 'all' (all confirmed jobs)",
     ),
     score_threshold: Optional[float] = typer.Option(
-        None, "--score-threshold", help="Re-assess jobs with prior score < threshold (0-100)"
+        None, "--score-threshold", help="Skip jobs with prior score < threshold (0-100); only affects --mode all"
     ),
     since: Optional[str] = typer.Option(
         None, "--since", help="Re-assess jobs crawled on/after this date (ISO format, e.g. 2026-07-01)"
