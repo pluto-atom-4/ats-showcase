@@ -861,7 +861,7 @@ uv run python -m src.cli assess \
   - `claude-sonnet-5` - Default ($3/$15 per 1M, 80% cheaper than Opus)
   - `claude-opus-4-8` - Premium ($15/$75 per 1M, best accuracy)
 - `--mode TEXT` - 'new-only' (unassessed) or 'all' (default: new-only)
-- `--score-threshold FLOAT` - Re-assess jobs < threshold
+- `--score-threshold FLOAT` - Skip jobs with prior score < threshold (only affects --mode all)
 - `--since DATE` - Re-assess jobs after ISO date (2026-07-01)
 
 **Output**: Assessment results, per-model cost summary, token usage
