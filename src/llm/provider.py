@@ -28,7 +28,7 @@ def _get_token_counter() -> TokenCounter:
     return TokenCounter()
 
 
-class AssessmentResult:
+class LLMAssessmentResult:
     """Result from job assessment."""
 
     def __init__(
@@ -131,7 +131,7 @@ class LLMProvider:
         job_id: str,
         job_chunks: List[str],
         cv_text: str,
-    ) -> AssessmentResult:
+    ) -> LLMAssessmentResult:
         """
         Assess CV fit for a job.
 
@@ -141,7 +141,7 @@ class LLMProvider:
             cv_text: User's CV as text
 
         Returns:
-            AssessmentResult with scores and recommendations
+            LLMAssessmentResult with scores and recommendations
 
         Raises:
             ValueError: If assessment fails after retries
@@ -191,7 +191,7 @@ class LLMProvider:
             except (json.JSONDecodeError, KeyError, ValueError):
                 resp = response if "response" in locals() else None
                 result_or_retry = self._handle_parse_error(attempt, job_id, resp)
-                if isinstance(result_or_retry, AssessmentResult):
+                if isinstance(result_or_retry, LLMAssessmentResult):
                     return result_or_retry
 
         raise ValueError(f"Failed to assess job {job_id} after 3 attempts")
@@ -356,9 +356,9 @@ class LLMProvider:
 
         return data
 
-    def _build_assessment_result(self, job_id: str, data: dict[str, Any], response: Any) -> AssessmentResult:
+    def _build_assessment_result(self, job_id: str, data: dict[str, Any], response: Any) -> LLMAssessmentResult:
         """
-        Build AssessmentResult from parsed data.
+        Build LLMAssessmentResult from parsed data.
 
         Args:
             job_id: Job ID
@@ -366,7 +366,7 @@ class LLMProvider:
             response: API response object (for token counts)
 
         Returns:
-            AssessmentResult object
+            LLMAssessmentResult object
         """
         input_tokens = response.usage.input_tokens
         output_tokens = response.usage.output_tokens
@@ -376,7 +376,7 @@ class LLMProvider:
             output_tokens / 1_000_000
         ) * self.output_price_per_1m
 
-        return AssessmentResult(
+        return LLMAssessmentResult(
             job_id=job_id,
             overall_score=float(data.get("overall_score", 50)),
             tech_score=float(data.get("tech_score", 50)),
@@ -427,7 +427,9 @@ class LLMProvider:
             logger.error(f"API connection failed for job {job_id}")
             return False
 
-    def _handle_parse_error(self, attempt: int, job_id: str, response: Optional[Any]) -> Union[AssessmentResult, bool]:
+    def _handle_parse_error(
+        self, attempt: int, job_id: str, response: Optional[Any]
+    ) -> Union[LLMAssessmentResult, bool]:
         """
         Handle JSON parsing error.
 
@@ -437,7 +439,7 @@ class LLMProvider:
             response: API response object (if available)
 
         Returns:
-            AssessmentResult on final attempt, True to retry otherwise
+            LLMAssessmentResult on final attempt, True to retry otherwise
         """
         if attempt < 2:
             logger.warning(f"Failed to parse response for job {job_id}, retrying with fallback...")
@@ -449,7 +451,7 @@ class LLMProvider:
             else:
                 total_tokens = 0
 
-            return AssessmentResult(
+            return LLMAssessmentResult(
                 job_id=job_id,
                 overall_score=50,
                 tech_score=50,
