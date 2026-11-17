@@ -555,7 +555,7 @@ uv run python -m src.cli assess \
 | `--confirmed-only` | `true` | Only assess jobs with status="confirmed" |
 | `--model` | `sonnet` | Claude model: haiku, sonnet, opus (or full ID like claude-sonnet-5) |
 | `--mode` | `new-only` | 'new-only' (unassessed) or 'all' (all confirmed) |
-| `--score-threshold` | None | Re-assess jobs below threshold |
+| `--score-threshold` | None | Skip jobs whose prior score is below threshold (0-100); only affects --mode all |
 | `--since` | None | Re-assess jobs after ISO date (2026-07-01) |
 
 ### Model Comparison
