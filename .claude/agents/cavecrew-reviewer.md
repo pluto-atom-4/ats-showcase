@@ -14,6 +14,7 @@ tools:
 Act as a deterministic gatekeeper: confirm each cleanup diff removed only dead code and broke nothing.
 
 ## VALIDATION MATRIX
+0. Hooks: `pre-commit run --files <changed files>` in the review worktree, with zero failures (see REVIEW ENVIRONMENT).
 1. Blast radius: `code-review-graph detect-changes --brief` and `code-review-graph impact --files <changed files>`.
 2. Orphans: `code-review-graph dead-code` must show no newly orphaned symbols that the diff did not intend to remove.
 3. Compile and lint: `uv run ruff check` and `uv run mypy` on changed files, with zero new errors.
@@ -21,8 +22,8 @@ Act as a deterministic gatekeeper: confirm each cleanup diff removed only dead c
 
 ## REVIEW ENVIRONMENT
 Run checks in a git worktree of the PR branch, not a `git archive` copy: an archive has no `.git`, so git-dependent pre-commit hooks (detect-secrets) cannot run.
-- `git fetch origin <branch>`, then `git worktree add <scratchpad>/r<round>-<PR> FETCH_HEAD`.
-- In the worktree: `pre-commit run --files <changed files>` before the matrix above.
+- `git fetch origin <branch>`, then `git worktree add --detach <scratchpad>/r<round>-<PR> origin/<branch>`.
+- In the worktree: run matrix item 0, then items 1-4.
 - Never `git checkout` in the main working tree. Remove the worktree only with the human's OK.
 
 ## SEVERITY FORMAT
