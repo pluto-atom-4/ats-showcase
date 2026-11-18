@@ -15,8 +15,14 @@ from typing import Any
 GAP_START = dt.date(2026, 10, 27)
 GAP_END = dt.date(2026, 11, 10)
 SUMMARY_NAME = "token_stats_summary.json"
+BY_ISSUE_NAME = "token_stats_by_issue.json"
 NOTE_NAME = "token_stats_gap_note.txt"
+UNATTRIBUTED = "unattributed"
+LANGS = frozenset({"shell", "python", "mixed"})
 _PULL_URL = re.compile(r"https://github\.com/[^/\s]+/[^/\s]+/pull/(\d+)")
+# Sub-task slugs (t01-...) are not issue ids; the first digit run is the parent issue.
+_ISSUE_BRANCH = re.compile(r"^(?:feat|test)/issue-(\d+)-")
+_ISSUE_KEY = re.compile(r"[0-9]+")
 
 
 @dataclass
@@ -24,6 +30,8 @@ class RunRecord:
     agent_type: str
     date: str | None
     branch: str | None
+    issue: int | None
+    lang: str | None
     pr_number: int | None
     input_tokens: int = 0
     output_tokens: int = 0
@@ -145,9 +153,35 @@ def _meta_agent_type(path: Path) -> str | None:
     return agent_type if isinstance(agent_type, str) and agent_type else None
 
 
+def _issue_from_branch(branch: str | None) -> int | None:
+    match = _ISSUE_BRANCH.match(branch or "")
+    return int(match.group(1)) if match else None
+
+
+def load_labels(path: Path) -> dict[int, str]:
+    """Read a JSON map of issue number to lang; raises OSError or ValueError if missing or malformed."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("expected a JSON object keyed by issue number")
+    labels: dict[int, str] = {}
+    for key, lang in raw.items():
+        if not isinstance(key, str) or not _ISSUE_KEY.fullmatch(key):
+            raise ValueError(f"issue key is not a number: {key!r}")
+        if lang not in LANGS:
+            raise ValueError(f"lang for issue {key} must be shell, python or mixed: {lang!r}")
+        labels[int(key)] = lang
+    return labels
+
+
+def _lang_for(issue: int | None, labels: dict[int, str] | None) -> str | None:
+    if issue is None or labels is None:
+        return None
+    return labels.get(issue)
+
+
 def parse_transcript(path: Path) -> RunRecord:
     """Summarise one JSONL transcript; raises OSError or UnicodeDecodeError if unreadable."""
-    record = RunRecord(agent_type="main", date=None, branch=None, pr_number=None)
+    record = RunRecord(agent_type="main", date=None, branch=None, issue=None, lang=None, pr_number=None)
     seen_message_ids: set[str] = set()
     full_read_ids: set[str] = set()
 
@@ -163,18 +197,21 @@ def parse_transcript(path: Path) -> RunRecord:
         if isinstance(message, dict):
             _apply_message(record, message, seen_message_ids, full_read_ids)
 
+    record.issue = _issue_from_branch(record.branch)
     meta_type = _meta_agent_type(path)
     if meta_type is not None:
         record.agent_type = meta_type
     return record
 
 
-def discover_records(input_dir: Path) -> DiscoveryResult:
+def discover_records(input_dir: Path, labels: dict[int, str] | None = None) -> DiscoveryResult:
     """Parse every JSONL transcript under a folder, recursively; unreadable files are skipped with a stderr line."""
     result = DiscoveryResult(records=[], skipped=[])
     for path in sorted(input_dir.rglob("*.jsonl")):
         try:
-            result.records.append(parse_transcript(path))
+            record = parse_transcript(path)
+            record.lang = _lang_for(record.issue, labels)
+            result.records.append(record)
         except (OSError, UnicodeDecodeError) as exc:
             result.skipped.append(path)
             print(f"skipped {path}: {exc}", file=sys.stderr)
@@ -197,11 +234,28 @@ def _gap_note(missing: list[str], start: dt.date, end: dt.date) -> str:
     return "\n".join(lines) + "\n"
 
 
+def roll_up_by_issue(records: list[RunRecord]) -> dict[str, dict[str, dict[str, int]]]:
+    """Sum runs and tokens per issue, then per agent type; runs without an issue go under 'unattributed'."""
+    rollup: dict[str, dict[str, dict[str, int]]] = {}
+    for r in records:
+        key = UNATTRIBUTED if r.issue is None else str(r.issue)
+        bucket = rollup.setdefault(key, {}).setdefault(
+            r.agent_type, {"runs": 0, "output_tokens": 0, "cache_read_tokens": 0, "cache_write_tokens": 0}
+        )
+        bucket["runs"] += 1
+        bucket["output_tokens"] += r.output_tokens
+        bucket["cache_read_tokens"] += r.cache_read_tokens
+        bucket["cache_write_tokens"] += r.cache_write_tokens
+    return rollup
+
+
 def write_archive(records: list[RunRecord], out_dir: Path) -> tuple[Path, Path]:
-    """Write the per-run summary JSON and the transcript gap note into out_dir."""
+    """Write the per-run summary, per-issue roll-up and transcript gap note into out_dir."""
     out_dir.mkdir(parents=True, exist_ok=True)
     summary_path = out_dir / SUMMARY_NAME
     summary_path.write_text(json.dumps([asdict(r) for r in records], indent=2) + "\n", encoding="utf-8")
+    by_issue_path = out_dir / BY_ISSUE_NAME
+    by_issue_path.write_text(json.dumps(roll_up_by_issue(records), indent=2) + "\n", encoding="utf-8")
 
     missing = find_gap(r.date for r in records)
     note_path = out_dir / NOTE_NAME
@@ -214,6 +268,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Summarise Claude Code JSONL transcripts.")
     parser.add_argument("input_dir", type=Path, help="Folder searched recursively for *.jsonl transcripts.")
     parser.add_argument("--archive", type=Path, default=None, help="Output folder for the summary and gap note.")
+    parser.add_argument("--labels", type=Path, default=None, help='JSON map {"<issue>": "shell"|"python"|"mixed"}.')
     args = parser.parse_args(argv)
 
     if not args.input_dir.is_dir():
@@ -222,14 +277,22 @@ def main(argv: list[str] | None = None) -> int:
     if args.archive is not None and args.archive.exists() and not args.archive.is_dir():
         print(f"--archive must be a directory, not a file: {args.archive}", file=sys.stderr)
         return 2
+    labels: dict[int, str] | None = None
+    if args.labels is not None:
+        try:
+            labels = load_labels(args.labels)
+        except (OSError, ValueError, RecursionError) as exc:
+            print(f"--labels is missing or malformed: {args.labels}: {exc}", file=sys.stderr)
+            return 2
 
-    result = discover_records(args.input_dir)
+    result = discover_records(args.input_dir, labels)
     if args.archive is None:
         print(json.dumps([asdict(r) for r in result.records], indent=2))
         return 0
 
     summary_path, note_path = write_archive(result.records, args.archive)
     print(f"{len(result.records)} run(s) -> {summary_path}")
+    print(f"per-issue roll-up -> {args.archive / BY_ISSUE_NAME}")
     print(f"gap note -> {note_path}")
     return 0
 
