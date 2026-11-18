@@ -19,6 +19,12 @@ Act as a deterministic gatekeeper: confirm each cleanup diff removed only dead c
 3. Compile and lint: `uv run ruff check` and `uv run mypy` on changed files, with zero new errors.
 4. Tests: `uv run pytest tests/ -q` must pass.
 
+## REVIEW ENVIRONMENT
+Run checks in a git worktree of the PR branch, not a `git archive` copy: an archive has no `.git`, so git-dependent pre-commit hooks (detect-secrets) cannot run.
+- `git fetch origin <branch>`, then `git worktree add <scratchpad>/r<round>-<PR> FETCH_HEAD`.
+- In the worktree: `pre-commit run --files <changed files>` before the matrix above.
+- Never `git checkout` in the main working tree. Remove the worktree only with the human's OK.
+
 ## SEVERITY FORMAT
 One line per finding, prefixed with exactly one of:
 - `🚨 Critical` — broken import, failing test, or orphaned live symbol
