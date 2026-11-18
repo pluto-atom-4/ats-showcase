@@ -80,6 +80,23 @@ fi
 
 ---
 
+## CI Confirmation (loop review, Gate 2)
+
+**Trigger:** The main thread asks for CI status of a PR after the builder pushes (end of each review round, and again before the final report). Read-only: report only, no fixes, no pushes.
+
+**Procedure:**
+1. Resolve the PR head SHA: `gh pr view <PR> --json headRefOid,statusCheckRollup`. Judge checks only on that SHA; a green run on an older SHA does not count.
+2. `gh pr checks <PR>`. Report each check as pass, fail, or pending. Pending is reported as pending, never as pass.
+3. For each failed check, once its run has completed: `gh run view <run-id> --log-failed`. Return the failing hook or step, the exact error text, and the named files and lines.
+   `--log-failed` output is mostly post-step cleanup tagged `UNKNOWN STEP`. Filter it out (`grep -v 'UNKNOWN STEP'`), and quote the failing step name and the `##[error]` lines.
+4. Verdict: `GREEN` (all checks pass on the head SHA), `PENDING` (any check still running or queued), or `RED` (any check failed).
+
+**Waiting:** This agent never waits or polls. The main thread waits (Monitor with an until-loop) and re-invokes it.
+
+**Local pre-commit parity:** git-dependent hooks (for example `detect-secrets`, which compares against line numbers in the index) cannot run in a `git archive` copy, which has no `.git`. Reviewers run `pre-commit run --files <changed files>` in a git worktree or clone of the PR branch (`git worktree add <scratchpad>/r<round>-<PR> FETCH_HEAD`), so these hooks fail locally before CI does.
+
+---
+
 ## Permission Enforcement
 
 **Files Protected from Builder Modification:**
