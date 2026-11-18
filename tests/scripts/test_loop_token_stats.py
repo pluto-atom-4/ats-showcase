@@ -443,6 +443,7 @@ def _subagent_lines() -> list[str]:
             "u-4",
             "2026-11-04T09:01:00Z",
             True,
+            agentType="inline-type",
             type="assistant",
             message=_msg("s-1", (5, 3, 50, 6), [_read_call("sr-1")]),
         ),
@@ -489,5 +490,6 @@ def test_real_shape_folder_yields_one_record_per_transcript(tmp_path: Path):
 def test_real_shape_fixture_uses_only_placeholder_paths(tmp_path: Path):
     root = _write_real_shape_folder(tmp_path)
     text = "".join(p.read_text(encoding="utf-8") for p in root.rglob("*") if p.is_file())
-    assert "/home/" not in text
+    for forbidden in ("/home/", "pluto", "ats-showcase", "@", "sk-ant"):
+        assert forbidden not in text, forbidden
     assert "/work/example" in text
