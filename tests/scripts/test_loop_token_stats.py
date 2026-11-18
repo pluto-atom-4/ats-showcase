@@ -285,3 +285,82 @@ def test_cli_rejects_archive_path_that_is_a_file(
     assert lts.main([str(synthetic_transcripts), "--archive", str(target)]) == 2
     assert "must be a directory" in capsys.readouterr().err
     assert target.read_text(encoding="utf-8") == "occupied"
+
+
+def _write_meta(transcript: Path, content: str | bytes) -> None:
+    meta = transcript.with_suffix(".meta.json")
+    if isinstance(content, bytes):
+        meta.write_bytes(content)
+    else:
+        meta.write_text(content, encoding="utf-8")
+
+
+def _subagent_session(tmp_path: Path, name: str = "agent-abc") -> Path:
+    return _write_session(
+        tmp_path / "sub" / f"{name}.jsonl",
+        [_assistant("2026-10-30T10:00:00Z", f"{name}-m", USAGE_A)],
+    )
+
+
+def test_subagent_meta_json_sets_agent_type(tmp_path: Path):
+    path = _subagent_session(tmp_path)
+    _write_meta(path, '{"agentType":"reviewer","isBuiltIn":false}')
+    assert lts.parse_transcript(path).agent_type == "reviewer"
+
+
+def test_meta_json_wins_over_inline_agent_type(tmp_path: Path):
+    path = _write_session(
+        tmp_path / "sub" / "agent-inline.jsonl",
+        [
+            _entry(type="user", timestamp="2026-10-30T10:00:00Z", agentType="builder", message={"content": "hi"}),
+            _assistant("2026-10-30T10:00:01Z", "i1", USAGE_B),
+        ],
+    )
+    _write_meta(path, '{"agentType":"reviewer"}')
+    assert lts.parse_transcript(path).agent_type == "reviewer"
+
+
+def test_inline_agent_type_used_when_meta_json_absent(tmp_path: Path):
+    path = _write_session(
+        tmp_path / "sub" / "agent-inline.jsonl",
+        [_entry(type="user", timestamp="2026-10-30T10:00:00Z", agentType="builder", message={"content": "hi"})],
+    )
+    assert lts.parse_transcript(path).agent_type == "builder"
+
+
+def test_missing_meta_json_keeps_main(tmp_path: Path):
+    assert lts.parse_transcript(_subagent_session(tmp_path)).agent_type == "main"
+
+
+def test_malformed_meta_json_keeps_main_and_parses_transcript(tmp_path: Path):
+    path = _subagent_session(tmp_path)
+    _write_meta(path, "{not json")
+    record = lts.parse_transcript(path)
+    assert record.agent_type == "main"
+    assert record.input_tokens == USAGE_A["input_tokens"]
+
+
+def test_unreadable_meta_json_keeps_main_and_parses_transcript(tmp_path: Path):
+    path = _subagent_session(tmp_path)
+    _write_meta(path, b"\xff\xfe\x80 not utf-8")
+    record = lts.parse_transcript(path)
+    assert record.agent_type == "main"
+    assert record.input_tokens == USAGE_A["input_tokens"]
+
+
+@pytest.mark.parametrize(
+    "meta_text",
+    ['["reviewer"]', '"reviewer"', '{"agentType": 7}', '{"agentType": ""}', '{"agentType": null}', "{}"],
+)
+def test_non_string_or_empty_meta_agent_type_keeps_main(tmp_path: Path, meta_text: str):
+    path = _subagent_session(tmp_path)
+    _write_meta(path, meta_text)
+    assert lts.parse_transcript(path).agent_type == "main"
+
+
+def test_deeply_nested_meta_json_keeps_main_and_parses_transcript(tmp_path: Path):
+    path = _subagent_session(tmp_path, name="agent-x")
+    _write_meta(path, "[" * 100000)
+    record = lts.parse_transcript(path)
+    assert record.agent_type == "main"
+    assert record.input_tokens == USAGE_A["input_tokens"]
