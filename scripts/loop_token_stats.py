@@ -139,7 +139,7 @@ def _apply_message(record: RunRecord, message: dict[str, Any], seen: set[str], f
 def _meta_agent_type(path: Path) -> str | None:
     try:
         meta = json.loads(path.with_suffix(".meta.json").read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError):
         return None
     agent_type = meta.get("agentType") if isinstance(meta, dict) else None
     return agent_type if isinstance(agent_type, str) and agent_type else None

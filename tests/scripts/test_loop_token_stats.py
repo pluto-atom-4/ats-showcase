@@ -356,3 +356,11 @@ def test_non_string_or_empty_meta_agent_type_keeps_main(tmp_path: Path, meta_tex
     path = _subagent_session(tmp_path)
     _write_meta(path, meta_text)
     assert lts.parse_transcript(path).agent_type == "main"
+
+
+def test_deeply_nested_meta_json_keeps_main_and_parses_transcript(tmp_path: Path):
+    path = _subagent_session(tmp_path, name="agent-x")
+    _write_meta(path, "[" * 100000)
+    record = lts.parse_transcript(path)
+    assert record.agent_type == "main"
+    assert record.input_tokens == USAGE_A["input_tokens"]
