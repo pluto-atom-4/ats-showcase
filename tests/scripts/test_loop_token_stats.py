@@ -17,6 +17,8 @@ RECORD_FIELDS = {
     "agent_type",
     "date",
     "branch",
+    "issue",
+    "lang",
     "pr_number",
     "input_tokens",
     "output_tokens",
@@ -493,3 +495,139 @@ def test_real_shape_fixture_uses_only_placeholder_paths(tmp_path: Path):
     for forbidden in ("/home/", "pluto", "ats-showcase", "@", "sk-ant"):
         assert forbidden not in text, forbidden
     assert "/work/example" in text
+
+
+@pytest.mark.parametrize(
+    ("branch", "expected"),
+    [
+        ("feat/issue-863-t01-token-stats-archive", 863),
+        ("test/issue-900-foo", 900),
+        ("feat/issue-7-x", 7),
+        ("fix/issue-12-foo", None),
+        ("feat/issue-7", None),
+        ("feat/issues-12-foo", None),
+        ("main", None),
+        (None, None),
+    ],
+)
+def test_issue_parsed_from_branch_prefix(tmp_path: Path, branch: str | None, expected: int | None):
+    path = _write_session(
+        tmp_path / "t" / "issue.jsonl", [_assistant("2026-10-30T10:00:00Z", "i", USAGE_B, branch=branch)]
+    )
+    assert lts.parse_transcript(path).issue == expected
+
+
+def _labelled_folder(tmp_path: Path) -> Path:
+    root = tmp_path / "labelled"
+    for name, branch in (("a", "feat/issue-863-x"), ("b", "feat/issue-900-y"), ("c", "feat/issue-777-z"), ("d", None)):
+        _write_session(
+            root / f"{name}.jsonl", [_assistant("2026-10-30T10:00:00Z", f"lab-{name}", USAGE_B, branch=branch)]
+        )
+    return root
+
+
+def test_lang_resolved_from_labels_map(tmp_path: Path):
+    labels = lts.load_labels(_write_json(tmp_path / "labels.json", {"863": "python", "900": "shell"}))
+    records = lts.discover_records(_labelled_folder(tmp_path), labels).records
+    langs = {r.issue: r.lang for r in records}
+    assert langs == {863: "python", 900: "shell", 777: None, None: None}
+
+
+def test_lang_is_none_without_labels_map(tmp_path: Path):
+    records = lts.discover_records(_labelled_folder(tmp_path)).records
+    assert all(r.lang is None for r in records)
+
+
+def _write_json(path: Path, payload: Any) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def test_cli_labels_flag_writes_lang_into_summary(tmp_path: Path):
+    labels_path = _write_json(tmp_path / "labels.json", {"863": "mixed"})
+    out_dir = tmp_path / "out"
+    code = lts.main([str(_labelled_folder(tmp_path)), "--archive", str(out_dir), "--labels", str(labels_path)])
+    assert code == 0
+    summary = json.loads((out_dir / lts.SUMMARY_NAME).read_text(encoding="utf-8"))
+    by_issue = {r["issue"]: r["lang"] for r in summary}
+    assert by_issue == {863: "mixed", 900: None, 777: None, None: None}
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "{not json",
+        '["863"]',
+        '{"abc": "python"}',
+        '{"863": "rust"}',
+        '{"863": null}',
+        '{"-1": "shell"}',
+        "[" * 100000,
+    ],
+)
+def test_malformed_labels_map_exits_nonzero(tmp_path: Path, content: str, capsys: pytest.CaptureFixture[str]):
+    labels_path = tmp_path / "labels.json"
+    labels_path.write_text(content, encoding="utf-8")
+    out_dir = tmp_path / "out"
+    assert lts.main([str(_labelled_folder(tmp_path)), "--archive", str(out_dir), "--labels", str(labels_path)]) == 2
+    assert "--labels" in capsys.readouterr().err
+    assert not out_dir.exists()
+
+
+def test_missing_labels_file_exits_nonzero(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    missing = tmp_path / "absent.json"
+    assert lts.main([str(_labelled_folder(tmp_path)), "--labels", str(missing)]) == 2
+    assert "--labels" in capsys.readouterr().err
+
+
+def test_non_utf8_labels_file_exits_nonzero(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    labels_path = tmp_path / "labels.bin"
+    labels_path.write_bytes(b"\xff\xfe\x80 not utf-8")
+    assert lts.main([str(_labelled_folder(tmp_path)), "--labels", str(labels_path)]) == 2
+    assert "--labels" in capsys.readouterr().err
+
+
+def _run(issue: int | None, agent_type: str, output: int, cache_read: int, cache_write: int) -> Any:
+    return lts.RunRecord(
+        agent_type=agent_type,
+        date="2026-10-30",
+        branch=None,
+        issue=issue,
+        lang=None,
+        pr_number=None,
+        output_tokens=output,
+        cache_read_tokens=cache_read,
+        cache_write_tokens=cache_write,
+    )
+
+
+def test_roll_up_splits_by_issue_then_agent_type_with_unattributed_bucket():
+    records = [
+        _run(863, "builder", 5, 100, 20),
+        _run(863, "builder", 7, 1, 2),
+        _run(863, "architect", 3, 10, 0),
+        _run(900, "builder", 4, 40, 4),
+        _run(None, "main", 9, 50, 6),
+        _run(None, "main", 1, 0, 1),
+    ]
+    assert lts.roll_up_by_issue(records) == {
+        "863": {
+            "builder": {"runs": 2, "output_tokens": 12, "cache_read_tokens": 101, "cache_write_tokens": 22},
+            "architect": {"runs": 1, "output_tokens": 3, "cache_read_tokens": 10, "cache_write_tokens": 0},
+        },
+        "900": {"builder": {"runs": 1, "output_tokens": 4, "cache_read_tokens": 40, "cache_write_tokens": 4}},
+        "unattributed": {"main": {"runs": 2, "output_tokens": 10, "cache_read_tokens": 50, "cache_write_tokens": 7}},
+    }
+
+
+def test_archive_writes_by_issue_file_and_keeps_summary_a_list(synthetic_transcripts: Path, tmp_path: Path):
+    out_dir = tmp_path / "archive"
+    summary_path, _ = lts.write_archive(lts.discover_records(synthetic_transcripts).records, out_dir)
+    assert isinstance(json.loads(summary_path.read_text(encoding="utf-8")), list)
+    by_issue = json.loads((out_dir / lts.BY_ISSUE_NAME).read_text(encoding="utf-8"))
+    assert by_issue["863"]["main"]["runs"] == 2
+    assert by_issue["863"]["main"]["cache_read_tokens"] == 250
+    assert by_issue["863"]["main"]["cache_write_tokens"] == 40
+    assert by_issue["863"]["builder"]["runs"] == 1
+    assert by_issue["863"]["builder"]["output_tokens"] == 7
