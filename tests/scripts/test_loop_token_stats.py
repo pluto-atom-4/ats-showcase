@@ -364,3 +364,132 @@ def test_deeply_nested_meta_json_keeps_main_and_parses_transcript(tmp_path: Path
     record = lts.parse_transcript(path)
     assert record.agent_type == "main"
     assert record.input_tokens == USAGE_A["input_tokens"]
+
+
+SYNTH_BRANCH = "feat/issue-890-synth"
+SYNTH_MAIN_ID = "00000000-0000-4000-8000-000000000001"
+SYNTH_AGENT_ID = "synth01"
+SYNTH_SESSION = {
+    "sessionId": "synth-session-0001",
+    "version": "0.0.0-synthetic",
+    "userType": "external",
+    "entrypoint": "cli",
+    "cwd": "/work/example",
+    "slug": "synthetic-slug",
+}
+
+
+USAGE_KEYS = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+
+
+def _msg(msg_id: str, counts: tuple[int, ...], content: list[Any]) -> dict[str, Any]:
+    usage = dict(zip(USAGE_KEYS, counts, strict=True))
+    return {"id": msg_id, "role": "assistant", "content": content, "usage": usage}
+
+
+def _row(uuid: str, ts: str, sidechain: bool = False, **fields: Any) -> str:
+    extra = {"isSidechain": True, "agentId": SYNTH_AGENT_ID} if sidechain else {}
+    return _entry(**SYNTH_SESSION, gitBranch=SYNTH_BRANCH, **extra, uuid=uuid, timestamp=ts, **fields)
+
+
+def _main_lines() -> list[str]:
+    return [
+        _row(
+            "m-1",
+            "2026-11-03T08:00:00Z",
+            type="assistant",
+            message=_msg("main-1", (7, 4, 300, 40), [_read_call("mr-1")]),
+        ),
+        _row("m-2", "2026-11-03T08:00:05Z", type="user", message={"content": [_read_result("mr-1", "x" * 10)]}),
+        _row("m-3", "2026-11-03T08:01:00Z", type="assistant", message=_msg("main-2", (2, 9, 25, 0), [_text("ok")])),
+    ]
+
+
+def _subagent_lines() -> list[str]:
+    snapshot = {"workingDirectory": "/work/example", "isWorktree": False, "isGitRepo": True, "platform": "linux"}
+    snapshot |= {"additionalWorkingDirectories": [], "shell": "bash", "osVersion": "synthetic"}
+    snapshot |= {"scratchpadDirectory": "/work/example/scratch"}
+    attachment = {"type": "synthetic", "url": None, "commit": None, "pr": None, "sendUserFileHint": False}
+    return [
+        _row(
+            "u-1",
+            "2026-11-04T09:00:00Z",
+            True,
+            parentUuid=None,
+            promptId="p-1",
+            type="user",
+            message={"role": "user", "content": "synthetic prompt"},
+        ),
+        _row(
+            "u-2",
+            "2026-11-04T09:00:01Z",
+            True,
+            type="attachment",
+            attachment={"type": "synthetic", "snapshot": snapshot},
+            rendered=[{"content": "synthetic"}],
+            renderedRole="user",
+        ),
+        _row("u-3", "2026-11-04T09:00:02Z", True, type="attachment", attachment=attachment),
+        _entry(
+            sessionId=SYNTH_SESSION["sessionId"],
+            agentId=SYNTH_AGENT_ID,
+            type="shape",
+            shapeHash="0123456789abcdef",
+            timestamp="2026-11-04T09:00:03Z",
+            version=SYNTH_SESSION["version"],
+            shape={"system": [{}], "tools": [{}]},
+        ),
+        _row(
+            "u-4",
+            "2026-11-04T09:01:00Z",
+            True,
+            agentType="inline-type",
+            type="assistant",
+            message=_msg("s-1", (5, 3, 50, 6), [_read_call("sr-1")]),
+        ),
+        _row("u-5", "2026-11-04T09:01:05Z", True, type="user", message={"content": [_read_result("sr-1", "w" * 321)]}),
+        _row(
+            "u-6",
+            "2026-11-04T09:02:00Z",
+            True,
+            type="assistant",
+            message=_msg("s-2", (1, 2, 10, 0), [_text("done")]),
+        ),
+    ]
+
+
+def _write_real_shape_folder(tmp_path: Path) -> Path:
+    projects = tmp_path / "projects"
+    root = projects / "synthetic-project"
+    _write_session(root / f"{SYNTH_MAIN_ID}.jsonl", _main_lines())
+    sub_dir = root / SYNTH_MAIN_ID / "subagents"
+    _write_session(sub_dir / f"agent-{SYNTH_AGENT_ID}.jsonl", _subagent_lines())
+    meta = {"agentType": "reviewer", "isBuiltIn": False, "launchedWithDefaults": True, "description": "synthetic"}
+    meta |= {"toolUseId": "toolu_synth01", "spawnDepth": 1, "requestShape": "background", "finished": True}
+    (sub_dir / f"agent-{SYNTH_AGENT_ID}.meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    return projects
+
+
+def test_real_shape_folder_yields_one_record_per_transcript(tmp_path: Path):
+    result = lts.discover_records(_write_real_shape_folder(tmp_path))
+    assert result.skipped == []
+    assert len(result.records) == 2
+    by_type = {r.agent_type: r for r in result.records}
+
+    main = by_type["main"]
+    assert (main.date, main.branch) == ("2026-11-03", SYNTH_BRANCH)
+    assert (main.input_tokens, main.output_tokens, main.cache_read_tokens, main.cache_write_tokens) == (9, 13, 325, 40)
+    assert main.full_read_sizes == [10]
+
+    sub = by_type["reviewer"]
+    assert (sub.date, sub.branch) == ("2026-11-04", SYNTH_BRANCH)
+    assert (sub.input_tokens, sub.output_tokens, sub.cache_read_tokens, sub.cache_write_tokens) == (6, 5, 60, 6)
+    assert sub.full_read_sizes == [321]
+
+
+def test_real_shape_fixture_uses_only_placeholder_paths(tmp_path: Path):
+    root = _write_real_shape_folder(tmp_path)
+    text = "".join(p.read_text(encoding="utf-8") for p in root.rglob("*") if p.is_file())
+    for forbidden in ("/home/", "pluto", "ats-showcase", "@", "sk-ant"):
+        assert forbidden not in text, forbidden
+    assert "/work/example" in text
