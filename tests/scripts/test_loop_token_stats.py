@@ -33,14 +33,18 @@ def _entry(**fields: Any) -> str:
 def _assistant(
     ts: str,
     msg_id: str,
-    usage: dict[str, int] | None = None,
+    usage: dict[str, Any] | None = None,
     content: list[Any] | None = None,
     branch: str | None = None,
 ) -> str:
-    message: dict[str, Any] = {"id": msg_id, "content": content or []}
+    message: dict[str, Any] = {"id": msg_id, "role": "assistant", "content": content or []}
     if usage is not None:
         message["usage"] = usage
     return _entry(type="assistant", timestamp=ts, gitBranch=branch, message=message)
+
+
+def _text(text: str) -> dict[str, str]:
+    return {"type": "text", "text": text}
 
 
 def _read_call(tool_id: str, offset: bool = False) -> dict[str, Any]:
@@ -66,14 +70,13 @@ USAGE_B = {"input_tokens": 3, "output_tokens": 7, "cache_read_input_tokens": 50,
 
 @pytest.fixture
 def synthetic_transcripts(tmp_path: Path) -> Path:
-    """Three synthetic sessions on 2026-10-20, 2026-10-26 and 2026-11-11 (gap between)."""
     root = tmp_path / "transcripts" / "synthetic-project"
     session_a = [
-        _entry(
-            type="user",
-            timestamp="2026-10-20T09:00:00Z",
-            gitBranch="feat/issue-863-synth",
-            message={"content": "see https://github.com/o/r/pull/901"},
+        _assistant(
+            "2026-10-20T09:00:00Z",
+            "m0",
+            content=[_text("opened https://github.com/o/r/pull/901")],
+            branch="feat/issue-863-synth",
         ),
         _assistant("2026-10-20T09:01:00Z", "m1", USAGE_A, [_read_call("r1")]),
         _entry(type="user", timestamp="2026-10-20T09:01:05Z", message={"content": [_read_result("r1", "x" * 1234)]}),
@@ -111,14 +114,15 @@ def _records_by_branch(summary: list[dict[str, Any]], branch: str) -> dict[str, 
 
 
 def test_discovers_records_from_synthetic_files(synthetic_transcripts: Path):
-    records = lts.discover_records(synthetic_transcripts)
-    assert len(records) == 3
-    assert sorted(r.date for r in records if r.date) == ["2026-10-20", "2026-10-26", "2026-11-11"]
+    result = lts.discover_records(synthetic_transcripts)
+    assert len(result.records) == 3
+    assert result.skipped == []
+    assert sorted(r.date for r in result.records if r.date) == ["2026-10-20", "2026-10-26", "2026-11-11"]
 
 
 def test_archive_file_has_expected_per_run_fields(synthetic_transcripts: Path, tmp_path: Path):
     out_dir = tmp_path / "archive"
-    summary_path, _ = lts.write_archive(lts.discover_records(synthetic_transcripts), out_dir)
+    summary_path, _ = lts.write_archive(lts.discover_records(synthetic_transcripts).records, out_dir)
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     assert len(summary) == 3
     assert all(set(r) == RECORD_FIELDS for r in summary)
@@ -141,7 +145,7 @@ def test_archive_file_has_expected_per_run_fields(synthetic_transcripts: Path, t
 
 def test_gap_note_lists_missing_dates(synthetic_transcripts: Path, tmp_path: Path):
     out_dir = tmp_path / "archive"
-    _, note_path = lts.write_archive(lts.discover_records(synthetic_transcripts), out_dir)
+    _, note_path = lts.write_archive(lts.discover_records(synthetic_transcripts).records, out_dir)
     note = note_path.read_text(encoding="utf-8")
     assert "2026-10-27" in note
     assert "2026-11-10" in note
@@ -166,7 +170,7 @@ def test_no_gap_note_when_every_date_present(tmp_path: Path):
     for day in days:
         line = _assistant(f"{day.isoformat()}T10:00:00Z", f"m-{day.isoformat()}", USAGE_B)
         _write_session(root / f"{day.isoformat()}.jsonl", [line])
-    _, note_path = lts.write_archive(lts.discover_records(root), tmp_path / "out")
+    _, note_path = lts.write_archive(lts.discover_records(root).records, tmp_path / "out")
     assert "No gap found" in note_path.read_text(encoding="utf-8")
 
 
@@ -187,7 +191,7 @@ def test_corrupt_lines_and_repeated_message_ids_are_handled(tmp_path: Path):
 def test_empty_folder_gives_no_records_and_full_gap(tmp_path: Path):
     empty = tmp_path / "empty"
     empty.mkdir()
-    records = lts.discover_records(empty)
+    records = lts.discover_records(empty).records
     assert records == []
     missing = lts.find_gap(r.date for r in records)
     assert missing[0] == "2026-10-27"
@@ -204,3 +208,80 @@ def test_cli_without_archive_prints_json(synthetic_transcripts: Path, capsys: py
 def test_cli_rejects_missing_input_dir(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     assert lts.main([str(tmp_path / "does-not-exist")]) == 2
     assert "not a directory" in capsys.readouterr().err
+
+
+def test_non_utf8_file_is_skipped_and_reported(synthetic_transcripts: Path, capsys: pytest.CaptureFixture[str]):
+    bad = synthetic_transcripts / "synthetic-project" / "binary.jsonl"
+    bad.write_bytes(b"\xff\xfe\x00not utf-8 \x80\x81\n")
+    result = lts.discover_records(synthetic_transcripts)
+    assert len(result.records) == 3
+    assert result.skipped == [bad]
+    assert f"skipped {bad}" in capsys.readouterr().err
+
+
+def test_non_numeric_usage_counts_as_zero(tmp_path: Path):
+    usage = {
+        "input_tokens": "abc",
+        "output_tokens": 4,
+        "cache_read_input_tokens": [1],
+        "cache_creation_input_tokens": None,
+    }
+    path = _write_session(tmp_path / "t" / "odd.jsonl", [_assistant("2026-10-30T10:00:00Z", "odd", usage)])
+    record = lts.parse_transcript(path)
+    assert record.input_tokens == 0
+    assert record.output_tokens == 4
+    assert record.cache_read_tokens == 0
+    assert record.cache_write_tokens == 0
+
+
+def test_pr_quoted_in_tool_result_is_not_captured(tmp_path: Path):
+    path = _write_session(
+        tmp_path / "t" / "quoted.jsonl",
+        [
+            _assistant("2026-10-30T10:00:00Z", "q1", USAGE_B, [_read_call("q")]),
+            _entry(
+                type="user",
+                timestamp="2026-10-30T10:00:01Z",
+                message={"content": [_read_result("q", "see https://github.com/o/other/pull/777")]},
+            ),
+            _assistant("2026-10-30T10:00:02Z", "q2", USAGE_B, content=[_text("done")]),
+        ],
+    )
+    assert lts.parse_transcript(path).pr_number is None
+
+
+def test_structured_pr_number_field_is_captured(tmp_path: Path):
+    line = _entry(
+        type="assistant",
+        timestamp="2026-10-30T10:00:00Z",
+        prNumber=55,
+        message={"id": "s1", "role": "assistant", "content": [_text("ok")]},
+    )
+    assert lts.parse_transcript(_write_session(tmp_path / "t" / "pr.jsonl", [line])).pr_number == 55
+
+
+def test_null_offset_and_limit_count_as_full_read(tmp_path: Path):
+    call = {
+        "type": "tool_use",
+        "id": "n1",
+        "name": "Read",
+        "input": {"file_path": "/s.py", "offset": None, "limit": None},
+    }
+    path = _write_session(
+        tmp_path / "t" / "nulls.jsonl",
+        [
+            _assistant("2026-10-30T10:00:00Z", "n1", USAGE_B, [call]),
+            _entry(type="user", timestamp="2026-10-30T10:00:01Z", message={"content": [_read_result("n1", "abcdefg")]}),
+        ],
+    )
+    assert lts.parse_transcript(path).full_read_sizes == [7]
+
+
+def test_cli_rejects_archive_path_that_is_a_file(
+    synthetic_transcripts: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    target = tmp_path / "not-a-dir"
+    target.write_text("occupied", encoding="utf-8")
+    assert lts.main([str(synthetic_transcripts), "--archive", str(target)]) == 2
+    assert "must be a directory" in capsys.readouterr().err
+    assert target.read_text(encoding="utf-8") == "occupied"

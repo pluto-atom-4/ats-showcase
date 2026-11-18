@@ -16,7 +16,7 @@ GAP_START = dt.date(2026, 10, 27)
 GAP_END = dt.date(2026, 11, 10)
 SUMMARY_NAME = "token_stats_summary.json"
 NOTE_NAME = "token_stats_gap_note.txt"
-_PR_PATTERNS = (re.compile(r"/pull/(\d+)"), re.compile(r"\bPR #(\d+)\b"))
+_PULL_URL = re.compile(r"https://github\.com/[^/\s]+/[^/\s]+/pull/(\d+)")
 
 
 @dataclass
@@ -32,31 +32,69 @@ class RunRecord:
     full_read_sizes: list[int] = field(default_factory=list)
 
 
+@dataclass
+class DiscoveryResult:
+    records: list[RunRecord]
+    skipped: list[Path]
+
+
+def _as_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _add_usage(record: RunRecord, usage: dict[str, Any]) -> None:
     # Keys follow the Anthropic API usage fields so sums match billing exports.
-    record.input_tokens += int(usage.get("input_tokens") or 0)
-    record.output_tokens += int(usage.get("output_tokens") or 0)
-    record.cache_read_tokens += int(usage.get("cache_read_input_tokens") or 0)
-    record.cache_write_tokens += int(usage.get("cache_creation_input_tokens") or 0)
+    record.input_tokens += _as_int(usage.get("input_tokens"))
+    record.output_tokens += _as_int(usage.get("output_tokens"))
+    record.cache_read_tokens += _as_int(usage.get("cache_read_input_tokens"))
+    record.cache_write_tokens += _as_int(usage.get("cache_creation_input_tokens"))
 
 
 def _result_size(content: Any) -> int:
     if isinstance(content, str):
         return len(content)
     if isinstance(content, list):
-        return sum(len(b.get("text", "")) for b in content if isinstance(b, dict))
+        total = 0
+        for block in content:
+            text = block.get("text") if isinstance(block, dict) else None
+            if isinstance(text, str):
+                total += len(text)
+        return total
     return 0
 
 
-def _find_pr(line: str) -> int | None:
-    for pattern in _PR_PATTERNS:
-        match = pattern.search(line)
+def _assistant_texts(obj: dict[str, Any], message: dict[str, Any]) -> list[str]:
+    # Only assistant-authored text counts: tool results quote PRs from unrelated work.
+    if obj.get("type") != "assistant" and message.get("role") != "assistant":
+        return []
+    content = message.get("content")
+    if isinstance(content, str):
+        return [content]
+    if not isinstance(content, list):
+        return []
+    return [
+        b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text" and isinstance(b.get("text"), str)
+    ]
+
+
+def _pr_from_obj(obj: dict[str, Any]) -> int | None:
+    explicit = obj.get("prNumber", obj.get("pr_number"))
+    if isinstance(explicit, int) and not isinstance(explicit, bool):
+        return explicit
+    message = obj.get("message")
+    if not isinstance(message, dict):
+        return None
+    for text in _assistant_texts(obj, message):
+        match = _PULL_URL.search(text)
         if match:
             return int(match.group(1))
     return None
 
 
-def _apply_metadata(record: RunRecord, obj: dict[str, Any], line: str) -> None:
+def _apply_metadata(record: RunRecord, obj: dict[str, Any]) -> None:
     timestamp = obj.get("timestamp")
     if record.date is None and isinstance(timestamp, str):
         record.date = timestamp[:10]
@@ -66,7 +104,7 @@ def _apply_metadata(record: RunRecord, obj: dict[str, Any], line: str) -> None:
     if record.agent_type == "main" and isinstance(obj.get("agentType"), str):
         record.agent_type = obj["agentType"]
     if record.pr_number is None:
-        record.pr_number = _find_pr(line)
+        record.pr_number = _pr_from_obj(obj)
 
 
 def _apply_tool_blocks(record: RunRecord, content: list[Any], full_read_ids: set[str]) -> None:
@@ -75,7 +113,7 @@ def _apply_tool_blocks(record: RunRecord, content: list[Any], full_read_ids: set
             continue
         if block.get("type") == "tool_use" and block.get("name") == "Read":
             tool_input = block.get("input")
-            if isinstance(tool_input, dict) and "offset" not in tool_input and "limit" not in tool_input:
+            if isinstance(tool_input, dict) and tool_input.get("offset") is None and tool_input.get("limit") is None:
                 full_read_ids.add(str(block.get("id")))
         elif block.get("type") == "tool_result":
             tool_id = str(block.get("tool_use_id"))
@@ -99,7 +137,7 @@ def _apply_message(record: RunRecord, message: dict[str, Any], seen: set[str], f
 
 
 def parse_transcript(path: Path) -> RunRecord:
-    """Summarise one JSONL transcript into a per-run record."""
+    """Summarise one JSONL transcript; raises OSError or UnicodeDecodeError if unreadable."""
     record = RunRecord(agent_type="main", date=None, branch=None, pr_number=None)
     seen_message_ids: set[str] = set()
     full_read_ids: set[str] = set()
@@ -111,7 +149,7 @@ def parse_transcript(path: Path) -> RunRecord:
             continue
         if not isinstance(obj, dict):
             continue
-        _apply_metadata(record, obj, line)
+        _apply_metadata(record, obj)
         message = obj.get("message")
         if isinstance(message, dict):
             _apply_message(record, message, seen_message_ids, full_read_ids)
@@ -119,9 +157,16 @@ def parse_transcript(path: Path) -> RunRecord:
     return record
 
 
-def discover_records(input_dir: Path) -> list[RunRecord]:
-    """Parse every JSONL transcript under a folder, recursively."""
-    return [parse_transcript(path) for path in sorted(input_dir.rglob("*.jsonl"))]
+def discover_records(input_dir: Path) -> DiscoveryResult:
+    """Parse every JSONL transcript under a folder, recursively; unreadable files are skipped with a stderr line."""
+    result = DiscoveryResult(records=[], skipped=[])
+    for path in sorted(input_dir.rglob("*.jsonl")):
+        try:
+            result.records.append(parse_transcript(path))
+        except (OSError, UnicodeDecodeError) as exc:
+            result.skipped.append(path)
+            print(f"skipped {path}: {exc}", file=sys.stderr)
+    return result
 
 
 def find_gap(dates: Iterable[str | None], start: dt.date = GAP_START, end: dt.date = GAP_END) -> list[str]:
@@ -162,14 +207,17 @@ def main(argv: list[str] | None = None) -> int:
     if not args.input_dir.is_dir():
         print(f"not a directory: {args.input_dir}", file=sys.stderr)
         return 2
+    if args.archive is not None and args.archive.exists() and not args.archive.is_dir():
+        print(f"--archive must be a directory, not a file: {args.archive}", file=sys.stderr)
+        return 2
 
-    records = discover_records(args.input_dir)
+    result = discover_records(args.input_dir)
     if args.archive is None:
-        print(json.dumps([asdict(r) for r in records], indent=2))
+        print(json.dumps([asdict(r) for r in result.records], indent=2))
         return 0
 
-    summary_path, note_path = write_archive(records, args.archive)
-    print(f"{len(records)} run(s) -> {summary_path}")
+    summary_path, note_path = write_archive(result.records, args.archive)
+    print(f"{len(result.records)} run(s) -> {summary_path}")
     print(f"gap note -> {note_path}")
     return 0
 
