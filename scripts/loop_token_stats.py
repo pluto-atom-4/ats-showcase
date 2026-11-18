@@ -136,6 +136,15 @@ def _apply_message(record: RunRecord, message: dict[str, Any], seen: set[str], f
         _apply_tool_blocks(record, content, full_read_ids)
 
 
+def _meta_agent_type(path: Path) -> str | None:
+    try:
+        meta = json.loads(path.with_suffix(".meta.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    agent_type = meta.get("agentType") if isinstance(meta, dict) else None
+    return agent_type if isinstance(agent_type, str) and agent_type else None
+
+
 def parse_transcript(path: Path) -> RunRecord:
     """Summarise one JSONL transcript; raises OSError or UnicodeDecodeError if unreadable."""
     record = RunRecord(agent_type="main", date=None, branch=None, pr_number=None)
@@ -154,6 +163,9 @@ def parse_transcript(path: Path) -> RunRecord:
         if isinstance(message, dict):
             _apply_message(record, message, seen_message_ids, full_read_ids)
 
+    meta_type = _meta_agent_type(path)
+    if meta_type is not None:
+        record.agent_type = meta_type
     return record
 
 
