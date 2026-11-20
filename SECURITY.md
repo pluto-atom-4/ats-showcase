@@ -2,7 +2,7 @@
 
 ## Reporting Vulnerabilities
 
-**Please do not publicly disclose security vulnerabilities** found in ATS Showcase. Instead:
+**Please do not publicly disclose security vulnerabilities** found in ATS Showcase. Instead, use GitHub private vulnerability reporting (Security tab, then Report a vulnerability), or:
 
 1. **Email Security Concern**: Send an email to the repository maintainers describing the vulnerability
 2. **Include Details**:
