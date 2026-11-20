@@ -56,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/pre-commit-no-main.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-commit-no-main.sh",
             "timeout": 10
           }
         ]
@@ -66,7 +66,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/code-graph-interceptor.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/code-graph-interceptor.sh",
             "timeout": 10
           }
         ]
@@ -94,7 +94,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/protected-file-guard.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protected-file-guard.sh",
             "timeout": 5
           }
         ]
@@ -106,7 +106,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/post-edit-quality.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-edit-quality.sh",
             "timeout": 60
           }
         ]
@@ -116,7 +116,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/gate1-plan-approval.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gate1-plan-approval.sh",
             "timeout": 30
           }
         ]
@@ -128,7 +128,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/subagent-rules-inject.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/subagent-rules-inject.sh",
             "timeout": 5
           }
         ]
@@ -140,7 +140,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/subagent-loop-cap.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/subagent-loop-cap.sh",
             "timeout": 5
           }
         ]
