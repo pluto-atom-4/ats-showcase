@@ -49,7 +49,6 @@ class TestHtmlToMarkdown:
             mock_markitdown.return_value.convert.side_effect = RuntimeError("boom")
             result = html_to_markdown(html)
 
-        # With the BeautifulSoup fallback, text is extracted rather than raw HTML returned.
         assert result != html, "Should use BeautifulSoup fallback, not return raw HTML"
         assert "content that should survive on failure" in result
         assert "<p>" not in result, "Should extract text, not return raw HTML"
@@ -187,7 +186,6 @@ class TestWorkdayHtmlFixtures:
             result = html_to_markdown(self.WORKDAY_WITH_EMDASH)
 
         assert "Responsibilities" in result
-        # "design—architecture" could stay as-is or be normalized.
         assert "Lead design" in result or "Lead design—architecture" in result
         # Regression guard: must not become "LeaddesignarchitectureNotWork".
         assert "Leaddesign" not in result
@@ -263,7 +261,6 @@ class TestDividerNormalization:
         lines = ["---Some Content"]
         result = _normalize_divider_lines(lines)
 
-        # A leading divider yields an empty first part, which is skipped, leaving only the content.
         assert "Some Content" in result
         # No divider because the part after --- was not empty, so no final divider is added
         assert "---" not in result or result.count("---") == 0
@@ -295,7 +292,6 @@ class TestDividerNormalization:
         lines = [":R69380---"]
         result = _normalize_divider_lines(lines)
 
-        # Orphaned ref should be skipped, should have exactly one divider
         assert ":R69380" not in "\n".join(result)
         assert result.count("---") == 1, f"Expected 1 divider, got {result.count('---')} in {result}"
 
@@ -306,7 +302,6 @@ class TestDividerNormalization:
         lines = ["|---|---|"]
         result = _normalize_divider_lines(lines)
 
-        # A table row contains --- but is not a content divider, so it stays unchanged.
         assert result == lines, f"Table row was modified: {result}"
 
 

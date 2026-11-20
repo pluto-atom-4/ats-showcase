@@ -220,7 +220,6 @@ class TestMarkdownSectionDividers:
         markdown = "## Requirements\n### Subsection\nSome content"
         result = add_markdown_section_headers(markdown)
         lines = result.split("\n")
-        # ## Requirements opens the document and ### Subsection follows a header, so no divider is inserted.
         assert lines.count("---") == 0
         req_idx = lines.index("## Requirements")
         sub_idx = lines.index("### Subsection")
