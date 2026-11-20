@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from click.exceptions import Exit
+from typer import Exit
 from typer.testing import CliRunner
 
 from src.verification.reviewer import JobReviewer, ReviewStats
