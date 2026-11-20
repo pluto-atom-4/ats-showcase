@@ -185,12 +185,10 @@ class TestMigrationPath:
         """Simple replacement pattern: HTMLCleaner().clean() -> clean_html()."""
         html = "<h1>Job Title</h1><p>Apply Now</p>"
 
-        # Old pattern (deprecated)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             old_result = HTMLCleaner().clean(html)
 
-        # New pattern (recommended)
         new_result = clean_html(html)
 
         assert isinstance(old_result, str)
