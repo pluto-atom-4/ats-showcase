@@ -30,6 +30,6 @@ def pytest_configure(config):
 @pytest.fixture
 def temp_db():
     """Fixture providing a temporary database path for tests."""
-    # delete=False: the path must outlive the handle; the OS cleans up after the test.
+    # delete=False: the path must outlive the handle; the fixture never unlinks it.
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         yield tmp.name
