@@ -216,13 +216,11 @@ class TestValidatePatternMultiLevelWrapper:
             "([(]a)+",
             # Escaped quantifier is a literal, not a quantified atom
             r"((a\+))+",
-            # Body ends in a literal after the quantified atom
             "((a+)b)+",
             # Wrapper without an outer repeat
             "((a+))",
             # Exact count is not a repeat (matches the existing {n} policy)
             "((a+)){2}",
-            # Sibling groups do not nest
             "(a+)(b+)",
         ],
     )
@@ -286,7 +284,7 @@ class TestCustomSpanCategorizer:
         patterns = [SpanPattern(category="test", pattern=r"a*")]
         cat = CustomSpanCategorizer(patterns)
 
-        # a* also matches zero-length at the end; those matches are skipped, leaving one span for "aaa".
+        # a* also matches zero-length at string end; those must be skipped.
         spans = cat.categorize("aaa")
         assert all(s.start_char != s.end_char for s in spans)
 
