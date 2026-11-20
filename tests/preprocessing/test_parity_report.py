@@ -85,7 +85,6 @@ class TestExtractV3Metrics:
         text = parity_check._load_fixture(parity_benefits_heavy_fixture)
         assert text is not None
 
-        # Monkeypatch Preprocessor._load_model to avoid model loading
         from src.tokenization import preprocessor as prep_module
 
         original_load_model = prep_module.Preprocessor._load_model
@@ -103,8 +102,7 @@ class TestExtractV3Metrics:
             assert avg_conf == pytest.approx(1.0, abs=0.01)
             assert req_by_section == {"SECTION_REQUIREMENTS": 5}
 
-            # Benefits/Compensation should NOT be in requirements_by_section
-            # (filtered by SKIP_SECTIONS in v3 extraction)
+            # Benefits/compensation are dropped by SKIP_SECTIONS in v3 extraction.
             assert "benefits" not in req_by_section
             assert "compensation" not in req_by_section
 
@@ -163,8 +161,7 @@ class TestExtractV3Metrics:
         text = parity_check._load_fixture(parity_benefits_heavy_fixture)
         assert text is not None
 
-        # Run REAL extraction path without monkeypatch
-        # extract_sectioned() is model-free, so this should work
+        # extract_sectioned() is model-free, so no _load_model patch is needed.
         try:
             count, sections, req_by_section, avg_conf, result = parity_check._extract_v3_metrics(text)
 
@@ -185,7 +182,6 @@ class TestExtractLegacyMetrics:
         text = parity_check._load_fixture(parity_benefits_heavy_fixture)
         assert text is not None
 
-        # Monkeypatch _load_model to set nlp=None (model unavailable)
         from src.tokenization import preprocessor as prep_module
 
         original_load_model = prep_module.Preprocessor._load_model
@@ -443,7 +439,6 @@ class TestGenerateParityReport:
                 with patch.object(parity_check, "_check_model_available", return_value=False):
                     report, exit_code = parity_check._generate_parity_report([parity_benefits_heavy_fixture])
 
-            # Schema violation should set exit code to 1
             assert exit_code == 1
         finally:
             prep_module.Preprocessor._load_model = original_load_model  # type: ignore[method-assign]
@@ -471,7 +466,6 @@ class TestGenerateParityReport:
                 with patch.object(parity_check, "_check_model_available", return_value=False):
                     report, exit_code = parity_check._generate_parity_report([temp_fixture])
 
-            # Exception should NOT set exit code to 1; exit code should be 0
             assert exit_code == 0
             assert "| error | Error |" in report
             assert "Extraction failed" in report
