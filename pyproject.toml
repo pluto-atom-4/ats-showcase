@@ -55,7 +55,7 @@ dependencies = [
 
     # TUI framework
     "textual>=0.42.0,<1.0",
-    "rich>=13.0,<14.0",
+    "rich>=13.0,<16.0",
 
     # LLM client
     "anthropic>=0.25.0,<1.0",
