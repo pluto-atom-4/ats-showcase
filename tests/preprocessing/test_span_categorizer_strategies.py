@@ -41,7 +41,6 @@ class TestNLPSpanCategorizer:
         """NLPSpanCategorizer is callable and returns Doc."""
         categorizer = NLPSpanCategorizer()
         doc = spacy.blank("en")("test text")
-        # Register extension if not already present
         if not doc.has_extension("requirements"):
             doc.set_extension("requirements", default=None)
         doc._.requirements = []
