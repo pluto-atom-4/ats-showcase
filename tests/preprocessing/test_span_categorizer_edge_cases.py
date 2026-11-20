@@ -54,7 +54,6 @@ class TestSpanBoundaryAccuracy:
         atomic_cases = [c for c in fixtures["cases"] if c["category"] == "atomic_simple"]
         assert len(atomic_cases) >= 5, "Expected at least 5 atomic_simple cases"
 
-        # Test cases that have trigger words matched by Phase 8a
         extracted_count = 0
         for case in atomic_cases[:3]:
             doc = preprocessor.nlp(case["raw_requirement"])  # type: ignore[misc]
@@ -417,7 +416,6 @@ class TestAmbiguousBoundaryResolution:
 
         extracted_count = 0
         for case in soft_cases:
-            # Ensure trigger word is present for Phase 8a extraction
             text = case["raw_requirement"]
             if not any(trigger in text.lower() for trigger in ["required", "must", "ability", "skill"]):
                 text = f"Required: {text}"
@@ -579,7 +577,6 @@ class TestPerformanceBenchmark:
 
         assert len(spans) > 0, "Should extract spans from complex document"
 
-        # Performance assertion: <50ms for 100-token document
         assert elapsed_ms < 50, f"Processing took {elapsed_ms:.2f}ms, expected <50ms"
 
         logger.info(
@@ -598,7 +595,6 @@ class TestPerformanceBenchmark:
             "Experience with Docker, containerization, and microservices architecture",
         ]
 
-        # Warm-up on first document (not timed)
         preprocessor.nlp(documents[0])  # type: ignore[misc]
 
         times = []
