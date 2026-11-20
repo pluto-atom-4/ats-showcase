@@ -186,6 +186,7 @@ class TestWorkdayHtmlFixtures:
             result = html_to_markdown(self.WORKDAY_WITH_EMDASH)
 
         assert "Responsibilities" in result
+        # Either form is acceptable: the em dash may be kept or normalized.
         assert "Lead design" in result or "Lead design—architecture" in result
         # Regression guard: must not become "LeaddesignarchitectureNotWork".
         assert "Leaddesign" not in result
@@ -302,6 +303,7 @@ class TestDividerNormalization:
         lines = ["|---|---|"]
         result = _normalize_divider_lines(lines)
 
+        # A table row contains --- but is not a divider, so it must stay unchanged.
         assert result == lines, f"Table row was modified: {result}"
 
 
