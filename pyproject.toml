@@ -58,7 +58,7 @@ dependencies = [
     "rich>=13.0,<16.0",
 
     # LLM client
-    "anthropic>=0.25.0,<1.0",
+    "anthropic>=0.25.0,<3.0",
 ]
 
 [dependency-groups]
