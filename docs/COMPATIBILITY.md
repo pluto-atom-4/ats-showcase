@@ -487,7 +487,7 @@ python --version  # Should be 3.13+
 | Pydantic | 2.5.0 | <3.0 | Must be v2 |
 | tiktoken | 0.8.0 | <1.0 | 0.5+ OK but 0.8+ faster |
 | Playwright | 1.48.0 | <2.0 | 1.40+ stable |
-| Anthropic | 0.25.0 | <1.0 | Latest recommended |
+| Anthropic | 0.25.0 | <3.0 | Latest recommended |
 
 ## spaCy Model Download Decision Tree
 
@@ -691,7 +691,7 @@ dependencies = [
     "tiktoken>=0.8.0,<1.0",          # ✅ Token counting
     "pydantic>=2.5.0,<3.0",          # Data validation
     "playwright>=1.48.0,<2.0",       # Web crawling
-    "anthropic>=0.25.0,<1.0",        # Claude API
+    "anthropic>=0.25.0,<3.0",        # Claude API
 ]
 ```
 
@@ -827,7 +827,7 @@ rm -rf ~/.cache/ms-playwright && uv run playwright install chromium
 **Mitigation**:
 ```bash
 # Update SDK to latest stable
-uv pip install --upgrade anthropic>=0.25.0,<1.0
+uv pip install --upgrade anthropic>=0.25.0,<3.0
 
 # Check system TLS support
 python -c "import ssl; print(f'OpenSSL: {ssl.OPENSSL_VERSION}')"
