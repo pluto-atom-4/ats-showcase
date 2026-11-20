@@ -3,7 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -38,7 +38,8 @@ def _message(text: str, input_tokens: int = 1200, output_tokens: int = 150) -> S
 def _api_error(cls: type[APIStatusError], status: int) -> APIStatusError:
     request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
     response = httpx.Response(status, request=request)
-    return cls("synthetic API error", response=response, body=None)
+    # anthropic 2.x types response as httpx2.Response; cast keeps mypy green on both majors
+    return cls("synthetic API error", response=cast(Any, response), body=None)
 
 
 @pytest.fixture(autouse=True)
