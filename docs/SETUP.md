@@ -132,7 +132,7 @@ All dependencies automatically installed with `uv sync`:
 | **lxml** | >=4.9.0 | Fast C-based parser (optional) | ✅ |
 | **tiktoken** | >=0.8.0 | Token counting for Claude API | ✅ |
 | **pydantic** | >=2.5.0 | Data validation (v2 required) | ✅ |
-| **anthropic** | >=0.25.0 | Claude API client | ✅ |
+| **anthropic** | >=0.25.0,<3.0 | Claude API client | ✅ |
 | **playwright** | >=1.48.0 | Browser automation | ✅ |
 
 ### spaCy Model Installation
