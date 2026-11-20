@@ -186,8 +186,6 @@ class TestClassifySentence:
         nice_to_have_sentence = "Nice to have TypeScript would be great."
         result = classify_sentence(nice_to_have_sentence)
         assert result is not None
-        # "nice to have" pattern has confidence 0.40
-        # Extra adjustment: -0.25
         expected = 0.40 - 0.25
         assert result.confidence == pytest.approx(expected)
 
@@ -230,13 +228,12 @@ class TestClassifySentence:
         assert result.trigger_word == "required"
         assert result.text == long_sentence[:MAX_SENTENCE_CHARS]
 
-        # A trigger beyond MAX_SENTENCE_CHARS is not seen
         late_trigger = "x" * MAX_SENTENCE_CHARS + " required"
         assert classify_sentence(late_trigger) is None
 
     def test_best_match_by_priority(self) -> None:
         """When multiple patterns match, lower priority wins."""
-        # "required" (priority 1, conf 0.95) beats "prefer" (priority 2, conf 0.65): lower priority number wins.
+        # Lower priority number wins regardless of confidence.
         sentence = "Preferred but required skill."
         result = classify_sentence(sentence)
         assert result is not None
@@ -413,7 +410,6 @@ class TestApplyConfidenceAdjustments:
     def test_multiple_adjustments_stack(self) -> None:
         """Multiple adjustments stack cumulatively."""
         base = 0.85
-        # Parenthetical (-0.10) + conditional (-0.15) = -0.25
         sentence = "Must have experience (preferred) if you know Python."
         result = apply_confidence_adjustments(base, sentence)
         assert result == pytest.approx(base - 0.10 - 0.15)
@@ -423,7 +419,6 @@ class TestApplyConfidenceAdjustments:
         base = 0.10
         sentence = "Nice to have (preferred) if you know something."
         result = apply_confidence_adjustments(base, sentence)
-        # -0.25 -0.10 -0.15 = -0.50, clamped to 0.0
         assert result == pytest.approx(0.0)
 
     def test_clamped_at_one(self) -> None:
@@ -431,13 +426,11 @@ class TestApplyConfidenceAdjustments:
         base = 0.97
         sentence = "Must have PYTHON SKILLS KNOWLEDGE LANGUAGE EXPERIENCE FRAMEWORK."
         result = apply_confidence_adjustments(base, sentence)
-        # +0.05 = 1.02, clamped to 1.0
         assert result == pytest.approx(1.0)
 
     def test_all_caps_requires_three_words(self) -> None:
         """All-caps boost requires 3+ words of 4+ letters."""
         base = 0.85
-        # Only 2 all-caps words: no boost
         sentence = "Must have PYTHON and java experience."
         result = apply_confidence_adjustments(base, sentence)
         assert result == pytest.approx(base)
