@@ -299,7 +299,6 @@ class TestCostAnalysisCommand:
             db_path = str(Path(tmpdir) / "test.db")
 
             store = JobStore(db_path)
-            # 3 v1.0 + 1 v2.0 job = 25% migrated.
             for i in range(3):
                 store.add_job(
                     job_id=f"job_v1_{i}",
