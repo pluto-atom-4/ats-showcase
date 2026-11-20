@@ -131,7 +131,7 @@ class TestClassifyLikelyUnparseable:
         assert outcome is ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT
 
     def test_walmart_shell_row_is_unparseable(self):
-        # Walmart rows 6,7,8,10,11 share the same shell capture: sections=4, zero yield.
+        # Walmart shell capture shared by rows 6,7,8,10,11; 459 sits just under the 460 shell length.
         result = make_job_result(4)
         outcome = classify_extraction_outcome(result, 459)
         assert outcome is ExtractionOutcome.LIKELY_UNPARSEABLE_INPUT
@@ -166,7 +166,7 @@ class TestClassifyNeedsHumanReview:
         assert outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW
 
     def test_walmart_job_9_zero_yield_needs_review(self):
-        # Reference: Walmart job 9 has 7 sections, desc_len 31591 (design doc 1.1/1.3), zero yield.
+        # Source: design doc jd-zero-extraction-fallback.md 1.1/1.3.
         result = make_job_result(7)
         outcome = classify_extraction_outcome(result, WALMART_JOB9_DESC_CHARS)
         assert outcome is ExtractionOutcome.NEEDS_HUMAN_REVIEW
