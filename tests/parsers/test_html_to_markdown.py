@@ -262,6 +262,7 @@ class TestDividerNormalization:
         lines = ["---Some Content"]
         result = _normalize_divider_lines(lines)
 
+        # A leading divider yields an empty first part, which is skipped, leaving only the content.
         assert "Some Content" in result
         # No divider because the part after --- was not empty, so no final divider is added
         assert "---" not in result or result.count("---") == 0
