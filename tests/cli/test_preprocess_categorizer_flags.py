@@ -62,7 +62,6 @@ def invalid_patterns_json_file(tmp_path: Path) -> Generator[Path, None, None]:
     """
     patterns_file = tmp_path / "invalid.json"
     with open(patterns_file, "w") as f:
-        # An object, not an array.
         f.write('{"category": "test"}')
     yield patterns_file
 
