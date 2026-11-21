@@ -95,4 +95,5 @@ def scope_to_selector(html: str, selector: str, strategy: str = "first") -> Scop
         return ScopeResult(fragment=fragment, match_count=match_count)
 
     except Exception as e:
+        # BeautifulSoup.select() raises on invalid selectors; surface it as ValueError
         raise ValueError(f"Invalid CSS selector '{selector}': {e}") from e

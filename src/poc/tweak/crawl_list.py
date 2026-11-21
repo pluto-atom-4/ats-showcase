@@ -403,6 +403,7 @@ async def extract_job_from_container(
         company_to_use = extracted_company or company_name
 
         url = ""
+        # WorkSource jobId extraction via navigation: click link -> navigate -> read jobId from the detail page URL.
         if link and company_key == "WorkSource":
             link_preview = link[:80] if link else "None"
             logger.debug(
@@ -557,6 +558,7 @@ async def crawl_company_jobs(
         delay_ms = crawler_config.get("delay_ms", 2000)
         await page.wait_for_timeout(delay_ms)
 
+        # WorkSource: use job_card selector to iterate individual cards (20 cards).
         # Other companies use job_container (prevents regression).
         if company_key == "WorkSource":
             job_selector = selectors.get("job_card") or GENERIC_FALLBACK_SELECTORS.get("job_card")

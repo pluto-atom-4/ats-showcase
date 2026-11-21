@@ -684,6 +684,7 @@ class SectionClassifier:
         title_text = self._normalize_text(section.title) if section.title else ""
         content_text = self._normalize_text(section.content) if section.content else ""
 
+        # Prefer title-based classification; fall back to content if no title or level=-2
         if title_text and section.level != -2:
             return self._classify_from_title(title_text, content_text)
         else:
@@ -880,6 +881,7 @@ class SectionClassifier:
                 type_classifications, is_skip=False, keyword_matches=()
             )
 
+        # Use first ~50 words as pseudo-title for matching
         first_words = " ".join(content_text.split()[:50])
 
         # Step 1: Try ruler pattern matching first (Issue #301 Q3)
