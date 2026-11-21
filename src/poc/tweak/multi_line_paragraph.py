@@ -214,8 +214,7 @@ def map_line_to_token_position(text: str, line_idx: int) -> tuple:
     for i, line in enumerate(lines):
         if i == line_idx:
             return (char_pos, char_pos + len(line))
-        # +1 for newline
-        char_pos += len(line) + 1  # +1 for newline
+        char_pos += len(line) + 1
 
     return (None, None)
 
@@ -284,7 +283,6 @@ class MarkdownSpanRuler:
 
         boundaries = self._find_boundaries(lines)
 
-        # Text before the first boundary becomes a preamble section (title=None, level=-2)
         if boundaries and boundaries[0] > 0:
             preamble_lines = lines[0 : boundaries[0]]
             preamble_text = "\n".join(preamble_lines).strip()
@@ -300,7 +298,6 @@ class MarkdownSpanRuler:
                 sections.append(preamble_section)
 
         for i, boundary_idx in enumerate(boundaries):
-            # End of current section is one line before next boundary
             if i + 1 < len(boundaries):
                 current_end = boundaries[i + 1] - 1
             else:
@@ -310,7 +307,6 @@ class MarkdownSpanRuler:
             if section:
                 sections.append(section)
 
-        # Trailing content after the last header (only when there are no headers at all)
         if not boundaries and lines:
             content = "\n".join(lines).strip()
             if content:
