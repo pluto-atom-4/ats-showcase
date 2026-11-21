@@ -29,7 +29,6 @@ def nlp() -> Language:
     except OSError:
         pytest.skip("spaCy model 'en_core_web_md' not available")
 
-    # Add component if not already present
     if "requirement_filter" not in nlp.pipe_names:
         nlp.add_pipe("requirement_filter", last=True)
 

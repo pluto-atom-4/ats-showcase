@@ -286,7 +286,7 @@ class TestCustomSpanCategorizer:
         patterns = [SpanPattern(category="test", pattern=r"a*")]
         cat = CustomSpanCategorizer(patterns)
 
-        # a* also matches zero-length at the end; those matches are skipped, leaving one span for "aaa".
+        # a* also matches zero-length at string end; those must be skipped.
         spans = cat.categorize("aaa")
         assert all(s.start_char != s.end_char for s in spans)
 

@@ -283,12 +283,10 @@ class TestSpanPreservationIntegration:
             for job in SAMPLE_JOBS:
                 text = job["description"]
                 doc = preprocessor.nlp(text)  # type: ignore[misc]
-                # Result discarded; timing only.
                 _ = chunker.chunk(text, doc=doc)
             elapsed_ms = (time.perf_counter() - start) * 1000
             return elapsed_ms / len(SAMPLE_JOBS)
 
-        # Warm-up absorbs first-call cost; median of repeats suppresses jitter.
         run_batch()
         samples = [run_batch() for _ in range(3)]
         avg_time_per_job = statistics.median(samples)
@@ -300,7 +298,6 @@ class TestSpanPreservationIntegration:
             f"({avg_time_per_job:.0f}ms/job)"
         )
 
-        # Performance check: should add <100ms per job (including pipeline overhead)
         assert avg_time_per_job < 100, f"Processing time {avg_time_per_job:.0f}ms/job exceeds 100ms target"
 
     def test_disable_span_preservation_flag(self, preprocessor: Preprocessor) -> None:
@@ -582,8 +579,7 @@ class TestDetailedPerformanceMetrics:
             total_ms = nlp_ms + chunk_ms
             phase_times["total"].append(total_ms)
 
-        # statistics.quantiles(method="exclusive") extrapolates past max(data), so p95 for N=10 is a phantom value.
-        # Use a rank check instead: at least 9 of 10 jobs under 300ms.
+        # Rank check, not statistics.quantiles: its exclusive method extrapolates past max(data) at N=10.
         median_total = statistics.median(phase_times["total"])
         max_total = max(phase_times["total"])
         jobs_under_300ms = sum(1 for t in phase_times["total"] if t < 300)
@@ -611,7 +607,6 @@ class TestDetailedPerformanceMetrics:
             f"Only {jobs_under_300ms}/10 jobs under 300ms target (median={median_total:.1f}ms, max={max_total:.1f}ms)"
         )
 
-        # Overall average should be <200ms (sanity check for regression)
         assert avg_total < 200, f"Average time per job {avg_total:.1f}ms exceeds 200ms target"
 
     @pytest.mark.perf
@@ -649,7 +644,6 @@ class TestDetailedPerformanceMetrics:
             return elapsed_ms / count
 
         for count in job_counts:
-            # Warm-up run absorbs first-call cost so it does not skew samples.
             run_batch(count)
             samples = [run_batch(count) for _ in range(repeats)]
             medians.append(statistics.median(samples))

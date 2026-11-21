@@ -171,7 +171,6 @@ class TestRequirementExtractionIntegration:
         print(f"Average extraction time: {avg_time_per_job:.2f}ms per job")
         print(f"Total time for {len(sample_jobs)} jobs: {total_ms:.2f}ms")
 
-        # Assert performance requirement: <50ms per job
         assert avg_time_per_job < 50.0, f"Extraction too slow: {avg_time_per_job:.2f}ms per job"
 
     def test_requirement_confidence_scoring(self, preprocessor, sample_jobs):
@@ -190,7 +189,6 @@ class TestRequirementExtractionIntegration:
                         confidence_by_trigger[trigger] = []
                     confidence_by_trigger[trigger].append(confidence)
 
-        # Tier 1 triggers must average higher confidence than Tier 3.
         tier1_triggers = {"required", "must", "essential", "ability to", "experience in"}
         tier3_triggers = {"nice to have", "ideal", "bonus"}
 
