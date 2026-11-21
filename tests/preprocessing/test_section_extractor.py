@@ -71,7 +71,6 @@ class TestSplitBullets:
         """Test section with bullets and non-bullet paragraphs."""
         text = "* Bullet one\n\nSome paragraph text\n* Bullet two"
         result = split_bullets(text)
-        # Non-bullet paragraphs are not added; only bullets
         assert "Bullet one" in result
         assert "Bullet two" in result
         assert "Some paragraph text" not in result
@@ -335,7 +334,6 @@ class TestExtractSectioned:
 
     def test_max_input_chars_truncation(self) -> None:
         """Test that input exceeding MAX_INPUT_CHARS is truncated."""
-        # Create text longer than MAX_INPUT_CHARS
         long_text = "## Requirements\n" + "a" * (MAX_INPUT_CHARS + 1000)
         result = extract_sectioned(long_text)
         assert isinstance(result, SectionedResult)
@@ -393,7 +391,6 @@ class TestExtractSectioned:
         result = extract_sectioned(text, min_confidence=0.50)
         # Should be filtered out (0.95 - 0.50 = 0.45 < 0.50)
         if result.requirements:
-            # If any slipped through, check they are not from BENEFITS.
             for req in result.requirements:
                 assert req.source_section != SectionLabel.BENEFITS
 
@@ -432,7 +429,6 @@ class TestExtractSectioned:
 """
         result = extract_sectioned(text, min_confidence=0.50)
         if result.requirements:
-            # Per-section counts must add up to the total.
             total = sum(result.requirements_by_section.values())
             assert total == len(result.requirements)
 
@@ -449,7 +445,6 @@ class TestExtractSectioned:
 """
         result = extract_sectioned(text, confidence_adjustments=custom_adjustments)
         if result.requirements:
-            # The injected 0.50 adjustment becomes the section boost.
             assert result.requirements[0].section_boost == 0.50
 
     def test_display_names_injection(self) -> None:
@@ -465,7 +460,6 @@ class TestExtractSectioned:
 """
         result = extract_sectioned(text, display_names=custom_names)
         if result.requirements:
-            # The injected display name is used.
             assert result.requirements[0].section_display_name == "Custom Requirements"
 
     def test_dedup_threshold_injectable(self) -> None:

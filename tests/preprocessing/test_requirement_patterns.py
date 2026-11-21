@@ -186,8 +186,6 @@ class TestClassifySentence:
         nice_to_have_sentence = "Nice to have TypeScript would be great."
         result = classify_sentence(nice_to_have_sentence)
         assert result is not None
-        # "nice to have" pattern has confidence 0.40
-        # Extra adjustment: -0.25
         expected = 0.40 - 0.25
         assert result.confidence == pytest.approx(expected)
 
@@ -230,7 +228,6 @@ class TestClassifySentence:
         assert result.trigger_word == "required"
         assert result.text == long_sentence[:MAX_SENTENCE_CHARS]
 
-        # A trigger beyond MAX_SENTENCE_CHARS is not seen
         late_trigger = "x" * MAX_SENTENCE_CHARS + " required"
         assert classify_sentence(late_trigger) is None
 
@@ -413,7 +410,6 @@ class TestApplyConfidenceAdjustments:
     def test_multiple_adjustments_stack(self) -> None:
         """Multiple adjustments stack cumulatively."""
         base = 0.85
-        # Parenthetical (-0.10) + conditional (-0.15) = -0.25
         sentence = "Must have experience (preferred) if you know Python."
         result = apply_confidence_adjustments(base, sentence)
         assert result == pytest.approx(base - 0.10 - 0.15)

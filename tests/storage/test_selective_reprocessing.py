@@ -85,7 +85,6 @@ class TestJobStoreSelectiveFiltering:
         store.add_job("job1", "Job 1", "Co1", "Remote", preprocessing_version="v3.0", tokens=500)
         store.add_job("job2", "Job 2", "Co2", "Remote", preprocessing_version="v2.0", tokens=400)
 
-        # Query for v3.0 jobs should work without raising an error
         jobs = store.get_jobs_for_reprocessing(version="v3.0")
         assert len(jobs) == 1
         assert jobs[0]["job_id"] == "job1"
@@ -96,7 +95,6 @@ class TestJobStoreSelectiveFiltering:
         """Test age filtering returns only jobs preprocessed N+ days ago."""
         store = JobStore(temp_db)
 
-        # Manually insert jobs with different preprocessed_at timestamps
         assert store.conn is not None
         cursor = store.conn.cursor()
         now = datetime.now()
@@ -242,7 +240,6 @@ class TestJobStoreSelectiveFiltering:
 
         jobs = store.get_jobs_for_reprocessing(version="v1.0")
 
-        # Should be ordered oldest first (20, 15, 10, 5, 1)
         job_ids = [j["job_id"] for j in jobs]
         assert job_ids == ["job_20", "job_15", "job_10", "job_5", "job_1"]
 
@@ -345,7 +342,6 @@ class TestSelectiveFilteringIntegration:
         now = datetime.now()
 
         for i in range(100):
-            # Jobs are 1 to 60 days old.
             days_ago = 1 + (i % 60)
             timestamp = (now - timedelta(days=days_ago)).isoformat()
             cursor.execute(
@@ -394,7 +390,6 @@ class TestSelectiveFilteringIntegration:
             limit=10,
         )
 
-        # 2 companies x 2 high-token jobs.
         assert len(ab_test_jobs) == 4
         for job in ab_test_jobs:
             assert job["company"] in ["Amazon", "Google"]

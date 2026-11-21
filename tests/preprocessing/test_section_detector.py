@@ -152,7 +152,6 @@ class TestSectionDetectorHeadingLikeFiltering:
 
     def test_heading_mid_sentence_not_detected_with_promote_headings(self) -> None:
         """detect skips 'Requirements' when mid-sentence with promote_headings=True."""
-        # Place 'Requirements' in the middle of a sentence
         text = "We have multiple requirements such as Requirements and qualifications"
         detector = SectionDetector(promote_headings=True)
         sections = detector.detect(text)
@@ -254,7 +253,6 @@ class TestSectionDetectorInputTruncation:
         large_text = "## Requirements\n" + "a" * (MAX_INPUT_CHARS + 1000)
         detector = SectionDetector()
         sections = detector.detect(large_text)
-        # Should not raise; sections may or may not be detected depending on truncation point
         assert len(sections) == 1
         assert sections[0].label == SectionLabel.REQUIREMENTS
         assert sections[0].content_end == MAX_INPUT_CHARS

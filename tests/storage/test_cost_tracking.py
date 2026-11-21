@@ -50,7 +50,6 @@ class TestJobStoreCostTracking:
             cost_after=0.00195,
         )
 
-        # Row layout: job_id, phase, version_before/after, tokens_before/after, cost_before/after.
         assert store.conn is not None
         cursor = store.conn.cursor()
         cursor.execute(
