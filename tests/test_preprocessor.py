@@ -120,7 +120,6 @@ def test_extract_entities_by_section_skips_technical_assessment_section(monkeypa
     )
 
     # Wrap (not replace) nlp to prove the section never reached spaCy, not merely that output was empty.
-    # Same as above: assert nlp was never called rather than relying on empty output.
     original_nlp = preprocessor.nlp
     nlp_calls: list[str] = []
 

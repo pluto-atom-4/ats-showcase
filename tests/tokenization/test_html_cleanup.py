@@ -105,7 +105,6 @@ class TestIsBoilerplatePhrase:
 
     def test_invalid_category(self):
         """Handle invalid category gracefully."""
-        # Should log warning and return False
         assert not is_boilerplate_phrase("Some text", category="invalid_category")
 
 

@@ -20,7 +20,6 @@ class TestPreprocessorSectionEngineBasics:
 
     def test_default_section_engine_is_none(self, monkeypatch: Any) -> None:
         """Default section_engine should be None (opt-in behavior)."""
-        # Monkeypatch _load_model to skip spaCy initialization
         monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
 
         preprocessor = Preprocessor()

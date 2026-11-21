@@ -338,7 +338,7 @@ class TestPreprocessorEdgeCases:
         skills, tech, reqs = preprocessor_with_mock.extract_entities(text)
         # Should have extracted tech (exact count depends on mock entity detection)
         assert isinstance(tech, list)
-        # Result should be sorted (verifies no duplicates within same case)
+        # Sorted equality is only a proxy for dedup: repeated "Python" would not break it.
         assert tech == sorted(tech)
 
     def test_segment_sentences_preserves_content(self, preprocessor_with_mock):
