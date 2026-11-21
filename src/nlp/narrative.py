@@ -91,6 +91,7 @@ class NarrativeRequirementExtractor:
         for pattern, group_idx in patterns:
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 skill = match.group(group_idx).strip()
+                # Generic phrases like "experience with various languages" are not skills.
                 if skill and not any(x in skill.lower() for x in ["environments", "languages"]):
                     skills.add(skill)
 
