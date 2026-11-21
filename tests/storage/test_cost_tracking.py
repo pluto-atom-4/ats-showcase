@@ -335,6 +335,7 @@ class TestBlendedTokenRates:
 
     def test_mixed_models_per_version_rates_and_savings(self, temp_db: str) -> None:
         """v1.0 rate follows its Haiku assessments; v2.0 rate follows its Sonnet assessments."""
+        # SYNTHETIC: jobs and assessment models for blended-rate coverage
         store = JobStore(temp_db)
         assessments = AssessmentStore(temp_db)
         store.add_job(job_id="v1_a", title="A", preprocessing_version="v1.0", tokens=1000)
@@ -362,6 +363,7 @@ class TestBlendedTokenRates:
 
     def test_token_weighted_blend_within_version(self, temp_db: str) -> None:
         """v1.0 rate is the token-weighted mean of its jobs' model rates."""
+        # SYNTHETIC: two v1.0 jobs with different models and token counts
         store = JobStore(temp_db)
         assessments = AssessmentStore(temp_db)
         store.add_job(job_id="v1_a", title="A", preprocessing_version="v1.0", tokens=1000)
@@ -381,6 +383,7 @@ class TestBlendedTokenRates:
 
     def test_null_model_falls_back_to_default_rate(self, temp_db: str) -> None:
         """Jobs without an assessment row or with NULL model use DEFAULT_MODEL rate."""
+        # SYNTHETIC: one job with no assessment row, one with model=None
         store = JobStore(temp_db)
         assessments = AssessmentStore(temp_db)
         store.add_job(job_id="v1_no_row", title="A", preprocessing_version="v1.0", tokens=1000)
@@ -400,6 +403,7 @@ class TestBlendedTokenRates:
 
     def test_empty_v2_group_yields_zero_rate_and_savings(self, temp_db: str) -> None:
         """Only v1.0 jobs present: v2.0 rate and savings are both 0.0."""
+        # SYNTHETIC: v1.0-only job set
         store = JobStore(temp_db)
         assessments = AssessmentStore(temp_db)
         store.add_job(job_id="v1_a", title="A", preprocessing_version="v1.0", tokens=1000)
@@ -416,6 +420,7 @@ class TestBlendedTokenRates:
 
     def test_old_db_without_model_column_uses_default_rate(self, temp_db: str) -> None:
         """job_assessments lacking a model column falls back to DEFAULT_MODEL rate without raising."""
+        # SYNTHETIC: legacy job_assessments table with no model column
         store = JobStore(temp_db)
         store.add_job(job_id="v1_a", title="A", preprocessing_version="v1.0", tokens=1000)
         store.add_job(job_id="v2_a", title="B", preprocessing_version="v2.0", tokens=500)

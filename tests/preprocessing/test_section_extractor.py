@@ -389,6 +389,7 @@ class TestExtractSectioned:
 * Required flexible working hours
 """
         result = extract_sectioned(text, min_confidence=0.50)
+        # Should be filtered out (0.95 - 0.50 = 0.45 < 0.50)
         if result.requirements:
             for req in result.requirements:
                 assert req.source_section != SectionLabel.BENEFITS
@@ -400,6 +401,7 @@ class TestExtractSectioned:
 * Must know Python
 * Nice knowledge of design patterns
 """
+        # High threshold: only "must" patterns survive
         result = extract_sectioned(text, min_confidence=0.90)
         assert len(result.requirements) <= 2
 

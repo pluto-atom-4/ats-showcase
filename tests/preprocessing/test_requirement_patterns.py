@@ -233,7 +233,7 @@ class TestClassifySentence:
 
     def test_best_match_by_priority(self) -> None:
         """When multiple patterns match, lower priority wins."""
-        # Lower priority number wins regardless of confidence.
+        # "required" (priority 1, conf 0.95) beats "prefer" (priority 2, conf 0.65): lower priority number wins.
         sentence = "Preferred but required skill."
         result = classify_sentence(sentence)
         assert result is not None
@@ -419,6 +419,7 @@ class TestApplyConfidenceAdjustments:
         base = 0.10
         sentence = "Nice to have (preferred) if you know something."
         result = apply_confidence_adjustments(base, sentence)
+        # -0.25 -0.10 -0.15 = -0.50, clamped to 0.0
         assert result == pytest.approx(0.0)
 
     def test_clamped_at_one(self) -> None:
@@ -426,11 +427,13 @@ class TestApplyConfidenceAdjustments:
         base = 0.97
         sentence = "Must have PYTHON SKILLS KNOWLEDGE LANGUAGE EXPERIENCE FRAMEWORK."
         result = apply_confidence_adjustments(base, sentence)
+        # +0.05 = 1.02, clamped to 1.0
         assert result == pytest.approx(1.0)
 
     def test_all_caps_requires_three_words(self) -> None:
         """All-caps boost requires 3+ words of 4+ letters."""
         base = 0.85
+        # Only 2 all-caps words: no boost
         sentence = "Must have PYTHON and java experience."
         result = apply_confidence_adjustments(base, sentence)
         assert result == pytest.approx(base)

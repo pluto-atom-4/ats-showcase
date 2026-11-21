@@ -416,6 +416,7 @@ class TestAmbiguousBoundaryResolution:
 
         extracted_count = 0
         for case in soft_cases:
+            # Ensure trigger word is present for Phase 8a extraction
             text = case["raw_requirement"]
             if not any(trigger in text.lower() for trigger in ["required", "must", "ability", "skill"]):
                 text = f"Required: {text}"
@@ -595,6 +596,7 @@ class TestPerformanceBenchmark:
             "Experience with Docker, containerization, and microservices architecture",
         ]
 
+        # Warm-up on first document (not timed)
         preprocessor.nlp(documents[0])  # type: ignore[misc]
 
         times = []

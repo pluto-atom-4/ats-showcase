@@ -208,6 +208,7 @@ class TestExpandSpan:
         text = "Required: 5+ years Python experience. Knowledge of Docker."
         doc = nlp(text)
 
+        # Tokens: 2 is "5", 5 is "Python"; the period comes after "experience".
         start_idx = 2
         end_idx = 5
 
@@ -221,6 +222,7 @@ class TestExpandSpan:
         text = "Required: Python and Java"
         doc = nlp(text)
 
+        # Token 2 is "Python".
         start_idx = 2
         end_idx = 2
 
