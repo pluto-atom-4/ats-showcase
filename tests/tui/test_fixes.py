@@ -258,8 +258,7 @@ class TestCrawlPhaseJobStorageFix:
 
     def test_crawl_phase_fallback_job_id_generation(self, state_manager):
         """Crawl phase generates ID from company/title if missing."""
-        # Simulate what dashboard.py does:
-        # job_id=job.id or f"{job.company}_{job.title}"
+        # Mirrors dashboard.py fallback: job.id or f"{job.company}_{job.title}"
         job_id = "techcorp_python_developer"
         state_manager.add_job(
             job_id=job_id,
