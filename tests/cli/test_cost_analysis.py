@@ -324,6 +324,7 @@ class TestCostAnalysisCommand:
             if json_start >= 0:
                 output = output[json_start:]
             output_data = json.loads(output)
+            # 3 v1.0 + 1 v2.0 job = 25% migrated.
             assert output_data["migration_progress_percent"] == 25.0
 
     def test_cost_analysis_token_rate_matches_blended_model_pricing(self) -> None:
