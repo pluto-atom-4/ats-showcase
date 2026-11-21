@@ -395,7 +395,6 @@ def process_job(
                 f"Invalid CSS selector '{description_selector}': {e}; processing full HTML",
             )
 
-    # Stage 1: Preprocess
     try:
         clean_html = preprocessor.process(raw_html)
     except Exception as e:
@@ -403,7 +402,6 @@ def process_job(
         result.extraction_outcome = ExtractionOutcome.ERROR
         return result
 
-    # Stage 2: Convert to Markdown
     try:
         markdown = converter.process(clean_html)
     except Exception as e:
@@ -411,7 +409,6 @@ def process_job(
         result.extraction_outcome = ExtractionOutcome.ERROR
         return result
 
-    # Stage 3: Polish Markdown
     try:
         polished_markdown = polisher.process(markdown)
     except Exception as e:
@@ -430,12 +427,10 @@ def process_job(
         except Exception as e:
             result.add_error("heading_promoter", str(e))
 
-    # Stage 4: Parse sections using MarkdownSpanRuler
     try:
         sections = ruler.parse(promoted_markdown)
         result.sections_detected = len(sections)
 
-        # Stage 5: Classify each section and aggregate confidence stats
         if sections:
             confidences = []
             markdown_sections = []
@@ -550,27 +545,23 @@ def process_job(
         # SectionClassifierComponent reads doc._.sections, so populate it from the ruler output.
         doc._.sections = sections
 
-        # Apply classifiers and extract data
         from src.poc.tweak.spacy_pipeline import SectionClassifierComponent
 
         section_classifier = SectionClassifierComponent(nlp, "section_classifier")
         doc = section_classifier(doc)
 
-        # Extract requirements
         try:
             doc = req_processor(doc)
             result.requirements = doc._.requirements if doc._.requirements else []
         except Exception as e:
             result.add_error("requirement_extraction", str(e))
 
-        # Extract skills
         try:
             doc = skill_processor(doc)
             result.skills = doc._.skills if doc._.skills else []
         except Exception as e:
             result.add_error("skill_extraction", str(e))
 
-        # Extract technologies
         try:
             doc = tech_processor(doc)
             result.technologies = doc._.technologies if doc._.technologies else []
