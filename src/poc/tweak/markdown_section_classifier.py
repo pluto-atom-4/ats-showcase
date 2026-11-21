@@ -78,7 +78,6 @@ def _compile_keyword_pattern(keyword: str) -> "re.Pattern[str]":
         Max cache size is 512 to balance memory and performance.
     """
     escaped = re.escape(keyword)
-    # Leading-only boundary: (?<!\w) prevents mid-word matches
     pattern_str = r"(?<!\w)" + escaped
     return re.compile(pattern_str)
 
@@ -278,7 +277,6 @@ def calculate_confidence(match_count: int, source: Literal["title", "content"], 
         instead. Returned confidence values are always in [0.0, 1.0].
     """
     if section_type == SectionType.SKIP:
-        # SKIP sections: lower base confidence, slower growth
         if source == "title":
             return min(1.0, 0.5 + (match_count * 0.25))
         else:
@@ -337,14 +335,11 @@ def fallback_confidence(source: Literal["title", "content"], has_content_text: b
         where the float is in [0.0, 1.0].
     """
     if source == "title":
-        # Title-based: no keywords matched, default to OTHER with low confidence
         return (SectionType.OTHER, 0.3)
     else:
         if has_content_text:
-            # Content exists, no keywords matched: default to DESCRIPTION (body text is typically descriptive)
             return (SectionType.DESCRIPTION, 0.2)
         else:
-            # No content at all: UNLABELED (no information for classification)
             return (SectionType.UNLABELED, 0.0)
 
 
@@ -609,7 +604,6 @@ class SectionClassifier:
 
                 self._nlp = spacy.load("en_core_web_md")
             except (ImportError, OSError):
-                # Graceful degradation: spaCy unavailable or model not installed
                 return None
         return self._nlp
 
@@ -690,7 +684,6 @@ class SectionClassifier:
         title_text = self._normalize_text(section.title) if section.title else ""
         content_text = self._normalize_text(section.content) if section.content else ""
 
-        # Prefer title-based classification; fall back to content if no title or level=-2
         if title_text and section.level != -2:
             return self._classify_from_title(title_text, content_text)
         else:
@@ -750,7 +743,6 @@ class SectionClassifier:
         # Step 1: Try ruler pattern matching first (Issue #301)
         ruler_matches = self._match_ruler_patterns(title_text, "title")
         for section_type, pattern_label in ruler_matches.items():
-            # Q1: ruler confidence is the ruler base confidence plus the per-section adjustment.
             confidence = self._calculate_ruler_confidence(pattern_label)
             if section_type not in all_matches:
                 all_matches[section_type] = ()
@@ -832,7 +824,6 @@ class SectionClassifier:
             fallback_type, fallback_conf = fallback_confidence("title", bool(content_text.strip()))
             type_classifications.append(TypeClassification(fallback_type, fallback_conf, ()))
 
-        # is_skip is True if SKIP is among the matched types
         is_skip = SectionType.SKIP in {tc.section_type for tc in type_classifications}
 
         return SectionClassification.from_type_classifications(
@@ -889,7 +880,6 @@ class SectionClassifier:
                 type_classifications, is_skip=False, keyword_matches=()
             )
 
-        # Use first ~50 words as pseudo-title for matching
         first_words = " ".join(content_text.split()[:50])
 
         # Step 1: Try ruler pattern matching first (Issue #301 Q3)
@@ -975,7 +965,6 @@ class SectionClassifier:
             fallback_type, fallback_conf = fallback_confidence("content", bool(content_text.strip()))
             result_classifications.append(TypeClassification(fallback_type, fallback_conf, ()))
 
-        # is_skip is True only if the top-ranked type is SKIP (content path)
         sorted_result = sorted(result_classifications, key=lambda tc: tc.confidence, reverse=True)
         is_skip = bool(sorted_result) and sorted_result[0].section_type is SectionType.SKIP
 
@@ -1024,7 +1013,6 @@ class SectionClassifier:
 
             return matched_types
         except Exception:
-            # Graceful degradation: if ruler matching fails, return empty dict
             return {}
 
     def _calculate_ruler_confidence(self, pattern_label: str) -> float:

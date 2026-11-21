@@ -63,7 +63,6 @@ def scope_to_selector(html: str, selector: str, strategy: str = "first") -> Scop
         if match_count == 0:
             return ScopeResult(fragment=None, match_count=0)
 
-        # Strategy "first": return first match's fragment (empty fragment -> None)
         if strategy == "first":
             first_match = matches[0]
             fragment = first_match.decode_contents().strip()
@@ -96,5 +95,4 @@ def scope_to_selector(html: str, selector: str, strategy: str = "first") -> Scop
         return ScopeResult(fragment=fragment, match_count=match_count)
 
     except Exception as e:
-        # BeautifulSoup.select() raises ValueError for invalid selectors
         raise ValueError(f"Invalid CSS selector '{selector}': {e}") from e
