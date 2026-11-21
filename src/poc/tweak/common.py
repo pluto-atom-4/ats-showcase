@@ -283,7 +283,6 @@ def setup_logging(
     )
     file_handler.setFormatter(file_format)
 
-    # Add handlers only once (avoid duplicates).
     if not logger.handlers:
         logger.addHandler(console_handler)
         logger.addHandler(file_handler)
