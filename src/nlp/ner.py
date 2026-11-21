@@ -77,7 +77,6 @@ class JobNERExtractor:
         detected_domain = detect_domain(text)
 
         skill_mappings = {
-            # Aerospace domain
             "Guidance and Control": [r"guidance\s+and\s+control|G&C", r"guidance.*control"],
             "G&C algorithms": [r"G&C\s+algorithms|guidance.*control.*algorithm"],
             "Conceptual level design": [r"conceptual.*design"],
@@ -140,7 +139,6 @@ class JobNERExtractor:
             "Stakeholder management": [r"stakeholder.*management"],
             "Technical documentation": [r"technical.*documentation"],
             "Knowledge transfer": [r"knowledge.*transfer"],
-            # Defense/Software domain (less exact, more narrative)
             "Software architecture": [r"(?:design|architect).*software\s+system|software\s+(?:design|architect)"],
             "Systems maintenance": [r"maintain.*system|system.*maintain"],
             "Technical communication": [r"communicate.*technical|technical\s+communicat"],
@@ -152,7 +150,6 @@ class JobNERExtractor:
                     inferred.add(skill)
                     break
 
-        # Defense/Software domain: ARINC-specific inferences
         if detected_domain == Domain.DEFENSE or detected_domain == Domain.SOFTWARE:
             if re.search(r"\bARINC\s+\d{3}\b", text, re.IGNORECASE):
                 inferred.add("Binary data transformation")
@@ -172,7 +169,6 @@ class JobNERExtractor:
         skills_with_conf = {}
         doc = self.nlp(text)
 
-        # First pass: keyphrase exact match (high confidence)
         matches = self.keyphrase_matcher(doc)
         for _match_id, start, end in matches:
             skill = doc[start:end].text
@@ -180,14 +176,12 @@ class JobNERExtractor:
                 conf = get_confidence(ExtractionMethod.KEYPHRASE_EXACT)
                 skills_with_conf[skill] = (skill, conf, ExtractionMethod.KEYPHRASE_EXACT)
 
-        # Second pass: infer from context (medium confidence)
         inferred = self._infer_related_skills(text)
         for skill in inferred:
             if skill not in skills_with_conf:
                 conf = get_confidence(ExtractionMethod.CONTEXT_INFERRED)
                 skills_with_conf[skill] = (skill, conf, ExtractionMethod.CONTEXT_INFERRED)
 
-        # Third pass: skill keyword fallback (low confidence)
         if len(skills_with_conf) < 15:
             matches = self.skill_matcher(doc)
             for _match_id, start, end in matches:
@@ -246,7 +240,6 @@ class JobNERExtractor:
             return requirements_with_conf
         reqs = self.parser.parse_requirements(text)
 
-        # Structured bullet requirements from company parser = high confidence
         for req in reqs:
             if req not in requirements_with_conf:
                 is_structured = (
@@ -317,7 +310,6 @@ class JobNERExtractor:
         Returns:
             Dict mapping requirement -> (requirement, confidence, method)
         """
-        # Use company-specific parser if available
         if self.parser:
             requirements_with_conf = self._extract_structured_requirements(text)
 
@@ -326,7 +318,6 @@ class JobNERExtractor:
 
             return requirements_with_conf
 
-        # Fallback to generic extraction (lower confidence)
         fallback_requirements = self._extract_requirements_fallback(text)
         requirements_with_conf = self._build_fallback_requirements(fallback_requirements)
 
@@ -396,7 +387,6 @@ class JobNERExtractor:
         bullets = re.findall(r"[\*•\-]\s+(.+?)(?:\n|$)", qual_text)
         for bullet in bullets:
             bullet = bullet.strip()
-            # Keep requirement bullets (10-150 chars, not starting with years)
             if 10 < len(bullet) < 150 and not re.match(r"^\d+\+", bullet):
                 if "years of experience" not in bullet.lower():
                     bullets_reqs.add(bullet)
@@ -485,30 +475,22 @@ class JobNERExtractor:
         """Generic requirement extraction fallback."""
         requirements = set()
 
-        # Years of experience from qualification sections
         for section_label in [r"basic\s+qualifications", r"minimum\s+qualifications", r"required\s+skills"]:
             requirements.update(self._extract_years_from_section(text, section_label))
 
-        # Other bullets from basic/minimum qualification sections
         for section_label in [r"basic\s+qualifications", r"minimum\s+qualifications", r"required\s+skills/experience"]:
             requirements.update(self._extract_qualification_bullets(text, section_label))
 
-        # Preferred qualifications
         requirements.update(self._extract_preferred_qualifications(text))
 
-        # Advanced degree
         requirements.update(self._extract_advanced_degree(text))
 
-        # Citizenship and export control
         requirements.update(self._extract_citizenship_requirement(text, requirements))
 
-        # Background check and drug test
         requirements.update(self._extract_background_check(text, requirements))
 
-        # Coding assessments and challenges
         requirements.update(self._extract_coding_assessment(text, requirements))
 
-        # Bachelor's degree
         requirements.update(self._extract_bachelors_degree(text, requirements))
 
         return requirements
