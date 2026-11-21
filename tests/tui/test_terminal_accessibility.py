@@ -66,8 +66,7 @@ class TestColorSchemeSupport:
         dashboard = ATPDashboard(StateManager())
         css = dashboard.CSS
 
-        # Should work on terminal without special theme handling
-        # (Textual handles light/dark automatically)
+        # Textual handles light/dark itself, so only CSS presence is asserted.
         assert len(css) > 0, "CSS must be defined for theme support"
 
 
@@ -93,7 +92,7 @@ class TestAccessibility:
         state_manager.phase_status["crawl"] = PhaseStatus.RUNNING
 
         pi = PhaseIndicator(state_manager)
-        # Widget should render status clearly (actual render requires app context)
+        # Render needs an app context, so this checks widget state, not output.
         assert hasattr(pi, "state"), "PhaseIndicator has access to state"
         assert "crawl" in state_manager.phase_status, "Phase status is trackable"
 
