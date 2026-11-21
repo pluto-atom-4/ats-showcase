@@ -229,7 +229,6 @@ class TestErrorHandling:
 
         metrics = state_manager.phase_metrics["crawl"]
         assert metrics.processed_items == 5
-        # Odd indices (i=1,3) fail; even indices succeed.
         assert metrics.failed_items == 2
 
 

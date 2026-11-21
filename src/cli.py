@@ -327,7 +327,6 @@ def _preprocess_job_for_phase(
     """
     try:
         clean_text = _build_preprocess_clean_text(job)
-        # Get doc with requirement spans for chunking.
         doc = preprocessor.nlp(clean_text) if preprocessor else None
         chunks = chunker.chunk(clean_text, doc=doc)
         token_count = sum(counter.count_tokens(c) for c in chunks)
@@ -1306,7 +1305,6 @@ def _preprocess_single_job(
         if preprocessor.categorizer_strategy == "custom":
             doc = preprocessor.apply_custom_spans(doc)
 
-        # Pass doc so chunking preserves requirement spans.
         chunks = chunker.chunk(clean_text, doc=doc)
         token_count = sum(counter.count_tokens(c) for c in chunks)
         estimated_cost = counter.estimate_cost(token_count)
@@ -1613,7 +1611,6 @@ def preprocess(
     logger.info("Starting preprocessing")
     typer.echo("🔄 Preprocessing jobs...\n")
 
-    # Validate span categorizer options (fail fast, exit 1 on bad input)
     _validate_categorizer_options(categorizer_strategy, span_patterns)
 
     # Validate preprocessing version (Issue #281 S5)
@@ -1663,7 +1660,6 @@ def preprocess(
     failed_count = 0
 
     if is_selective_reprocess:
-        # Phase 3C: Selective re-preprocessing from database
         store = JobStore()
         try:
             company_names = None
@@ -1782,7 +1778,6 @@ def preprocess(
             store.close()
 
     else:
-        # Phase 1-2: Normal preprocessing from files
         extracted_dir = Path("data/extracted_jobs")
         job_files = _validate_and_load_job_files(extracted_dir)
         typer.echo(f"📂 Processing {len(job_files)} job files...\n")
@@ -1863,7 +1858,6 @@ def _resolve_extracted_files(merge_all: bool, extracted: Optional[str], extracte
         logger.info(f"Processing {len(extracted_files)} extracted files: {[f.name for f in extracted_files]}")
         return extracted_files
 
-    # Legacy mode: use provided path or hardcoded default
     if extracted is None:
         extracted = "data/extracted_jobs/carbonrobotics_jobs.json"
         logger.warning("⚠️  Using hardcoded default for review. For multi-company workflows, use: review --merge-all")
