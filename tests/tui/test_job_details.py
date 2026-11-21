@@ -197,7 +197,6 @@ class TestAssessmentViewingWorkflow:
         job_data = {
             "id": "job_1",
             "title": "Minimal Job",
-            # Missing: assessment_summary, recommendations, scores
         }
 
         panel = JobDetailsPanel("job_1", job_data)
