@@ -75,7 +75,6 @@ def _verb_start_end(doc: Doc, start: int) -> int | None:
 
 
 # --- Participle inside a noun run (#523)
-# A participle tagged VERB (dep amod) joins the run only when a noun-run token follows; a trailing one is not absorbed.
 # A participle with dep acl ("systems used internally") is a clause, not a modifier.
 
 
@@ -338,7 +337,6 @@ def _adverb_led_list_end(doc: Doc, start: int) -> int | None:
 
 # --- Verb list before an object (#604)
 # "design, build, and maintain ... services": the skill verb is followed by a comma list of verbs, so no match starts.
-# Later verbs need only be VERB-tagged; the head verb must be a skill verb.
 
 
 def _verb_list_end(doc: Doc, start: int) -> int | None:
@@ -361,7 +359,6 @@ def _verb_list_end(doc: Doc, start: int) -> int | None:
 
 
 # --- Coordination extension (#509)
-# _coordinated_end() walks "A and B" / "A, B, and C" chains; bare-comma conjuncts stay only if a later one commits.
 # "lead data science, platform teams" -> "lead data science"; "or" followed by a VERB never merges.
 def _coordinated_end(doc: Doc, head_end: int) -> int:
     """Return the end of the coordinated span that starts at a head ending at ``head_end``.
@@ -505,8 +502,7 @@ class SkillExtractor:
                 adj_verb_end = _skill_verb_adjective_end(doc, i)
                 if adj_verb_end is not None:
                     matches.append(doc[i:adj_verb_end])
-            # Drop hyphen-variant matches whose "-" is spaced punctuation; the plain pattern still yields the
-            # non-hyphenated prefix.
+            # Spaced-dash hyphen variants are dropped; the plain pattern still yields the non-hyphenated prefix.
             matches = [
                 m
                 for m in matches
@@ -514,8 +510,7 @@ class SkillExtractor:
                 and not _is_glued_participle_head(doc, m.start)
                 and not _is_participial_with_head(doc, m.start)
             ]
-            # Extend each head through its coordinated conjuncts (#509); the extended span contains the
-            # head, so filter_spans keeps it.
+            # The extended span contains its head, so filter_spans keeps it.
             extended = [doc[m.start : _coordinated_end(doc, _participle_head_end(doc, m.end))] for m in matches]
 
             unique_spans = filter_spans(matches + extended)
