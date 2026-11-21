@@ -15,7 +15,6 @@ class Domain(str, Enum):
     GENERAL = "general"
 
 
-# Domain detection keywords
 DOMAIN_SIGNALS = {
     Domain.AEROSPACE: [
         r"\baerospace\b",
@@ -57,7 +56,6 @@ def detect_domain(job_description: str) -> Domain:
     """Detect job domain from description text."""
     text_lower = job_description.lower()
 
-    # Count signals per domain
     domain_scores = dict.fromkeys(Domain, 0)
 
     for domain, patterns in DOMAIN_SIGNALS.items():
@@ -65,153 +63,117 @@ def detect_domain(job_description: str) -> Domain:
             if re.search(pattern, text_lower, re.IGNORECASE):
                 domain_scores[domain] += 1
 
-    # Return domain with highest score, or GENERAL if no signals
     best_domain = max(domain_scores, key=lambda d: domain_scores[d])
     if domain_scores[best_domain] > 0:
         return best_domain
     return Domain.GENERAL
 
 
-# Aerospace domain keyphrases
 AEROSPACE_KEYPHRASES = {
-    # Core G&C concepts
     "Guidance and Control",
     "G&C algorithms",
-    # Design & analysis
     "Conceptual level design",
     "Post flight analysis",
     "Architectural decision making",
-    # Leadership & team
     "Team leadership",
     "Staff coaching",
     "Mentoring",
     "Technical oversight",
-    # Communication & collaboration
     "Collaborative skills",
     "Cross-functional communication",
     "Technical planning",
-    # Software practices
     "Software integration",
     "Software development",
     "Unit testing",
     "Verification and validation",
-    # Review & oversight
     "Design reviews",
     "Systems analysis",
     "Technical coaching",
-    # Operations
     "Launch operations support",
     "Test operations support",
-    # Testing & validation
     "Hardware-in-the-loop testing",
     "Vehicle test campaigns",
 }
 
-# Software domain keyphrases (Boeing, distributed systems)
-
 SOFTWARE_KEYPHRASES = {
-    # Architecture & design
     "Software architecture",
     "System design",
     "API design",
     "Database design",
     "Architecture review",
-    # Development practices
     "Hands-on software development",
     "Code reviews",
     "Design walkthroughs",
     "Technical documentation",
-    # Data & analytics
     "Binary data transformation",
     "Time-series data analytics",
     "Data collection",
     "Data preparation",
     "Quantitative analysis",
     "Statistical analysis",
-    # Sensor & calibration
     "Sensor data calibration",
     "Sensor data synchronization",
     "Integrity check implementation",
     "Engineering data interpretation",
     "Engineering drawing interpretation",
-    # Storage & systems
     "Storage architecture design",
     "Systems maintenance",
-    # Testing & quality
     "Code quality assurance",
     "Testing strategy",
-    # Cloud & deployment
     "Cloud service deployment",
     "CI/CD implementation",
-    # Leadership & management
     "Technical leadership",
     "Project management",
     "Technical coaching",
     "Mentoring",
-    # Analysis & planning
     "Problem decomposition",
     "Requirements analysis",
     "Technical communication",
     "Technology evaluation",
 }
 
-# Defense domain keyphrases (military, classified systems); overlaps software but adds defense-specific concepts
+# Overlaps SOFTWARE_KEYPHRASES; the defense-specific entries are the additions.
 
 DEFENSE_KEYPHRASES = {
-    # Architecture & design
     "Software architecture",
     "System design",
     "API design",
     "Database design",
-    # Development & implementation
     "Hands-on software development",
     "Software development",
     "Code reviews",
     "Design walkthroughs",
-    # Systems & maintenance
     "Systems maintenance",
     "Technical oversight",
-    # Data & transformation
     "Binary data transformation",
     "Data transformation",
     "Time-series data analytics",
     "Sensor data calibration",
     "Sensor data synchronization",
-    # Integration & testing
     "Software integration",
     "Integration testing",
     "Code quality assurance",
     "Testing strategy",
-    # Architecture & deployment
     "Cloud service deployment",
     "Infrastructure management",
-    # Verification
     "Verification and validation",
-    # Integrity
     "Integrity check implementation",
-    # Analysis
     "Engineering data interpretation",
     "Quantitative analysis",
     "Statistical analysis",
     "Problem decomposition",
     "Requirements analysis",
-    # Documentation
     "Software documentation",
     "Technical documentation",
-    # Leadership
     "Technical leadership",
     "Technical coaching",
     "Mentoring",
     "Project management",
-    # Communication
     "Technical communication",
     "Cross-functional communication",
 }
 
-# Hardware domain keyphrases (ASIC, FPGA, chip design)
-
 HARDWARE_KEYPHRASES = {
-    # Design & verification
     "Formal verification",
     "Clock gating",
     "CDC analysis",
@@ -219,23 +181,18 @@ HARDWARE_KEYPHRASES = {
     "Lint checking",
     "Gate simulation",
     "Timing analysis",
-    # Design entry
     "Verilog design",
     "SystemVerilog design",
     "SoC design",
     "ASIC design",
-    # Verification
     "SOC verification",
     "Performance optimization",
     "Power optimization",
     "DFT implementation",
-    # Integration & support
     "Systems maintenance",
     "Technical documentation",
     "Technical oversight",
 }
-
-# General/cross-domain keyphrases
 
 GENERAL_KEYPHRASES = {
     "Technical leadership",
