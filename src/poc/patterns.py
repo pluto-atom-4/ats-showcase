@@ -41,7 +41,6 @@ SECTION_RULER_PATTERNS: List[Dict[str, Any]] = [
             {"LOWER": "do"},
         ],
     },
-    # TOKEN PATTERNS (Single-word headers, backward compatible)
     {
         "label": "SECTION_REQUIREMENTS",
         "pattern": [
@@ -85,7 +84,6 @@ SECTION_RULER_PATTERNS: List[Dict[str, Any]] = [
         "pattern": r"(?i)(?:required\s+)?(?:professional\s+)?experience(?:\s+(?:section|level|required))?(?:\s*$|\n)",
         "type": "regex",
     },
-    # =================================================================
     {
         "label": "SECTION_BENEFITS",
         "pattern": [
