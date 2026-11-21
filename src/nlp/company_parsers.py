@@ -39,12 +39,10 @@ class BlueOriginParser(CompanyParser):
             bullets = re.findall(r"[\*•\-]\s+(.+?)(?:\n|$)", min_qual)
             for bullet in bullets:
                 bullet = bullet.strip()
-                # Keep bullets unless they're ONLY about years (no domain context)
                 is_only_years = re.match(r"^\d+\+?\s+years\s+of\s+experience\s*$", bullet, re.IGNORECASE)
                 if 10 < len(bullet) < 150 and not is_only_years:
                     requirements.add(bullet)
 
-        # Years of experience (only add if domain specified)
         years_pattern = (
             r"(\d+)\+?\s+years\s+(?:of\s+)?experience"
             r"(?:\s+(?:in|with|focused\s+on)\s+([^\.\n]+))?"

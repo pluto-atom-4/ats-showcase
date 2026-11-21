@@ -32,15 +32,11 @@ class ConfidentEntity:
         return self.value == str(other)
 
 
-# Confidence scores by extraction method
 CONFIDENCE_SCORES = {
-    # Skills
     ExtractionMethod.KEYPHRASE_EXACT: 0.95,
     ExtractionMethod.CONTEXT_INFERRED: 0.70,
     ExtractionMethod.SKILL_KEYWORD: 0.50,
-    # Technologies
     ExtractionMethod.PATTERN_MATCH: 0.92,
-    # Requirements
     ExtractionMethod.STRUCTURED_BULLET: 0.90,
     ExtractionMethod.FALLBACK: 0.65,
 }
