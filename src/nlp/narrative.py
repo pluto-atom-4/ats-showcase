@@ -44,7 +44,6 @@ class NarrativeRequirementExtractor:
         for sent in sentences:
             sent_text = sent.text.strip()
 
-            # Skip very short sentences and bullets
             if len(sent_text) < 15 or sent_text.startswith(("•", "*", "-", "●")):
                 continue
 
@@ -82,7 +81,6 @@ class NarrativeRequirementExtractor:
         """
         skills = set()
 
-        # Skill extraction patterns
         patterns = [
             (r"experience\s+(?:with|in|using)\s+([^,\.;]+?)(?:\s+and|\s+or|,|\.|\s+for)", 1),
             (r"expertise\s+(?:in|with)\s+([^,\.;]+?)(?:\s+and|\s+or|,|\.|\s+for)", 1),
@@ -93,7 +91,6 @@ class NarrativeRequirementExtractor:
         for pattern, group_idx in patterns:
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 skill = match.group(group_idx).strip()
-                # Filter out boilerplate
                 if skill and not any(x in skill.lower() for x in ["environments", "languages"]):
                     skills.add(skill)
 
@@ -103,7 +100,6 @@ class NarrativeRequirementExtractor:
         """Extract degree/certification requirements from narrative."""
         qualifications = set()
 
-        # Degree patterns
         degree_patterns = [
             r"(?:B\.?S\.?|Bachelor[''s]*)\s+(?:Degree|of\s+Science)\s+(?:in|from)\s+([^,\.;]+)",
             r"(?:M\.?S\.?|Master[''s]*)\s+(?:Degree|of\s+Science)\s+(?:in|from)\s+([^,\.;]+)",
@@ -128,7 +124,6 @@ class NarrativeRequirementExtractor:
         doc = self.nlp(text)
         sentences = list(doc.sents)
 
-        # Patterns for responsibilities (past tense, leadership, execution)
         resp_patterns = [
             r"(?:led|managed|directed|supervised)\s+([^,\.;]+?)(?:\s+(?:team|group|department)|,|\.)",
             r"(?:developed|designed|implemented|built)\s+([^,\.;]+?)(?:\s+system|s|,|\.)",
@@ -149,7 +144,6 @@ class NarrativeRequirementExtractor:
         """Extract soft skill requirements from narrative."""
         soft_skills = set()
 
-        # Soft skill phrases
         soft_skill_patterns = [
             r"(?:strong|excellent|exceptional)\s+(?:communication|interpersonal|leadership|organizational|problem.?solving|analytical|critical.?thinking)\s+(?:skill|ability|capacit)",
             r"(?:ability|capacity)\s+to\s+(?:work|collaborate|communicate)\s+(?:effectively|independently|with\s+(?:team|group|diverse))",
