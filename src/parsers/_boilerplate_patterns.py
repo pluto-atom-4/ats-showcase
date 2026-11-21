@@ -108,6 +108,7 @@ NAVIGATION_PATTERNS = [
     r"(?i)read\s+more",
 ]
 
+# Compiled once at module load.
 _COMPILED_PATTERNS: Dict[str, List[re.Pattern[str]]] = {
     "legal_compliance": [re.compile(p, re.IGNORECASE | re.MULTILINE) for p in LEGAL_COMPLIANCE_PATTERNS],
     "section_headers": [re.compile(p, re.IGNORECASE | re.MULTILINE) for p in SECTION_HEADER_PATTERNS],

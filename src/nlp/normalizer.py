@@ -8,6 +8,7 @@ def normalize_requirement(req: str) -> str:
     """Clean and normalize requirement text."""
     req = req.strip()
 
+    # Strip the (Preferred) tag here and re-add it at the end.
     is_preferred = "(Preferred)" in req
     req = req.replace("(Preferred)", "").strip()
 
@@ -103,6 +104,7 @@ def normalize_skills(skills: set[str]) -> set[str]:
     """Normalize skill names (preserve exact format from extraction)."""
     normalized = set()
 
+    # Keeps exact casing; .capitalize() below would mangle these.
     known_skills = {
         "Guidance and Control",
         "G&C algorithms",

@@ -387,6 +387,7 @@ class JobNERExtractor:
         bullets = re.findall(r"[\*•\-]\s+(.+?)(?:\n|$)", qual_text)
         for bullet in bullets:
             bullet = bullet.strip()
+            # Keep requirement bullets (10-150 chars, not starting with years)
             if 10 < len(bullet) < 150 and not re.match(r"^\d+\+", bullet):
                 if "years of experience" not in bullet.lower():
                     bullets_reqs.add(bullet)
