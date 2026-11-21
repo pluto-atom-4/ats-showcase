@@ -216,11 +216,13 @@ class TestValidatePatternMultiLevelWrapper:
             "([(]a)+",
             # Escaped quantifier is a literal, not a quantified atom
             r"((a\+))+",
+            # Body ends in a literal after the quantified atom
             "((a+)b)+",
             # Wrapper without an outer repeat
             "((a+))",
             # Exact count is not a repeat (matches the existing {n} policy)
             "((a+)){2}",
+            # Sibling groups do not nest
             "(a+)(b+)",
         ],
     )

@@ -164,6 +164,7 @@ class TestRequirementExtractionIntegration:
             for job in sample_jobs:
                 preprocessor.extract_trigger_requirements(job["description"])
 
+        # Warm-up run primes the same measured path; median over repeats
         total_ms = median_elapsed_ms(run_batch, repeats=3, warmup=1)
         avg_time_per_job = total_ms / len(sample_jobs)
 

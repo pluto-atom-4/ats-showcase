@@ -744,6 +744,7 @@ class TestComprehensiveEndToEnd:
             elapsed_ms = (time.perf_counter() - start) * 1000
             return elapsed_ms / len(SAMPLE_JOBS)
 
+        # Warm-up absorbs first-call cost; median of repeats suppresses jitter.
         run_batch()
         samples = [run_batch() for _ in range(3)]
         avg_ms_per_job = statistics.median(samples)
