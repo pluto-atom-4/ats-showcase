@@ -31,7 +31,6 @@ class TestPreprocessVersionValidation:
                 app,
                 ["preprocess", "--preprocessing-version", "4.0"],
             )
-            # Invalid version should cause exit code 1
             assert result.exit_code == 1
         finally:
             if jobs_file.exists():
@@ -121,7 +120,6 @@ class TestBuildSectionedRequirements:
 
     def test_build_sectioned_requirements_with_real_detector(self, monkeypatch: Any) -> None:
         """Real Preprocessor with SectionDetector extracts requirements correctly."""
-        # Monkeypatch to skip spaCy model loading
         monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
 
         detector = SectionDetector()
@@ -147,7 +145,6 @@ class TestBuildSectionedRequirements:
         """Preprocessor without section_engine returns None (v2.0 path)."""
         monkeypatch.setattr(Preprocessor, "_load_model", lambda self: None)
 
-        # Without section_engine this is v2.0 behavior.
         preprocessor = Preprocessor(extract_requirements=False, section_engine=None)
 
         clean_text = """## Requirements
@@ -156,7 +153,6 @@ class TestBuildSectionedRequirements:
 
         result = _build_sectioned_requirements(preprocessor, clean_text)
 
-        # Must return None when engine is not configured
         assert result is None
 
 

@@ -59,11 +59,9 @@ class TestCleanHtmlFullPipeline:
         """Boilerplate categories can be skipped."""
         html = "<p>Salary: $100K. We are committed to diversity.</p>"
 
-        # Skipping salary_benefits must preserve "$100K".
         result = clean_html(html, skip_boilerplate_categories={"salary_benefits"})
         assert "$" in result or "100" in result
 
-        # Skipping company_boilerplate must preserve "committed".
         result = clean_html(html, skip_boilerplate_categories={"company_boilerplate"})
         assert "committed" in result.lower()
 
@@ -83,12 +81,10 @@ class TestCleanHtmlFullPipeline:
 
         html = "<h1>Job Title</h1><p>Content here</p>"
 
-        # Mock MarkItDown to raise ImportError (simulates unavailable library)
         with patch("src.parsers.html_to_markdown.MarkItDown") as mock_markitdown:
             mock_markitdown.return_value.convert.side_effect = ImportError("MarkItDown not installed")
             result = html_to_markdown(html)
 
-        # Should return clean text via BeautifulSoup, NOT raw HTML
         assert result != html, "Should not return raw HTML on MarkItDown failure"
         assert "Job Title" in result or "Content" in result, "Should extract text via BeautifulSoup"
         assert isinstance(result, str)
@@ -110,7 +106,6 @@ class TestCleanHtmlFullPipeline:
             mock_bs.side_effect = RuntimeError("BeautifulSoup boom")
             result = html_to_markdown(html)
 
-        # Safe fallback: return original HTML
         assert result == html, "Should return original HTML as safe fallback when all else fails"
 
     def test_clean_html_beautifulsoup_path(self) -> None:
@@ -181,7 +176,6 @@ class TestBoilerplateRemovalCategories:
         html = "<p>We need a contractor for this project.</p>"
         result = clean_html(html)
 
-        # "contractor" should NOT be removed
         assert "contractor" in result.lower()
 
     def test_salary_benefits_removal(self) -> None:
@@ -256,7 +250,6 @@ class TestEdgeCases:
 
     def test_huge_html_input(self) -> None:
         """Large HTML document is processed without error."""
-        # Create a 100KB HTML document
         large_html = "<p>Content here.</p>" * 5000
         result = clean_html(large_html)
 
@@ -399,7 +392,6 @@ class TestPerformance:
             clean_html(job_html)
         elapsed = time.time() - start
 
-        # Should complete in under 10 seconds
         assert elapsed < 10, f"100 jobs took {elapsed:.2f}s, expected < 10s"
 
 

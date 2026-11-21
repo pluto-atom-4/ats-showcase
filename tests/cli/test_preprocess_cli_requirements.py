@@ -262,7 +262,6 @@ class TestPreprocessCLITokenCostAnalysis:
         assert result_with.exit_code in [0, 1]
         assert result_without.exit_code in [0, 1]
 
-        # Requirement extraction must add under 5% to total tokens.
         if tokens_with is not None and tokens_without is not None and tokens_without > 0:
             percent_increase = ((tokens_with - tokens_without) / tokens_without) * 100
             assert percent_increase < 5.0, f"Token increase too high: {percent_increase:.2f}% (expected <5%)"
