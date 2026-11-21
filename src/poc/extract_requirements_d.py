@@ -209,6 +209,7 @@ def _find_matching_requirement(
             union_len = max(len(target_lower), len(candidate_lower))
             substring_score = overlap_len / union_len if union_len > 0 else 0
 
+            # Substring matches between long (>40 chars) requirements are weighted higher.
             if min(len(target_lower), len(candidate_lower)) > 40:
                 ratio = max(ratio, substring_score * 1.1)
             else:

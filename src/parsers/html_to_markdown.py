@@ -62,6 +62,7 @@ def _normalize_html_before_extraction(html: str) -> str:
     html = re.sub(r":\s*[A-Za-z]+\d+", "", html)
     html = re.sub(r":\s*\d{4,}", "", html)
 
+    # Drop colons left orphaned by the removals above.
     html = re.sub(r">:\s*", "> ", html)
 
     # Remove empty paired tags; the backreference avoids matching unrelated tags.
@@ -369,6 +370,7 @@ def _process_divider_parts(parts: List[str], result: List[str]) -> None:
     """
     for i, part in enumerate(parts):
         part = part.strip()
+        # Workday leaves stray leading colons.
         part = re.sub(r"^:+\s*", "", part).strip()
 
         if _should_skip_divider_part(part):
@@ -438,6 +440,7 @@ def _insert_section_dividers(lines: List[str]) -> List[str]:
     Returns:
         List with dividers inserted before headers and isolated on own lines
     """
+    # Normalize embedded dividers first, then drop consecutive duplicates.
     normalized_lines = _normalize_divider_lines(lines)
 
     deduplicated: List[str] = []
