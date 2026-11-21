@@ -145,24 +145,19 @@ def _normalize_requirement_for_comparison(req: str) -> str:
     """
     req = req.strip()
 
-    # Remove parenthetical notes at end (e.g., "(Preferred)")
     req = re.sub(r"\s*\(.*?\)\s*$", "", req)
 
-    # Collapse verbose alternatives (and/or patterns)
     req = re.sub(r"working\s+with\s+and/or\s+", "", req, flags=re.IGNORECASE)
     req = re.sub(r"working\s+with\s+", "", req, flags=re.IGNORECASE)
 
-    # Simplify adjectives before "experience"
     adj_pattern = r"\b(deep|strong|extensive|proven|demonstrated)\s+experience\b"
     req = re.sub(adj_pattern, "experience", req, flags=re.IGNORECASE)
 
     req = re.sub(r"\bhands-?on\s+", "", req, flags=re.IGNORECASE)
 
-    # Standardize years patterns
     years_pattern = r"(\d+)\+?\s+years?\s+(?:of\s+)?experience\s+"
     req = re.sub(years_pattern, r"\1+ years of experience ", req, flags=re.IGNORECASE)
 
-    # Collapse multiple spaces
     req = re.sub(r"\s+", " ", req).strip()
 
     return req
@@ -214,7 +209,6 @@ def _find_matching_requirement(
             union_len = max(len(target_lower), len(candidate_lower))
             substring_score = overlap_len / union_len if union_len > 0 else 0
 
-            # Substring matches between long (>40 chars) requirements are weighted higher.
             if min(len(target_lower), len(candidate_lower)) > 40:
                 ratio = max(ratio, substring_score * 1.1)
             else:
@@ -399,7 +393,6 @@ def detect_sections(
     else:
         logger.debug("No 'ruler' span key found in doc.spans")
 
-    # Attach metadata to doc
     doc._.detected_sections = detected_sections
     doc._.section_labels = section_labels
 
