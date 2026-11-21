@@ -13,7 +13,6 @@ def transform_html_to_markdown(html_input):
         cleaned_text = text_node.replace("\xa0", " ")
         text_node.replace_with(cleaned_text)
 
-    # Force the bold header into its own block: look for <b> tags followed by a <br/>.
     for b_tag in soup.find_all("b"):
         if b_tag.next_sibling and b_tag.next_sibling.name == "br":
             # Wrap the bold element in <p> so MarkItDown treats it as a separate block
