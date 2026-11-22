@@ -24,7 +24,6 @@ def format_job_row(job: Job) -> str:
     Returns:
         Formatted string with pipe-separated fields, column-aligned.
     """
-    # Use fixed column widths for alignment
     posted_date = (job.get("posted_date") or "-")[:15].ljust(15)
     title = job["title"][:70].ljust(70)
     company = job["company"][:20].ljust(20)
@@ -215,7 +214,6 @@ class JobSelectorApp(App):
 
         filtered_ids = {job["id"] for job in filtered}
 
-        # Select all job IDs for jobs in the current filtered list
         for idx in range(job_list.option_count):
             option = job_list.get_option_at_index(idx)
             job_id = option.value
