@@ -28,13 +28,11 @@ from src.tokenization.soft_skills import (
 
 __all__ = [
     "Preprocessor",
-    # Soft skills
     "SOFT_SKILLS",
     "SOFT_SKILLS_BY_CATEGORY",
     "get_all_soft_skills",
     "get_soft_skills_by_category",
     "get_all_categories",
-    # Noise words
     "NOISE_WORDS",
     "NOISE_WORDS_BY_CATEGORY",
     "get_all_noise_words",
