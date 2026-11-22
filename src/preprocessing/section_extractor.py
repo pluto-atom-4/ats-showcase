@@ -90,20 +90,15 @@ def _normalize_requirement_for_comparison(req: str) -> str:
     """
     req = req.strip()
 
-    # Remove parenthetical notes at end (e.g., "(Preferred)")
     req = _PARENTHETICAL_PATTERN.sub("", req)
 
-    # Collapse verbose alternatives (and/or patterns)
     req = _WORKING_WITH_PATTERN.sub("", req)
     req = _WORKING_PATTERN.sub("", req)
 
-    # Simplify adjectives before "experience"
     req = _ADJECTIVE_PATTERN.sub("experience", req)
 
-    # Remove "hands-on" prefix
     req = _HANDS_ON_PATTERN.sub("", req)
 
-    # Standardize years patterns
     req = _YEARS_PATTERN.sub(r"\1+ years of experience ", req)
 
     req = _WHITESPACE_PATTERN.sub(" ", req).strip()
@@ -142,17 +137,14 @@ def _find_matching_requirement(
     for candidate in candidates:
         normalized_candidate = _normalize_requirement_for_comparison(candidate)
 
-        # Check for exact match after normalization (highest confidence)
         if normalized_target.lower() == normalized_candidate.lower():
             return (candidate, 1.0)
 
-        # Fuzzy string matching using SequenceMatcher
         target_lower = normalized_target.lower()
         candidate_lower = normalized_candidate.lower()
 
         ratio = SequenceMatcher(None, target_lower, candidate_lower).ratio()
 
-        # Boost score for substring matches
         if target_lower in candidate_lower or candidate_lower in target_lower:
             overlap_len = min(len(target_lower), len(candidate_lower))
             union_len = max(len(target_lower), len(candidate_lower))

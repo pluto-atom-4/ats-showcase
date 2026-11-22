@@ -41,13 +41,12 @@ class SectionLabel(StrEnum):
 
 
 SECTION_RULER_PATTERNS: tuple[dict[str, Any], ...] = (
-    # Target sections: requirements are extracted from these.
     # Multi-word headers: tokens must match spaCy's tokenization.
     {
         "label": SectionLabel.KNOWLEDGE_SKILLS.value,
         "pattern": [
             {"LOWER": "knowledge"},
-            {"IS_PUNCT": True, "OP": "?"},  # optional comma
+            {"IS_PUNCT": True, "OP": "?"},
             {"LOWER": "skills"},
             {"LOWER": {"IN": ["&", "and"]}},
             {"LOWER": "abilities"},
@@ -70,7 +69,6 @@ SECTION_RULER_PATTERNS: tuple[dict[str, Any], ...] = (
             {"LOWER": "do"},
         ],
     },
-    # Single-word headers: token patterns, plus one regex for technical skills.
     {
         "label": SectionLabel.REQUIREMENTS.value,
         "pattern": [
@@ -114,7 +112,6 @@ SECTION_RULER_PATTERNS: tuple[dict[str, Any], ...] = (
         "pattern": r"(?i)(?:required\s+)?(?:professional\s+)?experience(?:\s+(?:section|level|required))?(?:\s*$|\n)",
         "type": "regex",
     },
-    # Filter sections: extraction skips these.
     {
         "label": SectionLabel.BENEFITS.value,
         "pattern": [
@@ -138,20 +135,16 @@ SECTION_RULER_PATTERNS: tuple[dict[str, Any], ...] = (
 
 CONFIDENCE_ADJUSTMENT_BY_SECTION: Mapping[SectionLabel, float] = MappingProxyType(
     {
-        # High priority sections (explicit requirements)
         SectionLabel.REQUIREMENTS: 0.15,
         SectionLabel.QUALIFICATIONS: 0.10,
         SectionLabel.TECHNICAL_SKILLS: 0.12,
         SectionLabel.KNOWLEDGE_SKILLS: 0.12,
-        # Medium priority sections
         SectionLabel.EXPERIENCE: 0.08,
         SectionLabel.IN_OFFICE: 0.08,
         SectionLabel.EDUCATION: 0.05,
-        # Lower priority sections
         SectionLabel.PREFERRED_SKILLS: -0.15,
         SectionLabel.NICE_TO_HAVE: -0.25,
         SectionLabel.WHAT_YOU_DO: -0.05,
-        # Filter sections (exclude from extraction)
         SectionLabel.BENEFITS: -0.50,
         SectionLabel.COMPENSATION: -0.50,
         SectionLabel.HIRING_PROCESS: -0.50,
@@ -161,7 +154,6 @@ CONFIDENCE_ADJUSTMENT_BY_SECTION: Mapping[SectionLabel, float] = MappingProxyTyp
 
 SECTION_DISPLAY_NAMES: Mapping[SectionLabel, str] = MappingProxyType(
     {
-        # Token-based patterns
         SectionLabel.REQUIREMENTS: "Requirements",
         SectionLabel.QUALIFICATIONS: "Qualifications",
         SectionLabel.TECHNICAL_SKILLS: "Technical Skills",
@@ -169,11 +161,9 @@ SECTION_DISPLAY_NAMES: Mapping[SectionLabel, str] = MappingProxyType(
         SectionLabel.NICE_TO_HAVE: "Nice to Have",
         SectionLabel.EDUCATION: "Education",
         SectionLabel.EXPERIENCE: "Experience",
-        # Regex-based patterns
         SectionLabel.KNOWLEDGE_SKILLS: "Knowledge, Skills & Abilities",
         SectionLabel.IN_OFFICE: "In Office Requirements",
         SectionLabel.WHAT_YOU_DO: "What You'll Do",
-        # Filter sections
         SectionLabel.BENEFITS: "Benefits",
         SectionLabel.COMPENSATION: "Compensation",
         SectionLabel.HIRING_PROCESS: "Hiring Process",
