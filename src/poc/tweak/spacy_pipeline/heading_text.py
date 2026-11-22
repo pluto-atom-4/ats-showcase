@@ -20,8 +20,6 @@ Issue #268: Drop heading-only requirements. Issue #724: shared helper.
 import re
 from typing import Optional
 
-# Strips leading #, *, _ and whitespace, and trailing *, _, :, . and whitespace,
-# including a closing ATX run of #'s that is preceded by whitespace; markers in any order are fully stripped.
 # A "#" attached to a word is kept ("C#" stays "c#").
 _HEADING_MARKER_PATTERN = re.compile(r"^[#*_\s]+|(?:[*_:.\s]|\s#+(?=[\s*_:.#]*$))+$")
 
@@ -39,7 +37,6 @@ KNOWN_HEADING_PHRASES: frozenset[str] = frozenset(
 )
 
 # Deliberately narrow, not a general boilerplate detector; matched against the normalized key.
-# Matches the "applicants who do not meet ... qualifications will not be forwarded to the hiring department" notice,
 # which is boilerplate, not a heading.
 _BOILERPLATE_PATTERN = re.compile(
     r"applicants who do not meet (?:these|the minimum|the) qualifications "
