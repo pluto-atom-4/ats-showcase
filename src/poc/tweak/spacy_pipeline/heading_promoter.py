@@ -39,6 +39,7 @@ from src.poc.tweak.spacy_pipeline.section_header_keywords import SECTION_HEADER_
 
 logger = logging.getLogger(__name__)
 
+# Promoter-only set: 61 phrases (Issue #365 base set plus live-job-seen extras), none classified 'other'.
 # duties, education and nice to have are 'other' but in-vocabulary via SECTION_HEADER_KEYWORDS_ONLY (#733), not here.
 # The canonical filter phrases (KNOWN_HEADING_PHRASES) are unioned in below rather than listed twice.
 _PROMOTER_ONLY_HEADINGS: FrozenSet[str] = frozenset(
@@ -107,6 +108,7 @@ _PROMOTER_ONLY_HEADINGS: FrozenSet[str] = frozenset(
     ]
 )
 
+# Full vocabulary (83): promoter-only (61) + canonical filter phrases (6) + 16 section-header keywords (Issue #733).
 # Promoting them regardless of SectionClassifier labels is a human decision (#733), not a consistency result.
 # The allowlist test pins this behaviour.
 KNOWN_PLAIN_HEADINGS: FrozenSet[str] = _PROMOTER_ONLY_HEADINGS | KNOWN_HEADING_PHRASES | SECTION_HEADER_KEYWORDS_ONLY
@@ -131,16 +133,20 @@ EEO_TRIGGERS: FrozenSet[str] = frozenset(
 # promoted to "## Benefits" by an earlier pass still matches "benefits".
 HEADING_PREFIX_PATTERN = re.compile(r"^#{1,6}\s+")
 
+# End of a sentence: sentence-ending punctuation followed by whitespace (Issue #374).
 # An EEO paragraph is only a candidate when its trigger sits in this first sentence.
 FIRST_SENTENCE_END_PATTERN = re.compile(r"[.!?](?=\s)")
 
+# Sentence boundary used to examine every sentence after the first (Issue #374).
 # Known limitation (accepted): it also splits after abbreviations such as "U.S.", and the fragment "Applicants from the
 # U.S." then blocks isolation.
 _SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?])\s+")
 
+# DEI vocabulary that may follow an EEO sentence in the same paragraph (Issue #374).
 # Known limitation: hand-picked, so a job sentence containing "diversity" is also treated as EEO-ish.
 EEO_CONTINUATION_PATTERN = re.compile(r"\b(diversity|diverse|inclusion|inclusive|belonging)\b", re.IGNORECASE)
 
+# "without regard to" + protected-class term within ~60 chars (Issue #374 Defect 3); terms are singular or plural.
 # A bare "on the basis of" lead-in is deliberately absent: "Pay is set on the basis of age and experience."
 # would otherwise read as an EEO statement.
 PROTECTED_CLASS_PATTERN = re.compile(
@@ -150,6 +156,7 @@ PROTECTED_CLASS_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Disclaimer sentence after an EEO first sentence (Issue #374 round 6): "We do not discriminate." or
 # "do/does/will not discriminate" followed by on/against/based, so it does not block isolation.
 # Known limitation: a first-person job sentence "We do not discriminat..." is also read as EEO-ish.
 DISCRIMINATE_PATTERN = re.compile(

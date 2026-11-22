@@ -37,6 +37,7 @@ KNOWN_HEADING_PHRASES: frozenset[str] = frozenset(
 )
 
 # Deliberately narrow, not a general boilerplate detector; matched against the normalized key.
+# Matches the "applicants who do not meet ... qualifications will not be forwarded to the hiring department" notice,
 # which is boilerplate, not a heading.
 _BOILERPLATE_PATTERN = re.compile(
     r"applicants who do not meet (?:these|the minimum|the) qualifications "
