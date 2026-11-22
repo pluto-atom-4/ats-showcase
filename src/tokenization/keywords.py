@@ -13,7 +13,6 @@ Phase 5 (Issue #192) additions focus on aerospace/defense/manufacturing domains:
 """
 
 TECH_KEYWORDS = {
-    # Programming Languages
     "languages": {
         "python",
         "javascript",
@@ -29,7 +28,6 @@ TECH_KEYWORDS = {
         "scala",
         "kotlin",
     },
-    # Web Frameworks & Libraries
     "web": {
         "react",
         "vue",
@@ -45,7 +43,6 @@ TECH_KEYWORDS = {
         "svelte",
         "astro",
     },
-    # Cloud & Infrastructure
     "infrastructure": {
         "aws",
         "gcp",
@@ -68,7 +65,6 @@ TECH_KEYWORDS = {
         "harbor",
         "quay",
     },
-    # Databases & Data
     "databases": {
         "postgresql",
         "mysql",
@@ -121,7 +117,6 @@ TECH_KEYWORDS = {
         "cordic",
         "mac",
     },
-    # ML/AI Frameworks
     "ml_ai": {
         "tensorflow",
         "pytorch",
@@ -144,7 +139,6 @@ TECH_KEYWORDS = {
         "llm",
         "timm",
     },
-    # DevOps, Tools & Protocols
     "tools": {
         "jira",
         "confluence",
@@ -174,7 +168,6 @@ TECH_KEYWORDS = {
         "erp",
         "mrp",
     },
-    # Methodologies & Practices
     "methodologies": {
         "agile",
         "scrum",
@@ -185,7 +178,6 @@ TECH_KEYWORDS = {
         "lean",
         "xp",
     },
-    # Robotics & Emerging
     "robotics": {
         "ros",
         "ros2",
@@ -193,7 +185,6 @@ TECH_KEYWORDS = {
         "moveit",
         "webots",
     },
-    # Other Critical Tools
     "other": {
         "protobuf",
         "json",
