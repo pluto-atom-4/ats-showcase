@@ -10,6 +10,9 @@ import re
 import shutil
 import sys
 import tokenize
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -27,14 +30,24 @@ HEADER_RE = re.compile(r"\b(?:spdx|copyright|license)\b", re.IGNORECASE)
 ENCODING_RE = re.compile(r"coding[:=]\s*[-\w.]+")
 WHY_RE = re.compile(
     r"\b(?:why|because|hazard|do not|don't|workaround|units?|ordering|order matters"
-    r"|race|deadlock|thread-unsafe|timezone|utc|axis|sign convention|rad|deg)\b"
-    r"|https?://",
+    r"|race|deadlock|thread-unsafe|timezone|utc|axis|sign convention|rad|deg"
+    r"|deliberat(?:e|ely)|intentional(?:ly)?|known limitation|silent(?:ly)?)\b"
+    r"|\bbackward[- ]compat"
+    r"|https?://"
+    r"|\bregisters?\b.*\b(?:decorator|factory|@Language\.factory)\b"
+    r"|\b(?:run|runs)\s+(?:before|after|first)\b",
     re.IGNORECASE,
 )
 ISSUE_REF_RE = re.compile(r"(?<![\w&])#\d+\b")
 SYNTHETIC_RE = re.compile(r"\bSYNTHETIC\b")
 TODO_RE = re.compile(r"\b(?:todo|fixme)\b", re.IGNORECASE)
 TRACKED_REF_RE = re.compile(r"#\d+|https?://|issue\s+\d+", re.IGNORECASE)
+_KEEP_LIST_PATH = Path(__file__).with_name("why_keep_list.json")
+REPO_ROOT = Path(__file__).resolve().parent.parent
+KEPT_OVERRIDES: frozenset[tuple[str, str]] = frozenset(
+    (file_key, text) for file_key, text in json.loads(_KEEP_LIST_PATH.read_text(encoding="utf-8"))
+)
+_FILE_KEY: ContextVar[str | None] = ContextVar("strip_comments_file_key", default=None)
 
 
 @dataclass
@@ -119,7 +132,15 @@ def _trim_long_blocks(kept_full: list[int], lines: list[str], removed_full: set[
             result.manual_review.append({"line": line_no, "text": lines[line_no - 1].strip(), "tag": "trimmed_why"})
 
 
+def _kind_for(text: str, line_no: int, full_line: bool, file_key: str | None) -> str:
+    kind = _classify(text, line_no, full_line)
+    if kind == "remove" and file_key is not None and (file_key, text.lstrip("#").strip()) in KEPT_OVERRIDES:
+        return "why"
+    return kind
+
+
 def process_source(source: str) -> FileResult:
+    file_key = _FILE_KEY.get()
     lines = source.split("\n")
     result = FileResult(new_source=source)
     comments = [
@@ -134,7 +155,7 @@ def process_source(source: str) -> FileResult:
 
     for line_no, col, text in comments:
         full_line = lines[line_no - 1][:col].strip() == ""
-        kind = _classify(text, line_no, full_line)
+        kind = _kind_for(text, line_no, full_line, file_key)
         if kind == "directive":
             result.directive_count += 1
             continue
@@ -218,6 +239,22 @@ def collect_files(paths: list[Path]) -> list[Path]:
     return files
 
 
+def _repo_key(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+@contextmanager
+def _file_scope(file_key: str | None) -> Iterator[None]:
+    token = _FILE_KEY.set(file_key)
+    try:
+        yield
+    finally:
+        _FILE_KEY.reset(token)
+
+
 def run(paths: list[Path], apply: bool = False, report: dict | None = None) -> dict:
     if report is None:
         report = {"files": [], "directive_total": 0, "removed_total": 0}
@@ -235,7 +272,8 @@ def run(paths: list[Path], apply: bool = False, report: dict | None = None) -> d
         try:
             with open(path, encoding="utf-8", newline="") as fh:
                 original = fh.read()
-            res = process_source(original)
+            with _file_scope(_repo_key(path)):
+                res = process_source(original)
             entry["directive_count"] = res.directive_count
             entry["kept_why_count"] = res.kept_why_count
             entry["manual_review"] = res.manual_review
