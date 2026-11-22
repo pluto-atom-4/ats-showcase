@@ -12,7 +12,6 @@ def normalize_requirement(req: str) -> str:
     is_preferred = "(Preferred)" in req
     req = req.replace("(Preferred)", "").strip()
 
-    # Drop trailing location/project context so only the primary requirement remains.
     req = re.sub(r"\s+on\s+fast-paced\s+projects$", "", req, flags=re.IGNORECASE)
     req = re.sub(r"\s+on\s+military\s+installations?$", "", req, flags=re.IGNORECASE)
 
@@ -20,7 +19,6 @@ def normalize_requirement(req: str) -> str:
     req = re.sub(r",\s+(?:simulations|software),\s+and\s+[^,\.]*$", "", req, flags=re.IGNORECASE)
     req = re.sub(r",\s+and\s+integrated\s+vehicle.*$", "", req, flags=re.IGNORECASE)
 
-    # Handle "development, implementation, and testing" → "implementation and testing"
     if re.search(r"^Experience\s+in\s+development,\s+implementation,\s+and", req, re.IGNORECASE):
         req = re.sub(r"development,\s+", "", req, flags=re.IGNORECASE)
         req = re.sub(r",\s+and\s+", " and ", req, flags=re.IGNORECASE)
@@ -33,8 +31,6 @@ def normalize_requirement(req: str) -> str:
     if req.lower() == "experience in development":
         return ""
 
-    # Standardize phrasing patterns
-    # "Demonstrated experience X" → "Experience X"
     req = re.sub(r"^Demonstrated\s+experience\s+(?:in|with|involving)\s+", "Experience in ", req, flags=re.IGNORECASE)
     req = re.sub(r"^Demonstrated\s+ability\s+to\s+", "Ability to ", req, flags=re.IGNORECASE)
     req = re.sub(r"\s+as\s+well\s+as\s+", " and ", req, flags=re.IGNORECASE)
@@ -64,7 +60,6 @@ def deduplicate_requirements(requirements: set[str], similarity_threshold: float
         if i in used_indices:
             continue
 
-        # Check similarity with already-kept requirements and future ones
         keep_this = True
         for j in range(i + 1, len(reqs)):
             if j in used_indices:
@@ -72,18 +67,14 @@ def deduplicate_requirements(requirements: set[str], similarity_threshold: float
             other = reqs[j]
             ratio = SequenceMatcher(None, req.lower(), other.lower()).ratio()
 
-            # If similarity is high, mark longer one as duplicate
             if ratio > similarity_threshold:
                 if req.lower() in other.lower():
-                    # req is shorter and contained in other, keep req, discard other
                     used_indices.add(j)
                 elif other.lower() in req.lower():
-                    # other is shorter, discard this one
                     keep_this = False
                     used_indices.add(i)
                     break
                 else:
-                    # Similar but not substring, keep shorter
                     if len(req) <= len(other):
                         used_indices.add(j)
                     else:
@@ -113,9 +104,8 @@ def normalize_skills(skills: set[str]) -> set[str]:
     """Normalize skill names (preserve exact format from extraction)."""
     normalized = set()
 
-    # Known correctly-capitalized skills (multi-domain)
+    # Keeps exact casing; .capitalize() below would mangle these.
     known_skills = {
-        # Aerospace/Software Leadership
         "Guidance and Control",
         "G&C algorithms",
         "Conceptual level design",
@@ -139,7 +129,6 @@ def normalize_skills(skills: set[str]) -> set[str]:
         "System modeling",
         "Hardware-in-the-loop testing",
         "Vehicle test campaigns",
-        # ASIC/Hardware
         "Formal verification",
         "Clock gating",
         "CDC analysis",
@@ -155,7 +144,6 @@ def normalize_skills(skills: set[str]) -> set[str]:
         "DFT implementation",
         "Gate simulation",
         "Timing analysis",
-        # Software/Systems Domain
         "Software architecture",
         "Hands-on software development",
         "Systems maintenance",
@@ -180,7 +168,6 @@ def normalize_skills(skills: set[str]) -> set[str]:
         "Data preparation",
         "Cloud service deployment",
         "Software documentation",
-        # Additional Software/Systems
         "Software design",
         "System design",
         "Component design",
@@ -211,7 +198,6 @@ def normalize_skills(skills: set[str]) -> set[str]:
         if skill in known_skills:
             normalized.add(skill)
         else:
-            # Fallback: capitalize first letter of each word
             words = skill.split()
             capitalized = [w.capitalize() for w in words]
             normalized.add(" ".join(capitalized))
