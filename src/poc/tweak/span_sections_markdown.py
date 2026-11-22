@@ -2,6 +2,7 @@ import re
 
 
 def split_markdown_to_sections(text):
+    # #/##/### headings, '## **' headings, and lines that are only bold text.
     header_patterns = [
         r"^#{1,3}",
         r"^## \*\*",

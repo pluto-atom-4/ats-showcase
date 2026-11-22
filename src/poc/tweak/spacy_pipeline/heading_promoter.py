@@ -382,6 +382,8 @@ class HeadingPromoter(PipelineComponent):
         insert_line_idx = para_starts[first_eeo_idx]
 
         result_lines = list(lines)
+        # Keep the glued known heading line in place and insert the synthetic EEO heading, with blank lines around it,
+        # after that line.
         if split_glued_heading:
             result_lines.insert(insert_line_idx + 1, "")
             result_lines.insert(insert_line_idx + 2, "## Equal Opportunity Employer")
