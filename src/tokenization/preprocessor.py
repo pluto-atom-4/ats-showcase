@@ -283,6 +283,7 @@ class Preprocessor:
                 technologies.update(md_technologies)
                 requirements.update(md_requirements)
 
+                # For markdown, drop benefits/compensation/about/culture sections from full-text extraction.
                 skip_pattern_str = (
                     r"^#{1,3}\s+.*?"
                     r"(benefits|compensation|salary|pay|about|culture|company|how to apply)"
@@ -845,6 +846,7 @@ class Preprocessor:
         if re.match(r"^\d+[\d\.,\-]*%?$|^\$[\d,]+", entity_clean):
             return True
 
+        # Skip items containing percentages or large numbers (e.g., "5–50 %", "% Carbon Robotics", "90,000")
         if "%" in entity_clean or re.search(r"\d+[\–-]\d+\s*%?|\d{3,}", entity_clean):
             return True
 
@@ -976,6 +978,7 @@ class Preprocessor:
             if words[1][0].isupper() and len(words) <= 3:
                 return True
 
+        # Flag 4+ words with a conjunction or comma in the middle (e.g. "computer science and years").
         if len(words) >= 4:
             for w in words[1:-1]:
                 if w.lower() in ("and", "or", ","):

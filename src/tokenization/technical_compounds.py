@@ -179,6 +179,7 @@ def is_technical_compound(phrase: str) -> bool:
     if len(words) >= 2:
         for kw in ISSUE_191_KEYWORDS:
             if kw in phrase_lower:
+                # Only match as part of a phrase (e.g. "software development"), not the keyword alone.
                 if phrase_lower != kw and phrase_lower != kw.lower():
                     return True
 
