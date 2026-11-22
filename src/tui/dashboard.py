@@ -386,7 +386,6 @@ class ATPDashboard(Screen[None]):
                         self.state.update_job(job_id, status="rejected")
                         rejected_count += 1
                     else:
-                        # Skip or escape: job stays pending_review.
                         self.state.update_job(job_id, status="pending_review")
                 else:
                     self.state.update_job(job_id, status="confirmed")

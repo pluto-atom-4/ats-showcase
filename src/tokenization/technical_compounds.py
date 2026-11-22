@@ -62,7 +62,6 @@ TECHNICAL_COMPOUND_PATTERNS = {
     "system-level requirements",
     "system-level planning",
     "system-level optimization",
-    # Framework/library compounds
     "spring framework",
     "spring boot",
     "react native",
@@ -72,7 +71,6 @@ TECHNICAL_COMPOUND_PATTERNS = {
     "testing framework",
     "javascript framework",
     "python framework",
-    # Service compounds
     "web service",
     "microservice",
     "microservices",
@@ -81,27 +79,23 @@ TECHNICAL_COMPOUND_PATTERNS = {
     "api service",
     "rest service",
     "soap service",
-    # Database compounds
     "sql database",
     "nosql database",
     "relational database",
     "distributed database",
     "time series database",
-    # Language/tool combinations
     "python django",
     "python flask",
     "javascript react",
     "node.js",
     "python pandas",
     "python numpy",
-    # Infrastructure compounds
     "cloud infrastructure",
     "infrastructure as code",
     "container orchestration",
     "kubernetes cluster",
     "docker container",
     "ci/cd pipeline",
-    # Architecture patterns
     "microservices architecture",
     "event-driven architecture",
     "distributed system",
@@ -171,11 +165,10 @@ def is_technical_compound(phrase: str) -> bool:
 
     words = phrase_lower.split()
 
-    # Tier 1: exact match against known compounds
     if phrase_lower in TECHNICAL_COMPOUND_PATTERNS:
         return True
 
-    # Tier 2: multi-word tech compounds; single words are excluded to avoid false positives
+    # Single words are excluded to avoid false positives.
     if len(words) >= 2:
         for kw in MULTI_WORD_KEYWORDS:
             if kw in phrase_lower:
@@ -186,7 +179,6 @@ def is_technical_compound(phrase: str) -> bool:
     if len(words) >= 2:
         for kw in ISSUE_191_KEYWORDS:
             if kw in phrase_lower:
-                # Only match as part of a phrase (e.g. "software development"), not the keyword alone.
                 if phrase_lower != kw and phrase_lower != kw.lower():
                     return True
 
@@ -314,11 +306,9 @@ def get_confidence_score(phrase: str) -> float:
 
     words = phrase_lower.split()
 
-    # Tier 1: exact match
     if phrase_lower in TECHNICAL_COMPOUND_PATTERNS:
         return 0.95
 
-    # Tier 2: multi-word with a tech keyword
     if len(words) >= 2:
         for kw in MULTI_WORD_KEYWORDS:
             if kw in phrase_lower:
