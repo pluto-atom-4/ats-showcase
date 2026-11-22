@@ -12,9 +12,7 @@ Phase 7 (Issue #194) taxonomy includes:
 - Other Organizations (12+): staffing agencies, consulting firms, government agencies
 """
 
-# Company keywords organized by industry source
 COMPANY_KEYWORDS = {
-    # Aerospace/Defense
     "aerospace_defense": {
         "boeing",
         "lockheed",
@@ -24,7 +22,6 @@ COMPANY_KEYWORDS = {
         "northrop grumman",
         "general dynamics",
     },
-    # Technology Giants
     "technology": {
         "apple",
         "google",
@@ -36,12 +33,10 @@ COMPANY_KEYWORDS = {
         "nvidia",
         "ibm",
     },
-    # Space/Advanced Technology
     "space_tech": {
         "spacex",
         "blue origin",
     },
-    # Universities & Academic Institutions
     "universities": {
         "uw",
         "mit",
@@ -52,7 +47,6 @@ COMPANY_KEYWORDS = {
         "princeton",
         "yale",
     },
-    # Robotics & Robotics Manufacturing
     "robotics_manufacturing": {
         "carbon",
         "universal",
@@ -61,7 +55,6 @@ COMPANY_KEYWORDS = {
         "boston dynamics",
         "isac",
     },
-    # Staffing & Recruitment Agencies
     "staffing_agencies": {
         "heidrick",
         "recruiter",
@@ -69,20 +62,17 @@ COMPANY_KEYWORDS = {
         "talent",
         "agency",
     },
-    # Consulting & Professional Services
     "consulting": {
         "consulting",
         "accenture",
         "deloitte",
         "pwc",
     },
-    # Government & Regulatory Bodies
     "government": {
         "government",
         "federal",
         "department of",
     },
-    # Financial & Business Services
     "financial_services": {
         "goldman",
         "jpmorgan",
