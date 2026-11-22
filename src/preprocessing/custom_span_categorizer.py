@@ -31,10 +31,8 @@ if not Doc.has_extension("custom_spans"):
 # Group quantifier: +, *, {n,} or {n,m} with an optional lazy or possessive suffix; exact {n} is not flagged.
 _REPEAT_AFTER_GROUP = re.compile(r"(?:[+*]|\{\d*,\d*\})[?+]?")
 
-# Group header outside the alternation body: (?:, (?=, (?!, (?<=, (?<!, (?P<name>, scoped inline flags like (?i:.
 _GROUP_HEADER = re.compile(r"\?(?:P<\w+>|<[=!]|[=!:]|[aiLmsux]*(?:-[imsx]+)?:)")
 
-# Inline flag group that enables case-insensitive matching somewhere.
 _CASE_INSENSITIVE_FLAG = re.compile(r"\(\?[aiLmsux]*i")
 
 
@@ -119,7 +117,6 @@ def _has_overlapping_repeated_alternation(pattern: str) -> bool:
     malformed input is left for ``re.compile`` to report.
     """
     case_insensitive = _CASE_INSENSITIVE_FLAG.search(pattern) is not None
-    # Each open group: (index where the current branch starts, finished branches)
     stack: list[tuple[int, list[str]]] = []
     for kind, start, end in _scan_groups(pattern):
         if kind == "open":
@@ -161,7 +158,6 @@ def _has_quantified_group_wrapper(pattern: str) -> bool:
             repeated = _REPEAT_AFTER_GROUP.match(pattern, end) is not None
             if repeated and body_quantified:
                 return True
-            # A closed group is a quantified item if repeated, else it passes its body's quantified-ness to the parent.
             frames[-1][0] = body_quantified or repeated
         elif kind == "repeat":
             frames[-1][0] = True
@@ -220,16 +216,13 @@ def validate_pattern(pattern: str) -> None:
     # Strip lazy quantifiers so nested quantifiers are detected properly.
     stripped = re.sub(r"([+*}])\?", r"\1", pattern)
 
-    # Nested quantifiers: [+*}] optionally followed by ) then another [+*{].
     redos_pattern = r"[+*}]\)?[+*{]"
     if re.search(redos_pattern, stripped):
         raise ValueError(f"Pattern contains ReDoS-prone nested quantifiers: {pattern}")
 
-    # Check for repeated groups with overlapping alternation branches
     if _has_overlapping_repeated_alternation(pattern):
         raise ValueError(f"Pattern contains ReDoS-prone overlapping alternation: {pattern}")
 
-    # Check for repeated groups whose body ends in a quantified atom, at any depth
     if _has_quantified_group_wrapper(pattern):
         raise ValueError(f"Pattern contains ReDoS-prone nested quantifiers: {pattern}")
 
