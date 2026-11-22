@@ -53,7 +53,6 @@ async def extract_from_frame_element(
         if not elem:
             return ""
 
-        # Fallback chain: innerHTML -> outerHTML -> innerText
         content: Optional[str] = await elem.inner_html()
         if not content or len(content.strip()) < 50:
             content = await elem.evaluate("el => el.outerHTML")

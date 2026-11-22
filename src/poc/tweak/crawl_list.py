@@ -70,7 +70,6 @@ async def extract_text(element: Any, selector: Optional[str]) -> Optional[str]:
             text = await sub_element.text_content()
             return text.strip() if text else None
 
-        # If not found, try piercing shadow DOM with evaluate()
         text = await element.evaluate(
             """(el, sel) => {
                 const root = el.shadowRoot;
@@ -96,7 +95,6 @@ async def extract_link(element: Any, selector: Optional[str]) -> Optional[str]:
             href = await sub_element.get_attribute("href")
             return cast(Optional[str], href)
 
-        # If not found, try piercing shadow DOM with evaluate()
         href = await element.evaluate(
             """(el, sel) => {
                 const root = el.shadowRoot;
@@ -141,7 +139,6 @@ def parse_posted_date(text: Optional[str], reference: datetime) -> Optional[str]
         if "posted" in text_lower and "yesterday" in text_lower:
             return (reference.date() - timedelta(days=1)).isoformat()
 
-        # "Posted N Days Ago" and "Posted 30+ Days Ago"
         match = re.search(r"posted\s+(\d+)\+?\s+days?\s+ago", text_lower)
         if match:
             days_ago = int(match.group(1))
@@ -479,7 +476,6 @@ async def extract_job_from_container(
         crawled_at_dt = datetime.now(UTC)
         crawled_at = crawled_at_dt.isoformat()
 
-        # Parse posted date from Workday-style relative dates
         posted_date = parse_posted_date(posted_on_text, crawled_at_dt)
 
         logger.debug(f"Container {container_index}: Successfully created JobPosting with ID {job_id}")

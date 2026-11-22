@@ -214,8 +214,7 @@ def map_line_to_token_position(text: str, line_idx: int) -> tuple:
     for i, line in enumerate(lines):
         if i == line_idx:
             return (char_pos, char_pos + len(line))
-        # +1 for newline
-        char_pos += len(line) + 1  # +1 for newline
+        char_pos += len(line) + 1
 
     return (None, None)
 

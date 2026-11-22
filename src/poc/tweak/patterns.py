@@ -50,7 +50,6 @@ class SectionType(Enum):
 # Copied from src/poc/patterns.py (Issue #301 Phase 2)
 # Entry: {"label": str, "pattern": spaCy token-attribute list or regex string}; regex entries also set "type": "regex".
 SECTION_RULER_PATTERNS: List[Dict[str, Any]] = [
-    # Target sections: extract requirements from these
     {
         "label": "SECTION_KNOWLEDGE_SKILLS",
         "pattern": [
@@ -121,7 +120,6 @@ SECTION_RULER_PATTERNS: List[Dict[str, Any]] = [
         "pattern": r"(?i)(?:required\s+)?(?:professional\s+)?experience(?:\s+(?:section|level|required))?(?:\s*$|\n)",
         "type": "regex",
     },
-    # Filter sections: skip extraction from these
     {
         "label": "SECTION_BENEFITS",
         "pattern": [
@@ -180,7 +178,6 @@ SECTION_DISPLAY_NAMES: Dict[str, str] = {
 }
 
 
-# Many ruler labels map down to the existing SectionType values.
 RULER_LABEL_TO_SECTION_TYPE: Dict[str, SectionType] = {
     "SECTION_KNOWLEDGE_SKILLS": SectionType.SKILLS,
     "SECTION_IN_OFFICE": SectionType.QUALIFICATIONS,
