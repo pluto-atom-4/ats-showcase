@@ -886,7 +886,6 @@ class AssessmentStore:
 
     def _fetch_jobs_for_filter_stats(self, cursor: sqlite3.Cursor) -> list[Any]:
         """Fetch jobs for filter stats, trying multiple query variants."""
-        # Tried in order: job_reviews.crawled_at, jobs.crawled_at via join, then NULL.
         queries = [
             """SELECT jr.job_id, jr.status, jr.crawled_at,
                CASE WHEN ja.job_id IS NOT NULL THEN 1 ELSE 0 END as is_assessed
