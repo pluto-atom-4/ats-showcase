@@ -115,6 +115,7 @@ def _extract_span_boundaries(
     end_token_idx = None
 
     for token in doc:
+        # Start token: first token that ends after char_start.
         if start_token_idx is None and token.idx + len(token.text) > char_start:
             start_token_idx = token.i
         if token.idx + len(token.text) >= char_end:

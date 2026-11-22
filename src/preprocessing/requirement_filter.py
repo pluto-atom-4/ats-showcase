@@ -122,6 +122,7 @@ def _find_sentence_for_offset(char_offset: int, sent_ranges: list[tuple[int, int
     Returns:
         (sent_start, sent_end) if found, else None
     """
+    # float('inf') makes the comparison depend on the first tuple element only.
     idx = bisect.bisect_right(sent_ranges, (char_offset, float("inf")))
     if idx > 0:
         start, end = sent_ranges[idx - 1]
@@ -269,6 +270,7 @@ def requirement_filter(doc: Doc) -> Doc:
 
             requirements.append(requirement)
 
+    # Dedupe by text: keep highest confidence; on a tie prefer the better casing.
     seen: dict[str, dict[str, Any]] = {}
     for req in requirements:
         req_text = req["text"].lower()

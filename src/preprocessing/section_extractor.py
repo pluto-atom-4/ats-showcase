@@ -58,6 +58,7 @@ _HANDS_ON_PATTERN = re.compile(r"\bhands-?on\s+", re.IGNORECASE)
 _YEARS_PATTERN = re.compile(r"(\d+)\+?\s+years?\s+(?:of\s+)?experience\s+", re.IGNORECASE)
 _WHITESPACE_PATTERN = re.compile(r"\s+")
 
+# Cached sentencizer, initialized lazily.
 _SENTENCIZER: Language | None = None
 
 
