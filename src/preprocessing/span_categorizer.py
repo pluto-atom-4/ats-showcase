@@ -83,7 +83,6 @@ def _is_soft_boundary(
         True if soft boundary
     """
     if token_pos == "PUNCT" and token_text in rules.soft_stops:
-        # Soft stop unless followed by 'and' or 'or'
         if next_token_text and next_token_text.lower() in ["and", "or"]:
             return False
         return True
@@ -116,10 +115,8 @@ def _extract_span_boundaries(
     end_token_idx = None
 
     for token in doc:
-        # Include token if it starts before or at char_start AND ends after char_start (overlaps start)
         if start_token_idx is None and token.idx + len(token.text) > char_start:
             start_token_idx = token.i
-        # End token: found token that ends at or after char_end
         if token.idx + len(token.text) >= char_end:
             end_token_idx = token.i
             break
@@ -197,7 +194,6 @@ def _expand_span(
     Returns:
         Tuple of (expanded_start, expanded_end)
     """
-    # Skip articles at start
     current_start = _skip_initial_articles(doc, start_idx)
 
     current_end = end_idx
@@ -209,24 +205,20 @@ def _expand_span(
         if _should_stop_at_token(token.text, token.pos_, next_token_text, rules):
             break
 
-        # Conjunction expansion (and/or)
         if token.pos_ == "CCONJ" and token.text.lower() in ["and", "or"]:
             current_end += 1
             continue
 
-        # Hyphenated compounds should not break
         if token.pos_ == "PUNCT" and token.text == "-" and token.dep_ == "compound":
             current_end += 1
             continue
 
-        # Include relative clauses
         if token.pos_ == "SCONJ" and token.text.lower() in ["that", "which"]:
             current_end += 1
             continue
 
         current_end += 1
 
-    # Trim trailing hard boundary tokens
     # Ensure current_end is within bounds (may have incremented past end)
     if current_end >= len(doc):
         current_end = len(doc) - 1
@@ -239,7 +231,6 @@ def _expand_span(
         else:
             break
 
-    # Guard: ensure valid range (start <= end)
     if current_end < current_start:
         current_end = current_start
 
@@ -296,7 +287,6 @@ def categorize_spans(
     """
     requirement_spans: list[dict[str, Any]] = []
 
-    # Skip if no requirements from Phase 8a
     if not doc._.requirements:
         doc._.requirement_spans = requirement_spans
         return doc
