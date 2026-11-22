@@ -146,11 +146,8 @@ class SkillProcessor:
         Returns:
             List of skill items
         """
-        # Replace ' and ' with a delimiter
         text = re.sub(r"\s+and\s+", ",", text, flags=re.IGNORECASE)
-        # Split on comma, semicolon, or forward slash
         items = re.split(r"[,;/]", text)
-        # Strip whitespace from each item
         return [item.strip() for item in items if item.strip()]
 
     def _strip_trailing_qualifiers(self, text: str) -> str:
@@ -166,7 +163,6 @@ class SkillProcessor:
         if not words:
             return ""
 
-        # Check if last word (or last two words for 'a plus') is in stoplist
         while words:
             last_word = words[-1].lower().rstrip(".,;:")
             if len(words) >= 2:
@@ -252,7 +248,6 @@ class SkillProcessor:
         except Exception:
             return False
 
-        # At most 6 tokens.
         if len(chunk_doc) > 6:
             return False
 
