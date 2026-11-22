@@ -16,7 +16,6 @@ from typing import Set
 
 logger = logging.getLogger(__name__)
 
-# Category 1: Legal/compliance patterns
 LEGAL_COMPLIANCE_PATTERNS = [
     r"(?i)required\s+qualifications(?:\s|$)",
     r"(?i)qualifications\s+experience",
@@ -31,7 +30,6 @@ LEGAL_COMPLIANCE_PATTERNS = [
     r"(?i)compliance\s+requirements",
 ]
 
-# Category 2: Section headers
 # Note: These patterns target section-header artifacts (header: content).
 # Patterns use word boundaries \b to avoid false positives.
 # "Experience" is NOT included here (too broad) - it appears in body text.
@@ -49,7 +47,6 @@ SECTION_HEADER_PATTERNS = [
     r"(?i)\btechnical\s+skills\s*[:|-]",
 ]
 
-# Category 3: Company boilerplate
 COMPANY_BOILERPLATE_PATTERNS = [
     r"(?i)we\s+are\s+committed",
     r"(?i)we\s+believe",
@@ -61,7 +58,6 @@ COMPANY_BOILERPLATE_PATTERNS = [
     r"(?i)diversity\s+and\s+inclusion",
 ]
 
-# Category 4: Time references (employment type)
 # Note: "contract" uses negative lookahead to avoid matching "contractor", "contracting"
 TIME_REFERENCE_PATTERNS = [
     r"(?i)full[\s-]?time",
@@ -73,7 +69,6 @@ TIME_REFERENCE_PATTERNS = [
     r"(?i)shift\s+(?:work|position)",
 ]
 
-# Category 5: Salary/benefits
 SALARY_BENEFITS_PATTERNS = [
     r"(?i)salary.*?(?:\$|year|hour|annually)",
     r"(?i)\$[\d,]+.*?(?:year|hour|annually)",
@@ -89,7 +84,6 @@ SALARY_BENEFITS_PATTERNS = [
     r"(?i)bonus(?:es)?",
 ]
 
-# Category 6: Special formatting (HTML artifacts)
 SPECIAL_FORMATTING_PATTERNS = [
     r"&nbsp;+",
     r"&amp;",
@@ -100,7 +94,6 @@ SPECIAL_FORMATTING_PATTERNS = [
     r"\n{2,}",
 ]
 
-# Category 7: Navigation text
 NAVIGATION_PATTERNS = [
     r"(?i)apply\s+now",
     r"(?i)share",

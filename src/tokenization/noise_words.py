@@ -13,7 +13,6 @@ from skill extraction:
 """
 
 NOISE_WORDS_BY_CATEGORY = {
-    # Articles & Determiners
     "articles_determiners": {
         "the",
         "a",
@@ -31,7 +30,6 @@ NOISE_WORDS_BY_CATEGORY = {
         "their",
         "some",
     },
-    # Prepositions
     "prepositions": {
         "in",
         "on",
@@ -54,7 +52,6 @@ NOISE_WORDS_BY_CATEGORY = {
         "among",
         "through",
     },
-    # Conjunctions
     "conjunctions": {
         "and",
         "or",
@@ -69,7 +66,6 @@ NOISE_WORDS_BY_CATEGORY = {
         "while",
         "since",
     },
-    # Pronouns
     "pronouns": {
         "i",
         "you",
@@ -84,7 +80,6 @@ NOISE_WORDS_BY_CATEGORY = {
         "which",
         "who",
     },
-    # Generic Verbs
     "generic_verbs": {
         "do",
         "make",
@@ -102,7 +97,6 @@ NOISE_WORDS_BY_CATEGORY = {
         "keep",
         "try",
     },
-    # Numbers & Measurements
     "numbers_measurements": {
         "one",
         "two",
@@ -123,7 +117,6 @@ NOISE_WORDS_BY_CATEGORY = {
         "plus",
         "minus",
     },
-    # Generic Nouns
     "generic_nouns": {
         "thing",
         "stuff",
@@ -144,7 +137,6 @@ NOISE_WORDS_BY_CATEGORY = {
         "range",
         "value",
     },
-    # Filler Words
     "filler_words": {
         "really",
         "very",
