@@ -56,13 +56,11 @@ def _is_heading_like(text: str, start: int, end: int) -> bool:
     if line_end == -1:
         line_end = len(text)
 
-    # Check prefix: only whitespace and header markers allowed
     prefix = text[line_start:start]
     prefix_stripped = prefix.strip(_HEADER_PREFIX_CHARS)
     if prefix_stripped != "":
         return False
 
-    # Check suffix: should be empty or very short
     suffix = text[end:line_end]
     suffix_stripped = suffix.strip(" \t*_:#")
     if suffix_stripped and len(suffix_stripped) > 40:
@@ -215,7 +213,6 @@ class SectionDetector:
 
         kept_spans = _resolve_overlaps(raw_spans)
 
-        # Filter by promote_headings if enabled
         if self._promote_headings:
             filtered_spans: list[tuple[SectionLabel, int, int, str]] = []
             for label, start, end, header_text in kept_spans:
@@ -228,7 +225,6 @@ class SectionDetector:
         detected_sections: list[DetectedSection] = []
         for idx, (label, header_start, header_end, header_text) in enumerate(kept_spans):
             content_start = header_end
-            # Content ends at next header's start, or at end of text
             if idx + 1 < len(kept_spans):
                 content_end = kept_spans[idx + 1][1]
             else:
