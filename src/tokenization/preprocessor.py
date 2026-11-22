@@ -292,18 +292,14 @@ class Preprocessor:
                 text_to_extract = re.sub(skip_pattern_str, "", text, flags=re.MULTILINE | re.IGNORECASE | re.DOTALL)
                 text_to_clean = text_to_extract if text_to_extract.strip() else text
             else:
-                # Plain text: restrict to the job section, falling back to the full text when none is found.
                 job_section = self._extract_job_section(text)
                 text_to_clean = job_section if job_section.strip() else text
 
-            # Remove boilerplate (salary, legal, location metadata)
             cleaned_text = self._remove_boilerplate(text_to_clean)
 
-            # Extract entities from the cleaned text
             doc = self.nlp(cleaned_text)
             tech_keywords = self._get_tech_keywords()
 
-            # Extract from NER (named entities) - always do this for comprehensive extraction
             self._extract_from_ner(doc, tech_keywords, technologies, requirements)
 
             entity_pos_tags: dict[str, str] = {}
@@ -314,7 +310,6 @@ class Preprocessor:
             if not is_md:
                 self._extract_soft_skills(doc, soft_skills_set)
 
-            # Reclassify technical compounds: move compound phrases from skills to technologies.
             skills_list = list(skills) + list(soft_skills_set)
             reclassified_skills: list[str] = []
             for skill in skills_list:
@@ -323,7 +318,7 @@ class Preprocessor:
                 else:
                     reclassified_skills.append(skill)
 
-            # Filter noise, duplicates and short fragments; pass pre-computed POS tags to avoid a second NLP pass.
+            # Pass pre-computed POS tags to avoid a second NLP pass.
             skills = set(
                 self._filter_entities(reclassified_skills, entity_type="skills", entity_pos_tags=entity_pos_tags)
             )
@@ -515,7 +510,6 @@ class Preprocessor:
 
             filtered_tokens = []
             for token in doc:
-                # Keep tokens that are non-stopwords, preserved terms, named entities or punctuation.
                 if not token.is_stop or token.lemma_.lower() in preserve_terms or token.ent_type_ or token.is_punct:
                     filtered_tokens.append(token.text)
 
@@ -551,7 +545,6 @@ class Preprocessor:
             r"(?i)(skills|technical skills|core skills|desired skills)(?:\s*[:|\n])",
         ]
 
-        # Cutoff markers: extraction stops at these.
         cutoff_markers = [
             "equal opportunity",
             "affirmative action",
@@ -594,7 +587,6 @@ class Preprocessor:
 
         import re
 
-        # Salary, location metadata, legal, compliance and benefits lines.
         boilerplate_patterns = [
             r"salary.*?(\n|$)",
             r"\$[\d,]+.*?(?:year|hour|annually)",
@@ -673,7 +665,6 @@ class Preprocessor:
         if entity_clean.rstrip().endswith(":"):
             return True
 
-        # Skip possessive forms (Blue Origin's, Carbon Robotics', Blue's)
         if entity_clean.endswith("'s") or entity_clean.endswith("'"):
             return True
 
@@ -693,7 +684,6 @@ class Preprocessor:
         Returns:
             True if entity should be skipped, False otherwise
         """
-        # Skip single-word fragments
         if len(words) == 1:
             if entity_lower in ("one", "review", "oversees"):
                 return True
@@ -940,7 +930,6 @@ class Preprocessor:
         Returns:
             True if entity contains HTML artifacts, False otherwise
         """
-        # Named and numeric entities, and tags.
         html_entity_patterns = [
             r"&\w+;",
             r"&#\d+;",
@@ -990,7 +979,6 @@ class Preprocessor:
                 return True
 
         # Flag 4+ words with a conjunction or comma in the middle (e.g. "computer science and years").
-        # Shorter phrases pass.
         if len(words) >= 4:
             for w in words[1:-1]:
                 if w.lower() in ("and", "or", ","):
@@ -1153,11 +1141,9 @@ class Preprocessor:
         if not text:
             return False
 
-        # Strong indicator: Markdown section headers
         if re.search(r"^##\s+", text, re.MULTILINE):
             return True
 
-        # Headers, lists, bold, inline code and code blocks.
         markdown_indicators = [
             r"^#+\s+",
             r"^[\*\-\+]\s+",
@@ -1223,7 +1209,6 @@ class Preprocessor:
                 repaired_lines.append("")
                 continue
 
-            # Skip processing table rows (lines starting with | are table markup)
             if stripped.startswith("|"):
                 repaired_lines.append(line)
                 continue
@@ -1234,12 +1219,10 @@ class Preprocessor:
                     part = part.strip()
                     # Remove leading colons from parts (Workday artifact cleanup)
                     part = re.sub(r"^:+\s*", "", part).strip()
-                    # Skip pure Workday refs or IDs
                     if part and not re.match(r"^(?:R\d+|\w+\d+)\s*$", part):
                         repaired_lines.append(part)
                     if i < len(parts) - 1:
                         repaired_lines.append("---")
-                # Add a final divider only if the line ended with "---" and the loop did not already add one.
                 if len(parts) > 1 and not parts[-1].strip():
                     if not repaired_lines or repaired_lines[-1].strip() != "---":
                         repaired_lines.append("---")
@@ -1262,7 +1245,6 @@ class Preprocessor:
         if not text:
             return {}
 
-        # Phase 3: Repair embedded dividers before processing
         text = self._repair_malformed_dividers(text)
 
         sections: dict[str, str] = {}
@@ -1296,7 +1278,6 @@ class Preprocessor:
                 header_text = bold_header_match.group(1).strip().lower()
                 current_section = self._classify_section_from_header(header_text)
 
-                # If the bold header is not the whole line, the remainder (e.g. "— description") becomes content.
                 remaining = line[bold_header_match.end() :].strip()
                 if remaining:
                     current_content.append(remaining)

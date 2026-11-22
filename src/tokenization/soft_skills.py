@@ -12,7 +12,6 @@ This module provides soft skills categorized according to ESCO standards:
 """
 
 SOFT_SKILLS_BY_CATEGORY = {
-    # Communication & Presentation
     "communication": {
         "communication",
         "written communication",
@@ -25,7 +24,6 @@ SOFT_SKILLS_BY_CATEGORY = {
         "verbal",
         "articulate",
     },
-    # Leadership & Management
     "leadership": {
         "leadership",
         "project management",
@@ -38,7 +36,6 @@ SOFT_SKILLS_BY_CATEGORY = {
         "coaching",
         "training",
     },
-    # Teamwork & Collaboration
     "teamwork": {
         "teamwork",
         "collaboration",
@@ -50,7 +47,6 @@ SOFT_SKILLS_BY_CATEGORY = {
         "cooperation",
         "collaborative",
     },
-    # Problem-Solving & Analysis
     "problem_solving": {
         "problem-solving",
         "problem solving",
@@ -63,7 +59,6 @@ SOFT_SKILLS_BY_CATEGORY = {
         "logical thinking",
         "troubleshooting",
     },
-    # Organization & Planning
     "organization": {
         "organizational",
         "organizational skills",
@@ -74,7 +69,6 @@ SOFT_SKILLS_BY_CATEGORY = {
         "multitasking",
         "prioritization",
     },
-    # Emotional Intelligence
     "emotional_intelligence": {
         "emotional intelligence",
         "empathy",
@@ -85,7 +79,6 @@ SOFT_SKILLS_BY_CATEGORY = {
         "adaptability",
         "resilience",
     },
-    # Adaptability & Learning
     "adaptability": {
         "adaptability",
         "flexibility",
@@ -96,7 +89,6 @@ SOFT_SKILLS_BY_CATEGORY = {
         "innovative",
         "creative",
     },
-    # Customer & Relationship Management
     "customer_relations": {
         "customer service",
         "customer focus",
