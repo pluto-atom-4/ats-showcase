@@ -75,6 +75,7 @@ def _verb_start_end(doc: Doc, start: int) -> int | None:
 
 
 # --- Participle inside a noun run (#523)
+# A participle tagged VERB (dep amod) joins the run only when a noun-run token follows; a trailing one is not absorbed.
 # A participle with dep acl ("systems used internally") is a clause, not a modifier.
 
 
@@ -337,6 +338,7 @@ def _adverb_led_list_end(doc: Doc, start: int) -> int | None:
 
 # --- Verb list before an object (#604)
 # "design, build, and maintain ... services": the skill verb is followed by a comma list of verbs, so no match starts.
+# Later verbs need only be VERB-tagged; the head verb must be a skill verb.
 
 
 def _verb_list_end(doc: Doc, start: int) -> int | None:
@@ -359,6 +361,7 @@ def _verb_list_end(doc: Doc, start: int) -> int | None:
 
 
 # --- Coordination extension (#509)
+# _coordinated_end() walks "A and B" / "A, B, and C" chains; bare-comma conjuncts stay only if a later one commits.
 # "lead data science, platform teams" -> "lead data science"; "or" followed by a VERB never merges.
 def _coordinated_end(doc: Doc, head_end: int) -> int:
     """Return the end of the coordinated span that starts at a head ending at ``head_end``.
