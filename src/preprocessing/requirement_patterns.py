@@ -28,7 +28,6 @@ class RequirementPattern(TypedDict):
 
 
 REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
-    # Tier 1: mandatory language
     {
         "trigger": "required",
         "regex": r"\brequired\b",
@@ -83,7 +82,6 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.83,
         "priority": 1,
     },
-    # Tier 2: softer requirements
     {
         "trigger": "should",
         "regex": r"\bshould\s+(?:have|know|be|possess)",
@@ -108,7 +106,6 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.80,
         "priority": 2,
     },
-    # Tier 3: nice-to-have and aspirational
     {
         "trigger": "nice to have",
         "regex": r"\bnice\s+to\s+have\b",
@@ -127,7 +124,6 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.45,
         "priority": 3,
     },
-    # Bullet-specific patterns, extracted from bullets
     {
         "trigger": "years_in_bullet",
         "regex": r"\b(\d+\+?)\s+years?\b",
@@ -152,7 +148,6 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.92,
         "priority": 2,
     },
-    # Education patterns
     {
         "trigger": "degree abbreviation",
         "regex": r"\b(?:BS\+|MS\+|BA\+|MA\+|BS|MS|BA|MA|PhD)\b",
@@ -177,7 +172,6 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.78,
         "priority": 2,
     },
-    # Location/on-site patterns
     {
         "trigger": "on-site location",
         "regex": r"\b(?:on-site|on site|office|in-office|remote|hybrid|office-based)\b",
@@ -190,7 +184,6 @@ REQUIREMENT_PATTERNS: tuple[RequirementPattern, ...] = (
         "confidence": 0.75,
         "priority": 2,
     },
-    # Soft skill patterns
     {
         "trigger": "communication skills",
         "regex": (
@@ -280,7 +273,6 @@ def has_negation_context(sentence: str, trigger: str) -> bool:
     if trigger_pos == -1:
         return False
 
-    # Look ±50 chars around trigger
     context_start = max(0, trigger_pos - 50)
     context_end = min(len(sentence), trigger_pos + len(trigger) + 50)
     context = sentence[context_start:context_end]
@@ -310,19 +302,15 @@ def apply_confidence_adjustments(base_confidence: float, sentence: str) -> float
     """
     adjustment = base_confidence
 
-    # Parentheticals: lower confidence
     if _PARENTHETICAL_PATTERN.search(sentence):
         adjustment -= 0.10
 
-    # Conditional: lower confidence
     if _CONDITIONAL_PATTERN.search(sentence):
         adjustment -= 0.15
 
-    # Nice to have: significantly lower
     if _NICE_TO_HAVE_PATTERN.search(sentence):
         adjustment -= 0.25
 
-    # All-caps emphasis: boost
     if len(_ALL_CAPS_PATTERN.findall(sentence)) > 2:
         adjustment += 0.05
 
@@ -376,7 +364,6 @@ def classify_sentence(sentence: str) -> SentenceMatch | None:
             confidence = apply_confidence_adjustments(confidence, truncated)
 
             if confidence > 0:
-                # Keep best match (by priority, then confidence)
                 if _is_better((pattern, confidence), best_match):
                     best_match = (pattern, confidence)
 

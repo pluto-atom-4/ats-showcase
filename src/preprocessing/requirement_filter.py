@@ -122,7 +122,6 @@ def _find_sentence_for_offset(char_offset: int, sent_ranges: list[tuple[int, int
     Returns:
         (sent_start, sent_end) if found, else None
     """
-    # Binary search: find first sentence that ends after char_offset
     idx = bisect.bisect_right(sent_ranges, (char_offset, float("inf")))
     if idx > 0:
         start, end = sent_ranges[idx - 1]
@@ -181,7 +180,6 @@ def _apply_confidence_adjustments(
     adjusted = base_confidence
 
     # Window is 50 chars around the first occurrence of text; a repeated phrase may pick the wrong one.
-    # Falls back to the full sentence when text is not found.
     offset_in_sentence = full_sentence.find(text)
     if offset_in_sentence >= 0:
         text_start = max(0, offset_in_sentence - 50)
@@ -190,7 +188,6 @@ def _apply_confidence_adjustments(
     else:
         local_context = full_sentence
 
-    # Pattern 1: Negation before trigger word (e.g., "not required", "no experience")
     negation_before_pattern = (
         r"(?:no|not|don't|doesn't|didn't|without)\s+(?:prior\s+)?"
         r"(?:experience|requirement|required|require|requires|must|essential|ability\s+to|"
@@ -199,7 +196,6 @@ def _apply_confidence_adjustments(
     if re.search(negation_before_pattern, local_context, re.IGNORECASE):
         return 0.0
 
-    # Pattern 2: Negation after trigger word (e.g., "experience is not required")
     # Limited to local context to avoid false positives across unrelated clauses
     negation_after_pattern = (
         r"(?:experience|requirement|required|require|requires|must|essential|ability\s+to|"
@@ -258,7 +254,6 @@ def requirement_filter(doc: Doc) -> Doc:
 
             adjusted_confidence = _apply_confidence_adjustments(base_confidence, matched_text, full_sentence)
 
-            # Skip if confidence is 0 (negation case)
             if adjusted_confidence <= 0.0:
                 continue
 
@@ -274,7 +269,6 @@ def requirement_filter(doc: Doc) -> Doc:
 
             requirements.append(requirement)
 
-    # Deduplicate by text (keep highest confidence; prefer better casing when tied)
     seen: dict[str, dict[str, Any]] = {}
     for req in requirements:
         req_text = req["text"].lower()
@@ -283,7 +277,6 @@ def requirement_filter(doc: Doc) -> Doc:
         elif req["confidence"] > seen[req_text]["confidence"]:
             seen[req_text] = req
         elif req["confidence"] == seen[req_text]["confidence"]:
-            # Tied confidence: prefer better casing (more capitals)
             seen[req_text] = _apply_casing_preference(seen[req_text], req)
 
     doc._.requirements = list(seen.values())
