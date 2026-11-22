@@ -23,7 +23,6 @@ class RequirementPattern(TypedDict):
 
 
 REQUIREMENT_PATTERNS: List[RequirementPattern] = [
-    # Priority 1: mandatory language
     {
         "trigger": "required",
         "regex": r"\brequired\b",
@@ -78,7 +77,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.83,
         "priority": 1,
     },
-    # Priority 2: softer requirements
     {
         "trigger": "should",
         "regex": r"\bshould\s+(?:have|know|be|possess)",
@@ -103,7 +101,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.80,
         "priority": 2,
     },
-    # Priority 3: nice-to-have, aspirational
     {
         "trigger": "nice to have",
         "regex": r"\bnice\s+to\s+have\b",
@@ -122,7 +119,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.45,
         "priority": 3,
     },
-    # Bullet-specific patterns; priorities 1-2
     {
         "trigger": "years_in_bullet",
         "regex": r"\b(\d+\+?)\s+years?\b",

@@ -1,5 +1,4 @@
 TECH_TERMS = {
-    # --- Carbon Robotics / AI / Robotics Specific ---
     "PyTorch",
     "pytorch lightning",
     "C++",
@@ -14,7 +13,6 @@ TECH_TERMS = {
     "real-time inference",
     "Large Plant Model",
     "LPM",
-    # --- Languages ---
     "python",
     "java",
     "javascript",
@@ -23,7 +21,6 @@ TECH_TERMS = {
     "go",
     "golang",
     "c#",
-    # --- Frameworks & Libraries ---
     "react",
     "angular",
     "vue",
@@ -34,7 +31,6 @@ TECH_TERMS = {
     "tensorflow",
     "sklearn",
     "grpc",
-    # --- Cloud & Infrastructure ---
     "aws",
     "azure",
     "gcp",
@@ -42,13 +38,11 @@ TECH_TERMS = {
     "docker",
     "kafka",
     "terraform",
-    # --- Databases & Search ---
     "postgresql",
     "mongodb",
     "redis",
     "elasticsearch",
     "lightning",
-    # --- Tools & Collaboration ---
     "git",
     "github",
     "gitlab",

@@ -505,8 +505,7 @@ class SkillExtractor:
                 adj_verb_end = _skill_verb_adjective_end(doc, i)
                 if adj_verb_end is not None:
                     matches.append(doc[i:adj_verb_end])
-            # Drop hyphen-variant matches whose "-" is spaced punctuation; the plain pattern still yields the
-            # non-hyphenated prefix.
+            # Spaced-dash hyphen variants are dropped; the plain pattern still yields the non-hyphenated prefix.
             matches = [
                 m
                 for m in matches
@@ -514,8 +513,7 @@ class SkillExtractor:
                 and not _is_glued_participle_head(doc, m.start)
                 and not _is_participial_with_head(doc, m.start)
             ]
-            # Extend each head through its coordinated conjuncts (#509); the extended span contains the
-            # head, so filter_spans keeps it.
+            # The extended span contains its head, so filter_spans keeps it.
             extended = [doc[m.start : _coordinated_end(doc, _participle_head_end(doc, m.end))] for m in matches]
 
             unique_spans = filter_spans(matches + extended)

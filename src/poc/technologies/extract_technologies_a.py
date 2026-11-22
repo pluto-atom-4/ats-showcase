@@ -72,7 +72,6 @@ def _is_tech_context(doc, ent, other_techs):
         return True
     if word in _PREV_CUE_INSUFFICIENT and _is_built_with_final(doc, ent):
         return True
-    # Adjacent to another TECH match (optionally across a list joiner)
     for tok_idx, step in ((ent.end, 1), (ent.start - 1, -1)):
         if 0 <= tok_idx < len(doc) and doc[tok_idx].lower_ in _LIST_JOINERS:
             tok_idx += step
