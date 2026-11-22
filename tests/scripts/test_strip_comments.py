@@ -309,3 +309,93 @@ def test_prose_lookalikes_removed(comment):
 def test_trailing_type_annotation_kept_full_line_prose_removed():
     assert strip("x = []  # type: list[int]\n") == "x = []  # type: list[int]\n"
     assert strip("def f(a):\n    # type: (int) -> str\n    return a\n").count("type:") == 1
+
+
+KEPT_TEXT = "Assumed ~30% token reduction from boilerplate removal, not measured."
+KEPT_FILE = "src/cli.py"
+
+
+def strip_for(src: str, file_key: str | None) -> str:
+    with sc._file_scope(file_key):
+        return str(sc.process_source(src).new_source)
+
+
+def test_kept_override_hit_keeps_comment():
+    src = f"# {KEPT_TEXT}\nx = 1\n"
+    assert strip(src) == "x = 1\n"
+    assert strip_for(src, KEPT_FILE) == src
+
+
+@pytest.mark.parametrize("file_key", ["src/other.py", "tests/test_cli.py", None])
+def test_kept_override_miss_removes_comment(file_key):
+    src = f"# {KEPT_TEXT}\nx = 1\n"
+    assert strip_for(src, file_key) == "x = 1\n"
+
+
+def test_kept_override_miss_on_text_removes_comment():
+    assert strip_for("# Assumed ~30% token reduction\nx = 1\n", KEPT_FILE) == "x = 1\n"
+
+
+def test_kept_override_entries_are_unique_pairs():
+    pairs = json.loads((Path(__file__).parents[2] / "scripts" / "why_keep_list.json").read_text(encoding="utf-8"))
+    assert all(isinstance(p, list) and len(p) == 2 for p in pairs)
+    assert len({tuple(p) for p in pairs}) == len(pairs)
+
+
+MISLABELS = [
+    ("src/integrity/models.py", "# One of 'error', 'warning', 'info'."),
+    ("src/nlp/confidence.py", "# 0.0 to 1.0"),
+    ("src/poc/extract_requirements_c.py", "# Start AFTER the section header"),
+    ("src/poc/extract_requirements_d.py", "# Start AFTER the section header"),
+    ("src/poc/tweak/markdown_section_classifier.py", "# Use first ~50 words as pseudo-title for matching"),
+    ("src/tokenization/technical_compounds.py", "# Medium-confidence keyword patterns for detection"),
+    ("tests/test_technical_compounds_phase1.py", "# Expected in Phase 3 output"),
+]
+
+
+@pytest.mark.parametrize(("file_key", "comment"), MISLABELS)
+def test_mislabel_stays_removed(file_key, comment):
+    assert strip_for(f"{comment}\nx = 1\n", file_key) == "x = 1\n"
+
+
+def test_label_comment_stays_removed():
+    src = "DATA = [\n    # Operations\n    1,\n]\n"
+    assert strip_for(src, "src/example.py") == "DATA = [\n    1,\n]\n"
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        "# Importing registers the component via its decorator.",
+        "# Registers the handler through the factory at import time.",
+        "# Must run after requirement_filter, which populates doc._.requirements.",
+        "# Runs before the tokenizer is loaded.",
+        "# Deliberately broad: user-supplied config JSON can have any shape.",
+        "# Intentional: the cache is never evicted.",
+        '# Known limitation (accepted): generic triggers such as "is an equal opportunity"',
+        "# The check compares after.lower_, so an uppercase entry would silently never match.",
+        "# Re-export for backward compatibility",
+        "# Kept for backward-compat with old configs.",
+    ],
+)
+def test_structural_idiom_kept(comment):
+    assert sc._classify(comment, 1, True) == "why"
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        "# Registers the handler for events.",
+        "# The loop runs once per frame.",
+        "# Runs the parser after cleanup finishes.",
+        "# Delete the file.",
+        "# Intent is unclear here.",
+        "# known issues list",
+        "# silence warnings from the logger",
+        "# backward pass of the network",
+        "# avoid this pattern",
+        "# must be called once",
+    ],
+)
+def test_structural_idiom_near_miss_removed(comment):
+    assert sc._classify(comment, 1, True) == "remove"
