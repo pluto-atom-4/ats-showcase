@@ -1,0 +1,1666 @@
+[
+  [
+    "src/cli.py",
+    "Assumed ~30% token reduction from boilerplate removal, not measured."
+  ],
+  [
+    "src/cli.py",
+    "Assumes 300 output tokens per job."
+  ],
+  [
+    "src/cli.py",
+    "Default cost limit: $0.10 (roughly 30k tokens on Sonnet)"
+  ],
+  [
+    "src/cli.py",
+    "Initialize SectionDetector for v3.0 (built once, reused for all jobs)"
+  ],
+  [
+    "src/cli.py",
+    "Keep the list; a JSON round trip is only needed for storage."
+  ],
+  [
+    "src/cli.py",
+    "Placeholder: does not actually re-run preprocessing."
+  ],
+  [
+    "src/cli.py",
+    "The chunker reads doc._.requirement_spans from this same doc."
+  ],
+  [
+    "src/integrity/purger.py",
+    "Child tables first, jobs last; src never enables PRAGMA foreign_keys."
+  ],
+  [
+    "src/integrity/purger.py",
+    "VACUUM cannot run inside a transaction"
+  ],
+  [
+    "src/llm/provider.py",
+    "Estimate before the call: the actual output length is unknown until the response arrives."
+  ],
+  [
+    "src/llm/provider.py",
+    "Lazy: loading the tiktoken encoding is slow and only the raw assess path needs it."
+  ],
+  [
+    "src/llm/provider.py",
+    "Lazy: src.assessment imports assessor, which will import this module once C3 lands."
+  ],
+  [
+    "src/nlp/company_parsers.py",
+    "Bullets that are only \"N+ years of experience\" are skipped: no domain context."
+  ],
+  [
+    "src/nlp/domains.py",
+    "Overlaps SOFTWARE_KEYPHRASES; the defense-specific entries are the additions."
+  ],
+  [
+    "src/nlp/narrative.py",
+    "Generic phrases like \"experience with various languages\" are not skills."
+  ],
+  [
+    "src/nlp/ner.py",
+    "Exact match after normalization; a substring check would treat 'C' as a duplicate of 'C++'."
+  ],
+  [
+    "src/nlp/ner.py",
+    "Keep requirement bullets (10-150 chars, not starting with years)"
+  ],
+  [
+    "src/nlp/ner.py",
+    "Normalized values no longer equal the original keys, so average confidence over substring matches."
+  ],
+  [
+    "src/nlp/ner.py",
+    "Pattern doesn't exist yet."
+  ],
+  [
+    "src/nlp/ner.py",
+    "Software/Systems domain: kept narrow; generic terms (agile, DevOps, CI/CD) mostly appear as preferences."
+  ],
+  [
+    "src/nlp/normalizer.py",
+    "\"Experience in development\" is a fragment left from trimming; normalize_requirements drops the empty result."
+  ],
+  [
+    "src/nlp/normalizer.py",
+    "Drop only trailing simulations/software items, not core concepts: \"X, simulations, and software\" -> \"X\"."
+  ],
+  [
+    "src/nlp/normalizer.py",
+    "Keeps exact casing; .capitalize() below would mangle these."
+  ],
+  [
+    "src/nlp/normalizer.py",
+    "Leave \"M.S. or Ph.D.\" alone; otherwise drop (e.g. ...), (HIL) and trailing parentheticals."
+  ],
+  [
+    "src/nlp/normalizer.py",
+    "Strip the (Preferred) tag here and re-add it at the end."
+  ],
+  [
+    "src/nlp/patterns.py",
+    "Skill keyphrases extracted directly from job requirements; multi-domain."
+  ],
+  [
+    "src/parsers/_boilerplate_patterns.py",
+    "Compiled once at module load."
+  ],
+  [
+    "src/parsers/_boilerplate_patterns.py",
+    "Note: \"contract\" uses negative lookahead to avoid matching \"contractor\", \"contracting\""
+  ],
+  [
+    "src/parsers/_boilerplate_patterns.py",
+    "Note: \"experience\" is intentionally excluded (too broad)."
+  ],
+  [
+    "src/parsers/html_to_markdown.py",
+    "Boilerplate whitespace collapse can embed dividers in text; repair them after it."
+  ],
+  [
+    "src/parsers/html_to_markdown.py",
+    "Both branches are no-ops: trailing text is a separator or inline content; the label is used either way."
+  ],
+  [
+    "src/parsers/html_to_markdown.py",
+    "Convert <dt>Label</dt><dd>Value</dd> to <div><p>Label</p><p>Value</p></div> so each lands on its own line."
+  ],
+  [
+    "src/parsers/html_to_markdown.py",
+    "Drop colons left orphaned by the removals above."
+  ],
+  [
+    "src/parsers/html_to_markdown.py",
+    "Embedded dividers: \"text---\", \"---text\", \":R69380---\", \"---:R69380\", \":---\"."
+  ],
+  [
+    "src/parsers/html_to_markdown.py",
+    "Matching is case-insensitive, after stripping bold markers and a trailing colon, with curly apostrophes normalized."
+  ],
+  [
+    "src/parsers/html_to_markdown.py",
+    "Normalize embedded dividers first, then drop consecutive duplicates."
+  ],
+  [
+    "src/parsers/html_to_markdown.py",
+    "Remove Workday ID refs (e.g. \":R69380\"); pure-digit refs go only at 4+ digits, so \":1\" to \":999\" survive."
+  ],
+  [
+    "src/parsers/html_to_markdown.py",
+    "Remove empty paired tags; the backreference avoids matching unrelated tags."
+  ],
+  [
+    "src/parsers/html_to_markdown.py",
+    "Standalone lines matching these become \"## \" headers when the HTML lacks real heading tags."
+  ],
+  [
+    "src/parsers/html_to_markdown.py",
+    "Step 3 (section dividers) is folded into add_markdown_section_headers."
+  ],
+  [
+    "src/parsers/html_to_markdown.py",
+    "Workday leaves stray leading colons."
+  ],
+  [
+    "src/poc/bullet_point_preprocessor.py",
+    "(?<!\\n) skips a \"*\" right after a newline so bullet markers survive."
+  ],
+  [
+    "src/poc/bullet_point_preprocessor.py",
+    "Avoid matching across newlines."
+  ],
+  [
+    "src/poc/extract_requirements.py",
+    "Side-effect imports: register the requirement_filter and span_categorizer pipes."
+  ],
+  [
+    "src/poc/extract_requirements_b.py",
+    "Re-export for backward compatibility"
+  ],
+  [
+    "src/poc/extract_requirements_c.py",
+    "A section contained within another is skipped; the containing one keeps the content."
+  ],
+  [
+    "src/poc/extract_requirements_c.py",
+    "Skip normalize_bullet_points() so bullet markers survive for Phase B bullet splitting."
+  ],
+  [
+    "src/poc/extract_requirements_c.py",
+    "Sorted by start so the next section's start is this section's content_end."
+  ],
+  [
+    "src/poc/extract_requirements_d.py",
+    "A section contained within another is skipped; the containing one keeps the content."
+  ],
+  [
+    "src/poc/extract_requirements_d.py",
+    "Longest first so the longer, more specific version wins over its substrings."
+  ],
+  [
+    "src/poc/extract_requirements_d.py",
+    "Skip normalize_bullet_points() so bullet markers survive for Phase B bullet splitting."
+  ],
+  [
+    "src/poc/extract_requirements_d.py",
+    "Sorted by start so the next section's start is this section's content_end."
+  ],
+  [
+    "src/poc/extract_requirements_d.py",
+    "Substring matches between long (>40 chars) requirements are weighted higher."
+  ],
+  [
+    "src/poc/patterns.py",
+    "\"you'll\" tokenizes as [you, 'll]; this optional token is the 'll or \"will\", which is not punctuation."
+  ],
+  [
+    "src/poc/patterns.py",
+    "Added to base pattern confidence; range -0.50 to +0.50, final confidence clamped to [0.0, 1.0]."
+  ],
+  [
+    "src/poc/patterns.py",
+    "Regex entries need \"type\": \"regex\" (a bare string is not a token pattern)."
+  ],
+  [
+    "src/poc/patterns.py",
+    "SECTION_WHAT_YOU_DO is intentionally excluded (responsibilities, not requirements; penalty -0.05)."
+  ],
+  [
+    "src/poc/requirement_classifier.py",
+    "A negated trigger discards the whole sentence, even if another pattern would match."
+  ],
+  [
+    "src/poc/requirement_classifier.py",
+    "Lower priority number wins; ties go to higher confidence."
+  ],
+  [
+    "src/poc/requirement_classifier.py",
+    "Negation must fall within 50 chars of the trigger."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "\"Built with Go and gRPC\" names a stack, not a skill phrase: a participle skill verb before \"with\" is dropped."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "\"data-driven\" is tagged VERB and would start a match as a skill verb (\"drive\"); a participle glued after a hyphen"
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "\"design fault-tolerant, low-latency services\": the comma joins premodifiers of one head noun; a trailing clause is"
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "\"design, build, and maintain ... services\": the skill verb is followed by a comma list of verbs, so no match starts."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "\"end-to-end\" (ADP only); the DET and its hyphen are optional."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "\"high-performance\" is tokenized [high, -, performance]; the PUNCT \"-\" would stop the noun run, so"
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "\"lead agile, platform teams\" is unaffected: its \"lead\" is sentence-led."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "\"lead data science, platform teams\" -> \"lead data science\"; \"or\" followed by a VERB never merges."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "A participle tagged VERB (dep amod) joins the run only when a noun-run token follows; a trailing one is not absorbed."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "A participle with dep acl (\"systems used internally\") is a clause, not a modifier."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "ADP excluded: prepositions are not descriptors."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "Coordinated objects are not matched here: _coordinated_end() extends each head through"
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "Later verbs need only be VERB-tagged; the head verb must be a skill verb."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "Spaced dashes are rejected in extract() via _has_spaced_dash()."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "Spaced-dash hyphen variants are dropped; the plain pattern still yields the non-hyphenated prefix."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "The base form \"Build scalable APIs with Python\" (VB/VBP) is unchanged."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "The extended span contains its head, so filter_spans keeps it."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "_conjunct_end() refuses it, so it is never merged into the preceding span."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "_coordinated_end() walks \"A and B\" / \"A, B, and C\" chains; bare-comma conjuncts stay only if a later one commits."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "is never a head verb, so that match is dropped."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "one hyphen join is allowed."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "participle must not be a skill verb itself."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "spaCy sometimes tags a coordinated skill verb NOUN (dep conj), so the Matcher never starts on it; the guard does."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "spaCy tags \"lead\" ADJ in \"design systems and lead teams\"; it starts its own span only after a comma or conjunction."
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "spaCy tags the imperative NOUN and the participle VERB, so no action verb starts a match; the"
+  ],
+  [
+    "src/poc/skills/extract_skills_a.py",
+    "tags the participle VERB with dep amod, which the noun-run pattern does not accept."
+  ],
+  [
+    "src/poc/skills/patterns.py",
+    "Lemmas: the Matcher compares LEMMA, so \"designing\" and \"designed\" match \"design\"."
+  ],
+  [
+    "src/poc/technologies/extract_technologies_a.py",
+    "A contrast word ends the negation scope: \"No prior experience needed, but Kubernetes is required.\" keeps kubernetes."
+  ],
+  [
+    "src/poc/technologies/extract_technologies_a.py",
+    "Lowercased so case variants (PyTorch, pytorch) collapse to one entry."
+  ],
+  [
+    "src/poc/technologies/extract_technologies_a.py",
+    "Terms whose common English meaning (\"lightning strike\") makes a preceding cue too weak: only a following"
+  ],
+  [
+    "src/poc/technologies/extract_technologies_a.py",
+    "Vue.js: tokenizer may keep it whole or split on the dot."
+  ],
+  [
+    "src/poc/technologies/extract_technologies_a.py",
+    "deliberately not a cue (optional, not absent)."
+  ],
+  [
+    "src/poc/technologies/extract_technologies_a.py",
+    "spaCy splits intra-word hyphens into 3 tokens, so emit \"-\" too: \"anchor-free\" -> anchor, -, free."
+  ],
+  [
+    "src/poc/technologies/patterns.py",
+    "#513: compound, so \"Spring Boot\" does not yield bare \"spring\""
+  ],
+  [
+    "src/poc/technologies/patterns.py",
+    "Words that, directly after \"<ambiguous term>-\", count as tech evidence (\"Go-based\"); other hyphens read as English"
+  ],
+  [
+    "src/poc/technologies/patterns.py",
+    "compounds (\"Go-to-market\")."
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "(has_errors() would turn the job into ERROR), and partial appends are rolled back."
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "Cache of source_config -> (selector, match, error): skips re-resolving a key already seen in this batch."
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "Checks see de-escaped text; kept sentences keep their original form."
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "Deliberately broad: user-supplied config JSON can have any shape, and a malformed"
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "Explicit entity_ruler registration (required by TechnologyProcessor, D5 decision)."
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "Mirrors heading_text._is_structural_level (module-private there); kept inline to stay in scope."
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "SectionClassifierComponent reads doc._.sections, so populate it from the ruler output."
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "Sentences come from polished_markdown, not promoted_markdown (intentional; no section alignment)."
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "Store full precision here; rounding only happens in MarkdownSection.to_dict()."
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "apply_fallback sets PARTIAL_RECOVERY itself; a failure is logged, not added to result.errors"
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "confidence stats are still reported."
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "config must never abort the whole batch. Degrade this key to unscoped instead."
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "isinstance guard: an unhashable value (e.g. list from malformed config) would raise TypeError"
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "multi-type data preserved)."
+  ],
+  [
+    "src/poc/tweak/batch_processor.py",
+    "on set membership and abort the batch; treat it as invalid instead."
+  ],
+  [
+    "src/poc/tweak/common.py",
+    "Add handlers only once (avoid duplicates)."
+  ],
+  [
+    "src/poc/tweak/common.py",
+    "Runs at import: replaces sys.excepthook process-wide."
+  ],
+  [
+    "src/poc/tweak/common.py",
+    "utf-8-sig tolerates a leading BOM (common from Windows editors)"
+  ],
+  [
+    "src/poc/tweak/crawl_details.py",
+    "Adaptive retry for slow-loading description pages; ms per attempt."
+  ],
+  [
+    "src/poc/tweak/crawl_details.py",
+    "Deliberately overlaps the generic shell guard in extract_description_from_detail_page: that guard would discard"
+  ],
+  [
+    "src/poc/tweak/crawl_details.py",
+    "Fallback chain: innerHTML (raw HTML, preferred for preprocessing) -> outerHTML -> innerText"
+  ],
+  [
+    "src/poc/tweak/crawl_details.py",
+    "None."
+  ],
+  [
+    "src/poc/tweak/crawl_details.py",
+    "Shell = WorkSource search-list page. Length cannot discriminate: the shell (~15.5k text chars) is longer than a real"
+  ],
+  [
+    "src/poc/tweak/crawl_details.py",
+    "WorkSource: the listing page has no description node, so the selector gate would skip the getJobDetails"
+  ],
+  [
+    "src/poc/tweak/crawl_details.py",
+    "detail page (~6.7k). These phrases appear on the shell and on no real detail page capture; two distinct hits are"
+  ],
+  [
+    "src/poc/tweak/crawl_details.py",
+    "fallback is the DOM at the stable job-details URL."
+  ],
+  [
+    "src/poc/tweak/crawl_details.py",
+    "required so one phrase in ordinary prose is not treated as shell."
+  ],
+  [
+    "src/poc/tweak/crawl_details.py",
+    "shell content, but this check must run first so shell API content triggers the DOM fallback instead of returning"
+  ],
+  [
+    "src/poc/tweak/crawl_list.py",
+    "Always extract job_id from URL first (works even if page navigation fails)"
+  ],
+  [
+    "src/poc/tweak/crawl_list.py",
+    "Limit length to 100 chars to prevent excess tokens"
+  ],
+  [
+    "src/poc/tweak/crawl_list.py",
+    "Other companies use job_container (prevents regression)."
+  ],
+  [
+    "src/poc/tweak/crawl_list.py",
+    "WorkSource jobId extraction via navigation: click link -> navigate -> read jobId from the detail page URL."
+  ],
+  [
+    "src/poc/tweak/crawl_list.py",
+    "WorkSource: use job_card selector to iterate individual cards (20 cards)."
+  ],
+  [
+    "src/poc/tweak/crawl_list.py",
+    "parse_qs returns lists of values, so take the first"
+  ],
+  [
+    "src/poc/tweak/extraction_status.py",
+    "Not read by classify_extraction_outcome(); used by the fallback extraction path."
+  ],
+  [
+    "src/poc/tweak/format_paragraph.py",
+    "Exactly one empty line after bold text ending with a colon (the converter may output a single \\n)"
+  ],
+  [
+    "src/poc/tweak/format_paragraph.py",
+    "Wrap the bold element in <p> so MarkItDown treats it as a separate block"
+  ],
+  [
+    "src/poc/tweak/html_scope.py",
+    "BeautifulSoup.select() raises on invalid selectors; surface it as ValueError"
+  ],
+  [
+    "src/poc/tweak/html_scope.py",
+    "Unknown strategy: treat as \"first\""
+  ],
+  [
+    "src/poc/tweak/markdown_section_classifier.py",
+    "No early return: every matching category is collected so a section can carry multiple types"
+  ],
+  [
+    "src/poc/tweak/markdown_section_classifier.py",
+    "Prefer title-based classification; fall back to content if no title or level=-2"
+  ],
+  [
+    "src/poc/tweak/markdown_section_classifier.py",
+    "Simple implementation: first ruler match per type wins (no longest-span resolution)"
+  ],
+  [
+    "src/poc/tweak/multi_line_paragraph.py",
+    "\"numeric\" levels are read from the actual \"#\" count in the text; BOLD_PATTERN (-1) is a non-numbered bold marker."
+  ],
+  [
+    "src/poc/tweak/multi_line_paragraph.py",
+    "End of current section is one line before next boundary"
+  ],
+  [
+    "src/poc/tweak/multi_line_paragraph.py",
+    "Header patterns mirror span_sections_markdown.py."
+  ],
+  [
+    "src/poc/tweak/multi_line_paragraph.py",
+    "Text before the first boundary becomes a preamble section (title=None, level=-2)"
+  ],
+  [
+    "src/poc/tweak/multi_line_paragraph.py",
+    "Trailing content after the last header (only when there are no headers at all)"
+  ],
+  [
+    "src/poc/tweak/multi_line_paragraph.py",
+    "set_extension raises if the extension is already registered."
+  ],
+  [
+    "src/poc/tweak/patterns.py",
+    "Applied to base pattern confidence when extracting from a given section."
+  ],
+  [
+    "src/poc/tweak/patterns.py",
+    "Entry: {\"label\": str, \"pattern\": spaCy token-attribute list or regex string}; regex entries also set \"type\": \"regex\"."
+  ],
+  [
+    "src/poc/tweak/patterns.py",
+    "Lives here, not in markdown_section_classifier.py, to avoid a circular import:"
+  ],
+  [
+    "src/poc/tweak/patterns.py",
+    "Range -0.50 to +0.50; final confidence is clamped to [0.0, 1.0]."
+  ],
+  [
+    "src/poc/tweak/patterns.py",
+    "that module imports patterns.py and patterns.py needs SectionType for type hints."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/__init__.py",
+    "Importing registry registers the component factories; it must run on package import."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/fallback_processor.py",
+    "Fixed confidences for recovered items: tier 1 also caps requirement confidence at this value;"
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/fallback_processor.py",
+    "tier 2 (taxonomy) is lower."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "\"do/does/will not discriminate\" followed by on/against/based, so it does not block isolation."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "A bare \"on the basis of\" lead-in is deliberately absent: \"Pay is set on the basis of age and experience.\""
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Accepted false positives: test_travel_booking_accommodation_wording_is_boilerplate_known_limitation."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "An EEO paragraph is only a candidate when its trigger sits in this first sentence."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Applied after Guards 3 and 5, so it only runs when no preceding or existing EEO heading applies."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Bare \"contact\", \"email\" and \"accommodation\" are deliberately absent (they open ordinary job sentences)."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Everything below works on LF."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Guard 1: _is_eeo_paragraph ignores a leading heading marker, so a paragraph whose first line is already"
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Guard 2: the first line is a known heading. Return unchanged if it is the EEO heading or a 1-line paragraph;"
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Input is LF-normalised by process(); the original trailing-newline status is restored on return."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Keep the glued known heading line in place and insert the synthetic EEO heading, with blank lines around it,"
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Known limitation (accepted): generic triggers such as \"is an equal opportunity\" can false-positive on non-EEO text,"
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Known limitation (accepted): it also splits after abbreviations such as \"U.S.\", and the fragment \"Applicants from the"
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Known limitation: bare \"disability\" and \"by email\" still match case-insensitively."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Known limitation: hand-picked, so a job sentence containing \"diversity\" is also treated as EEO-ish."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Known limitation: lead-ins \"all\" and \"people\" match job wording (\"All who require accommodations for travel.\")."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Normalise line endings to the first one detected (CRLF or LF) so mixed input produces uniform output."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Only consulted for sentences after an EEO first sentence, so it cannot trigger isolation by itself."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Silent skip: a second EEO heading would duplicate an existing one."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "The allowlist test pins this behaviour."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "The canonical filter phrases (KNOWN_HEADING_PHRASES) are unioned in below rather than listed twice."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "Triggers are searched in the first sentence only; later sentences are checked below so EEO text is not"
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "U.S.\" then blocks isolation."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "a markdown heading can be selected; leave it unchanged rather than heading it twice."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "after that line."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "e.g. \"This is an equal opportunity to grow your career.\""
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "promoted to \"## Benefits\" by an earlier pass still matches \"benefits\"."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_promoter.py",
+    "would otherwise read as an EEO statement."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_text.py",
+    "A \"#\" attached to a word is kept (\"C#\" stays \"c#\")."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_text.py",
+    "Deliberately narrow, not a general boilerplate detector; matched against the normalized key."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/heading_text.py",
+    "which is boilerplate, not a heading."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/markdown_polisher.py",
+    "Compiled once here; process() runs them per call."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/registry.py",
+    "Importing section_classifier triggers its @Language.factory() registration."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/requirement_processor.py",
+    "confidence is below min_confidence."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/skill_processor.py",
+    "\"Go\")."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/skill_processor.py",
+    "#375)."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/skill_processor.py",
+    "Reject chunks containing a verb, auxiliary or pronoun token unless it is a tech term (\"going forward\" vs"
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/skill_processor.py",
+    "SKILLS is a label but not ranked first: look up its own confidence so the gate still applies."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/skill_processor.py",
+    "Skip markdown heading lines so heading text never reaches the Matcher or noun-led fallback (Issue"
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/skill_processor.py",
+    "Word boundaries so a multi-word term does not match inside a longer word."
+  ],
+  [
+    "src/poc/tweak/spacy_pipeline/technology_processor.py",
+    "min_confidence; otherwise fall back to labels only."
+  ],
+  [
+    "src/poc/tweak/span_sections_markdown.py",
+    "#/##/### headings, '## **' headings, and lines that are only bold text."
+  ],
+  [
+    "src/poc/ui/job_selector.py",
+    "batch_processor requires a description field."
+  ],
+  [
+    "src/poc/ui/loader.py",
+    "error is None only when job is not None"
+  ],
+  [
+    "src/preprocessing/custom_span_categorizer.py",
+    "A closed group counts as quantified if repeated, else it inherits its body's quantified-ness."
+  ],
+  [
+    "src/preprocessing/custom_span_categorizer.py",
+    "Copy metadata to isolate per match"
+  ],
+  [
+    "src/preprocessing/custom_span_categorizer.py",
+    "Each frame: [last item quantified, an earlier alternation branch was]"
+  ],
+  [
+    "src/preprocessing/custom_span_categorizer.py",
+    "Each open group: (index where the current branch starts, finished branches)."
+  ],
+  [
+    "src/preprocessing/custom_span_categorizer.py",
+    "Group header outside the alternation body: (?:, (?=, (?!, (?<=, (?<!, (?P<name>, scoped flags like (?i:."
+  ],
+  [
+    "src/preprocessing/custom_span_categorizer.py",
+    "Group quantifier: +, *, {n,} or {n,m} with an optional lazy or possessive suffix; exact {n} is not flagged."
+  ],
+  [
+    "src/preprocessing/custom_span_categorizer.py",
+    "Nested quantifiers: [+*}] optionally followed by ), then another [+*{]."
+  ],
+  [
+    "src/preprocessing/custom_span_categorizer.py",
+    "Strip lazy quantifiers so nested quantifiers are detected properly."
+  ],
+  [
+    "src/preprocessing/requirement_filter.py",
+    "Dedupe by text: keep highest confidence; on a tie prefer the better casing."
+  ],
+  [
+    "src/preprocessing/requirement_filter.py",
+    "Limited to local context to avoid false positives across unrelated clauses"
+  ],
+  [
+    "src/preprocessing/requirement_filter.py",
+    "Patterns allow word chars, spaces and hyphens (some also '.' or ':') and are matched with re.IGNORECASE."
+  ],
+  [
+    "src/preprocessing/requirement_filter.py",
+    "Window is 50 chars around the first occurrence of text; a repeated phrase may pick the wrong one."
+  ],
+  [
+    "src/preprocessing/requirement_filter.py",
+    "float('inf') makes the comparison depend on the first tuple element only."
+  ],
+  [
+    "src/preprocessing/section_detector.py",
+    "+1 so rfind(-1) -> 0"
+  ],
+  [
+    "src/preprocessing/section_detector.py",
+    "Deep copy patterns to avoid mutating shared module-level data"
+  ],
+  [
+    "src/preprocessing/section_extractor.py",
+    "Cached sentencizer, initialized lazily."
+  ],
+  [
+    "src/preprocessing/section_extractor.py",
+    "Weight substring match higher if both are long (more specific)"
+  ],
+  [
+    "src/preprocessing/section_patterns.py",
+    "Multi-word headers: tokens must match spaCy's tokenization."
+  ],
+  [
+    "src/preprocessing/section_patterns.py",
+    "WHAT_YOU_DO is intentionally excluded: responsibilities, not requirements (adjustment -0.05)."
+  ],
+  [
+    "src/preprocessing/section_patterns.py",
+    "optional 'll or will"
+  ],
+  [
+    "src/preprocessing/span_categorizer.py",
+    "Ensure current_end is within bounds (may have incremented past end)"
+  ],
+  [
+    "src/preprocessing/span_categorizer.py",
+    "Start token: first token that ends after char_start."
+  ],
+  [
+    "src/setup/setup_precommit.py",
+    "Setup succeeded; hook run failures are left for the user to review."
+  ],
+  [
+    "src/storage/assessment_store.py",
+    "Re-creating an existing index is harmless; only other errors warrant a warning."
+  ],
+  [
+    "src/storage/assessment_store.py",
+    "Tried in order: job_reviews.crawled_at, jobs.crawled_at via join, then NULL (schema compatibility)."
+  ],
+  [
+    "src/storage/job_store.py",
+    "Expected: column already exists; any other OperationalError is swallowed too."
+  ],
+  [
+    "src/storage/job_store.py",
+    "Old DBs predate job_assessments.model; use DEFAULT_MODEL for all rows."
+  ],
+  [
+    "src/storage/job_store.py",
+    "Score filtering is not implemented: no score column is joined here"
+  ],
+  [
+    "src/tokenization/chunker.py",
+    "A plain substring find misses spans split across chunks (\"Python and Docker\")."
+  ],
+  [
+    "src/tokenization/chunker.py",
+    "Check for a partial match on word boundaries instead."
+  ],
+  [
+    "src/tokenization/chunker.py",
+    "Check span prefix (for cases like \"Python and Docker\" → chunk ends at \"Python and\")"
+  ],
+  [
+    "src/tokenization/chunker.py",
+    "Finalizing would split a requirement span: keep adding unless the chunk is already huge."
+  ],
+  [
+    "src/tokenization/chunker.py",
+    "Use word boundary regex to avoid false positives (e.g., \"Python\" in \"Cython\")"
+  ],
+  [
+    "src/tokenization/html_cleanup.py",
+    "\"Experience\" is NOT included here (too broad) - it appears in body text."
+  ],
+  [
+    "src/tokenization/html_cleanup.py",
+    "Note: \"contract\" uses negative lookahead to avoid matching \"contractor\", \"contracting\""
+  ],
+  [
+    "src/tokenization/html_cleanup.py",
+    "Note: These patterns target section-header artifacts (header: content)."
+  ],
+  [
+    "src/tokenization/html_cleanup.py",
+    "Patterns use word boundaries \\b to avoid false positives."
+  ],
+  [
+    "src/tokenization/keywords.py",
+    "Hardware/FPGA/Embedded & Engineering Tools - CRITICAL for ATS domain"
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "\"responsibilities\" does not substring-match \"responsibility\", so fold it in explicitly."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "3+ transitions typically indicates MixedCase fragment"
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Flag 4+ words with a conjunction or comma in the middle (e.g. \"computer science and years\")."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "For markdown, drop benefits/compensation/about/culture sections from full-text extraction."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "If no formal job section found, return empty (fallback to original text)"
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Importing registers the component via its decorator."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Importing registers the factory via its decorator."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Job section headers in priority order; must be followed by a colon or newline to avoid mid-sentence matches."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Keep a single adjective only if it is a soft skill or tech keyword; spaCy tags \"Agile\" and \"Lean\" as ADJ."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Keep in sync with the \"responsibilities\" cases in _extract_noun_compounds and _route_list_item_by_section."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Markdown gets soft skills per skills section (_extract_entities_by_section); plain text uses full text."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Must run after requirement_filter, which populates doc._.requirements."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Pass pre-computed POS tags to avoid a second NLP pass."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Placed before 'ner' when present, otherwise appended."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Remove leading colons from parts (Workday artifact cleanup)"
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Requirement phrases run longer than skill and technology names, hence 100 vs 70 chars."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Section names (or substrings) skipped by _extract_entities_by_section. Single source of truth:"
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Single adjectives are filtered only when a POS tag is available, to avoid false positives."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Skip if contains excessive formatting artifacts (but allow parentheses in some contexts)"
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Skip items containing percentages or large numbers (e.g., \"5–50 %\", \"% Carbon Robotics\", \"90,000\")"
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "Substring match for compound entities, e.g. \"% Carbon Robotics\" contains \"carbon robotics\"."
+  ],
+  [
+    "src/tokenization/preprocessor.py",
+    "other tooling (e.g. .claude/scripts/analyze_sections.py) should reference Preprocessor.SKIP_SECTIONS, not copy it."
+  ],
+  [
+    "src/tokenization/technical_compounds.py",
+    "Only match as part of a phrase (e.g. \"software development\"), not the keyword alone."
+  ],
+  [
+    "src/tokenization/technical_compounds.py",
+    "Single words are excluded to avoid false positives."
+  ],
+  [
+    "src/tui/dashboard.py",
+    "Review leaves rejected jobs in state.jobs; skip them here."
+  ],
+  [
+    "src/tui/dashboard.py",
+    "Skip or escape: job stays pending_review."
+  ],
+  [
+    "src/verification/reviewer.py",
+    "Backward compat: a single path becomes a one-element list."
+  ],
+  [
+    "src/verification/reviewer.py",
+    "Carry over timeline fields: INSERT OR REPLACE below would otherwise wipe them."
+  ],
+  [
+    "src/verification/reviewer.py",
+    "Expected: column already exists; any other OperationalError is swallowed too."
+  ],
+  [
+    "src/verification/reviewer.py",
+    "Re-review must see already-reviewed jobs, so skip flags are disabled."
+  ],
+  [
+    "tests/browser/test_crawler_html_extraction.py",
+    "<50 chars trips the crawler min-length check and forces the outerHTML fallback."
+  ],
+  [
+    "tests/browser/test_crawler_html_extraction.py",
+    ">100 chars so frame1 satisfies the min-length check and frame2 is never tried."
+  ],
+  [
+    "tests/browser/test_crawler_html_extraction.py",
+    ">100 chars to pass the crawler min-length check."
+  ],
+  [
+    "tests/browser/test_crawler_html_extraction.py",
+    ">100 chars to pass the crawler min-length check; frame1 raises so frame2 is used."
+  ],
+  [
+    "tests/cli/test_cost_analysis.py",
+    "3 v1.0 + 1 v2.0 job = 25% migrated."
+  ],
+  [
+    "tests/cli/test_preprocess_categorizer_flags.py",
+    "Help text truncates long flag names, so check for partial match"
+  ],
+  [
+    "tests/cli/test_preprocess_categorizer_flags.py",
+    "Keep the CLI off the real data/extracted_jobs."
+  ],
+  [
+    "tests/cli/test_preprocess_cli_requirements.py",
+    "Check for flag names (may be truncated in help due to column width)"
+  ],
+  [
+    "tests/cli/test_preprocess_cli_requirements.py",
+    "The export may not happen (e.g. no jobs), so verify JSON only if it did."
+  ],
+  [
+    "tests/cli/test_preprocess_cli_requirements.py",
+    "tmp_path cleanup is handled by pytest."
+  ],
+  [
+    "tests/cli/test_preprocess_selective.py",
+    "Accepts preview or no-jobs output; the database contents are not controlled here."
+  ],
+  [
+    "tests/cli/test_preprocess_selective.py",
+    "Check for filter options (help output may truncate with ellipsis)"
+  ],
+  [
+    "tests/cli/test_preprocess_v3.py",
+    "Without the \"v\" prefix; the job must normalize it to \"v3.0\"."
+  ],
+  [
+    "tests/cli/test_preprocess_version_flags.py",
+    "Check for flag prefix (handles truncation in narrow terminals)"
+  ],
+  [
+    "tests/conftest.py",
+    "delete=False: the path must outlive the handle; the fixture never unlinks it."
+  ],
+  [
+    "tests/llm/test_provider.py",
+    "Haiku $0.80 in / $4.00 out per 1M tokens"
+  ],
+  [
+    "tests/llm/test_provider.py",
+    "Simulates the C3 import order: provider loaded first, then the assessment package"
+  ],
+  [
+    "tests/llm/test_provider.py",
+    "Sonnet $3.00 in / $15.00 out per 1M tokens"
+  ],
+  [
+    "tests/llm/test_provider.py",
+    "anthropic 2.x types response as httpx2.Response; cast keeps mypy green on both majors"
+  ],
+  [
+    "tests/parsers/test_html_cleanup_integration.py",
+    "\"experience\" keyword alone shouldn't be removed"
+  ],
+  [
+    "tests/parsers/test_html_cleanup_integration.py",
+    "Header format varies (## or structured); assert content only."
+  ],
+  [
+    "tests/parsers/test_html_to_markdown.py",
+    "A leading divider yields an empty first part, which is skipped, leaving only the content."
+  ],
+  [
+    "tests/parsers/test_html_to_markdown.py",
+    "A table row contains --- but is not a divider, so it must stay unchanged."
+  ],
+  [
+    "tests/parsers/test_html_to_markdown.py",
+    "At minimum, they should not be mixed with other text"
+  ],
+  [
+    "tests/parsers/test_html_to_markdown.py",
+    "Either form is acceptable: the em dash may be kept or normalized."
+  ],
+  [
+    "tests/parsers/test_html_to_markdown.py",
+    "References like :R69380 should not appear (or be on isolated lines)"
+  ],
+  [
+    "tests/parsers/test_html_to_markdown.py",
+    "Regression guard: must not become \"LeaddesignarchitectureNotWork\"."
+  ],
+  [
+    "tests/parsers/test_normalize_description.py",
+    "Count only standalone '---' lines; markdown table separators like '| --- | --- |' are expected and unrelated."
+  ],
+  [
+    "tests/parsers/test_normalize_description.py",
+    "Intentional: test passes None at runtime to verify the guard."
+  ],
+  [
+    "tests/parsers/test_normalize_description.py",
+    "No divider for the first line, nor for a header that directly follows a header."
+  ],
+  [
+    "tests/parsers/test_preprocessing_compatibility.py",
+    "Skipping salary_benefits keeps the \"$\" and amount."
+  ],
+  [
+    "tests/poc/test_extract_requirements.py",
+    "Nice to have scores 0.40, below min_confidence 0.80, so it should be filtered."
+  ],
+  [
+    "tests/poc/test_extract_requirements_c_patterns.py",
+    "Exact pipe count depends on the spaCy version; only verify the model loaded."
+  ],
+  [
+    "tests/poc/test_extract_requirements_d.py",
+    "Dedup keeps the longest by sorting length desc, so the (Preferred) version wins."
+  ],
+  [
+    "tests/poc/test_skills_extractor.py",
+    "Coarse sanity bound only (5s), not a perf assertion; avoids CI flake."
+  ],
+  [
+    "tests/poc/test_skills_extractor.py",
+    "Span must not stop at \"and\"; \"building services\" is a separate verb phrase."
+  ],
+  [
+    "tests/poc/test_skills_extractor.py",
+    "The optional \"the/of\" connector is kept; \"of systems\" is not (ADP excluded from the noun run)."
+  ],
+  [
+    "tests/poc/test_technologies_extractor.py",
+    "\"nice to have\" is not a negation cue."
+  ],
+  [
+    "tests/poc/test_technologies_extractor.py",
+    "Coarse sanity bound only (5s), not a perf assertion; avoids CI flake."
+  ],
+  [
+    "tests/poc/test_technologies_extractor.py",
+    "Positive control: the fallback path still extracts non-negated terms, not a silent [] from the except."
+  ],
+  [
+    "tests/poc/test_technologies_extractor.py",
+    "The check compares after.lower_, so an uppercase entry would silently never match."
+  ],
+  [
+    "tests/poc/tweak/spacy_pipeline/test_fallback_processor.py",
+    "Precondition: the relaxed pass really produces 'python', so the guard is what is tested."
+  ],
+  [
+    "tests/poc/tweak/spacy_pipeline/test_heading_text.py",
+    "Level 0 is not a structural ruler level, so the colon carve-out must not fire."
+  ],
+  [
+    "tests/poc/tweak/spacy_pipeline/test_heading_text.py",
+    "Matched by the boilerplate regex path, not by set membership."
+  ],
+  [
+    "tests/poc/tweak/spacy_pipeline/test_heading_text.py",
+    "Trailing '#' attached to a word is content, not an ATX closer."
+  ],
+  [
+    "tests/poc/tweak/spacy_pipeline/test_section_classifier_integration.py",
+    "Trigger ends at index 199, the last index inside [:200]."
+  ],
+  [
+    "tests/poc/tweak/spacy_pipeline/test_section_classifier_integration.py",
+    "clean_html strips legal boilerplate (incl. EEO) before the promoter runs, so use the raw conversion."
+  ],
+  [
+    "tests/poc/tweak/test_batch_processor.py",
+    "Resolver loads config twice (selector + match) on the single cache miss."
+  ],
+  [
+    "tests/poc/tweak/test_batch_processor.py",
+    "Select by fixture heading, not content equality: blanking removes the equality."
+  ],
+  [
+    "tests/poc/tweak/test_extraction_status.py",
+    "Source: design doc jd-zero-extraction-fallback.md 1.1/1.3."
+  ],
+  [
+    "tests/poc/tweak/test_extraction_status.py",
+    "Walmart shell capture shared by rows 6,7,8,10,11; 459 sits just under the 460 shell length."
+  ],
+  [
+    "tests/poc/tweak/test_html_scope.py",
+    "Both fragments are equal length after stripping, so the first one wins."
+  ],
+  [
+    "tests/poc/ui/test_tui_job_selector.py",
+    "select() takes values (job_id), not indices."
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "Body ends in a literal after the quantified atom"
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "Body ends in an escaped literal paren, not a group close"
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "Class holding '(' must not open a group"
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "Class holding ')' must not close the group early; body ends in literal a"
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "Escaped parens are literals, so the outer + does not repeat a group"
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "Escaped quantifier is a literal, not a quantified atom"
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "Exact count is not a repeat (matches the existing {n} policy)"
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "Must-pass set: no nested quantifier, or quantifier not in a repeated group"
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "Quantifier characters inside a class are not quantifiers"
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "Rebind names so other tests keep referring to the classes they were written against."
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "Same start; sorted by (start_char, end_char), so shorter first"
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "Wrapper without an outer repeat"
+  ],
+  [
+    "tests/preprocessing/test_custom_span_categorizer.py",
+    "a* also matches zero-length at string end; those must be skipped."
+  ],
+  [
+    "tests/preprocessing/test_integration_preprocessor_requirements.py",
+    "Warm-up run primes the same measured path; median over repeats"
+  ],
+  [
+    "tests/preprocessing/test_integration_spans_chunks.py",
+    "A span may split across at most 2 chunks when the boundary is tight."
+  ],
+  [
+    "tests/preprocessing/test_integration_spans_chunks.py",
+    "Allow up to 200ms avg per job (accounts for system load, JIT compilation, CI environment)"
+  ],
+  [
+    "tests/preprocessing/test_integration_spans_chunks.py",
+    "Per-job time may vary by +/-50% between batches."
+  ],
+  [
+    "tests/preprocessing/test_integration_spans_chunks.py",
+    "Rank check, not statistics.quantiles: its exclusive method extrapolates past max(data) at N=10."
+  ],
+  [
+    "tests/preprocessing/test_integration_spans_chunks.py",
+    "Warm-up absorbs first-call cost; median of repeats suppresses jitter."
+  ],
+  [
+    "tests/preprocessing/test_integration_spans_chunks.py",
+    "span_categorizer may be in the pipeline, but spans are not used for chunking here."
+  ],
+  [
+    "tests/preprocessing/test_parity_report.py",
+    "Benefits/compensation are dropped by SKIP_SECTIONS in v3 extraction."
+  ],
+  [
+    "tests/preprocessing/test_parity_report.py",
+    "Deliberate mismatch: 2 requirements are expected."
+  ],
+  [
+    "tests/preprocessing/test_parity_report.py",
+    "If real extraction fails, it's a regression - propagate error"
+  ],
+  [
+    "tests/preprocessing/test_parity_report.py",
+    "Load parity_check module using importlib (no conftest.py needed)"
+  ],
+  [
+    "tests/preprocessing/test_parity_report.py",
+    "With nlp=None, extract_entities returns empty lists"
+  ],
+  [
+    "tests/preprocessing/test_parity_report.py",
+    "extract_sectioned() is model-free, so no _load_model patch is needed."
+  ],
+  [
+    "tests/preprocessing/test_requirement_filter.py",
+    "If the match does not align with sentence boundaries, full_sentence is the context (find() returns -1)."
+  ],
+  [
+    "tests/preprocessing/test_requirement_filter.py",
+    "Import requirement filter module to register the component via decorator"
+  ],
+  [
+    "tests/preprocessing/test_requirement_filter.py",
+    "Passes vacuously when the negated requirement is not extracted at all."
+  ],
+  [
+    "tests/preprocessing/test_requirement_filter.py",
+    "Should complete without error, using local 50-char context window"
+  ],
+  [
+    "tests/preprocessing/test_requirement_filter.py",
+    "When two requirements match case-insensitively with equal confidence, the better-capitalized one wins."
+  ],
+  [
+    "tests/preprocessing/test_requirement_patterns.py",
+    "\"must\" and \"ability_in_bullet\" tie on priority 1; \"must\" wins on confidence (0.93 vs 0.90)."
+  ],
+  [
+    "tests/preprocessing/test_requirement_patterns.py",
+    "\"required\" (priority 1, conf 0.95) beats \"prefer\" (priority 2, conf 0.65): lower priority number wins."
+  ],
+  [
+    "tests/preprocessing/test_requirement_patterns.py",
+    "+0.05 = 1.02, clamped to 1.0"
+  ],
+  [
+    "tests/preprocessing/test_requirement_patterns.py",
+    "-0.25 -0.10 -0.15 = -0.50, clamped to 0.0"
+  ],
+  [
+    "tests/preprocessing/test_requirement_patterns.py",
+    "Confidence 0.93, no adjustments applied"
+  ],
+  [
+    "tests/preprocessing/test_requirement_patterns.py",
+    "Only 2 all-caps words: no boost"
+  ],
+  [
+    "tests/preprocessing/test_section_detector.py",
+    "Both 'requirements' and 'qualifications' match the ruler but sit mid-line"
+  ],
+  [
+    "tests/preprocessing/test_section_detector.py",
+    "The pipeline is blank, so it has no tagger."
+  ],
+  [
+    "tests/preprocessing/test_section_detector.py",
+    "header_start is the offset after \"## \"."
+  ],
+  [
+    "tests/preprocessing/test_section_extractor.py",
+    "High threshold: no match (score 0.632 < 0.9)"
+  ],
+  [
+    "tests/preprocessing/test_section_extractor.py",
+    "High threshold: only \"must\" patterns survive"
+  ],
+  [
+    "tests/preprocessing/test_section_extractor.py",
+    "Low threshold: match (score 0.632 >= 0.5)"
+  ],
+  [
+    "tests/preprocessing/test_section_extractor.py",
+    "Should be filtered out (0.95 - 0.50 = 0.45 < 0.50)"
+  ],
+  [
+    "tests/preprocessing/test_span_categorizer.py",
+    "Token 0 is \"cross\"; \"-\" and \"functional\" follow."
+  ],
+  [
+    "tests/preprocessing/test_span_categorizer.py",
+    "Token 2 is \"Python\"."
+  ],
+  [
+    "tests/preprocessing/test_span_categorizer.py",
+    "Tokens: 2 is \"5\", 5 is \"Python\"; the period comes after \"experience\"."
+  ],
+  [
+    "tests/preprocessing/test_span_categorizer_edge_cases.py",
+    "Ensure trigger word is present for Phase 8a extraction"
+  ],
+  [
+    "tests/preprocessing/test_span_categorizer_edge_cases.py",
+    "Negations should be excluded (Phase 8a filters with confidence=0.0)"
+  ],
+  [
+    "tests/preprocessing/test_span_categorizer_edge_cases.py",
+    "Prepend trigger word to make Phase 8a extract it"
+  ],
+  [
+    "tests/preprocessing/test_span_categorizer_edge_cases.py",
+    "Warm-up on first document (not timed)"
+  ],
+  [
+    "tests/preprocessing/test_span_types.py",
+    "Fields are frozen so they cannot be reassigned; check that equal metadata dicts are separate objects."
+  ],
+  [
+    "tests/storage/test_cost_tracking.py",
+    "5 jobs at 1000 tokens (v1.0) vs 650 (v2.0); DEFAULT_MODEL input price is $3.00/1M."
+  ],
+  [
+    "tests/storage/test_selective_reprocessing.py",
+    "Filter for min_tokens=1000 should skip NULL"
+  ],
+  [
+    "tests/storage/test_selective_reprocessing.py",
+    "Insert out of order so the ORDER BY is actually exercised."
+  ],
+  [
+    "tests/storage/test_selective_reprocessing.py",
+    "Recent job from Amazon (should be filtered out by age)"
+  ],
+  [
+    "tests/test_assessment_store_filters.py",
+    "Only the jobs table, deliberately no job_reviews, to force the fallback; jobs uses id not job_id."
+  ],
+  [
+    "tests/test_cli_multi_company_review.py",
+    "4 jobs * 0.00045 cost"
+  ],
+  [
+    "tests/test_cli_multi_company_review.py",
+    "4 jobs * 150 tokens"
+  ],
+  [
+    "tests/test_e2e_date_filters.py",
+    "Fixture assessments are dated 2025-06-20, not 2026; the year is deliberate."
+  ],
+  [
+    "tests/test_html_parsing_phase6_integration.py",
+    "Built directly (no blank line before the next header) to control line adjacency for the divider-boundary code."
+  ],
+  [
+    "tests/test_html_parsing_phase6_integration.py",
+    "warm-up, untimed"
+  ],
+  [
+    "tests/test_id_generation.py",
+    "Anchor is the extracted digit id, not the normalized company (url=None path)."
+  ],
+  [
+    "tests/test_id_generation.py",
+    "Same gh_jid on different hosts -> same ID: the portal ID is the anchor."
+  ],
+  [
+    "tests/test_integrity_inspector.py",
+    "UNIQUE(job_id) means duplicates cannot be inserted here, so the check must find none."
+  ],
+  [
+    "tests/test_integrity_purger.py",
+    "1 job + 1 assessment + 1 preprocessed + 1 cost_tracking + 1 review"
+  ],
+  [
+    "tests/test_issue_116_mode_filters.py",
+    "Mode filter runs before any other filter."
+  ],
+  [
+    "tests/test_issue_116_mode_filters.py",
+    "Mode filter runs first, so the reason is already_reviewed even for a rejected job."
+  ],
+  [
+    "tests/test_issue_116_mode_filters.py",
+    "Status filter runs before the date filter."
+  ],
+  [
+    "tests/test_issue_116_mode_filters.py",
+    "mode=\"all\" bypasses the mode filter, leaving the status filter to decide."
+  ],
+  [
+    "tests/test_llm_comparison.py",
+    "narrow str | None for mypy when pytest is untyped (pre-commit env)"
+  ],
+  [
+    "tests/test_phase3b_quality_tracking.py",
+    "SQLite stores bool as int"
+  ],
+  [
+    "tests/test_preprocessor.py",
+    "Wrap (not replace) nlp to prove the section never reached spaCy, not merely that output was empty."
+  ],
+  [
+    "tests/test_section_model.py",
+    "60 chars + \"...\""
+  ],
+  [
+    "tests/test_verification.py",
+    "mode=\"all\" bypasses the mode filter so skip_before_date is exercised."
+  ],
+  [
+    "tests/test_verification.py",
+    "mode=\"all\" bypasses the mode filter so the status filter is exercised."
+  ],
+  [
+    "tests/test_view.py",
+    "Passes only if the default report file exists; env-dependent."
+  ],
+  [
+    "tests/tokenization/test_html_cleanup.py",
+    "Deliberately pass None to check graceful handling."
+  ],
+  [
+    "tests/tokenization/test_preprocessor_categorizer_strategy.py",
+    "Create a blank spaCy doc (no model needed, custom categorizer is regex-only)"
+  ],
+  [
+    "tests/tokenization/test_preprocessor_enhanced.py",
+    "Non-empty, so the equality above is meaningful."
+  ],
+  [
+    "tests/tokenization/test_preprocessor_enhanced.py",
+    "Should have extracted tech (exact count depends on mock entity detection)"
+  ],
+  [
+    "tests/tokenization/test_preprocessor_enhanced.py",
+    "Sorted equality is only a proxy for dedup: repeated \"Python\" would not break it."
+  ],
+  [
+    "tests/tokenization/test_preprocessor_section_engine.py",
+    "Both should be SectionedResult and equal by value (frozen dataclass)"
+  ],
+  [
+    "tests/tokenization/test_preprocessor_section_engine.py",
+    "Patch at module level where it's imported"
+  ],
+  [
+    "tests/tokenization/test_preprocessor_section_engine.py",
+    "The Benefits section is present but its bullets match no trigger pattern."
+  ],
+  [
+    "tests/tui/test_config_wizard.py",
+    "Simulate collecting with defaults (not calling _collect_config due to Textual)"
+  ],
+  [
+    "tests/tui/test_error_handling_edge_cases.py",
+    "No built-in clear, but jobs dict is mutable"
+  ],
+  [
+    "tests/tui/test_error_handling_edge_cases.py",
+    "Progress percent can exceed 100%"
+  ],
+  [
+    "tests/tui/test_fixes.py",
+    "Mirrors dashboard.py fallback: job.id or f\"{job.company}_{job.title}\""
+  ],
+  [
+    "tests/tui/test_fixes.py",
+    "Should show accumulated tokens (1000 + 2000 + 3000 = 6000)"
+  ],
+  [
+    "tests/tui/test_integration_workflow.py",
+    "Process 2 items over 0.1 fake seconds (0.05 s per item)"
+  ],
+  [
+    "tests/tui/test_job_details.py",
+    "Populate job_rows directly, mirroring update_rows without a DataTable."
+  ],
+  [
+    "tests/tui/test_job_details.py",
+    "Without setting cursor_row (which is read-only), verify job_rows mapping"
+  ],
+  [
+    "tests/tui/test_review_phase_interactive.py",
+    "Focus is deferred to _set_focus."
+  ],
+  [
+    "tests/tui/test_state.py",
+    "Processed 10 in 10s = 1 item/sec, 90 remaining = 90s ETA"
+  ],
+  [
+    "tests/tui/test_state.py",
+    "Processed 99 in 10s = 9.9 items/sec, 1 remaining = ~0.101s ETA"
+  ],
+  [
+    "tests/tui/test_terminal_accessibility.py",
+    "Render needs an app context, so this checks widget state, not output."
+  ],
+  [
+    "tests/tui/test_terminal_accessibility.py",
+    "Stored intact; the UI truncates on display."
+  ],
+  [
+    "tests/tui/test_terminal_accessibility.py",
+    "Textual handles light/dark itself, so only CSS presence is asserted."
+  ]
+]
