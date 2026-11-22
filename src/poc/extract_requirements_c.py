@@ -199,7 +199,6 @@ def detect_sections(
 
     doc = nlp(text)
 
-    # Extract section spans from SpanRuler output
     detected_sections = []
     section_labels = set()
 
@@ -218,7 +217,6 @@ def detect_sections(
     else:
         logger.debug("No 'ruler' span key found in doc.spans")
 
-    # Attach metadata to doc
     doc._.detected_sections = detected_sections
     doc._.section_labels = section_labels
 

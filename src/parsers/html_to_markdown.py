@@ -47,7 +47,6 @@ def _normalize_html_before_extraction(html: str) -> str:
     if not html:
         return html
 
-    # Remove Workday metadata attributes (data-*, aria-*)
     html = re.sub(r'\s+(?:data-|aria-)[a-z\-]+=(?:"[^"]*"|\'[^\']*\'|[^\s>]+)', "", html)
 
     # Convert <dt>Label</dt><dd>Value</dd> to <div><p>Label</p><p>Value</p></div> so each lands on its own line.
@@ -182,7 +181,6 @@ def _postprocess_markdown_text(text: str) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r" {2,}", " ", text)
 
-    # Drop standalone Workday ID refs (lines that are just ":R69380" or similar).
     text_lines = text.split("\n")
     cleaned_lines = []
     for line in text_lines:
@@ -208,13 +206,11 @@ def _postprocess_markdown_text(text: str) -> str:
 # Matching is case-insensitive, after stripping bold markers and a trailing colon, with curly apostrophes normalized.
 _SECTION_HEADER_KEYWORDS = frozenset(
     {
-        # qualifications
         "qualifications",
         "desired qualifications",
         "preferred qualifications",
         "minimum qualifications",
         "essential qualifications",
-        # requirements
         "requirements",
         "must-have",
         "must haves",
@@ -224,28 +220,21 @@ _SECTION_HEADER_KEYWORDS = frozenset(
         "nice to have",
         "nice to haves",
         "needed",
-        # skills
         "skills",
         "technical skills",
         "core skills",
         "competencies",
-        # knowledge
         "knowledge",
         "understanding",
-        # responsibilities
         "responsibilities",
         "what you'll do",
         "duties",
         "accountabilities",
-        # experience
         "experience",
         "background",
-        # education
         "education",
-        # benefits / compensation
         "benefits",
         "compensation",
-        # about-the-role variants
         "about the role",
         "about this role",
         "what we're looking for",
@@ -314,7 +303,6 @@ def _synthesize_bold_subsection_headers(lines: List[str]) -> None:
 
         label = _extract_bold_label(stripped)
         if label is None:
-            # Bold at line start with trailing text, e.g. "**Responsibilities** include" or "**Label** — description".
             match = re.match(r"^\*\*([^\*]+)\*\*", stripped)
             if not match:
                 continue
@@ -382,7 +370,7 @@ def _process_divider_parts(parts: List[str], result: List[str]) -> None:
     """
     for i, part in enumerate(parts):
         part = part.strip()
-        # Remove leading colons from parts (Workday artifact cleanup)
+        # Workday leaves stray leading colons.
         part = re.sub(r"^:+\s*", "", part).strip()
 
         if _should_skip_divider_part(part):
@@ -415,7 +403,6 @@ def _normalize_divider_lines(lines: List[str]) -> List[str]:
             result.append("")
             continue
 
-        # Skip processing table rows (lines starting with | are table markup)
         if stripped.startswith("|"):
             result.append(line)
             continue
@@ -425,7 +412,6 @@ def _normalize_divider_lines(lines: List[str]) -> List[str]:
             parts = stripped.split("---")
             _process_divider_parts(parts, result)
 
-            # Add a final divider only if the line ended with "---" and the loop did not already add one.
             if len(parts) > 1 and not parts[-1].strip():
                 if not result or result[-1].strip() != "---":
                     result.append("---")
@@ -572,27 +558,22 @@ def clean_html(
     if not html or not isinstance(html, str):
         return ""
 
-    # Step 1: Convert HTML to Markdown (MarkItDown + BeautifulSoup fallback)
     markdown = html_to_markdown(html)
     if not markdown:
         return ""
 
-    # Step 2: Synthesize section headers (if enabled)
     if include_section_headers:
         markdown = add_markdown_section_headers(markdown)
 
     # Step 3 (section dividers) is folded into add_markdown_section_headers.
 
-    # Step 4: Remove boilerplate using pre-compiled patterns
     cleaned = _boilerplate_patterns.remove_boilerplate_fast(markdown, skip_categories=skip_boilerplate_categories)
 
-    # Step 5: Remove HTML entities
     cleaned = _boilerplate_patterns.remove_html_entities(cleaned)
 
-    # Step 6: Normalize whitespace
     cleaned = _boilerplate_patterns._normalize_whitespace(cleaned)
 
-    # Step 7: Repair dividers that boilerplate removal's whitespace collapse may have embedded in text.
+    # Boilerplate whitespace collapse can embed dividers in text; repair them after it.
     cleaned_lines = cleaned.split("\n")
     repaired_lines = _normalize_divider_lines(cleaned_lines)
     cleaned = "\n".join(repaired_lines)

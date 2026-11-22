@@ -74,7 +74,6 @@ def _apply_adjustments(base_confidence: float, sentence: str) -> float:
     """
     adj = base_confidence
 
-    # Parentheticals: lower confidence
     if re.search(r"\(.*?\)", sentence):
         adj -= 0.10
 
@@ -84,7 +83,6 @@ def _apply_adjustments(base_confidence: float, sentence: str) -> float:
     if re.search(r"nice\s+to\s+have", sentence, re.IGNORECASE):
         adj -= 0.25
 
-    # All-caps emphasis: boost
     if len(re.findall(r"\b[A-Z]{4,}\b", sentence)) > 2:
         adj += 0.05
 

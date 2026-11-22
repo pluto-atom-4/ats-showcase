@@ -39,23 +39,19 @@ def normalize_bullet_points(markdown: str) -> str:
         line = lines[i]
         stripped = line.lstrip()
 
-        # Check for bullet prefix (*, -, +)
         if re.match(r"^[*\-+]\s+", stripped):
             content = re.sub(r"^[*\-+]\s+", "", stripped, count=1).strip()
             if content and not content.endswith((".", "!", "?")):
                 content += "."
             result.append(content)
 
-        # Check for numbered bullet (1., 2., etc.)
         elif re.match(r"^\d+\.\s+", stripped):
             content = re.sub(r"^\d+\.\s+", "", stripped, count=1).strip()
             if content and not content.endswith((".", "!", "?")):
                 content += "."
             result.append(content)
 
-        # Check for inline header + bullet (e.g., "### Some Header* Bullet")
         elif re.search(r"^#+\s+.+[*\-+]\s+", stripped):
-            # Split header from bullet content
             match = re.match(r"(^#+\s+.+?)\s*[*\-+]\s+(.+)", stripped)
             if match:
                 header = match.group(1).strip()
@@ -201,14 +197,12 @@ def normalize_nested_bullets(markdown: str) -> str:
         stripped = line.lstrip()
         indent = len(line) - len(stripped)
 
-        # Match any bullet pattern (*, -, +) at any indent level
         if re.match(r"^[*\-+]\s+", stripped):
             content = re.sub(r"^[*\-+]\s+", "", stripped, count=1).strip()
             if content and not content.endswith((".", "!", "?")):
                 content += "."
             result.append(" " * indent + content)
 
-        # Match numbered bullets at any indent level
         elif re.match(r"^\d+\.\s+", stripped):
             content = re.sub(r"^\d+\.\s+", "", stripped, count=1).strip()
             if content and not content.endswith((".", "!", "?")):
@@ -238,17 +232,14 @@ def normalize_handles_existing_periods(markdown: str) -> str:
     for line in lines:
         stripped = line.lstrip()
 
-        # Match bullet patterns
         if re.match(r"^[*\-+]\s+", stripped):
             content = re.sub(r"^[*\-+]\s+", "", stripped, count=1).strip()
-            # Add period only if missing (no double-period)
             if content and not content.endswith((".", "!", "?")):
                 content += "."
             result.append(content)
 
         elif re.match(r"^\d+\.\s+", stripped):
             content = re.sub(r"^\d+\.\s+", "", stripped, count=1).strip()
-            # Add period only if missing
             if content and not content.endswith((".", "!", "?")):
                 content += "."
             result.append(content)
@@ -277,9 +268,8 @@ def normalize_markdown_artifacts(text: str) -> str:
     Returns:
         Text with markdown artifacts removed
     """
-    # Remove ** (bold) - avoid matching across newlines
+    # Avoid matching across newlines.
     text = re.sub(r"\*\*([^*\n]+)\*\*", r"\1", text)
-    # Remove __ (bold alternative)
     text = re.sub(r"__([^_\n]+)__", r"\1", text)
     # (?<!\n) skips a "*" right after a newline so bullet markers survive.
     text = re.sub(r"(?<!\n)\*([^*\n]+)\*", r"\1", text)
@@ -329,7 +319,6 @@ def remove_excessive_newlines(text: str) -> str:
     Returns:
         Text with excessive newlines normalized
     """
-    # Replace 3+ newlines with exactly 2 (one blank line)
     text = re.sub(r"\n\n\n+", "\n\n", text)
     return text
 
@@ -403,7 +392,6 @@ def split_by_bullet_markers(text: str) -> list[str]:
         stripped = line.lstrip()
         indent = len(line) - len(stripped)
 
-        # Check for bullet marker at start of line
         unordered_match = re.match(r"^[*\-+]\s+(.+)", stripped)
         numbered_match = re.match(r"^\d+\.\s+(.+)", stripped)
 

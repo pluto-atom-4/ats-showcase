@@ -89,17 +89,14 @@ class RequirementExtractor:
         Returns:
             Company name or None if not found
         """
-        # Pattern 1: # Company Name at start
         h1_match = re.search(r"^#\s+([^\n]+)", markdown_text, re.MULTILINE)
         if h1_match:
             return h1_match.group(1).strip()
 
-        # Pattern 2: ## Company Name
         h2_match = re.search(r"^##\s+([^\n]+)", markdown_text, re.MULTILINE)
         if h2_match:
             return h2_match.group(1).strip()
 
-        # Pattern 3: Company: Name pattern
         company_pattern = re.search(r"(?:company|employer):\s*([^\n]+)", markdown_text, re.IGNORECASE)
         if company_pattern:
             return company_pattern.group(1).strip()
