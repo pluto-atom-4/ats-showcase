@@ -21,7 +21,6 @@ class RequirementPattern(TypedDict):
 
 
 REQUIREMENT_PATTERNS: List[RequirementPattern] = [
-    # TIER 1: High-confidence (0.90-0.95) - Mandatory language
     {
         "trigger": "required",
         "regex": r"\brequired\b",
@@ -76,7 +75,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.83,
         "priority": 1,
     },
-    # TIER 2: Medium-confidence (0.65-0.80) - Softer requirements
     {
         "trigger": "should",
         "regex": r"\bshould\s+(?:have|know|be|possess)",
@@ -101,7 +99,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.80,
         "priority": 2,
     },
-    # TIER 3: Lower-confidence (0.40-0.55) - Nice-to-have, aspirational
     {
         "trigger": "nice to have",
         "regex": r"\bnice\s+to\s+have\b",
@@ -120,7 +117,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.45,
         "priority": 3,
     },
-    # BULLET-SPECIFIC PATTERNS (extracted from bullets)
     {
         "trigger": "years_in_bullet",
         "regex": r"\b(\d+\+?)\s+years?\b",
@@ -145,7 +141,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.92,
         "priority": 2,
     },
-    # PHASE C EXPANSION: Education patterns
     {
         "trigger": "degree abbreviation",
         "regex": r"\b(?:BS\+|MS\+|BA\+|MA\+|BS|MS|BA|MA|PhD)\b",
@@ -170,7 +165,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.78,
         "priority": 2,
     },
-    # PHASE C EXPANSION: Location/on-site patterns
     {
         "trigger": "on-site location",
         "regex": r"\b(?:on-site|on site|office|in-office|remote|hybrid|office-based)\b",
@@ -183,7 +177,6 @@ REQUIREMENT_PATTERNS: List[RequirementPattern] = [
         "confidence": 0.75,
         "priority": 2,
     },
-    # PHASE C EXPANSION: Soft skill patterns
     {
         "trigger": "communication skills",
         "regex": r"\b(?:communicat(?:e|ion|or)|written|verbal|presentation)\s+(?:skills?|abilities?)\b",
@@ -240,7 +233,6 @@ SKILL_VERBS: List[str] = [
 
 
 TECH_TERMS: Set[str] = {
-    # Carbon Robotics / AI / Robotics specific
     "PyTorch",
     "C++",
     "computer vision",
@@ -254,7 +246,6 @@ TECH_TERMS: Set[str] = {
     "real-time inference",
     "Large Plant Model",
     "LPM",
-    # --- Languages ---
     "python",
     "java",
     "javascript",
@@ -263,7 +254,6 @@ TECH_TERMS: Set[str] = {
     "go",
     "golang",
     "c#",
-    # --- Frameworks & Libraries ---
     "react",
     "angular",
     "vue",
@@ -272,18 +262,15 @@ TECH_TERMS: Set[str] = {
     "spring",
     "tensorflow",
     "sklearn",
-    # --- Cloud & Infrastructure ---
     "aws",
     "azure",
     "gcp",
     "kubernetes",
     "docker",
-    # --- Databases & Search ---
     "postgresql",
     "mongodb",
     "redis",
     "elasticsearch",
-    # --- Tools & Collaboration ---
     "git",
     "github",
     "gitlab",

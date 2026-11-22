@@ -234,11 +234,9 @@ class MarkdownPolisher(PipelineComponent):
         # Compiled once here; process() runs them per call.
         self._re_list_tight = re.compile(r"(\n\* .+?)\n\n(?=\* )")
 
-        # Bold-only header lines: used to add the blank line before and after them.
         self._re_header_before = re.compile(r"(?<=.)\n(\*\*.*?\*\*)")
         self._re_header_after = re.compile(r"(\*\*.*?\*\*)\n(?=.)")
 
-        # A list block needs a blank line before its first item and after its last.
         self._re_list_block_before = re.compile(r"(^[^*\n][^\n]*[^\n\s])\n(\* )", re.MULTILINE)
         self._re_list_block_after = re.compile(r"(\n\* [^\n]+)\n([^\n\*])")
 

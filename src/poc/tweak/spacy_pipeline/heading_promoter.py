@@ -165,8 +165,6 @@ DISCRIMINATE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# "encouraged to apply" (Issue #374 round 6), e.g. "Women, minorities, veterans and individuals with disabilities are
-# encouraged to apply."
 # Only consulted for sentences after an EEO first sentence, so it cannot trigger isolation by itself.
 ENCOURAGED_TO_APPLY_PATTERN = re.compile(r"encouraged to apply", re.IGNORECASE)
 
@@ -190,10 +188,8 @@ ACCOMMODATION_REQUEST_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# A paragraph that is only a bare "Accommodations" section label (optional trailing colon).
 ACCOMMODATION_LABEL_PATTERN = re.compile(r"accommodations?:?", re.IGNORECASE)
 
-# Multi-word boilerplate phrases, matched as plain substrings.
 BOILERPLATE_PHRASES: Tuple[str, ...] = (
     "if you need",
     "reasonable accommodation",
@@ -274,10 +270,8 @@ class HeadingPromoter(PipelineComponent):
             line_ending = "\r\n" if first_newline > 0 and text[first_newline - 1] == "\r" else "\n"
             text = text.replace("\r\n", "\n")
 
-            # Phase 1: isolate trailing EEO paragraphs
             text = self._isolate_eeo_paragraphs(text)
 
-            # Phase 2: promote plain-text headings
             lines = text.split("\n")
             result_lines = []
 
@@ -337,7 +331,6 @@ class HeadingPromoter(PipelineComponent):
         if len(paragraphs) < 2:
             return text
 
-        # Find the first EEO paragraph such that everything after it is boilerplate or further EEO paragraphs.
         # Because the first qualifying EEO paragraph is chosen, a run of EEO paragraphs is isolated at its first member.
         first_eeo_idx = -1
         for i in range(len(paragraphs)):
@@ -376,15 +369,12 @@ class HeadingPromoter(PipelineComponent):
                 return text
             split_glued_heading = True
 
-        # Guard 3: the preceding paragraph ends with a heading
         if first_eeo_idx > 0:
             preceding_para = paragraphs[first_eeo_idx - 1]
             if preceding_para and HEADING_PREFIX_PATTERN.match(preceding_para[-1].strip()):
                 return text
 
-        # Guard 5 (silent skip): an EEO heading already exists anywhere in the document, with a "#" marker and/or "*" or
-        # "_" emphasis;
-        # inserting another would duplicate it.
+        # Silent skip: a second EEO heading would duplicate an existing one.
         for line in lines:
             if self._normalize(line.strip().strip("#*_: ")) == EEO_HEADING_NORMALIZED:
                 return text
@@ -548,8 +538,7 @@ class HeadingPromoter(PipelineComponent):
         if BOILERPLATE_WORD_PATTERN.search(text):
             return True
 
-        # Strip a markdown heading marker and emphasis so "## Accommodations", "**Accommodations**" and
-        # "_Accommodations_" count as a bare label (Issue #374).
+        # Issue #374: a heading marker or emphasis must not hide a bare label.
         label_text = HEADING_PREFIX_PATTERN.sub("", text).strip().strip("*_: ")
         if ACCOMMODATION_REQUEST_PATTERN.search(text) or ACCOMMODATION_LABEL_PATTERN.fullmatch(label_text):
             return True

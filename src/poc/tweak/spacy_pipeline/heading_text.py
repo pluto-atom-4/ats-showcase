@@ -20,8 +20,6 @@ Issue #268: Drop heading-only requirements. Issue #724: shared helper.
 import re
 from typing import Optional
 
-# Strips leading #, *, _ and whitespace, and trailing *, _, :, . and whitespace,
-# including a closing ATX run of #'s that is preceded by whitespace; markers in any order are fully stripped.
 # A "#" attached to a word is kept ("C#" stays "c#").
 _HEADING_MARKER_PATTERN = re.compile(r"^[#*_\s]+|(?:[*_:.\s]|\s#+(?=[\s*_:.#]*$))+$")
 
