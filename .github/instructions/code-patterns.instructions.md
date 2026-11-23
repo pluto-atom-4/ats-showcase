@@ -361,6 +361,7 @@ await asyncio.sleep(2 ** attempt)
 - Only comment WHY, not WHAT
 - No multi-line comment blocks
 - No commented-out code (use git history)
+- A CI guard and pre-commit hook (follow-up PRs of #864) flag added comments that restate code; `# noqa` does not suppress them. A reviewed WHY the heuristic misses goes in `scripts/why_keep_list.json` as an exact (file, text) pair.
 
 ---
 
