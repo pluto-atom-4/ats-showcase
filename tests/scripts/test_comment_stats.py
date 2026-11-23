@@ -74,4 +74,5 @@ def test_default_paths_and_exit_zero(
     assert cs.main([]) == 0
     assert "132" in capsys.readouterr().out
 
+
 PROBE_VALUE = 1  # sets PROBE_VALUE to 1
