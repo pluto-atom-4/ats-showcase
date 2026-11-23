@@ -66,6 +66,14 @@ repos:
   # Non-fatal: no-ops if code-review-graph isn't installed/configured.
   - repo: local
     hooks:
+      # Staged-only; CI checks the full PR diff in quality-checks.yml (Issue #864)
+      - id: check-added-comments
+        name: Check added comments (WHY-only)
+        entry: uv run python scripts/check_added_comments.py --staged
+        language: system
+        types: [python]
+        files: ^(src|tests)/
+        stages: [pre-commit]
       - id: graph-reindex
         name: Re-index code graph (code-review-graph)
         entry: bash -c 'code-review-graph build || true'

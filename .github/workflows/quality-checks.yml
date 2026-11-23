@@ -45,6 +45,22 @@ jobs:
       - name: Run pre-commit hooks
         run: uv run pre-commit run --all-files
 
+      - name: Scoped commented-out-code check (ERA001)
+        if: github.event_name == 'pull_request'
+        run: uv run ruff check --select ERA001 src tests --output-format=concise
+
+      - name: Check added comments (WHY-only)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          mapfile -t files < <(git diff --name-only --no-ext-diff --no-textconv --diff-filter=AM "$BASE_SHA"...HEAD -- 'src/*.py' 'tests/*.py')
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No changed src/tests Python files; skipping added-comment check."
+            exit 0
+          fi
+          uv run python scripts/check_added_comments.py --base-ref "$BASE_SHA" "${files[@]}"
+
       - name: Run type checking
         run: uv run mypy src/ tests/
 
