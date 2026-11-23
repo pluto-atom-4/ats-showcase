@@ -399,3 +399,15 @@ def test_structural_idiom_kept(comment):
 )
 def test_structural_idiom_near_miss_removed(comment):
     assert sc._classify(comment, 1, True) == "remove"
+
+
+def test_prose_before_noqa_is_not_directive():
+    assert sc._classify("# obviously sets x to 5  # noqa", 5, True) == "remove"
+
+
+@pytest.mark.parametrize(
+    "comment",
+    ["# noqa: E501", "# type: ignore[arg-type]"],
+)
+def test_bare_leading_directive_classified_directive(comment):
+    assert sc._classify(comment, 5, True) == "directive"
