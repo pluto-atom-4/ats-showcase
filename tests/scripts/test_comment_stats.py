@@ -12,12 +12,7 @@ assert _SPEC and _SPEC.loader
 cs = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(cs)
 
-SRC_A = (
-    "# plain note about setup\n"
-    "import os  # noqa: F401\n"
-    "# WHY: ordering matters here\n"
-    "x = 1  # units are meters\n"
-)
+SRC_A = "# plain note about setup\nimport os  # noqa: F401\n# WHY: ordering matters here\nx = 1  # units are meters\n"
 TESTS_B = "# set up the fixture\ny = 2  # noqa: E501\n# pragma: no cover\n"
 
 
