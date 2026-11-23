@@ -36,7 +36,7 @@ Additionally, the workflow is **inherently async:** crawler fetches multiple pag
 #### **1. Textual** ⭐ SELECTED (94/100)
 
 **By:** Textualize (maintainers of Rich)
-**Release:** v0.1+ (2023), v0.42+ current
+**Release:** v0.1+ (2023), v1.0.0 locked in this project
 **License:** MIT
 
 **Async Support:** Native (built on asyncio)
@@ -90,7 +90,7 @@ async def test_crawl_panel():
 - ✅ Large projects using it: Atuin (shell history), DuckDB (query CLI), Hatch (package manager)
 
 **Cons:**
-- ⚠️ Textual < v1.0 (currently v0.42): Breaking changes possible in minor versions
+- ⚠️ Pre-2.0 major line (locked at 1.0.0): a future 2.0 or breaking minor release is possible
 - ⚠️ Steeper learning curve: CSS-like layout, event model, widget lifecycle
 - ⚠️ Larger binary footprint: ~20MB with dependencies
 
@@ -345,17 +345,17 @@ Urwid/Blessed have no testing framework.
 
 ---
 
-### Risk Mitigation: Textual < v1.0
+### Risk Mitigation: Textual Major Version Upgrades
 
-**Risk:** Textual is v0.42 (not v1.0 yet). Minor version bumps (0.42 → 0.43, 0.50) might break API.
+**Risk:** Textual 2.0 or a breaking 1.x minor release could change the API. The project is on Textual 1.0.0 (locked in `uv.lock`).
 
 **Mitigation Strategy:**
 
-1. **Pin version in pyproject.toml:**
+1. **Pin version range in pyproject.toml:**
    ```toml
-   textual = "^0.42.0"  # Allow patches, lock minor
+   textual = ">=0.42.0,<2.0"
    ```
-   This allows 0.42.x security patches but not 0.43+ (breaking changes).
+   The `<2.0` cap blocks an automatic jump to the next major. `uv.lock` holds 1.0.0 and only moves when the lock is upgraded explicitly.
 
 2. **Minimize direct Textual usage:**
    - Wrap Textual components in StateManager, Panels (loose coupling)
@@ -388,7 +388,7 @@ Urwid/Blessed have no testing framework.
 - Rich integration saves dependencies and complexity
 - Testing support enables CI/CD automation
 - Active maintenance + large projects using it prove stability
-- Risk (v0.42 < v1.0) is mitigated by version pinning + loose coupling
+- Risk (a future Textual 2.0) is mitigated by the `<2.0` cap, the lock file, and loose coupling
 
 ---
 
