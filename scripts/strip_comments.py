@@ -78,7 +78,7 @@ def _classify(text: str, line_no: int, full_line: bool) -> str:
         return "directive"
     if full_line and line_no <= 3 and HEADER_RE.search(body):
         return "directive"
-    if DIRECTIVE_RE.search(body):
+    if DIRECTIVE_RE.match(body):
         return "directive"
     if not full_line and TYPE_ANNOTATION_RE.match(body):
         return "directive"
