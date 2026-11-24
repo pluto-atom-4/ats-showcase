@@ -120,6 +120,17 @@ def test_runs_outside_windows_and_undated_ignored():
     assert _summary(runs) == baseline
 
 
+def test_record_without_date_key_is_ignored():
+    runs = [
+        {"agent_type": "builder", "full_reads": [{"path": "src/a.py", "size": 999}]},
+        _before([("src/a.py", 100)]),
+        _after([("src/a.py", 50)]),
+    ]
+    summary = _summary(runs)
+    assert summary["n_files"] == 1
+    assert summary["median_reduction_pct"] == pytest.approx(50.0)
+
+
 def test_caveman_prefix_folds_and_pairs():
     runs = [
         _run("caveman:builder", "2026-10-20", [("src/a.py", 100)]),

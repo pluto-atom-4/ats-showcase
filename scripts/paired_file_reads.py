@@ -83,7 +83,7 @@ def _pool_sizes(
     before: dict[str, list[int]] = {}
     after: dict[str, list[int]] = {}
     for run in runs:
-        date = run["date"]
+        date = run.get("date")
         if _fold(run["agent_type"]) is None or date is None:
             continue
         if date <= before_end:
