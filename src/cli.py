@@ -3161,7 +3161,7 @@ def stats(
     show_token_usage: bool = typer.Option(False, help="Show token statistics"),
 ) -> None:
     """Display database and cost statistics."""
-    # TODO: Implement stats logic
+    # TODO(#985): stats not implemented; --show-token-usage is ignored
     logger.info("Displaying statistics")
     typer.echo("📈 Statistics:")
 
