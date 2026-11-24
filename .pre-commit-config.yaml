@@ -13,13 +13,13 @@ repos:
         entry: trailing-whitespace-fixer
         language: python
         types: [text]
-        stages: [commit]
+        stages: [pre-commit]
       - id: end-of-file-fixer
         name: Fix end of file
         entry: end-of-file-fixer
         language: python
         types: [text]
-        stages: [commit]
+        stages: [pre-commit]
 
   # Secret Leak Prevention
   - repo: https://github.com/Yelp/detect-secrets
