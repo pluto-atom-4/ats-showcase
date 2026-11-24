@@ -69,7 +69,7 @@ def _transcript(path: Path, usage: dict[str, int]) -> str:
     return str(path)
 
 
-def _write_manifest(path: Path, entries: list[Any]) -> Path:
+def _write_manifest(path: Path, entries: Any) -> Path:
     path.write_text(json.dumps(entries), encoding="utf-8")
     return path
 
