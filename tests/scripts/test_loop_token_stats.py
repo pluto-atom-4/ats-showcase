@@ -25,7 +25,10 @@ RECORD_FIELDS = {
     "cache_read_tokens",
     "cache_write_tokens",
     "full_read_sizes",
+    "full_reads",
 }
+
+PROJECT_ROOT = Path("/synthetic/project")
 
 
 def _entry(**fields: Any) -> str:
@@ -277,6 +280,93 @@ def test_null_offset_and_limit_count_as_full_read(tmp_path: Path):
         ],
     )
     assert lts.parse_transcript(path).full_read_sizes == [7]
+
+
+def _read_of(tool_id: str, tool_input: dict[str, Any]) -> dict[str, Any]:
+    return {"type": "tool_use", "id": tool_id, "name": "Read", "input": tool_input}
+
+
+def test_full_reads_keep_path_and_size_of_full_reads_only(tmp_path: Path):
+    path = _write_session(
+        tmp_path / "t" / "paths.jsonl",
+        [
+            _assistant(
+                "2026-10-30T10:00:00Z",
+                "p1",
+                USAGE_B,
+                [
+                    _read_of("f1", {"file_path": "/synthetic/project/pkg/mod.py"}),
+                    _read_of("f2", {"file_path": "/synthetic/other/conf.toml"}),
+                    _read_of("f3", {"file_path": "/synthetic/project/pkg/part.py", "offset": 5}),
+                ],
+            ),
+            _entry(
+                type="user",
+                timestamp="2026-10-30T10:00:01Z",
+                message={
+                    "content": [
+                        _read_result("f1", "a" * 40),
+                        _read_result("f2", "b" * 12),
+                        _read_result("f3", "c" * 99),
+                    ]
+                },
+            ),
+        ],
+    )
+    record = lts.parse_transcript(path, project_root=PROJECT_ROOT)
+    assert record.full_reads == [
+        {"path": "pkg/mod.py", "size": 40},
+        {"path": "/synthetic/other/conf.toml", "size": 12},
+    ]
+    assert record.full_read_sizes == [40, 12]
+
+
+def test_missing_or_non_string_full_read_path_becomes_empty(tmp_path: Path):
+    path = _write_session(
+        tmp_path / "t" / "nopath.jsonl",
+        [
+            _assistant(
+                "2026-10-30T10:00:00Z",
+                "np1",
+                USAGE_B,
+                [_read_of("e1", {}), _read_of("e2", {"file_path": 42})],
+            ),
+            _entry(
+                type="user",
+                timestamp="2026-10-30T10:00:01Z",
+                message={"content": [_read_result("e1", "xx"), _read_result("e2", "yyy")]},
+            ),
+        ],
+    )
+    record = lts.parse_transcript(path, project_root=PROJECT_ROOT)
+    assert record.full_reads == [{"path": "", "size": 2}, {"path": "", "size": 3}]
+    assert record.full_read_sizes == [2, 3]
+
+
+def test_full_reads_flow_through_discovery_and_summary(synthetic_transcripts: Path, tmp_path: Path):
+    result = lts.discover_records(synthetic_transcripts, project_root=PROJECT_ROOT)
+    assert len(result.records) == 3
+    run_a = next(r for r in result.records if r.branch == "feat/issue-863-synth")
+    assert run_a.full_reads == [{"path": "/synthetic/module.py", "size": 1234}]
+
+    summary_path, _ = lts.write_archive(result.records, tmp_path / "archive")
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert all(len(r["full_reads"]) == len(r["full_read_sizes"]) for r in summary)
+
+
+def test_cli_project_root_makes_paths_relative(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    _write_session(
+        tmp_path / "root" / "s.jsonl",
+        [
+            _assistant(
+                "2026-10-30T10:00:00Z", "cli1", USAGE_B, [_read_of("c1", {"file_path": "/synthetic/project/x.py"})]
+            ),
+            _entry(type="user", timestamp="2026-10-30T10:00:01Z", message={"content": [_read_result("c1", "abc")]}),
+        ],
+    )
+    assert lts.main([str(tmp_path / "root"), "--project-root", str(PROJECT_ROOT)]) == 0
+    printed = json.loads(capsys.readouterr().out)
+    assert printed[0]["full_reads"] == [{"path": "x.py", "size": 3}]
 
 
 def test_cli_rejects_archive_path_that_is_a_file(

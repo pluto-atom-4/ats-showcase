@@ -38,6 +38,7 @@ class RunRecord:
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
     full_read_sizes: list[int] = field(default_factory=list)
+    full_reads: list[dict[str, str | int]] = field(default_factory=list)
 
 
 @dataclass
@@ -72,6 +73,12 @@ def _result_size(content: Any) -> int:
                 total += len(text)
         return total
     return 0
+
+
+def _display_path(file_path: str, project_root: Path) -> str:
+    # Relative paths keep the archive free of the home directory.
+    path = Path(file_path)
+    return str(path.relative_to(project_root)) if path.is_relative_to(project_root) else file_path
 
 
 def _assistant_texts(obj: dict[str, Any], message: dict[str, Any]) -> list[str]:
@@ -115,22 +122,30 @@ def _apply_metadata(record: RunRecord, obj: dict[str, Any]) -> None:
         record.pr_number = _pr_from_obj(obj)
 
 
-def _apply_tool_blocks(record: RunRecord, content: list[Any], full_read_ids: set[str]) -> None:
+def _apply_tool_blocks(
+    record: RunRecord, content: list[Any], full_read_ids: dict[str, str], project_root: Path
+) -> None:
     for block in content:
         if not isinstance(block, dict):
             continue
         if block.get("type") == "tool_use" and block.get("name") == "Read":
             tool_input = block.get("input")
             if isinstance(tool_input, dict) and tool_input.get("offset") is None and tool_input.get("limit") is None:
-                full_read_ids.add(str(block.get("id")))
+                file_path = tool_input.get("file_path")
+                full_read_ids[str(block.get("id"))] = file_path if isinstance(file_path, str) else ""
         elif block.get("type") == "tool_result":
             tool_id = str(block.get("tool_use_id"))
             if tool_id in full_read_ids:
-                full_read_ids.discard(tool_id)
-                record.full_read_sizes.append(_result_size(block.get("content")))
+                file_path = full_read_ids.pop(tool_id)
+                size = _result_size(block.get("content"))
+                record.full_read_sizes.append(size)
+                path = _display_path(file_path, project_root) if file_path else ""
+                record.full_reads.append({"path": path, "size": size})
 
 
-def _apply_message(record: RunRecord, message: dict[str, Any], seen: set[str], full_read_ids: set[str]) -> None:
+def _apply_message(
+    record: RunRecord, message: dict[str, Any], seen: set[str], full_read_ids: dict[str, str], project_root: Path
+) -> None:
     # Streamed assistant chunks repeat the same message id and usage block.
     message_id = message.get("id")
     usage = message.get("usage")
@@ -141,7 +156,7 @@ def _apply_message(record: RunRecord, message: dict[str, Any], seen: set[str], f
 
     content = message.get("content")
     if isinstance(content, list):
-        _apply_tool_blocks(record, content, full_read_ids)
+        _apply_tool_blocks(record, content, full_read_ids, project_root)
 
 
 def _meta_agent_type(path: Path) -> str | None:
@@ -179,11 +194,12 @@ def _lang_for(issue: int | None, labels: dict[int, str] | None) -> str | None:
     return labels.get(issue)
 
 
-def parse_transcript(path: Path) -> RunRecord:
+def parse_transcript(path: Path, project_root: Path | None = None) -> RunRecord:
     """Summarise one JSONL transcript; raises OSError or UnicodeDecodeError if unreadable."""
+    root = Path.cwd() if project_root is None else project_root
     record = RunRecord(agent_type="main", date=None, branch=None, issue=None, lang=None, pr_number=None)
     seen_message_ids: set[str] = set()
-    full_read_ids: set[str] = set()
+    full_read_ids: dict[str, str] = {}
 
     for line in path.read_text(encoding="utf-8").splitlines():
         try:
@@ -195,7 +211,7 @@ def parse_transcript(path: Path) -> RunRecord:
         _apply_metadata(record, obj)
         message = obj.get("message")
         if isinstance(message, dict):
-            _apply_message(record, message, seen_message_ids, full_read_ids)
+            _apply_message(record, message, seen_message_ids, full_read_ids, root)
 
     record.issue = _issue_from_branch(record.branch)
     meta_type = _meta_agent_type(path)
@@ -204,12 +220,14 @@ def parse_transcript(path: Path) -> RunRecord:
     return record
 
 
-def discover_records(input_dir: Path, labels: dict[int, str] | None = None) -> DiscoveryResult:
+def discover_records(
+    input_dir: Path, labels: dict[int, str] | None = None, project_root: Path | None = None
+) -> DiscoveryResult:
     """Parse every JSONL transcript under a folder, recursively; unreadable files are skipped with a stderr line."""
     result = DiscoveryResult(records=[], skipped=[])
     for path in sorted(input_dir.rglob("*.jsonl")):
         try:
-            record = parse_transcript(path)
+            record = parse_transcript(path, project_root)
             record.lang = _lang_for(record.issue, labels)
             result.records.append(record)
         except (OSError, UnicodeDecodeError) as exc:
@@ -269,6 +287,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("input_dir", type=Path, help="Folder searched recursively for *.jsonl transcripts.")
     parser.add_argument("--archive", type=Path, default=None, help="Output folder for the summary and gap note.")
     parser.add_argument("--labels", type=Path, default=None, help='JSON map {"<issue>": "shell"|"python"|"mixed"}.')
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        default=Path.cwd(),
+        help="Full-read paths under this folder are stored relative to it.",
+    )
     args = parser.parse_args(argv)
 
     if not args.input_dir.is_dir():
@@ -285,7 +309,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"--labels is missing or malformed: {args.labels}: {exc}", file=sys.stderr)
             return 2
 
-    result = discover_records(args.input_dir, labels)
+    result = discover_records(args.input_dir, labels, args.project_root)
     if args.archive is None:
         print(json.dumps([asdict(r) for r in result.records], indent=2))
         return 0
