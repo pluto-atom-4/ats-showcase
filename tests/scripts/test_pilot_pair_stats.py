@@ -18,10 +18,14 @@ def _load(name: str) -> Any:
     return module
 
 
-# The pilot script imports its siblings by bare name, so they must be registered first.
-_load("loop_token_stats")
-trend = _load("loop_token_trend")
-pps = _load("pilot_pair_stats")
+def _load_pilot_module() -> Any:
+    for sibling in ("loop_token_stats", "loop_token_trend"):
+        _load(sibling)
+    return _load("pilot_pair_stats")
+
+
+pps = _load_pilot_module()
+trend = sys.modules["loop_token_trend"]
 
 COMPONENTS = pps.COMPONENTS
 PRE_USAGE = {
