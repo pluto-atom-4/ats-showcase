@@ -20,7 +20,7 @@ def _load(name: str) -> Any:
 
 # The pilot script imports its siblings by bare name, so they must be registered first.
 _load("loop_token_stats")
-_load("loop_token_trend")
+trend = _load("loop_token_trend")
 pps = _load("pilot_pair_stats")
 
 COMPONENTS = pps.COMPONENTS
@@ -37,8 +37,9 @@ POST_USAGE = {
     "cache_creation_input_tokens": 100,
 }
 ZERO_USAGE = {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
-# Cost is input + 1.25*cache_write + 0.1*cache_read + 5*output: PRE = 700.0, POST = 355.0.
-PRE_POST_REDUCTION = (700.0 - 355.0) / 700.0 * 100
+PRE_COST = trend.cost({"input_tokens": 100, "output_tokens": 50, "cache_read_tokens": 1000, "cache_write_tokens": 200})
+POST_COST = trend.cost({"input_tokens": 50, "output_tokens": 20, "cache_read_tokens": 800, "cache_write_tokens": 100})
+PRE_POST_REDUCTION = (PRE_COST - POST_COST) / PRE_COST * 100
 FIVE_REDUCTIONS = [10.0, 20.0, 30.0, 40.0, 50.0]
 TIGHT_REDUCTIONS = [30.0, 30.5, 29.5, 30.2, 29.8]
 
@@ -151,8 +152,8 @@ def test_pair_cost_computes_reduction(tmp_path: Path) -> None:
     result = pps.pair_cost(940, Path(pre), Path(post))
     assert result is not None
     assert result["pr"] == 940
-    assert result["cost_pre"] == 700.0
-    assert result["cost_post"] == 355.0
+    assert result["cost_pre"] == PRE_COST
+    assert result["cost_post"] == POST_COST
     assert result["reduction_pct"] == pytest.approx(PRE_POST_REDUCTION)
     assert result["components_pre"]["input_tokens"] == 100
     assert result["components_post"]["cache_read_tokens"] == 800
