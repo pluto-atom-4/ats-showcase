@@ -579,7 +579,6 @@ When code changes:
 - [ ] No secrets in commits: `git log --oneline | grep -i "key\|secret\|password"`
 - [ ] All PRs merged to main
 - [ ] Bump version in `src/__init__.py` (semantic versioning)
-- [ ] Update CHANGELOG.md with new features/fixes
 
 ### Staging Deployment
 
@@ -718,7 +717,8 @@ python -m spacy download en_core_web_md
 
 # Development
 python -m src.cli crawl --help
-python -m src.cli assess --mock
+# Show assess options
+python -m src.cli assess --help
 
 # Testing
 pytest tests/ -v
