@@ -30,8 +30,7 @@ src/
 ├── config.py                (env vars, defaults, validation)
 ├── browser/
 │   ├── __init__.py
-│   ├── crawler.py           (20–30 functions, 300–500 lines)
-│   └── selectors.py         (configuration, no logic)
+│   └── crawler.py           (20–30 functions, 300–500 lines)
 ├── tokenization/
 │   ├── __init__.py
 │   ├── markitdown.py        (wrapper around MarkItDown)

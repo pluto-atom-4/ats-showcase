@@ -97,8 +97,7 @@ src/
 ├── cli.py                    Main Typer entry point (8 commands)
 │
 ├── browser/
-│   ├── crawler.py            Playwright multi-tab pool, company loop
-│   └── selectors.py          CSS selector management, validation
+│   └── crawler.py            Playwright multi-tab pool, company loop
 │
 ├── tokenization/
 │   ├── markitdown.py         MarkItDown extraction (HTML → Markdown)

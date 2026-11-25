@@ -42,8 +42,7 @@ uv run playwright install
 cp .env.example .env
 # Edit .env and add ANTHROPIC_API_KEY
 
-# Initialize database
-uv run python src/storage/db.py --init
+# Database schema is created automatically on first run; no separate init command exists.
 
 # Run tests to verify setup
 uv run pytest tests/ -v
@@ -59,7 +58,7 @@ python --version  # Should be 3.12+
 uv pip list
 
 # Run quick test
-uv run pytest tests/test_storage.py::test_database_initialization -v
+uv run pytest tests/storage/ -v
 
 # Check code quality tools
 black --version
