@@ -222,7 +222,7 @@ class Crawler:
             logger.debug(f"Error extracting link with selector {selector}: {e}")
         return None
 
-    async def _fetch_job_detail(self, job_url: str, selectors: Dict[str, str]) -> tuple[str, Optional[str]]:
+    async def _fetch_job_detail(self, job_url: str, selectors: Dict[str, str]) -> tuple[str, Optional[List[str]]]:
         """Fetch job description and requirements from detail page."""
         if not self.context:
             logger.debug("No context available")
@@ -259,8 +259,10 @@ class Crawler:
             if req_selector:
                 req_elem = await detail_page.query_selector(req_selector)
                 if req_elem:
-                    req_text = await req_elem.text_content()
-                    requirements = req_text.strip() if req_text else None
+                    # inner_text keeps <li>/<br> line breaks that text_content glues together
+                    req_text = await req_elem.inner_text()
+                    lines = [line.strip() for line in req_text.splitlines()]
+                    requirements = [line for line in lines if line] or None
 
             logger.debug(f"Fetched detail: {len(description)} chars")
             return description, requirements
