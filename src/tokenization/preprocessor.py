@@ -204,7 +204,7 @@ class Preprocessor:
         # POC regex-only sentence splitter (Issue #638). Additive: writes only doc._.poc_sentences.
         if self.enable_poc_sentence_splitter:
             # Importing registers the factory via its decorator.
-            import src.poc.sentence_splitter  # noqa: F401
+            import src.preprocessing.sentence_splitter  # noqa: F401
 
             if "poc_sentence_splitter" not in self.nlp.pipe_names:
                 self.nlp.add_pipe("poc_sentence_splitter")

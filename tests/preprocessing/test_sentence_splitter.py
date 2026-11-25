@@ -7,9 +7,9 @@ from pathlib import Path
 
 import spacy
 
-from src.poc.sentence_splitter import PocSentenceSplitterComponent, create_poc_sentence_splitter
+from src.preprocessing.sentence_splitter import PocSentenceSplitterComponent, create_poc_sentence_splitter
 
-MODULE_PATH = Path(__file__).resolve().parents[2] / "src" / "poc" / "sentence_splitter.py"
+MODULE_PATH = Path(__file__).resolve().parents[2] / "src" / "preprocessing" / "sentence_splitter.py"
 
 
 def _module_ast() -> ast.Module:

@@ -38,7 +38,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 import spacy  # noqa: E402
 
-import src.poc.sentence_splitter  # noqa: E402,F401  (registers poc_sentence_splitter factory)
+import src.preprocessing.sentence_splitter  # noqa: E402,F401  (registers poc_sentence_splitter factory)
 from src.poc.tweak.batch_processor import load_jobs, process_job  # noqa: E402
 from src.poc.tweak.markdown_section_classifier import SectionClassifier  # noqa: E402
 from src.poc.tweak.multi_line_paragraph import MarkdownSpanRuler  # noqa: E402
