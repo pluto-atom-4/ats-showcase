@@ -17,6 +17,8 @@ from typer.testing import CliRunner
 from src.cli import app
 
 runner = CliRunner()
+# Rich wraps help text at COLUMNS; pin wide so phrase assertions do not split across lines.
+HELP_ENV = {"COLUMNS": "200"}
 
 
 def strip_ansi(text: str) -> str:
@@ -170,23 +172,22 @@ class TestPreprocessCLIRequirementExtraction:
 
     def test_preprocess_help_includes_requirement_flags(self):
         """Test that help text includes requirement extraction flags."""
-        result = runner.invoke(app, ["preprocess", "--help"])
+        result = runner.invoke(app, ["preprocess", "--help"], env=HELP_ENV)
 
         assert result.exit_code == 0
         help_output_clean = strip_ansi(result.stdout)
-        # Check for flag names (may be truncated in help due to column width)
-        assert "extract-requireme" in help_output_clean or "--extract-requirements" in help_output_clean
-        assert "no-extract-requi" in help_output_clean or "--no-extract-requirements" in help_output_clean
-        assert "export-requiremen" in help_output_clean or "--export-requirements-json" in help_output_clean
+        assert "--extract-requirements" in help_output_clean
+        assert "--no-extract-requirements" in help_output_clean
+        assert "--export-requirements-json" in help_output_clean
         assert "trigger-based requirement extraction" in help_output_clean.lower()
 
     def test_default_extract_requirements_enabled(self):
         """Test that requirement extraction is enabled by default."""
-        result = runner.invoke(app, ["preprocess", "--help"])
+        result = runner.invoke(app, ["preprocess", "--help"], env=HELP_ENV)
 
         assert result.exit_code == 0
         help_output_clean = strip_ansi(result.stdout)
-        assert "extract-requirement" in help_output_clean.lower()
+        assert "--extract-requirements" in help_output_clean
 
     def test_requirement_extraction_produces_json_output(self, sample_jobs_file):
         """Test that requirement extraction produces valid JSON output."""
