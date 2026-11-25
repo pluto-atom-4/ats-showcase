@@ -245,22 +245,35 @@ class TestTokenCounter:
 
 ```python
 import pytest
-import asyncio
-from src.browser.crawler import JobCrawler
-from src.tokenization.cleaner import Cleaner
+from src.browser.crawler import Crawler
+from src.parsers.html_to_markdown import clean_html
+
+SELECTORS = {
+    "job_container": ".job-posting",
+    "title": ".job-title",
+    "location": ".job-location",
+    "link": "a.job-link",
+}
 
 @pytest.mark.asyncio
-async def test_crawl_and_preprocess():
-    """Test crawl output feeds into preprocess input."""
-    crawler = JobCrawler(config=CrawlerConfig(headless=True))
-    raw_job = await crawler.extract_job("https://acme.com/jobs/123")
+async def test_crawl_and_clean():
+    """Test crawl output feeds into the preprocess cleaning step."""
+    crawler = Crawler(headless=True)
+    try:
+        jobs = await crawler.crawl_company(
+            "Acme",
+            "https://acme.com/jobs",
+            SELECTORS,
+            crawler_config={"fetch_detail": True},
+        )
+    finally:
+        await crawler.close()
 
-    cleaner = Cleaner()
-    cleaned = cleaner.clean(raw_job.html)
-
-    assert cleaned.token_count < raw_job.html_token_estimate
-    assert len(cleaned.text) > 0
-    assert "<script>" not in cleaned.text  # tags removed
+    assert jobs
+    cleaned = clean_html(jobs[0].description)
+    assert isinstance(cleaned, str)
+    assert len(cleaned) > 0
+    assert "<script>" not in cleaned  # tags removed
 ```
 
 ### E2E Testing
@@ -510,12 +523,21 @@ Always include:
 - Expected output or side effects
 
 ```python
-# Example: Extracting jobs from a company
-from src.browser.crawler import JobCrawler
+# Example: Extracting jobs from one company career page
+from src.browser.crawler import Crawler
 
-crawler = JobCrawler(config=CrawlerConfig(headless=True))
-jobs = await crawler.crawl_company("acme")
-# Output: list[RawJob] with 50–200 jobs
+selectors = {
+    "job_container": ".job-posting",
+    "title": ".job-title",
+    "location": ".job-location",
+    "link": "a.job-link",
+}
+crawler = Crawler(headless=True)
+try:
+    jobs = await crawler.crawl_company("Acme", "https://acme.com/jobs", selectors)
+finally:
+    await crawler.close()
+# Output: list[JobPosting]
 ```
 
 ### Table Format
