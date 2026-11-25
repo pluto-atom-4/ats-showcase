@@ -670,23 +670,9 @@ python -m src.cli crawl
 **Error**: `RateLimitError: 429 Too Many Requests`
 
 **Solution**:
-- Already handled in batch_processor.py with exponential backoff
-- Monitor cost tracking: `cli stats`
-- Reduce batch size: `cli assess --batch 5` (instead of 20)
-
-### Database Lock
-
-**Error**: `sqlite3.OperationalError: database is locked`
-
-**Solution**:
-```bash
-# Check if another process is using DB
-lsof | grep ats_playground.db
-
-# Close process or wait
-# Or increase timeout
-export SQLITE_TIMEOUT=10  # seconds
-```
+- Already handled in `src/llm/provider.py` (`LLMProvider`) with exponential backoff
+- Monitor cost tracking: `python -m src.cli stats --show-token-usage`
+- Reduce job count per run: `python -m src.cli assess --cv data/cv.json --limit 5`
 
 ### Import Errors
 
@@ -704,7 +690,7 @@ python -m src.cli --help
 
 ### Type Check Failures
 
-**Error**: `error: Argument 1 to "extract_job" has incompatible type "str"; expected "URL"`
+**Error**: `error: Argument "selectors" to "crawl_company" of "Crawler" has incompatible type "str"; expected "Dict[str, str]"`
 
 **Solution**:
 - Use proper types for all function arguments
@@ -719,7 +705,7 @@ python -m src.cli --help
 - Use `pytest.approx()` for floating-point comparisons
 - Use `assert result == expected` for exact matches
 - Run `pytest -vv` for detailed output
-- Check fixture data in `tests/fixtures/`
+- Check fixture data under the relevant module's fixtures directory (e.g. `tests/preprocessing/fixtures/`)
 
 ---
 
