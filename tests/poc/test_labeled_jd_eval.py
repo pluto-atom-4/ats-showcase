@@ -1,4 +1,4 @@
-"""Model-free tests for the labeled-JD loader and metric helpers in scripts/eval_poc_accuracy.py.
+"""Model-free tests for the labeled-JD loader and metric helpers in src/poc/scripts/eval_poc_accuracy.py.
 
 Covers format validation (Issue #500), the synthetic template, and the
 no-file / bad-flag paths of the CLI. Does not load the spaCy model.
@@ -17,8 +17,10 @@ TEMPLATE = ROOT / "tests" / "poc" / "fixtures" / "synthetic_labeled_jd_TEMPLATE.
 
 @pytest.fixture(scope="module")
 def ev() -> ModuleType:
-    """Import scripts/eval_poc_accuracy.py as a module (it is not a package)."""
-    spec = importlib.util.spec_from_file_location("eval_poc_accuracy", ROOT / "scripts" / "eval_poc_accuracy.py")
+    """Import src/poc/scripts/eval_poc_accuracy.py as a module (it is not a package)."""
+    spec = importlib.util.spec_from_file_location(
+        "eval_poc_accuracy", ROOT / "src" / "poc" / "scripts" / "eval_poc_accuracy.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

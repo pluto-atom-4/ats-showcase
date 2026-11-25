@@ -1,4 +1,4 @@
-"""Model-free tests for corpus mode in scripts/eval_poc_accuracy.py (Issue #552).
+"""Model-free tests for corpus mode in src/poc/scripts/eval_poc_accuracy.py (Issue #552).
 
 Covers sentence splitting, corpus discovery, deterministic dumps, the compare
 diff, CLI validation and an end-to-end run with stub extractors. Does not load
@@ -19,8 +19,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 @pytest.fixture(scope="module")
 def ev() -> ModuleType:
-    """Import scripts/eval_poc_accuracy.py as a module (it is not a package)."""
-    spec = importlib.util.spec_from_file_location("eval_poc_accuracy", ROOT / "scripts" / "eval_poc_accuracy.py")
+    """Import src/poc/scripts/eval_poc_accuracy.py as a module (it is not a package)."""
+    spec = importlib.util.spec_from_file_location(
+        "eval_poc_accuracy", ROOT / "src" / "poc" / "scripts" / "eval_poc_accuracy.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

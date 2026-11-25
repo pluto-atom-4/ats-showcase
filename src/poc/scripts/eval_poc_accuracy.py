@@ -1,8 +1,8 @@
 """Run POC skill/tech extractors over the labeled eval set and print metrics.
 
 Usage (from repo root, needs spaCy model en_core_web_md):
-    uv run python scripts/eval_poc_accuracy.py
-    uv run python scripts/eval_poc_accuracy.py --labeled-jds path/to/labeled_jds.json
+    uv run python src/poc/scripts/eval_poc_accuracy.py
+    uv run python src/poc/scripts/eval_poc_accuracy.py --labeled-jds path/to/labeled_jds.json
 
 Prints per-snippet hit rate / precision / exact match and micro totals.
 Hit rate = |E & X| / |E|; precision = |E & X| / |X|; N/A when denominator is 0.
@@ -17,9 +17,9 @@ See docs/dev-note/poc/extraction_accuracy_report.md (Issue #431, #449, #500).
 Corpus mode (Issue #552) runs the same extractors over every sentence of a
 wider corpus instead of the labeled sets, so output can be diffed before and
 after a change:
-    uv run python scripts/eval_poc_accuracy.py --corpus tests/poc/fixtures --dump before.json
+    uv run python src/poc/scripts/eval_poc_accuracy.py --corpus tests/poc/fixtures --dump before.json
     # ... make the change ...
-    uv run python scripts/eval_poc_accuracy.py --corpus tests/poc/fixtures --compare before.json
+    uv run python src/poc/scripts/eval_poc_accuracy.py --corpus tests/poc/fixtures --compare before.json
 --corpus takes a directory (searched recursively) or a glob; only *.md and *.json
 files are read. --dump writes the per-sentence output as sorted, indented JSON;
 --compare prints only sentences whose text, skill output or tech output differs
@@ -38,7 +38,7 @@ from typing import Any
 
 import spacy
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
 from src.poc.skills.extract_skills_a import SkillExtractor  # noqa: E402
