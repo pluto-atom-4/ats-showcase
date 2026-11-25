@@ -1264,6 +1264,10 @@
     "Both fragments are equal length after stripping, so the first one wins."
   ],
   [
+    "tests/poc/tweak/test_section_model.py",
+    "60 chars + \"...\""
+  ],
+  [
     "tests/poc/ui/test_tui_job_selector.py",
     "select() takes values (job_id), not indices."
   ],
@@ -1558,10 +1562,6 @@
   [
     "tests/test_preprocessor.py",
     "Wrap (not replace) nlp to prove the section never reached spaCy, not merely that output was empty."
-  ],
-  [
-    "tests/test_section_model.py",
-    "60 chars + \"...\""
   ],
   [
     "tests/test_verification.py",
