@@ -101,34 +101,17 @@ class crawler:  # lowercase class
 
 ### Type Hints & Dataclasses
 
-Use `dataclasses` for models (avoids boilerplate):
+Use pydantic models for `src/models/` (`JobPosting`, `PreprocessedJob`, `Assessment`); validation runs on construction. Use `dataclasses` for internal types in preprocessing, storage, and TUI code:
 
 ```python
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional
+from src.models.job import JobPosting
 
-@dataclass
-class RawJob:
-    """Extracted job from crawl phase."""
-    url: str
-    title: str
-    company: str
-    html: str
-    timestamp: datetime
-
-    def __post_init__(self) -> None:
-        # Validation after init
-        if not self.url.startswith("http"):
-            raise ValueError(f"Invalid URL: {self.url}")
-
-# Use
-job = RawJob(
-    url="https://...",
-    title="Engineer",
+# Invalid url or missing title raises pydantic.ValidationError
+job = JobPosting(
+    title="Senior Python Engineer",
     company="Acme",
-    html="<html>...",
-    timestamp=datetime.now()
+    url="https://acme.com/jobs/123",
+    description="Build and maintain crawlers.",
 )
 ```
 
@@ -327,9 +310,11 @@ Use `conftest.py` for shared fixtures:
 
 ```python
 # tests/conftest.py
+import json
+
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from src.browser.crawler import JobCrawler
+from src.models.job import JobPosting
 
 @pytest.fixture
 def mock_browser():
@@ -367,14 +352,13 @@ def mock_claude_response():
     }
 
 @pytest.fixture
-def raw_job_sample():
-    """Sample raw job from crawl phase."""
-    return RawJob(
-        url="https://acme.com/jobs/123",
+def job_posting_sample():
+    """Sample job posting from crawl phase."""
+    return JobPosting(
         title="Senior Python Engineer",
         company="Acme",
-        html="<html>...</html>",
-        timestamp=datetime.now()
+        url="https://acme.com/jobs/123",
+        description="<p>Build and maintain crawlers.</p>",
     )
 ```
 
