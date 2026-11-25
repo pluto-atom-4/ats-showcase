@@ -527,14 +527,20 @@ Tests are organized by module:
 
 ```
 tests/
-├── conftest.py              # Shared fixtures
-├── test_browser.py          # browser/ module tests
-├── test_parsers.py          # parsers/ module tests
-├── test_tokenization.py     # tokenization/ module tests
-├── test_models.py           # models/ module tests
-├── test_llm.py              # llm/ module tests
-├── test_verification.py     # verification/ module tests
-└── test_storage.py          # storage/ module tests
+├── __init__.py
+├── conftest.py        # Shared fixtures
+├── test_*.py          # Top-level tests
+├── assessment/        # assessment/ module tests
+├── browser/           # browser/ module tests
+├── cli/               # CLI tests
+├── llm/               # llm/ module tests
+├── parsers/           # parsers/ module tests
+├── poc/               # poc/ module tests
+├── preprocessing/     # preprocessing/ module tests
+├── scripts/           # tooling script tests
+├── storage/           # storage/ module tests
+├── tokenization/      # tokenization/ module tests
+└── tui/               # tui/ module tests
 ```
 
 ### Writing Tests
