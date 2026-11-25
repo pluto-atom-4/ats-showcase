@@ -51,11 +51,9 @@ python -m src.setup.validate_nlp_setup
 
 **Recommended**: Python 3.12.x (bugfix phase, EOL 2028-10)
 **Alternative**: Python 3.13+ (security-only, newer features)
-**Not Recommended**: Python 3.11 (legacy, performance slower)
 
 | Version | Status | EOL | Recommendation |
 |---------|--------|-----|-----------------|
-| 3.11 | Legacy | 2027-10 | ❌ Avoid |
 | **3.12** | Bugfix | 2028-10 | ✅ **Recommended** |
 | 3.13 | Security | 2029-10 | ⚠️ OK for dev |
 

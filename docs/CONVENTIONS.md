@@ -14,7 +14,7 @@
 
 ### Python Version & Tools
 
-**Target**: Python 3.11+
+**Target**: Python 3.12+
 **Package manager**: `uv` (faster than pip)
 **Type checking**: `mypy` (non-strict by default; `run-local-ci.sh --strict` available)
 **Linting**: `ruff` (Rust-based, faster than flake8)
