@@ -17,8 +17,8 @@ Exit codes:
   2 - An --input path does not exist
 
 Usage:
-  uv run python scripts/measure_heading_promoter_fp.py
-  uv run python scripts/measure_heading_promoter_fp.py --input data/work/my_details.json --output out/report.md
+  uv run python src/poc/scripts/measure_heading_promoter_fp.py
+  uv run python src/poc/scripts/measure_heading_promoter_fp.py --input data/work/my_details.json --output out/report.md
 """
 
 from __future__ import annotations
@@ -30,9 +30,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-# Ensure src module is importable when run as a script (matches scripts/parity_check.py)
-_SCRIPT_DIR = Path(__file__).parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent
+# Script sits 3 levels below the project root; put it on sys.path so `src` imports resolve
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
