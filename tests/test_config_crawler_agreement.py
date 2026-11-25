@@ -28,5 +28,7 @@ def test_config_has_at_least_one_company() -> None:
 
 def test_every_selector_key_is_read_by_crawler() -> None:
     for name, company in _load_companies().items():
-        unknown = set(company.get("selectors", {})) - CRAWLER_SELECTOR_KEYS
+        selectors = company.get("selectors")
+        assert selectors, f"{name} has no selectors"
+        unknown = set(selectors) - CRAWLER_SELECTOR_KEYS
         assert not unknown, f"{name} has selector keys the crawler ignores: {sorted(unknown)}"
