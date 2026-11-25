@@ -44,9 +44,8 @@ ats-showcase/
 │   └── --min-score          # Export threshold
 │
 ├── stats                    # Analytics
-│   ├── --show-tokens        # Token usage report
-│   ├── --show-costs         # Cost breakdown by company
-│   └── --days               # Time period (default: 7)
+│   ├── --db                 # Path to assessment database
+│   └── --show-token-usage   # Show token usage and cost breakdown
 │
 └── --all                    # Full workflow (crawl→preprocess→verify→assess→export)
     └── --up-to              # Stop at phase [crawl|preprocess|review|assess]
@@ -1026,23 +1025,17 @@ uv run python -m src.cli purge \
 ---
 
 ### stats
-**Purpose**: Analytics and cost tracking
+**Purpose**: Database and cost statistics
 
 ```bash
-ats-showcase stats \
-  --show-tokens \
-  --show-costs \
-  --days 7
+uv run python -m src.cli stats --show-token-usage
 ```
 
 **Options**:
-- `--show-tokens/--hide-tokens` - Token usage report (default: show)
-- `--show-costs/--hide-costs` - Cost breakdown (default: show)
-- `--show-timing/--hide-timing` - Performance metrics (default: show)
-- `--days INT` - Time period (default: 7)
-- `--company TEXT` - Filter by company (optional)
+- `--db TEXT` - Path to assessment database (default: `data/ats_playground.db`)
+- `--show-token-usage/--no-show-token-usage` - Show token usage and cost breakdown (default: no-show-token-usage)
 
-**Output**: Summary tables and charts
+**Output**: Total assessments, average score, score range; with `--show-token-usage`, also shows input/output tokens, total cost, and average cost per job. For v1.0 vs v2.0 preprocessing cost comparisons, use `cost-analysis` instead.
 
 ---
 
