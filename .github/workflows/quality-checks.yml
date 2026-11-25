@@ -8,9 +8,47 @@ on:
     types: [opened, synchronize, reopened, edited]
 
 jobs:
+  changes:
+    name: Detect docs-only change
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Detect docs-only change
+        id: diff
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          code=true
+          if [ "$EVENT_NAME" = "pull_request" ] \
+            && [ "$BASE_SHA" != "0000000000000000000000000000000000000000" ] \
+            && changed=$(git diff --name-only "$BASE_SHA..$HEAD_SHA"); then
+            code=false
+            if [ -z "$changed" ]; then
+              code=true
+            fi
+            # .github/* precedes *.md so workflow-adjacent markdown still runs the full pipeline.
+            while IFS= read -r path; do
+              case "$path" in
+                .github/*|.claude/scripts/*) code=true; break ;;
+                *.md|docs/*|LICENSE*|.claude/*) ;;
+                *) code=true; break ;;
+              esac
+            done <<< "$changed"
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   quality:
     name: Quality Assurance
     runs-on: ubuntu-latest
+    needs: changes
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -34,23 +72,31 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies with uv
+        if: needs.changes.outputs.code == 'true'
         run: uv sync --all-extras && uv run python --version
 
       - name: Download spaCy model
+        if: needs.changes.outputs.code == 'true'
         run: uv run python -m spacy download en_core_web_md
 
       - name: Validate pre-commit config
         run: uv run pre-commit validate-config
 
       - name: Run pre-commit hooks
+        if: needs.changes.outputs.code == 'true'
         run: uv run pre-commit run --all-files
 
+      - name: Run docs-only pre-commit hooks
+        if: needs.changes.outputs.code == 'false'
+        # Pinned to the uv.lock pre-commit version so hook behaviour matches the full run.
+        run: uvx pre-commit@4.7.0 run trailing-whitespace end-of-file-fixer detect-secrets --all-files
+
       - name: Scoped commented-out-code check (ERA001)
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
         run: uv run ruff check --select ERA001 src tests --output-format=concise
 
       - name: Check added comments (WHY-only)
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -62,14 +108,17 @@ jobs:
           uv run python scripts/check_added_comments.py --base-ref "$BASE_SHA" "${files[@]}"
 
       - name: Run type checking
+        if: needs.changes.outputs.code == 'true'
         run: uv run mypy src/ tests/
 
       - name: Run tests with coverage
+        if: needs.changes.outputs.code == 'true'
         run: |
           export PYTHONPATH="${{ github.workspace }}/src:$PYTHONPATH"
           uv run pytest tests/ -v --ignore=tests/poc -m "not perf" --cov=src -n auto --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage to Codecov
+        if: needs.changes.outputs.code == 'true'
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: ./coverage.xml
@@ -79,6 +128,7 @@ jobs:
 
       - name: Run performance tests (serial, advisory)
         id: perf
+        if: needs.changes.outputs.code == 'true'
         # Wall-clock budget tests run alone, without xdist or coverage, so CPU contention
         # does not flake them. Advisory: failures are reported but do not fail the job (#570).
         continue-on-error: true
@@ -87,7 +137,7 @@ jobs:
           uv run pytest tests/ -v --ignore=tests/poc -m perf -n 0 --no-cov
 
       - name: Surface advisory perf test failure
-        if: always() && steps.perf.outcome == 'failure'
+        if: always() && needs.changes.outputs.code == 'true' && steps.perf.outcome == 'failure'
         run: |
           {
             echo "### Advisory perf tests failed"
@@ -99,6 +149,7 @@ jobs:
   quality-poc:
     name: Quality Assurance (poc)
     runs-on: ubuntu-latest
+    needs: changes
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -122,17 +173,21 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies with uv
+        if: needs.changes.outputs.code == 'true'
         run: uv sync --all-extras && uv run python --version
 
       - name: Download spaCy model
+        if: needs.changes.outputs.code == 'true'
         run: uv run python -m spacy download en_core_web_md
 
       - name: Run poc tests with coverage
+        if: needs.changes.outputs.code == 'true'
         run: |
           export PYTHONPATH="${{ github.workspace }}/src:$PYTHONPATH"
           uv run pytest tests/poc/ -v --cov=src -n auto --cov-report=xml
 
       - name: Upload poc coverage to Codecov
+        if: needs.changes.outputs.code == 'true'
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: ./coverage.xml
