@@ -1,6 +1,6 @@
 # Labeled-JD Eval Set (Issue #500)
 
-Optional labeled job-description set for `scripts/eval_poc_accuracy.py`. It sits alongside the 27-snippet set (`tests/poc/fixtures/accuracy_eval_set.json`, see [extraction_accuracy_report.md](extraction_accuracy_report.md)) and reports precision and recall for skills and technologies against real, maintainer-labeled text.
+Optional labeled job-description set for `src/poc/scripts/eval_poc_accuracy.py`. It sits alongside the 27-snippet set (`tests/poc/fixtures/accuracy_eval_set.json`, see [extraction_accuracy_report.md](extraction_accuracy_report.md)) and reports precision and recall for skills and technologies against real, maintainer-labeled text.
 
 Parent: #268. Corpus mode (`--corpus`, `--dump`, `--compare`, #552) is out of scope; it may build on this loader.
 
@@ -59,8 +59,8 @@ Follow the same rules as the snippet set (see "Ground truth labeling rules" in `
 5. Validate and score:
 
 ```bash
-uv run python scripts/eval_poc_accuracy.py                                   # uses data/poc/labeled_jds.json if present
-uv run python scripts/eval_poc_accuracy.py --labeled-jds path/to/file.json   # explicit file
+uv run python src/poc/scripts/eval_poc_accuracy.py                           # uses data/poc/labeled_jds.json if present
+uv run python src/poc/scripts/eval_poc_accuracy.py --labeled-jds path/to/file.json   # explicit file
 ```
 
 The labeled section prints `LABELED JD SET <path> entries=N`, a per-entry table (skills and tech recall and precision, `N/A` when a denominator is 0), and micro totals. Recall is hits / expected, precision is hits / extracted.

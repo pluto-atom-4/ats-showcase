@@ -82,9 +82,9 @@ Re-run on 2026-10-12 after the go-fix (#475) and hyphenation-fix (#476). Values 
 
 ### Run record
 
-- **Command (Post Run 1):** `.venv/bin/python scripts/benchmark_poc_extraction.py` (JSON, default `--repeats 5`), from the worktree root.
-- **Command (Post Run 2):** `.venv/bin/python scripts/benchmark_poc_extraction.py --table` (default `--repeats 5`), from the worktree root.
-- **Command (Baseline):** `.venv/bin/python scripts/benchmark_poc_extraction.py --table` from a snapshot directory containing only `src/` exported from `612626c` (`git archive`), plus this script and the two raw JD fixtures copied from HEAD.
+- **Command (Post Run 1):** `.venv/bin/python src/poc/scripts/benchmark_poc_extraction.py` (JSON, default `--repeats 5`), from the worktree root.
+- **Command (Post Run 2):** `.venv/bin/python src/poc/scripts/benchmark_poc_extraction.py --table` (default `--repeats 5`), from the worktree root.
+- **Command (Baseline):** `.venv/bin/python src/poc/scripts/benchmark_poc_extraction.py --table` from a snapshot directory containing only `src/` exported from `612626c` (`git archive`), plus this script and the two raw JD fixtures copied from HEAD.
 - **Date:** 2026-10-12.
 - **Commit context:** post-fix runs on HEAD `2d93802` (`src/poc/` last changed by `5ee416f` #475 and `18aa412` #476). Baseline on `612626c`. Worktree branch `docs/issue-477-benchmark-rerun`.
 - **Venv:** `/home/pluto-atom-4/Documents/full-stack/ats-playground/.venv/bin/python`, Python 3.12.12 (GCC 14.2.0 build); spaCy 3.8.14; `en_core_web_md` 3.8.0. `uv sync` was not run.
