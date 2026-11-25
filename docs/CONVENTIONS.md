@@ -117,6 +117,8 @@ job = JobPosting(
 
 ### Error Handling
 
+Names in this section are illustrative, not the real API.
+
 **Prefer specific exceptions**:
 
 ```python
@@ -175,14 +177,16 @@ logger.critical("Database corrupted, cannot continue", exc_info=True)
 
 ### Async/Await Patterns
 
-Use `asyncio` for I/O-bound operations (crawl, API calls):
+Use `asyncio` for I/O-bound operations (crawl, API calls). Names in this section are illustrative, not the real API.
 
 ```python
 import asyncio
 from typing import Coroutine
 
+from src.models.job import JobPosting
+
 # Good: concurrent requests
-async def crawl_companies(companies: list[str]) -> list[RawJob]:
+async def crawl_companies(companies: list[str]) -> list[JobPosting]:
     tasks = [crawl_company(company) for company in companies]
     return await asyncio.gather(*tasks, return_exceptions=True)
 
