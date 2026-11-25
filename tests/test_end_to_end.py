@@ -1,22 +1,11 @@
 """End-to-end integration tests for full assessment pipeline."""
 
-from typing import Any, Generator, List
+from typing import Any, List
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.assessment.assessor import Assessor
-from src.storage.db import Database
-
-
-@pytest.fixture
-def temp_db() -> Generator[Database, None, None]:
-    """Temporary SQLite database for testing."""
-    db = Database(":memory:")
-    db.connect()
-    db.initialize_schema()
-    yield db
-    db.close()
 
 
 @pytest.fixture
