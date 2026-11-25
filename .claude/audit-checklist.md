@@ -40,7 +40,7 @@ Run this checklist quarterly to verify context files remain aligned with codebas
 **DESIGN.md:**
 - [ ] Architecture diagram/description matches actual code structure
 - [ ] Anti-patterns section reflects current DO NOTs
-- [ ] Database schema matches src/storage/db.py
+- [ ] Database schema matches src/storage/schema.py
 - [ ] All referenced file paths exist (no dead links)
 
 **AGENTS.md:**

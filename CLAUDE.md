@@ -29,7 +29,7 @@ uv sync
 uv run python -m spacy download en_core_web_md
 uv run playwright install chromium
 cp .env.example .env  # Set ANTHROPIC_API_KEY
-uv run python src/storage/db.py --init
+# Database schema is created automatically on first JobStore()/AssessmentStore() call — no separate init step
 ```
 
 ---
