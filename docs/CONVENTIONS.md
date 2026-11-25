@@ -76,66 +76,48 @@ tests/
 ### Naming Conventions
 
 **Modules**: `snake_case` (crawler.py, llm_client.py)
-**Classes**: `PascalCase` (JobCrawler, CLaudeClient, StorageClient)
-**Functions**: `snake_case` (extract_job_title, validate_selector)
+**Classes**: `PascalCase` (Crawler, LLMProvider, JobStore)
+**Functions**: `snake_case` (clean_html, count_tokens)
 **Constants**: `UPPER_SNAKE_CASE` (MAX_RETRIES, DEFAULT_TIMEOUT)
 **Private**: `_leading_underscore` (_internal_helper, _parse_html)
-**Dataclasses**: `PascalCase` (RawJob, PreprocessedJob, Assessment)
+**Models**: `PascalCase` pydantic classes in `src/models/` (JobPosting, PreprocessedJob, Assessment)
 **Type hints**: Always required (mypy; strict via `run-local-ci.sh --strict`)
 
 ```python
 # GOOD
-class JobCrawler:
+class Crawler:
     MAX_RETRIES = 5
     DEFAULT_TIMEOUT = 30
 
-    def __init__(self, config: CrawlerConfig) -> None:
-        self._browser_pool: list[Browser] = []
-
-    async def extract_jobs(self, url: str) -> list[RawJob]:
+    async def crawl_company(self, url: str) -> list[JobPosting]:
         pass
 
 # BAD
-class job_crawler:  # lowercase class
-    def extractJobs(self, url):  # camelCase method
+class crawler:  # lowercase class
+    def crawlCompany(self, url):  # camelCase method
         MAX_TIMEOUT = 30  # constant in method
         pass
 ```
 
 ### Type Hints & Dataclasses
 
-Use `dataclasses` for models (avoids boilerplate):
+Use pydantic models for `src/models/` (`JobPosting`, `PreprocessedJob`, `Assessment`); validation runs on construction. Use `dataclasses` for internal types in preprocessing, storage, and TUI code:
 
 ```python
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional
+from src.models.job import JobPosting
 
-@dataclass
-class RawJob:
-    """Extracted job from crawl phase."""
-    url: str
-    title: str
-    company: str
-    html: str
-    timestamp: datetime
-
-    def __post_init__(self) -> None:
-        # Validation after init
-        if not self.url.startswith("http"):
-            raise ValueError(f"Invalid URL: {self.url}")
-
-# Use
-job = RawJob(
-    url="https://...",
-    title="Engineer",
+# Invalid url or missing title raises pydantic.ValidationError
+job = JobPosting(
+    title="Senior Python Engineer",
     company="Acme",
-    html="<html>...",
-    timestamp=datetime.now()
+    url="https://acme.com/jobs/123",
+    description="Build and maintain crawlers.",
 )
 ```
 
 ### Error Handling
+
+Names in this section are illustrative, not the real API.
 
 **Prefer specific exceptions**:
 
@@ -195,14 +177,16 @@ logger.critical("Database corrupted, cannot continue", exc_info=True)
 
 ### Async/Await Patterns
 
-Use `asyncio` for I/O-bound operations (crawl, API calls):
+Use `asyncio` for I/O-bound operations (crawl, API calls). Names in this section are illustrative, not the real API.
 
 ```python
 import asyncio
 from typing import Coroutine
 
+from src.models.job import JobPosting
+
 # Good: concurrent requests
-async def crawl_companies(companies: list[str]) -> list[RawJob]:
+async def crawl_companies(companies: list[str]) -> list[JobPosting]:
     tasks = [crawl_company(company) for company in companies]
     return await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -240,20 +224,19 @@ class TestTokenCounter:
     def test_count_tokens_basic(self):
         counter = TokenCounter()
         text = "Hello world"
-        count = counter.count(text)
+        count = counter.count_tokens(text)
         assert count > 0
         assert isinstance(count, int)
 
     def test_count_tokens_empty(self):
         counter = TokenCounter()
-        count = counter.count("")
+        count = counter.count_tokens("")
         assert count == 0
 
-    @patch("tiktoken.encoding_for_model")
-    def test_uses_correct_model(self, mock_encoding):
-        counter = TokenCounter(model="gpt-4")
-        counter.count("test")
-        mock_encoding.assert_called_with("gpt-4")
+    @patch("tiktoken.get_encoding")
+    def test_loads_cl100k_base_encoding(self, mock_get_encoding):
+        TokenCounter()
+        mock_get_encoding.assert_called_with("cl100k_base")
 ```
 
 ### Integration Testing
@@ -262,22 +245,35 @@ class TestTokenCounter:
 
 ```python
 import pytest
-import asyncio
-from src.browser.crawler import JobCrawler
-from src.tokenization.cleaner import Cleaner
+from src.browser.crawler import Crawler
+from src.parsers.html_to_markdown import clean_html
+
+SELECTORS = {
+    "job_container": ".job-posting",
+    "title": ".job-title",
+    "location": ".job-location",
+    "link": "a.job-link",
+}
 
 @pytest.mark.asyncio
-async def test_crawl_and_preprocess():
-    """Test crawl output feeds into preprocess input."""
-    crawler = JobCrawler(config=CrawlerConfig(headless=True))
-    raw_job = await crawler.extract_job("https://acme.com/jobs/123")
+async def test_crawl_and_clean():
+    """Test crawl output feeds into the preprocess cleaning step."""
+    crawler = Crawler(headless=True)
+    try:
+        jobs = await crawler.crawl_company(
+            "Acme",
+            "https://acme.com/jobs",
+            SELECTORS,
+            crawler_config={"fetch_detail": True},
+        )
+    finally:
+        await crawler.close()
 
-    cleaner = Cleaner()
-    cleaned = cleaner.clean(raw_job.html)
-
-    assert cleaned.token_count < raw_job.html_token_estimate
-    assert len(cleaned.text) > 0
-    assert "<script>" not in cleaned.text  # tags removed
+    assert jobs
+    cleaned = clean_html(jobs[0].description)
+    assert isinstance(cleaned, str)
+    assert len(cleaned) > 0
+    assert "<script>" not in cleaned  # tags removed
 ```
 
 ### E2E Testing
@@ -285,43 +281,42 @@ async def test_crawl_and_preprocess():
 **Principle**: Test full workflow with real services (staging)
 
 ```python
-import pytest
-import tempfile
 import json
 from pathlib import Path
-from src.cli import app
+
 from typer.testing import CliRunner
 
-def test_full_workflow_e2e():
-    """Test crawl → preprocess → review → assess → export."""
+from src.cli import app
+
+def test_crawl_and_preprocess_e2e(tmp_path: Path) -> None:
+    """Test crawl → preprocess via the CLI; stops before any paid API call."""
+    # Hazard: runs a live crawl and writes data/ats_playground.db relative to the CWD; use a scratch CWD
+    config_path = tmp_path / "companies.json"
+    config_path.write_text(json.dumps({
+        "companies": {
+            "Acme": {
+                "enabled": True,
+                "name": "Acme",
+                "url": "https://acme.com/jobs",
+                "selectors": {
+                    "job_container": ".job-posting",
+                    "title": ".job-title",
+                    "location": ".job-location",
+                    "link": "a.job-link",
+                },
+                "crawler": {"fetch_detail": False},
+            }
+        }
+    }))
+    cv_path = tmp_path / "cv.json"
+    cv_path.write_text("{}")
+
     runner = CliRunner()
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Mock company config
-        config_path = Path(tmpdir) / "companies.json"
-        config_path.write_text(json.dumps({
-            "acme": {"url": "https://acme.com/jobs", "selector": "..."}
-        }))
-
-        # Crawl
-        result = runner.invoke(app, ["crawl", "--company", "acme", "--dry-run"])
-        assert result.exit_code == 0
-
-        # Preprocess
-        result = runner.invoke(app, ["preprocess", "--batch", "10"])
-        assert result.exit_code == 0
-
-        # Review (non-interactive, auto-approve all)
-        result = runner.invoke(app, ["review", "--auto-approve"])
-        assert result.exit_code == 0
-
-        # Assess (mock Claude responses)
-        result = runner.invoke(app, ["assess", "--mock"])
-        assert result.exit_code == 0
-
-        # Export
-        result = runner.invoke(app, ["export", "--output", f"{tmpdir}/out.md"])
-        assert result.exit_code == 0
-        assert Path(f"{tmpdir}/out.md").exists()
+    result = runner.invoke(app, [
+        "all", "--cv", str(cv_path), "--config", str(config_path),
+        "--no-tui", "--up-to", "preprocess",
+    ])
+    assert result.exit_code == 0
 ```
 
 ### Mocking & Fixtures
@@ -330,9 +325,11 @@ Use `conftest.py` for shared fixtures:
 
 ```python
 # tests/conftest.py
+import json
+
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from src.browser.crawler import JobCrawler
+from src.models.job import JobPosting
 
 @pytest.fixture
 def mock_browser():
@@ -370,14 +367,13 @@ def mock_claude_response():
     }
 
 @pytest.fixture
-def raw_job_sample():
-    """Sample raw job from crawl phase."""
-    return RawJob(
-        url="https://acme.com/jobs/123",
+def job_posting_sample():
+    """Sample job posting from crawl phase."""
+    return JobPosting(
         title="Senior Python Engineer",
         company="Acme",
-        html="<html>...</html>",
-        timestamp=datetime.now()
+        url="https://acme.com/jobs/123",
+        description="<p>Build and maintain crawlers.</p>",
     )
 ```
 
@@ -526,12 +522,21 @@ Always include:
 - Expected output or side effects
 
 ```python
-# Example: Extracting jobs from a company
-from src.browser.crawler import JobCrawler
+# Example: Extracting jobs from one company career page
+from src.browser.crawler import Crawler
 
-crawler = JobCrawler(config=CrawlerConfig(headless=True))
-jobs = await crawler.crawl_company("acme")
-# Output: list[RawJob] with 50–200 jobs
+selectors = {
+    "job_container": ".job-posting",
+    "title": ".job-title",
+    "location": ".job-location",
+    "link": "a.job-link",
+}
+crawler = Crawler(headless=True)
+try:
+    jobs = await crawler.crawl_company("Acme", "https://acme.com/jobs", selectors)
+finally:
+    await crawler.close()
+# Output: list[JobPosting]
 ```
 
 ### Table Format
@@ -574,7 +579,6 @@ When code changes:
 - [ ] No secrets in commits: `git log --oneline | grep -i "key\|secret\|password"`
 - [ ] All PRs merged to main
 - [ ] Bump version in `src/__init__.py` (semantic versioning)
-- [ ] Update CHANGELOG.md with new features/fixes
 
 ### Staging Deployment
 
@@ -665,23 +669,9 @@ python -m src.cli crawl
 **Error**: `RateLimitError: 429 Too Many Requests`
 
 **Solution**:
-- Already handled in batch_processor.py with exponential backoff
-- Monitor cost tracking: `cli stats`
-- Reduce batch size: `cli assess --batch 5` (instead of 20)
-
-### Database Lock
-
-**Error**: `sqlite3.OperationalError: database is locked`
-
-**Solution**:
-```bash
-# Check if another process is using DB
-lsof | grep ats_playground.db
-
-# Close process or wait
-# Or increase timeout
-export SQLITE_TIMEOUT=10  # seconds
-```
+- Already handled in `src/llm/provider.py` (`LLMProvider`) with exponential backoff
+- Monitor cost tracking: `python -m src.cli stats --show-token-usage`
+- Reduce job count per run: `python -m src.cli assess --cv data/cv.json --limit 5`
 
 ### Import Errors
 
@@ -699,7 +689,7 @@ python -m src.cli --help
 
 ### Type Check Failures
 
-**Error**: `error: Argument 1 to "extract_job" has incompatible type "str"; expected "URL"`
+**Error**: `error: Argument "selectors" to "crawl_company" of "Crawler" has incompatible type "str"; expected "Dict[str, str]"`
 
 **Solution**:
 - Use proper types for all function arguments
@@ -714,7 +704,7 @@ python -m src.cli --help
 - Use `pytest.approx()` for floating-point comparisons
 - Use `assert result == expected` for exact matches
 - Run `pytest -vv` for detailed output
-- Check fixture data in `tests/fixtures/`
+- Check fixture data under the relevant module's fixtures directory (e.g. `tests/preprocessing/fixtures/`)
 
 ---
 
@@ -727,7 +717,8 @@ python -m spacy download en_core_web_md
 
 # Development
 python -m src.cli crawl --help
-python -m src.cli assess --mock
+# Show assess options
+python -m src.cli assess --help
 
 # Testing
 pytest tests/ -v
