@@ -154,14 +154,11 @@ if [ "$RUN_TESTS" = true ]; then
     fi
     echo "✅ All tests passed"
     echo
-    STEP_COUNT=5
-else
-    STEP_COUNT=4
 fi
 
 # Final summary
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "✅ All $STEP_COUNT checks passed!"
+echo "✅ All $TOTAL_STEPS checks passed!"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo
 echo "💡 Tip: Use 'git commit' to commit staged changes"
