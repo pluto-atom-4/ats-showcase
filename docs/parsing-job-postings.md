@@ -124,3 +124,115 @@ page.close(); return jobs
 
 The crawl has no second pass. Detail pages are fetched inline, one job at a time, during the listing loop.
 
+---
+
+## Worked Example: TechCorp
+
+`config/companies.json` is tracked. Its `TechCorp` entry, unchanged (the URL is a placeholder domain):
+
+```json
+{
+  "companies": {
+    "TechCorp": {
+      "enabled": true,
+      "name": "Tech Corp",
+      "url": "https://techcorp.example.com/careers",
+      "selectors": {
+        "job_container": ".job-posting",
+        "title": ".job-title",
+        "description_selector": ".job-description",
+        "location": ".job-location",
+        "requirements_selector": ".job-requirements",
+        "link": "a.job-link"
+      },
+      "crawler": {
+        "fetch_detail": false
+      }
+    }
+  }
+}
+```
+
+What a run does with this entry:
+
+1. `enabled: true` passes the CLI filter (`filter_enabled_companies`). The crawler never reads `enabled`.
+2. `wait_for_selector` and `delay_ms` are not set, so the crawler waits for `.job-posting` (up to 10 s) and then sleeps 2000 ms.
+3. For each `.job-posting`, `title`, `location`, and `link` are read. The link is made absolute against `https://techcorp.example.com/careers`.
+4. `fetch_detail` is `false`, so `description_selector` and `requirements_selector` are not used. Each `JobPosting` has `description=""` and `requirements=None`.
+
+To get descriptions and requirements, set `"fetch_detail": true`. The detail pages are then read through `description_selector` and `requirements_selector`.
+
+**Illustrative only (not in the tracked config).** A description inside an iframe uses `inner_description_selector`:
+
+```json
+"selectors": {
+  "job_container": "li.job",
+  "title": "h3",
+  "link": "a",
+  "description_selector": "iframe#job-frame",
+  "inner_description_selector": "div.job-body"
+},
+"crawler": {
+  "fetch_detail": true
+}
+```
+
+---
+
+## Selector Discovery
+
+1. Open the career page in DevTools (F12).
+2. Pick selectors that match one element per job. Prefer `data-*` attributes and stable class names. Avoid generated class names.
+3. Check each selector in the console. The container count must equal the number of jobs on the page:
+
+```javascript
+document.querySelectorAll(".job-posting").length            // one per job
+document.querySelectorAll(".job-posting .job-title").length // should equal the line above
+document.querySelector(".job-posting a.job-link")?.getAttribute("href")
+```
+
+A title count below the container count means some jobs will be dropped, because a container with no title is skipped.
+
+---
+
+## Error Handling
+
+### Crawler-Level
+
+| Scenario | What the code does |
+|----------|--------------------|
+| `goto` fails or times out | Outer `except` logs an error; `crawl_company` returns `[]`. Other companies still run. |
+| `job_container` key missing | `KeyError` is caught by the same outer `except`; returns `[]`. |
+| `wait_for_selector` times out | Warning is logged; the crawl continues with the delay and query. |
+| Zero containers matched | `Found 0 job containers` is logged at info level; the loop does nothing; returns `[]`. |
+| Container has no title | Warning `No title found in container`; the job is dropped. |
+| Any other per-container exception | Warning `Failed to extract job i`; that job is skipped. |
+| Detail fetch fails | `_fetch_job_detail` returns `("", None)`; the job is kept with an empty description. |
+| Iframe content not found | Returns `""`, so the description is empty. |
+
+The selector wait (`crawler.py:86-91`):
+
+```python
+try:
+    await page.wait_for_selector(wait_selector, timeout=10000)
+except Exception as e:
+    logger.warning(f"Selector {wait_selector} not found: {e}")
+```
+
+The per-container call (`crawler.py:104-112`):
+
+```python
+try:
+    job = await self._extract_job_from_container(
+        page, container, company_name, selectors, url, crawler_config
+    )
+    if job:
+        jobs.append(job)
+except Exception as e:
+    logger.warning(f"Failed to extract job {i}: {e}")
+```
+
+### Known Issue: `requirements` Type
+
+When `fetch_detail` is on and `requirements_selector` matches, `_fetch_job_detail` returns a `str`. `JobPosting.requirements` is declared `Optional[List[str]]` (`src/models/job.py`). Pydantic rejects a `str` for that field. The `ValidationError` is caught in `_extract_job_from_container`, which returns `None`, so the job is dropped. This was confirmed offline with pydantic 2 against the same field type. It was not reproduced end-to-end.
+
