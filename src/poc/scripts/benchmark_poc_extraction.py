@@ -9,7 +9,7 @@ Measures:
 Inputs are built by repeating the POC fixture text. Token counts are len(nlp(text)).
 
 Usage:
-    uv run python scripts/benchmark_poc_extraction.py [--table] [--repeats N]
+    uv run python src/poc/scripts/benchmark_poc_extraction.py [--table] [--repeats N]
 """
 
 import argparse
@@ -25,7 +25,7 @@ from typing import Any
 import spacy
 from spacy.language import Language
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 

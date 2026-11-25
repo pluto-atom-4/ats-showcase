@@ -2,7 +2,7 @@
 
 Benchmark for the POC extractors: `SkillExtractor` (`src/poc/skills/extract_skills_a.py`) and `TechExtractor` (`src/poc/technologies/extract_technologies_a.py`).
 
-Script: `scripts/benchmark_poc_extraction.py`
+Script: `src/poc/scripts/benchmark_poc_extraction.py`
 
 ---
 
@@ -29,13 +29,13 @@ Script: `scripts/benchmark_poc_extraction.py`
 
 ```bash
 # JSON to stdout (default)
-uv run python scripts/benchmark_poc_extraction.py
+uv run python src/poc/scripts/benchmark_poc_extraction.py
 
 # Plain text table
-uv run python scripts/benchmark_poc_extraction.py --table
+uv run python src/poc/scripts/benchmark_poc_extraction.py --table
 
 # Custom repeat count (default 5, must be >= 1)
-uv run python scripts/benchmark_poc_extraction.py [--table] [--repeats N]
+uv run python src/poc/scripts/benchmark_poc_extraction.py [--table] [--repeats N]
 ```
 
 Requirements:
