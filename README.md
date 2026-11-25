@@ -479,8 +479,7 @@ uv run python -c "from anthropic import Anthropic; print(Anthropic().models.list
 lsof | grep ats_playground.db
 
 # Clear database if corrupted
-rm data/ats_playground.db
-uv run python src/storage/db.py --init
+rm data/ats_playground.db   # recreated automatically on the next command
 ```
 
 **More troubleshooting**: [COMPATIBILITY.md](./docs/COMPATIBILITY.md) — version matrix, environment setup, known issues
