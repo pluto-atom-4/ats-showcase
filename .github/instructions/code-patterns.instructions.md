@@ -165,14 +165,14 @@ def load_config(path: str) -> dict:
 Always use `JobStore` abstraction; never write raw SQL:
 
 ```python
-from src.storage.db import JobStore
+from src.storage.job_store import JobStore
 
 def review_job(job_id: str, status: str) -> None:
     """Save job review status."""
     store = JobStore()
 
     # Use JobStore methods (safe, with type validation)
-    store.save_review(
+    store.add_job(
         job_id=job_id,
         status=status,
         title="Job Title",
@@ -183,7 +183,7 @@ def review_job(job_id: str, status: str) -> None:
 ```
 
 **Rules:**
-- Use context manager if available: `with JobStore() as store:`
+- `JobStore` has no context manager; call `store.close()` when done
 - Never construct SQL strings directly
 - Use prepared statements (built into JobStore)
 - Always close/commit after writes
@@ -241,19 +241,18 @@ class TestJobStore:
         """Test saving and retrieving jobs."""
         store = JobStore(db_path=temp_db)
 
-        store.save_review("job_1", "confirmed", title="Engineer", location="SF")
-        status = store.get_review_status("job_1")
+        store.add_job(job_id="job_1", title="Engineer", status="confirmed")
+        job = store.get_job("job_1")
 
-        assert status == "confirmed"
+        assert job["status"] == "confirmed"
         store.close()
 
     def test_filters_rejected_jobs(self, temp_db):
         """Test that rejected jobs are filtered."""
         store = JobStore(db_path=temp_db)
-        store.save_review("job_1", "rejected", reason="location")
+        store.add_job(job_id="job_1", title="Engineer", status="rejected")
 
-        skip, reason = store.should_skip_job("job_1", skip_rejected=True)
-        assert skip is True
+        assert store.get_all_jobs(status="confirmed") == []
         store.close()
 ```
 

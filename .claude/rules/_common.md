@@ -90,8 +90,7 @@ uv run python -m src.cli query --keyword "python" --status confirmed
 ### Database
 
 ```bash
-# Initialize database
-uv run python src/storage/db.py --init
+# Database auto-initializes on first use (JobStore/AssessmentStore create schema lazily); no init command exists
 
 # Export markdown report
 uv run python -m src.cli export --output data/assessments/report.md
@@ -149,21 +148,18 @@ Compare actual vs estimated. Use for future token prediction refinement.
 
 ## Database Access Pattern
 
-**Always use JobStore for queries (never raw SQL):**
+**Always use the store classes for queries (never raw SQL):**
 
 ```python
-from src.storage.db import JobStore
+from src.storage.assessment_store import AssessmentStore
 
-store = JobStore("data/ats_playground.db")
+store = AssessmentStore("data/ats_playground.db")
 
 # Query by keyword
-results = store.query_by_keyword("python", min_score=75)
+results = store.search_by_keyword("python", min_score=75)
 
 # Get assessment for job
-assessment = store.get_assessment(job_id)
-
-# Update job status
-store.update_job_status(job_id, "confirmed")
+assessment = store.get_assessment_by_id(job_id)
 ```
 
 ---
