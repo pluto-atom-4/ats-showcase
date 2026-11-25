@@ -58,7 +58,7 @@ python --version  # Should be 3.12+
 uv pip list
 
 # Run quick test
-uv run pytest tests/test_storage.py::test_database_initialization -v
+uv run pytest tests/storage/ -v
 
 # Check code quality tools
 black --version
