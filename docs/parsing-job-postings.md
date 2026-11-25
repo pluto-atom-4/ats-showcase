@@ -1,586 +1,367 @@
-# Parsing Job Postings: Listing Page to Individual Job Posts
+# Parsing Job Postings: Crawler and Selector Contract
 
-**Last Updated**: 2026-06-16
-**Scope**: End-to-end job posting extraction workflow using Playwright and CSS selectors
+**Last Updated**: 2026-11-25
+**Scope**: Listing-page crawl and optional detail-page fetch in `src/browser/crawler.py`, driven by `config/companies.json`
 
 ---
 
 ## Overview
 
-The ATS Showcase job parsing pipeline consists of two integrated components that work together to extract job postings from company career pages:
+`Crawler` loads each enabled company's career page in Chromium (Playwright), selects job containers with the CSS selectors in that company's `selectors` block, and returns `JobPosting` objects with `status="pending_review"`. If the company's `crawler` block sets `fetch_detail`, it also opens each job link and reads the description and requirements from the detail page.
 
-1. **Crawler** (`src/browser/crawler.py`) — Navigates listing pages and extracts structured job data
-2. **HTML Cleaner** (`src/parsers/html_cleaner.py`) — Converts raw HTML to clean, processable text
+The crawler does not clean HTML. For HTML-to-text conversion, see the `clean_html()` docstring in `src/parsers/html_to_markdown.py`.
 
-Configuration is provided via JSON files (e.g., `config_test/workdays.json`) that define selectors, platform types, and crawler behavior per company.
+Run it with:
+
+```bash
+uv run python -m src.cli crawl --config config/companies.json
+uv run python -m src.cli crawl --config-dir config
+```
 
 ---
 
 ## Component Architecture
 
-### 1. Crawler (`src/browser/crawler.py`)
-
-**Purpose**: Orchestrates Playwright browser automation to navigate career pages and extract job listings.
-
-**Key Classes & Methods**:
-
-#### `Crawler` Class
+### Crawler (`src/browser/crawler.py`)
 
 | Method | Purpose |
 |--------|---------|
-| `__init__(headless, timeout_ms)` | Initialize browser with headless mode and timeout settings |
-| `initialize()` | Launch Playwright Chromium browser and create context |
-| `close()` | Gracefully shutdown browser and cleanup resources |
-| `crawl_company()` | Main extraction logic for a single company |
-| `crawl_multiple()` | Parallel crawling for multiple companies |
-| `_extract_job_from_container()` | Extract job metadata from individual job card |
-| `_extract_text()` | Helper to extract text via CSS selector |
-| `_extract_link()` | Helper to extract href via CSS selector |
+| `__init__(headless=True, timeout_ms=30000)` | Store settings; no browser is started |
+| `initialize()` | Start Playwright, launch Chromium, create one browser context |
+| `close()` | Close context, browser, and Playwright |
+| `crawl_company(company_name, url, selectors, crawler_config=None)` | Crawl one listing page; returns `[]` if the page-level flow fails |
+| `crawl_multiple(companies)` | Crawl each company in turn; calls `initialize()` and `close()` itself |
+| `_extract_job_from_container(page, container, company_name, selectors, base_url, crawler_config)` | Build one `JobPosting` from a container; returns `None` if there is no title |
+| `_extract_text(element, selector)` | Stripped `text_content()` of the first match |
+| `_extract_link(element, selector)` | `href` attribute of the first match |
+| `_extract_html(element, selector)` | `inner_html()` of the first match; defined but not called by the crawl path |
+| `_fetch_job_detail(job_url, selectors)` | Open the detail page; returns `(description, requirements)` |
+| `_fetch_iframe_via_frame(page, inner_selector=None)` | Read iframe content through the Playwright frame API |
+| `_extract_from_frame_element(frame, frame_index, selector)` | Fallback chain for an element inside a frame |
+| `_extract_from_frame_body(frame, frame_index)` | Fallback chain for a frame's `<body>` |
 
-#### Configuration Parameters
+### Crawler Configuration (`crawler` block)
 
-The crawler accepts `crawler_config` dict with:
+The `crawl_multiple` method passes each company's `crawler` block (or `{}`) to `crawl_company`. The crawler reads exactly these four keys:
 
-| Parameter | Type | Default | Purpose |
-|-----------|------|---------|---------|
-| `wait_for_selector` | str | `selectors["job_container"]` | Selector to wait for before proceeding |
-| `delay_ms` | int | 2000 | Artificial delay (ms) after page load to allow async rendering |
+| Key | Default | Effect |
+|-----|---------|--------|
+| `wait_for_selector` | `selectors["job_container"]` | Waited for up to 10 s after page load. A timeout logs a warning and the crawl continues. |
+| `delay_ms` | `2000` | Fixed sleep after the wait, for client-side rendering |
+| `fetch_detail` | off | When truthy, each job with a link gets a detail-page fetch |
+| `max_jobs_debug` | no cap | Stops processing a company's containers after this many |
 
-#### Browser Initialization
+The 10 s wait timeout is hardcoded. Navigation always uses `wait_until="networkidle"`, which is not configurable.
+
+### Browser Lifecycle
 
 ```python
 self.playwright = await async_playwright().start()
-self.browser = await self.playwright.chromium.launch(headless=headless)
+self.browser = await self.playwright.chromium.launch(headless=self.headless)
 self.context = await self.browser.new_context()
 ```
 
-- **Headless mode**: Renders page without UI (faster, suitable for CI/CD)
-- **Context**: Isolated browser session; enables cookie/session management
-- **Default timeout**: 30 seconds for all page operations
+- **Headless**: taken from the constructor; the CLI passes `--headless` (default on).
+- **One context** is shared by all companies. Each listing page and each detail page is a separate `Page`.
+- **Timeout**: `page.set_default_timeout(timeout_ms)` is set on every page. The default is 30 000 ms, and the CLI `--timeout` option (default 30000) is passed through.
+- `crawl_company` calls `initialize()` only when the browser or context is missing. `crawl_multiple` always calls it.
+- The listing page is closed only on the success path. If navigation fails, the page stays open until `close()` closes the context.
 
 ---
 
-### Per-Company Selectors (removed `src/browser/selectors.py`)
+### Per-Company Selectors
 
-The `selectors.py` module and its `SelectorManager` class were removed. Per-company CSS selectors now come from the `selectors` object in each `config/companies.json` entry. `Crawler.crawl_multiple` passes it to `crawl_company` in `src/browser/crawler.py`. `job_container` is required; `title`, `location`, `link`, `description_selector`, `inner_description_selector` and `requirements_selector` are optional. Full rewrite of this document tracked in #1030.
+Selectors come from the `selectors` object of each company entry in `config/companies.json`.
 
----
+| Key | Required in code | Read by | Used for |
+|-----|------------------|---------|----------|
+| `job_container` | Yes | `selectors["job_container"]` | One match per job. A missing key raises `KeyError`, which `crawl_company` logs; the company returns `[]`. |
+| `title` | No | `.get()` | Job title. A container with no title is skipped. |
+| `location` | No | `.get()` | Job location. Defaults to `"Not specified"`. |
+| `link` | No | `.get()` | Job URL from `href`, made absolute with `urljoin` against the company `url`. `url` is `None` if absent. |
+| `description_selector` | No | `.get()`, detail fetch only | Detail-page description. A plain element gives its `inner_html()`. An `<iframe>` goes through the frame path. |
+| `inner_description_selector` | No | `.get()`, detail fetch only | Selector inside the iframe. Used only when `description_selector` matches an iframe. |
+| `requirements_selector` | No | `.get()`, detail fetch only | Detail-page requirements from `text_content()`. See the known issue under Error Handling. |
 
-### 2. HTML Cleaner (`src/parsers/html_cleaner.py`)
+The `description_selector`, `inner_description_selector`, and `requirements_selector` keys are read only when `fetch_detail` is truthy.
 
-**Purpose**: Convert raw HTML to clean, structured text for preprocessing.
+## Cleaning Raw HTML
 
-**Key Classes & Methods**:
+The crawler stores HTML as it finds it. `description` is the raw `inner_html()` of the detail element, or raw HTML from the iframe frame API. Nothing in `src/browser/crawler.py` converts it to text.
 
-#### `HTMLCleaner` Class
-
-| Method | Purpose |
-|--------|---------|
-| `__init__(prefer_markitdown)` | Initialize with preferred cleaning library |
-| `_check_markitdown()` | Verify MarkItDown availability |
-| `clean(html)` | Main entry point; converts HTML to text |
-| `_clean_with_markitdown(html)` | Primary cleaning using MarkItDown |
-| `_clean_with_beautifulsoup(html)` | Fallback cleaning using BeautifulSoup + lxml |
-| `_postprocess_text(text)` | Normalize whitespace and remove boilerplate |
-| `extract_text(html, selector)` | Extract text using optional CSS selector |
-| `remove_boilerplate(text)` | Remove legal/EEO/generic text |
-
-#### Cleaning Pipeline
-
-1. **HTML Parsing**
-   - Primary: MarkItDown (Microsoft-maintained, structure-preserving)
-   - Fallback: BeautifulSoup + lxml (removes script/style tags)
-
-2. **Text Extraction**
-   - Remove `<script>` and `<style>` tags
-   - Extract text content
-   - Preserve semantic structure (MarkItDown converts to Markdown)
-
-3. **Postprocessing** (normalize_text → remove_boilerplate)
-   ```
-   1. Strip leading/trailing whitespace per line
-   2. Split on double spaces and consolidate
-   3. Normalize newlines (3+ → 2)
-   4. Normalize spaces (2+ → 1)
-   5. Remove boilerplate patterns (regex-based)
-   6. Final strip
-   ```
-
-#### Boilerplate Patterns Removed
-
-```python
-BOILERPLATE_PATTERNS = [
-    r"equal\s+opportunity\s+employer",
-    r"EEO\s*statement",
-    r"we\s+are\s+an\s+equal\s+opportunity",
-    r"apply\s+now",
-    r"job\s+id\s*[:=]",
-    r"posted\s+on\s*:",
-    r"job\s+posted",
-    r"share\s+this\s+job",
-    r"job\s+details",
-]
-```
+- Conversion and boilerplate removal: `clean_html()` in `src/parsers/html_to_markdown.py`. Its docstring lists the pipeline.
+- `src/parsers/html_cleaner.py` is deprecated and is not imported by the crawler.
 
 ---
 
-## Data Flow: Listing Page to Job Details
-
-### Phase 1: Page Load & DOM Wait
+## Data Flow: Listing Page to Job Postings
 
 ```
-START
+crawl_company(company_name, url, selectors, crawler_config)
   ↓
-Crawler.crawl_company(url, selectors, config)
+new Page; set_default_timeout(timeout_ms)
   ↓
-context.new_page()
+goto(url, wait_until="networkidle")
   ↓
-page.goto(url, wait_until="networkidle")
-  ├─ Renders page
-  ├─ Loads all network requests
-  └─ Waits for async JS rendering
+wait_for_selector(wait_selector, timeout=10 s)     [timeout: warning, continue]
   ↓
-[wait_for_selector] (optional, default: job_container)
-  ├─ Default waits for job listing to load
-  └─ Timeout: 10 seconds
+wait_for_timeout(delay_ms)
   ↓
-page.wait_for_timeout(delay_ms)
-  └─ Additional wait (default: 2000ms) for SPA updates
+query_selector_all(selectors["job_container"])       → containers
+  ↓
+for each container (stop after max_jobs_debug, if set):
+  _extract_job_from_container(page, container, company_name, selectors, url, crawler_config)
+    ├─ title, location, link     (_extract_text / _extract_link)
+    ├─ no title → return None
+    ├─ link = urljoin(url, link) when link is set
+    ├─ fetch_detail and link → _fetch_job_detail(link, selectors)
+    │     → (description, requirements); ("", None) on any failure
+    ├─ id = generate_job_id(company, title, location or "Not specified", link)
+    └─ return JobPosting(status="pending_review", crawled_at=utcnow)
+  ↓
+page.close(); return jobs
 ```
 
-**Why Multi-Stage Waits?**
-- `wait_until="networkidle"` waits for page resources (CSS, JS)
-- `wait_for_selector` waits for specific DOM element
-- `delay_ms` allows SPA frameworks time to render job cards
-
-Example (Workday):
-```json
-{
-  "url": "https://boeing.wd1.myworkdayjobs.com/en-US/EXTERNAL_CAREERS",
-  "crawler": {
-    "wait_for_selector": "[data-automation-id=\"jobResults\"]",
-    "delay_ms": 2000
-  }
-}
-```
-
-### Phase 2: Listing Page Extraction
-
-```
-page.query_selector_all(selectors["job_container"])
-  ↓
-Returns: job_containers[] (array of DOM elements)
-  ↓
-FOR EACH job_container:
-  ├─ _extract_job_from_container(page, container)
-  │  ├─ container.query_selector(selectors["title"])
-  │  │  └─ Extract text → job.title
-  │  ├─ container.query_selector(selectors["location"])
-  │  │  └─ Extract text → job.location
-  │  └─ container.query_selector(selectors["link"])
-  │     └─ Extract href → job.url
-  │
-  └─ Create JobPosting object with:
-     ├─ title: "Senior Software Engineer"
-     ├─ company: "Boeing"
-     ├─ location: "Seattle, WA"
-     ├─ url: "https://boeing.wd1.myworkdayjobs.com/en-US/job/..."
-     ├─ description: "" (empty from listing)
-     ├─ requirements: None
-     ├─ status: "pending_review"
-     └─ crawled_date: datetime.utcnow()
-```
-
-**Key Points:**
-- Only `title`, `location`, `url` are extracted from listing page
-- `description` and `requirements` are left empty (populated later from job detail page)
-- `status` set to `pending_review` for manual verification before LLM assessment
-- Each job gets unique URL for individual page crawling (Phase 3)
-
-### Phase 3: Individual Job Detail Page Extraction
-
-The job URLs extracted in Phase 2 can be used to crawl individual job detail pages:
-
-```
-FOR EACH job IN jobs:
-  ├─ Navigate to job.url
-  ├─ Extract full description from detail page
-  ├─ Parse requirements/qualifications
-  ├─ Extract salary info (if available)
-  └─ Update JobPosting with full content
-```
-
-**Current Implementation Status**:
-- Phase 2 (listing extraction) ✅ Implemented
-- Phase 3 (detail page extraction) ⏳ Planned (URLs captured, content extraction not yet implemented)
+The crawl has no second pass. Detail pages are fetched inline, one job at a time, during the listing loop.
 
 ---
 
-## Real-World Example: Boeing Workday
+## Worked Example: TechCorp
 
-### Configuration (config_test/workdays.json)
+`config/companies.json` is tracked. Its `TechCorp` entry, unchanged (the URL is a placeholder domain):
 
 ```json
 {
-  "Boeing": {
-    "name": "Boeing",
-    "url": "https://boeing.wd1.myworkdayjobs.com/en-US/EXTERNAL_CAREERS",
-    "selectors": {
-      "job_container": "[data-automation-id=\"jobResults\"]",
-      "job_list": "[role=\"list\"]",
-      "job_card": "li",
-      "title": "div.css-qiqmbt",
-      "job_id": "div.css-248241",
-      "metadata": "div.css-b3pn3b",
-      "compound_all_jobs": "[data-automation-id=\"jobResults\"] [role=\"list\"] li",
-      "compound_job_titles": "[data-automation-id=\"jobResults\"] [role=\"list\"] li div.css-qiqmbt"
-    },
-    "metadata": {
-      "platform": "workday",
-      "total_jobs_found": 40,
-      "validation_rate": 100
+  "companies": {
+    "TechCorp": {
+      "enabled": true,
+      "name": "Tech Corp",
+      "url": "https://techcorp.example.com/careers",
+      "selectors": {
+        "job_container": ".job-posting",
+        "title": ".job-title",
+        "description_selector": ".job-description",
+        "location": ".job-location",
+        "requirements_selector": ".job-requirements",
+        "link": "a.job-link"
+      },
+      "crawler": {
+        "fetch_detail": false
+      }
     }
   }
 }
 ```
 
-### Execution Steps
+What a run does with this entry:
 
-1. **Page Load**
-   ```
-   goto("https://boeing.wd1.myworkdayjobs.com/en-US/EXTERNAL_CAREERS")
-   wait_for_selector("[data-automation-id=\"jobResults\"]")  // Job listings present
-   wait_for_timeout(2000)                                   // SPA rendering
-   ```
+1. `enabled: true` passes the CLI filter (`filter_enabled_companies`). The crawler never reads `enabled`.
+2. `wait_for_selector` and `delay_ms` are not set, so the crawler waits for `.job-posting` (up to 10 s) and then sleeps 2000 ms.
+3. For each `.job-posting`, `title`, `location`, and `link` are read. The link is made absolute against `https://techcorp.example.com/careers`.
+4. `fetch_detail` is `false`, so `description_selector` and `requirements_selector` are not used. Each `JobPosting` has `description=""` and `requirements=None`.
 
-2. **Locate Job Container**
-   ```
-   query_selector_all("[data-automation-id=\"jobResults\"]")
-   → Returns: 1 container with all jobs
-   ```
+To get descriptions and requirements, set `"fetch_detail": true`. The detail pages are then read through `description_selector` and `requirements_selector`.
 
-3. **Find Individual Job Cards**
-   ```
-   Within container, find all: [role="list"] li
-   → Returns: 40 <li> elements (each is a job card)
-   ```
-
-4. **Extract Each Job**
-   ```
-   For li[0]:
-     title = query_selector("div.css-qiqmbt").text_content()
-     location = derived from metadata if available
-     link = query_selector("a[href]").href
-
-   Result: JobPosting(
-     title="Senior Systems Engineer",
-     location="Seattle, WA",
-     url="https://boeing.wd1.myworkdayjobs.com/en-US/job/...",
-     ...
-   )
-   ```
-
-### Why Emotion CSS Classes?
-
-Workday (and similar platforms) use dynamically generated CSS classes:
-- **Primary class** `css-1q2dra3` — Applied to most job cards
-- **Secondary class** `css-h2nt8k` — Applied to alternate layouts
-- **Dynamic** — Classes regenerate on page refresh
-
-**Solution**: Use stable data attributes instead
-- ✅ Use: `[data-automation-id="jobResults"]` (stable ID)
-- ❌ Avoid: `.css-1q2dra3` (regenerates)
-
----
-
-## Selector Discovery & Validation
-
-### How to Find Selectors
-
-1. **Open Browser DevTools** (F12)
-2. **Inspect job card element** (right-click → Inspect)
-3. **Look for**:
-   - `data-*` attributes (stable, preferred)
-   - Unique class combinations (less stable)
-   - Avoid: Auto-generated classes like `.css-XXXXX`
-
-4. **Test in DevTools Console**:
-   ```javascript
-   // Find all job cards
-   document.querySelectorAll("[data-automation-id='jobResults'] [role='list'] li")
-
-   // Find all titles
-   document.querySelectorAll("[data-automation-id='jobResults'] [role='list'] li div.css-qiqmbt")
-
-   // Verify count matches expected
-   ```
-
-### Validation Metadata
-
-The config includes evaluation results:
+**Illustrative only (not in the tracked config).** A description inside an iframe uses `inner_description_selector`:
 
 ```json
-"metadata": {
-  "platform": "workday",
-  "total_jobs_found": 40,
-  "validation_rate": 100,
-  "valid_cards": 40,
-  "last_evaluated": "2026-06-15T17:42:18Z"
+"selectors": {
+  "job_container": "li.job",
+  "title": "h3",
+  "link": "a",
+  "description_selector": "iframe#job-frame",
+  "inner_description_selector": "div.job-body"
+},
+"crawler": {
+  "fetch_detail": true
 }
 ```
 
-- **validation_rate** — % of cards with required fields (title)
-- **last_evaluated** — When selectors were last tested
-- **Stale configs** — If evaluation date > 30 days, re-validate selectors
+---
+
+## Selector Discovery
+
+1. Open the career page in DevTools (F12).
+2. Pick selectors that match one element per job. Prefer `data-*` attributes and stable class names. Avoid generated class names.
+3. Check each selector in the console. The container count must equal the number of jobs on the page:
+
+```javascript
+document.querySelectorAll(".job-posting").length            // one per job
+document.querySelectorAll(".job-posting .job-title").length // should equal the line above
+document.querySelector(".job-posting a.job-link")?.getAttribute("href")
+```
+
+A title count below the container count means some jobs will be dropped, because a container with no title is skipped.
 
 ---
 
-## Error Handling & Recovery
+## Error Handling
 
 ### Crawler-Level
 
-| Scenario | Handling |
-|----------|----------|
-| **Selector not found** | Log warning, wait fails gracefully, continue with available jobs |
-| **Job extraction fails** | Log warning, skip job, continue with next |
-| **Page load timeout** | Return empty list after timeout |
-| **Container query returns 0** | Log info (may be empty careers page), return empty list |
+| Scenario | What the code does |
+|----------|--------------------|
+| `goto` fails or times out | Outer `except` logs an error; `crawl_company` returns `[]`. Other companies still run. |
+| `job_container` key missing | `KeyError` is caught by the same outer `except`; returns `[]`. |
+| `wait_for_selector` times out | Warning is logged; the crawl continues with the delay and query. |
+| Zero containers matched | `Found 0 job containers` is logged at info level; the loop does nothing; returns `[]`. |
+| Container has no title | Warning `No title found in container`; the job is dropped. |
+| Any other per-container exception | Warning `Failed to extract job i`; that job is skipped. |
+| Detail fetch fails | `_fetch_job_detail` returns `("", None)`; the job is kept with an empty description. |
+| Iframe content not found | Returns `""`, so the description is empty. |
+
+The selector wait (`crawler.py:86-91`):
 
 ```python
 try:
     await page.wait_for_selector(wait_selector, timeout=10000)
 except Exception as e:
     logger.warning(f"Selector {wait_selector} not found: {e}")
-    # Continue without waiting
 ```
 
-### Extraction-Level
+The per-container call (`crawler.py:104-112`):
 
 ```python
 try:
-    job = await self._extract_job_from_container(page, container, company_name, selectors)
+    job = await self._extract_job_from_container(
+        page, container, company_name, selectors, url, crawler_config
+    )
     if job:
         jobs.append(job)
 except Exception as e:
     logger.warning(f"Failed to extract job {i}: {e}")
-    # Skip this job, continue with next
 ```
 
-### HTML Cleaning-Level
+### Known Issue: `requirements` Type
 
-```python
-# Try MarkItDown first
-if self.prefer_markitdown and self.markitdown_available:
-    try:
-        return self._clean_with_markitdown(html)
-    except Exception:
-        # Fall back to BeautifulSoup
-        return self._clean_with_beautifulsoup(html)
-```
+When `fetch_detail` is on and `requirements_selector` matches, `_fetch_job_detail` returns a `str`. `JobPosting.requirements` is declared `Optional[List[str]]` (`src/models/job.py`). Pydantic rejects a `str` for that field. The `ValidationError` is caught in `_extract_job_from_container`, which returns `None`, so the job is dropped. This was confirmed offline with pydantic 2 against the same field type. It was not reproduced end-to-end.
 
 ---
 
-## Performance Considerations
+## Performance
 
-### Parallelization
-
-```python
-tasks = []
-for company_name, company_config in companies.items():
-    task = self.crawl_company(...)
-    tasks.append((company_name, task))
-
-# Execute concurrently
-for company_name, task in tasks:
-    results[company_name] = await task
-```
-
-**Async benefits**:
-- Multiple companies crawled in parallel
-- Single company: Job extraction is sequential (per-job processing in loop)
-- Overall throughput: ~5-10 companies concurrently (limited by browser resources)
-
-### Browser Resource Management
-
-```python
-# One page per job extraction loop iteration
-for i, container in enumerate(job_containers):
-    # Queries within same page (no new context)
-    job = await self._extract_job_from_container(page, container, ...)
-
-# Close after all jobs extracted
-await page.close()
-```
-
-- **Context reuse** — Single page object for all jobs on listing
-- **No redundant navigation** — Single page load per company
-- **Cleanup** — Pages explicitly closed to free resources
+- **Companies run sequentially.** `crawl_multiple` creates one coroutine per company and awaits them one at a time in a `for` loop. There is no `asyncio.gather`, `create_task`, or semaphore in the crawler, so there is no concurrency limit, and there is no concurrency at all.
+- **Jobs run sequentially within a company.** Each container is processed in turn.
+- **Fixed waits per listing page:** `networkidle` load, then the `wait_for_selector` wait (up to 10 s), then `delay_ms` (default 2000 ms).
+- **Fixed waits per detail page** (when `fetch_detail` is on): `networkidle` load, then 1000 ms. An iframe adds `networkidle` plus 500 ms.
+- **One extra `Page` per job** with `fetch_detail`. It is closed in a `finally` block.
+- **`max_jobs_debug`** caps the number of containers processed per company. Use it when testing.
 
 ---
 
 ## Data Model
 
-### JobPosting Object
+### JobPosting Fields Set by the Crawler
 
-Created by crawler at listing page extraction:
+The crawler constructs `JobPosting` (`src/models/job.py`) with these values:
 
-```python
-JobPosting(
-    id=None,                              # Auto-generated in DB
-    title="Senior Software Engineer",     # From listing page
-    company="Boeing",                      # Config
-    location="Seattle, WA",               # From listing page selector
-    url="https://...",                    # From listing page selector
-    description="",                       # Empty (filled from detail page later)
-    requirements=None,                    # Not extracted yet
-    salary_min=None,                      # Not extracted
-    salary_max=None,                      # Not extracted
-    posted_date=None,                     # Not extracted
-    status="pending_review",              # Default status
-    crawled_date=datetime.utcnow(),      # Extraction timestamp
-)
-```
+| Field | Value |
+|-------|-------|
+| `id` | `generate_job_id(company, title, location, url)`, computed before the object is built |
+| `title` | Stripped text of `title` selector |
+| `company` | Company name key from the config |
+| `location` | Stripped text of `location` selector, or `"Not specified"` |
+| `url` | Absolute URL from `link`, or `None` |
+| `description` | Detail-page raw HTML (or plain text from the iframe fallback), or `""` when detail fetch is off or fails |
+| `requirements` | Detail-page text, or `None` (see the known issue above) |
+| `salary_min`, `salary_max` | Always `None` |
+| `posted_date` | Always `None` |
+| `status` | `"pending_review"` |
+| `crawled_at` | `datetime.utcnow()` at extraction |
+
+
+### Job ID
+
+`generate_job_id` (`src/id_generation/hash_generator.py`) normalizes company, title, and location, and takes the URL as an anchor. It hashes the result with SHA-256 and returns `{portal}:{hash[:16]}`, where `portal` comes from the URL (or `custom`). The same posting gets the same ID across runs.
 
 ### Status Lifecycle
 
 ```
-pending_review  →  confirmed / rejected  →  (if confirmed) assessed
-                                        ↓
-                            Assessment results + match scores
+crawler writes:  pending_review  →  confirmed | rejected
 ```
+
+- The crawler writes `pending_review`. The `job_reviews` status column defaults to `'pending'` in `src/storage/schema.py`, but the crawler always sets `pending_review` explicitly.
+- `assessed` is not stored in a column. `AssessmentStore.get_assessment_status` derives it at read time: it returns `"assessed"` when a `job_assessments` row exists for the job.
 
 ---
 
 ## Future Enhancements
 
-### Phase 3: Detail Page Extraction (Planned)
+Not implemented. None of these keys or code paths exist in `src/browser/crawler.py`:
 
-Currently extracted URLs can be used to:
-
-1. **Navigate to each job detail page**
-   ```python
-   async def crawl_job_detail(url: str) -> Optional[str]:
-       page = await context.new_page()
-       await page.goto(url)
-       # Extract full description, requirements, salary
-       description = await page.query_selector(selector_description).text_content()
-       return description
-   ```
-
-2. **Extract full job description** (currently blank)
-   ```python
-   job.description = HTMLCleaner().clean(detail_html)
-   ```
-
-3. **Parse requirements** (currently None)
-   ```python
-   job.requirements = parse_requirements_from_description(job.description)
-   ```
-
-### Multi-Page Listing Support
-
-For sites with pagination:
-
-```python
-# In crawler config
-"pagination": {
-    "next_button_selector": "a.next-page",
-    "max_pages": 5
-}
-
-# Loop through pages
-while has_next_page:
-    page = await page.click(selector_next)
-    jobs.extend(await extract_jobs(page))
-```
-
-### Dynamic Site Support
-
-For JavaScript-heavy sites:
-
-```python
-# In crawler config
-"wait_strategies": {
-    "network_idle": true,           # Wait for network
-    "wait_for_selector": "[data-loaded]",
-    "wait_ms": 5000                 # Extra buffer
-}
-```
+- **Pagination.** No next-page selector or page limit is read. Only one listing page is loaded per company.
+- **Salary and posted date.** `salary_min`, `salary_max`, and `posted_date` are always `None`.
+- **Configurable wait strategies.** Only `wait_for_selector` and `delay_ms` are configurable. `networkidle` is hardcoded.
+- **Concurrent companies.** Companies run one after another (see Performance).
 
 ---
 
 ## Debugging Guide
 
-### Verify Selectors
+### Check Selectors Against the Live Page
 
-```bash
-# Open Chrome DevTools in target career page
-# Run in console:
-document.querySelectorAll('[data-automation-id="jobResults"]')
-document.querySelectorAll('[data-automation-id="jobResults"] [role="list"] li')
-
-# Should return NodeList with expected count
-```
+Use the console snippets in [Selector Discovery](#selector-discovery). If a count is wrong, the container or title selector is the usual cause.
 
 ### Enable Debug Logging
 
 ```python
 import logging
+
 logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger("src.browser.crawler")
-# Now you'll see detailed extraction logs
+logging.getLogger("src.browser.crawler").setLevel(logging.DEBUG)
 ```
 
-### Test Single Company
+The crawler logs `Found N job containers`, per-job extraction, and `fetch_detail` decisions at debug level.
+
+### Test One Company
+
+Illustrative. Replace the URL with a real career page, and do not run it against a site you have not been asked to test.
 
 ```python
-from src.browser.crawler import Crawler
 import asyncio
 
-async def test():
-    crawler = Crawler(headless=False)  # Visual mode for debugging
-    jobs = await crawler.crawl_company(
-        "Boeing",
-        "https://boeing.wd1.myworkdayjobs.com/en-US/EXTERNAL_CAREERS",
-        {
-            "job_container": "[data-automation-id='jobResults']",
-            "title": "div.css-qiqmbt",
-            "location": "span.location",
-            "link": "a[href]",
-        }
-    )
-    for job in jobs:
-        print(f"{job.title} @ {job.company}")
-    await crawler.close()
+from src.browser.crawler import Crawler
 
-asyncio.run(test())
+
+async def main() -> None:
+    crawler = Crawler(headless=False)
+    try:
+        jobs = await crawler.crawl_company(
+            "TechCorp",
+            "https://techcorp.example.com/careers",
+            {
+                "job_container": ".job-posting",
+                "title": ".job-title",
+                "location": ".job-location",
+                "link": "a.job-link",
+            },
+            {"max_jobs_debug": 3},
+        )
+        for job in jobs:
+            print(f"{job.title} @ {job.company}")
+    finally:
+        await crawler.close()
+
+
+asyncio.run(main())
 ```
 
-### Inspect Network Requests
-
-In Playwright:
-
-```python
-page.on("response", lambda response: print(f"{response.url}: {response.status}"))
-```
+`crawl_company` returns `[]` on page-level failure without raising, so an empty result can mean either no jobs or a failed load. Check the log.
 
 ---
 
 ## Summary
 
-The job parsing pipeline provides a modular, extensible system for extracting job postings:
+The crawler in `src/browser/crawler.py`:
 
-1. **Crawler** handles navigation, page loading, and job card extraction
-2. **HTML Cleaner** converts raw HTML to clean, processable text
-3. **Configuration files** (JSON) enable site-specific selector definition
+1. Loads each enabled company's listing page in headless Chromium.
+2. Extracts title, location, and link from each `job_container` match using the company's selectors.
+3. Optionally fetches each job's detail page for description and requirements (`fetch_detail`).
+4. Returns `JobPosting` objects with `status="pending_review"`.
 
-**Current Capabilities**:
-- ✅ Multi-site crawling (Workday, generic platforms)
-- ✅ Async/parallel execution
-- ✅ Graceful error handling
-- ✅ HTML cleaning with MarkItDown/BeautifulSoup
+HTML-to-text conversion is `clean_html()` in `src/parsers/html_to_markdown.py`.
 
-**Next Steps**:
-- 🚧 Detail page extraction (job descriptions, requirements, salary)
-- 🚧 Pagination support
-- 🚧 Multi-step job application flow crawling
+**Known gaps:**
+- Companies are crawled sequentially.
+- `requirements` from the detail page is a `str` but the model expects `List[str]`, so those jobs are dropped.
+- Pagination, salary extraction, and posted-date extraction are not implemented.
