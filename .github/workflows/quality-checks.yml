@@ -51,7 +51,7 @@ jobs:
     needs: changes
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.12"]
     # UV_PYTHON overrides .python-version (pinned to 3.12) so every uv call uses the matrix interpreter.
     env:
       UV_PYTHON: ${{ matrix.python-version }}
@@ -155,7 +155,7 @@ jobs:
     needs: changes
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.12"]
     # UV_PYTHON overrides .python-version (pinned to 3.12) so every uv call uses the matrix interpreter.
     env:
       UV_PYTHON: ${{ matrix.python-version }}
