@@ -281,43 +281,42 @@ async def test_crawl_and_clean():
 **Principle**: Test full workflow with real services (staging)
 
 ```python
-import pytest
-import tempfile
 import json
 from pathlib import Path
-from src.cli import app
+
 from typer.testing import CliRunner
 
-def test_full_workflow_e2e():
-    """Test crawl → preprocess → review → assess → export."""
+from src.cli import app
+
+def test_crawl_and_preprocess_e2e(tmp_path: Path) -> None:
+    """Test crawl → preprocess via the CLI; stops before any paid API call."""
+    # Hazard: runs a live crawl and writes data/ats_playground.db relative to the CWD; use a scratch CWD
+    config_path = tmp_path / "companies.json"
+    config_path.write_text(json.dumps({
+        "companies": {
+            "Acme": {
+                "enabled": True,
+                "name": "Acme",
+                "url": "https://acme.com/jobs",
+                "selectors": {
+                    "job_container": ".job-posting",
+                    "title": ".job-title",
+                    "location": ".job-location",
+                    "link": "a.job-link",
+                },
+                "crawler": {"fetch_detail": False},
+            }
+        }
+    }))
+    cv_path = tmp_path / "cv.json"
+    cv_path.write_text("{}")
+
     runner = CliRunner()
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Mock company config
-        config_path = Path(tmpdir) / "companies.json"
-        config_path.write_text(json.dumps({
-            "acme": {"url": "https://acme.com/jobs", "selector": "..."}
-        }))
-
-        # Crawl
-        result = runner.invoke(app, ["crawl", "--company", "acme", "--dry-run"])
-        assert result.exit_code == 0
-
-        # Preprocess
-        result = runner.invoke(app, ["preprocess", "--batch", "10"])
-        assert result.exit_code == 0
-
-        # Review (non-interactive, auto-approve all)
-        result = runner.invoke(app, ["review", "--auto-approve"])
-        assert result.exit_code == 0
-
-        # Assess (mock Claude responses)
-        result = runner.invoke(app, ["assess", "--mock"])
-        assert result.exit_code == 0
-
-        # Export
-        result = runner.invoke(app, ["export", "--output", f"{tmpdir}/out.md"])
-        assert result.exit_code == 0
-        assert Path(f"{tmpdir}/out.md").exists()
+    result = runner.invoke(app, [
+        "all", "--cv", str(cv_path), "--config", str(config_path),
+        "--no-tui", "--up-to", "preprocess",
+    ])
+    assert result.exit_code == 0
 ```
 
 ### Mocking & Fixtures
