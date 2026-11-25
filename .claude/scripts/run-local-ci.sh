@@ -1,6 +1,6 @@
 #!/bin/bash
 # Local CI: Run code quality checks on staged files
-# Usage: bash .claude/scripts/run-local-ci.sh [--tests] [--strict]
+# Usage: bash .claude/scripts/run-local-ci.sh [--tests] [--tests-workers=N|auto] [--strict]
 
 set -e
 # Fail a pipeline if any stage fails (otherwise `cmd | tee` reports tee's status; Issue #369)
@@ -13,10 +13,21 @@ cd "$PROJECT_ROOT"
 # Parse arguments
 RUN_TESTS=false
 STRICT_MODE=false
+TEST_WORKERS=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --tests)
+            RUN_TESTS=true
+            shift
+            ;;
+        --tests-workers=*)
+            TEST_WORKERS="${1#--tests-workers=}"
+            if ! [[ "$TEST_WORKERS" =~ ^([1-9][0-9]*|auto)$ ]]; then
+                echo "Invalid --tests-workers value: '$TEST_WORKERS' (use a positive integer or 'auto')"
+                echo "Usage: bash .claude/scripts/run-local-ci.sh [--tests] [--tests-workers=N|auto] [--strict]"
+                exit 1
+            fi
             RUN_TESTS=true
             shift
             ;;
@@ -26,7 +37,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: bash .claude/scripts/run-local-ci.sh [--tests] [--strict]"
+            echo "Usage: bash .claude/scripts/run-local-ci.sh [--tests] [--tests-workers=N|auto] [--strict]"
             exit 1
             ;;
     esac
@@ -122,10 +133,24 @@ echo
 if [ "$RUN_TESTS" = true ]; then
     echo "🧪 Step 4/$TOTAL_STEPS: Running tests..."
     export PYTHONPATH="${PROJECT_ROOT}/src:$PYTHONPATH"
-    if ! uv run pytest tests/ -v --tb=short > "$PYTEST_LOG" 2>&1; then
-        echo "❌ Tests failed"
-        cat "$PYTEST_LOG"
-        exit 1
+    if [ -z "$TEST_WORKERS" ]; then
+        if ! uv run pytest tests/ -v --tb=short > "$PYTEST_LOG" 2>&1; then
+            echo "❌ Tests failed"
+            cat "$PYTEST_LOG"
+            exit 1
+        fi
+    else
+        if ! uv run pytest tests/ -v --tb=short -m "not perf" -n "$TEST_WORKERS" > "$PYTEST_LOG" 2>&1; then
+            echo "❌ Tests failed (parallel phase)"
+            cat "$PYTEST_LOG"
+            exit 1
+        fi
+        # perf tests are timing-sensitive: run serially after the parallel phase
+        if ! uv run pytest tests/ -v --tb=short -m perf -n 0 >> "$PYTEST_LOG" 2>&1; then
+            echo "❌ Tests failed (perf phase)"
+            cat "$PYTEST_LOG"
+            exit 1
+        fi
     fi
     echo "✅ All tests passed"
     echo
@@ -141,4 +166,5 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo
 echo "💡 Tip: Use 'git commit' to commit staged changes"
 echo "   Use '--tests' to also run pytest: bash .claude/scripts/run-local-ci.sh --tests"
+echo "   Use '--tests-workers=auto' to run non-perf tests in parallel (perf stays serial)"
 echo "   Use '--strict' for strict mypy mode: bash .claude/scripts/run-local-ci.sh --strict"
