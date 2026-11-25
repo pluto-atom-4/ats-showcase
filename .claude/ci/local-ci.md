@@ -13,6 +13,9 @@ bash .claude/scripts/run-local-ci.sh
 # Run with tests included
 bash .claude/scripts/run-local-ci.sh --tests
 
+# Run tests in parallel (non-perf with xdist, then perf serially)
+bash .claude/scripts/run-local-ci.sh --tests-workers=auto
+
 # Run with strict mypy mode
 bash .claude/scripts/run-local-ci.sh --strict
 ```
@@ -35,6 +38,9 @@ bash .claude/scripts/run-local-ci.sh --strict
 - Only if `--tests` flag used
 - Runs pytest with coverage report
 - Required before merge
+- `--tests-workers=N|auto` implies `--tests`: runs `-m "not perf" -n N`, then `-m perf -n 0`
+- Default stays serial (`pytest tests/`). On low-core machines parallel plus a serial perf phase can be slower
+- Invalid N exits 1 before any check runs
 
 ### Optional: Strict Mode
 - Only if `--strict` flag used
