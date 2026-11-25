@@ -236,3 +236,132 @@ except Exception as e:
 
 When `fetch_detail` is on and `requirements_selector` matches, `_fetch_job_detail` returns a `str`. `JobPosting.requirements` is declared `Optional[List[str]]` (`src/models/job.py`). Pydantic rejects a `str` for that field. The `ValidationError` is caught in `_extract_job_from_container`, which returns `None`, so the job is dropped. This was confirmed offline with pydantic 2 against the same field type. It was not reproduced end-to-end.
 
+---
+
+## Performance
+
+- **Companies run sequentially.** `crawl_multiple` creates one coroutine per company and awaits them one at a time in a `for` loop. There is no `asyncio.gather`, `create_task`, or semaphore in the crawler, so there is no concurrency limit, and there is no concurrency at all.
+- **Jobs run sequentially within a company.** Each container is processed in turn.
+- **Fixed waits per listing page:** `networkidle` load, then the `wait_for_selector` wait (up to 10 s), then `delay_ms` (default 2000 ms).
+- **Fixed waits per detail page** (when `fetch_detail` is on): `networkidle` load, then 1000 ms. An iframe adds `networkidle` plus 500 ms.
+- **One extra `Page` per job** with `fetch_detail`. It is closed in a `finally` block.
+- **`max_jobs_debug`** caps the number of containers processed per company. Use it when testing.
+
+---
+
+## Data Model
+
+### JobPosting Fields Set by the Crawler
+
+The crawler constructs `JobPosting` (`src/models/job.py`) with these values:
+
+| Field | Value |
+|-------|-------|
+| `id` | `generate_job_id(company, title, location, url)`, computed before the object is built |
+| `title` | Stripped text of `title` selector |
+| `company` | Company name key from the config |
+| `location` | Stripped text of `location` selector, or `"Not specified"` |
+| `url` | Absolute URL from `link`, or `None` |
+| `description` | Detail-page raw HTML (or plain text from the iframe fallback), or `""` when detail fetch is off or fails |
+| `requirements` | Detail-page text, or `None` (see the known issue above) |
+| `salary_min`, `salary_max` | Always `None` |
+| `posted_date` | Always `None` |
+| `status` | `"pending_review"` |
+| `crawled_at` | `datetime.utcnow()` at extraction |
+
+
+### Job ID
+
+`generate_job_id` (`src/id_generation/hash_generator.py`) normalizes company, title, and location, and takes the URL as an anchor. It hashes the result with SHA-256 and returns `{portal}:{hash[:16]}`, where `portal` comes from the URL (or `custom`). The same posting gets the same ID across runs.
+
+### Status Lifecycle
+
+```
+crawler writes:  pending_review  →  confirmed | rejected
+```
+
+- The crawler writes `pending_review`. The `job_reviews` status column defaults to `'pending'` in `src/storage/schema.py`, but the crawler always sets `pending_review` explicitly.
+- `assessed` is not stored in a column. `AssessmentStore.get_assessment_status` derives it at read time: it returns `"assessed"` when a `job_assessments` row exists for the job.
+
+---
+
+## Future Enhancements
+
+Not implemented. None of these keys or code paths exist in `src/browser/crawler.py`:
+
+- **Pagination.** No next-page selector or page limit is read. Only one listing page is loaded per company.
+- **Salary and posted date.** `salary_min`, `salary_max`, and `posted_date` are always `None`.
+- **Configurable wait strategies.** Only `wait_for_selector` and `delay_ms` are configurable. `networkidle` is hardcoded.
+- **Concurrent companies.** Companies run one after another (see Performance).
+
+---
+
+## Debugging Guide
+
+### Check Selectors Against the Live Page
+
+Use the console snippets in [Selector Discovery](#selector-discovery). If a count is wrong, the container or title selector is the usual cause.
+
+### Enable Debug Logging
+
+```python
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger("src.browser.crawler").setLevel(logging.DEBUG)
+```
+
+The crawler logs `Found N job containers`, per-job extraction, and `fetch_detail` decisions at debug level.
+
+### Test One Company
+
+Illustrative. Replace the URL with a real career page, and do not run it against a site you have not been asked to test.
+
+```python
+import asyncio
+
+from src.browser.crawler import Crawler
+
+
+async def main() -> None:
+    crawler = Crawler(headless=False)
+    try:
+        jobs = await crawler.crawl_company(
+            "TechCorp",
+            "https://techcorp.example.com/careers",
+            {
+                "job_container": ".job-posting",
+                "title": ".job-title",
+                "location": ".job-location",
+                "link": "a.job-link",
+            },
+            {"max_jobs_debug": 3},
+        )
+        for job in jobs:
+            print(f"{job.title} @ {job.company}")
+    finally:
+        await crawler.close()
+
+
+asyncio.run(main())
+```
+
+`crawl_company` returns `[]` on page-level failure without raising, so an empty result can mean either no jobs or a failed load. Check the log.
+
+---
+
+## Summary
+
+The crawler in `src/browser/crawler.py`:
+
+1. Loads each enabled company's listing page in headless Chromium.
+2. Extracts title, location, and link from each `job_container` match using the company's selectors.
+3. Optionally fetches each job's detail page for description and requirements (`fetch_detail`).
+4. Returns `JobPosting` objects with `status="pending_review"`.
+
+HTML-to-text conversion is `clean_html()` in `src/parsers/html_to_markdown.py`.
+
+**Known gaps:**
+- Companies are crawled sequentially.
+- `requirements` from the detail page is a `str` but the model expects `List[str]`, so those jobs are dropped.
+- Pagination, salary extraction, and posted-date extraction are not implemented.
