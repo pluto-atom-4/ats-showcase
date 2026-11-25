@@ -76,28 +76,25 @@ tests/
 ### Naming Conventions
 
 **Modules**: `snake_case` (crawler.py, llm_client.py)
-**Classes**: `PascalCase` (JobCrawler, CLaudeClient, StorageClient)
-**Functions**: `snake_case` (extract_job_title, validate_selector)
+**Classes**: `PascalCase` (Crawler, LLMProvider, JobStore)
+**Functions**: `snake_case` (clean_html, count_tokens)
 **Constants**: `UPPER_SNAKE_CASE` (MAX_RETRIES, DEFAULT_TIMEOUT)
 **Private**: `_leading_underscore` (_internal_helper, _parse_html)
-**Dataclasses**: `PascalCase` (RawJob, PreprocessedJob, Assessment)
+**Models**: `PascalCase` pydantic classes in `src/models/` (JobPosting, PreprocessedJob, Assessment)
 **Type hints**: Always required (mypy; strict via `run-local-ci.sh --strict`)
 
 ```python
 # GOOD
-class JobCrawler:
+class Crawler:
     MAX_RETRIES = 5
     DEFAULT_TIMEOUT = 30
 
-    def __init__(self, config: CrawlerConfig) -> None:
-        self._browser_pool: list[Browser] = []
-
-    async def extract_jobs(self, url: str) -> list[RawJob]:
+    async def crawl_company(self, url: str) -> list[JobPosting]:
         pass
 
 # BAD
-class job_crawler:  # lowercase class
-    def extractJobs(self, url):  # camelCase method
+class crawler:  # lowercase class
+    def crawlCompany(self, url):  # camelCase method
         MAX_TIMEOUT = 30  # constant in method
         pass
 ```
