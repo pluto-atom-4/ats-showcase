@@ -1663,4 +1663,25 @@
     "tests/tui/test_terminal_accessibility.py",
     "Textual handles light/dark itself, so only CSS presence is asserted."
   ]
+,
+  [
+    "src/poc/scripts/eval_poc_accuracy.py",
+    "data/ is gitignored, so a real (third-party) labeled set placed here is never committed."
+  ],
+  [
+    "src/poc/scripts/eval_poc_accuracy.py",
+    "Break after sentence-final punctuation followed by whitespace (no lookbehind on abbreviations)."
+  ],
+  [
+    "src/poc/scripts/eval_poc_accuracy.py",
+    "Leading Markdown markers: headings, bullets, numbered items, blockquotes."
+  ],
+  [
+    "src/poc/scripts/eval_poc_accuracy.py",
+    "hits, expected, extracted"
+  ],
+  [
+    "src/poc/scripts/eval_poc_accuracy.py",
+    "Informational diff: exit status is 0 whether or not sentences changed (see PR for rationale)."
+  ]
 ]
