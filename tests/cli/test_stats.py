@@ -1,5 +1,6 @@
 """Tests for the stats CLI command (#985)."""
 
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -9,6 +10,13 @@ from src.storage.assessment_store import AssessmentStore
 
 runner = CliRunner()
 HELP_ENV = {"COLUMNS": "200"}
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape sequences from text."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
+
+
 EMPTY_LINES = [
     "📈 Statistics:",
     "   Total assessments: 0",
@@ -55,9 +63,10 @@ class TestStatsCommand:
     def test_stats_help(self) -> None:
         result = runner.invoke(app, ["stats", "--help"], env=HELP_ENV)
         assert result.exit_code == 0
-        assert "--db" in result.stdout
-        assert "--show-token-usage" in result.stdout
-        assert "--no-show-token-usage" in result.stdout
+        clean_output = strip_ansi(result.stdout)
+        assert "--db" in clean_output
+        assert "--show-token-usage" in clean_output
+        assert "--no-show-token-usage" in clean_output
 
     def test_stats_empty_db(self, tmp_path: Path) -> None:
         db = tmp_path / "empty.db"
