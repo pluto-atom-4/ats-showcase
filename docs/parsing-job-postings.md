@@ -85,3 +85,42 @@ Selectors come from the `selectors` object of each company entry in `config/comp
 
 The `description_selector`, `inner_description_selector`, and `requirements_selector` keys are read only when `fetch_detail` is truthy.
 
+## Cleaning Raw HTML
+
+The crawler stores HTML as it finds it. `description` is the raw `inner_html()` of the detail element, or raw HTML from the iframe frame API. Nothing in `src/browser/crawler.py` converts it to text.
+
+- Conversion and boilerplate removal: `clean_html()` in `src/parsers/html_to_markdown.py`. Its docstring lists the pipeline.
+- `src/parsers/html_cleaner.py` is deprecated and is not imported by the crawler.
+
+---
+
+## Data Flow: Listing Page to Job Postings
+
+```
+crawl_company(company_name, url, selectors, crawler_config)
+  ↓
+new Page; set_default_timeout(timeout_ms)
+  ↓
+goto(url, wait_until="networkidle")
+  ↓
+wait_for_selector(wait_selector, timeout=10 s)     [timeout: warning, continue]
+  ↓
+wait_for_timeout(delay_ms)
+  ↓
+query_selector_all(selectors["job_container"])       → containers
+  ↓
+for each container (stop after max_jobs_debug, if set):
+  _extract_job_from_container(page, container, company_name, selectors, url, crawler_config)
+    ├─ title, location, link     (_extract_text / _extract_link)
+    ├─ no title → return None
+    ├─ link = urljoin(url, link) when link is set
+    ├─ fetch_detail and link → _fetch_job_detail(link, selectors)
+    │     → (description, requirements); ("", None) on any failure
+    ├─ id = generate_job_id(company, title, location or "Not specified", link)
+    └─ return JobPosting(status="pending_review", crawled_at=utcnow)
+  ↓
+page.close(); return jobs
+```
+
+The crawl has no second pass. Detail pages are fetched inline, one job at a time, during the listing loop.
+
