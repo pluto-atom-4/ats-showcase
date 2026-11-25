@@ -571,9 +571,8 @@ page.on("response", lambda response: print(f"{response.url}: {response.status}")
 The job parsing pipeline provides a modular, extensible system for extracting job postings:
 
 1. **Crawler** handles navigation, page loading, and job card extraction
-2. **Selector Manager** centralizes multi-site configuration and validation
-3. **HTML Cleaner** converts raw HTML to clean, processable text
-4. **Configuration files** (JSON) enable site-specific selector definition
+2. **HTML Cleaner** converts raw HTML to clean, processable text
+3. **Configuration files** (JSON) enable site-specific selector definition
 
 **Current Capabilities**:
 - ✅ Multi-site crawling (Workday, generic platforms)
