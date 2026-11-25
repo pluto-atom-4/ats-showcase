@@ -496,7 +496,7 @@ Pre-commit also runs in GitHub Actions for PR validation. The same `.pre-commit-
 
 **CI/CD Workflow** (`.github/workflows/quality-checks.yml`):
 - Runs on: `push` to main/develop, all PRs
-- Python versions: 3.11, 3.12
+- Python version: 3.12
 - Fails PR if any hook fails
 - Results shown in PR checks
 
