@@ -52,7 +52,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import spacy
 
-import src.poc.sentence_splitter  # noqa: F401  (registers poc_sentence_splitter factory + doc extension)
+import src.preprocessing.sentence_splitter  # noqa: F401  (registers poc_sentence_splitter factory + doc extension)
 from src.poc.tweak.extraction_status import (
     FALLBACK_MIN_SECTION_CONFIDENCE,
     MIN_DESCRIPTION_CHARS,
