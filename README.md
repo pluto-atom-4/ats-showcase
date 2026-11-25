@@ -389,7 +389,7 @@ uv run pytest tests/ -v --cov=src --cov-report=term-missing
 
 # Run specific test suite
 uv run pytest tests/test_llm.py -v
-uv run pytest tests/test_storage.py::test_query_results -v
+uv run pytest tests/storage/ -v
 
 # Run with detailed output
 uv run pytest tests/ -vv -s
