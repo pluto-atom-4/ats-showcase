@@ -453,7 +453,7 @@ def db_retry(cursor, query, args, max_retries=3):
 - Solution: Backup & recreate
 ```bash
 mv data/ats_playground.db data/ats_playground.db.bak
-uv run python src/storage/db.py --init
+# Database schema is created automatically on first run; no separate init command exists.
 ```
 
 ### 10. **Multi-Version Python Issues**

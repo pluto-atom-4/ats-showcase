@@ -165,7 +165,8 @@ See CLAUDE.md and `.claude/rules/` for enforcement mechanisms.
 ```bash
 uv sync && uv run python -m spacy download en_core_web_md
 uv run playwright install chromium
-cp .env.example .env && uv run python src/storage/db.py --init
+cp .env.example .env
+# Database schema is created automatically on first run; no separate init command exists.
 ```
 
 ---
