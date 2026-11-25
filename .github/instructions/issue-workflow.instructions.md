@@ -545,7 +545,7 @@ gh pr checks   # Show CI status
 
 **Monitor for:**
 - ✅ Code Quality Checks (black, ruff, mypy, pytest)
-- ✅ Tests passing on Python 3.11 and 3.12
+- ✅ Tests passing on Python 3.12
 - ✅ All quality gates passing
 
 ### Step 5.3: Address Feedback
@@ -825,7 +825,7 @@ uv run pytest tests/ -xvs   # Verbose, stop on first failure
 ```bash
 # Check Python version difference
 python --version              # Local
-# GitHub Actions uses 3.11 and 3.12
+# GitHub Actions uses 3.12
 # Try with different version or check CI logs
 gh pr checks    # View detailed logs
 ```
