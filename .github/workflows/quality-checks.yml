@@ -37,9 +37,10 @@ jobs:
             if [ -n "$changed" ]; then
               core=false
               poc=false
-              # Case order matters: .github/* must match before *.md, and specific files before tests/* and docs.
+              # Case order matters: .github/instructions/*.md precedes .github/* (which precedes *.md); specific files precede tests/* and docs.
               while IFS= read -r path; do
                 case "$path" in
+                  .github/instructions/*.md) ;;
                   .github/*|.claude/scripts/*|pyproject.toml|uv.lock|.pre-commit-config.yaml|tests/conftest.py|conftest.py|tests/__init__.py|.python-version|scripts/*)
                     core=true; poc=true ;;
                   tests/poc/fixtures/raw_job_description.md)
@@ -54,7 +55,7 @@ jobs:
                     poc=true ;;
                   tests/*)
                     core=true ;;
-                  *.md|docs/*|LICENSE*|.claude/*) ;;
+                  *.md|docs/*|LICENSE*|.claude/*|.secrets.baseline) ;;
                   *)
                     core=true ;;
                 esac
