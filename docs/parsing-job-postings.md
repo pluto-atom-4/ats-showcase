@@ -7,11 +7,10 @@
 
 ## Overview
 
-The ATS Showcase job parsing pipeline consists of three integrated components that work together to extract job postings from company career pages:
+The ATS Showcase job parsing pipeline consists of two integrated components that work together to extract job postings from company career pages:
 
 1. **Crawler** (`src/browser/crawler.py`) — Navigates listing pages and extracts structured job data
-2. **Selector Manager** (`src/browser/selectors.py`) — Manages CSS selectors for multi-site support
-3. **HTML Cleaner** (`src/parsers/html_cleaner.py`) — Converts raw HTML to clean, processable text
+2. **HTML Cleaner** (`src/parsers/html_cleaner.py`) — Converts raw HTML to clean, processable text
 
 Configuration is provided via JSON files (e.g., `config_test/workdays.json`) that define selectors, platform types, and crawler behavior per company.
 
@@ -61,57 +60,13 @@ self.context = await self.browser.new_context()
 
 ---
 
-### 2. Selector Manager (`src/browser/selectors.py`)
+### Per-Company Selectors (removed `src/browser/selectors.py`)
 
-**Purpose**: Centralize and validate CSS selector configuration for multi-site crawling.
-
-**Key Classes & Methods**:
-
-#### `SelectorManager` Class
-
-| Method | Purpose |
-|--------|---------|
-| `__init__(selectors_file)` | Load selectors from JSON file |
-| `load_selectors(filepath)` | Parse and store selector definitions |
-| `get_selectors(company)` | Retrieve selector dict for company |
-| `add_company(company, selectors)` | Add/update selectors for company |
-| `validate_selectors(selectors)` | Verify required fields present |
-
-#### Selector Requirements
-
-```python
-required_fields = ["job_container", "title", "description"]
-```
-
-Each company config must include these CSS selectors:
-
-| Selector | Purpose | Example |
-|----------|---------|---------|
-| `job_container` | Root element containing all jobs (listing page) | `[data-automation-id="jobResults"]` |
-| `job_list` | Container for individual job cards | `[role="list"]` |
-| `job_card` | Individual job listing element | `li` |
-| `title` | Job title text within card | `div.css-qiqmbt` |
-| `location` | Job location (optional) | `span.location` |
-| `link` | Job detail page URL | `a[href]` |
-| `description` | Job description preview (optional) | `div.description` |
-
-#### Compound Selectors
-
-For complex DOM traversal, compound selectors allow nested queries:
-
-```json
-"compound_all_jobs": "[data-automation-id=\"jobResults\"] [role=\"list\"] li",
-"compound_job_titles": "[data-automation-id=\"jobResults\"] [role=\"list\"] li div.css-qiqmbt"
-```
-
-These are useful for:
-- Validating nesting hierarchy
-- Direct selection without intermediate steps
-- Debugging selector chains
+The `selectors.py` module and its `SelectorManager` class were removed. Per-company CSS selectors now come from the `selectors` object in each `config/companies.json` entry. `Crawler.crawl_multiple` passes it to `crawl_company` in `src/browser/crawler.py`. `job_container` is required; `title`, `location`, `link`, `description_selector`, `inner_description_selector` and `requirements_selector` are optional. Full rewrite of this document tracked in #1030.
 
 ---
 
-### 3. HTML Cleaner (`src/parsers/html_cleaner.py`)
+### 2. HTML Cleaner (`src/parsers/html_cleaner.py`)
 
 **Purpose**: Convert raw HTML to clean, structured text for preprocessing.
 
