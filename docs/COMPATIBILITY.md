@@ -5,7 +5,7 @@
 ### 1. **spaCy & Python Version**
 
 #### ✅ Fully Supported
-- **spaCy 3.8+** supports Python 3.11, 3.12, 3.13, 3.14
+- **spaCy 3.8+** supports Python 3.12, 3.13, 3.14
 - spaCy v3.8.12+ migrated to Pydantic v2 (full compatibility)
 - Recommended: Python 3.13 for best performance
 
@@ -27,7 +27,7 @@
 
 #### ✅ Supported Versions
 - MarkItDown 0.1.5+ (stable, Microsoft-maintained)
-- Works with all Python 3.11+ versions
+- Works with all Python 3.12+ versions
 - Optional dependencies: `pip install "markitdown[all]"` for full format support
 
 #### ⚠️ Installation Notes
@@ -121,7 +121,7 @@ uv pip install lxml
 #### ✅ Supported Versions
 - Playwright 1.40+ (stable)
 - Playwright 1.48+ (recommended, latest)
-- Python 3.11+
+- Python 3.12+
 
 #### ❌ Common Issues
 
@@ -174,7 +174,7 @@ pip install 'pydantic>=2.5'
 
 #### ✅ Supported
 - anthropic 0.25.0+
-- Works with Python 3.11+
+- Works with Python 3.12+
 
 #### ❌ Known Issues
 
@@ -214,7 +214,7 @@ def call_claude(client, messages):
 #### ⚠️ Safe Download Flow
 
 **Pre-download checklist**:
-- [ ] Python 3.11+ installed (check: `python --version`)
+- [ ] Python 3.12+ installed (check: `python --version`)
 - [ ] Virtual environment active (check: `echo $VIRTUAL_ENV`)
 - [ ] 200+ MB disk space available (check: `df -h /`)
 - [ ] Network connectivity to PyPI (check: `curl -I https://files.pythonhosted.org`)
@@ -460,7 +460,7 @@ uv run python src/storage/db.py --init
 
 #### Common Setup Mistakes
 - `python` points to Python 2.7 (old systems)
-- `python3` points to 3.9, but project needs 3.11+
+- `python3` points to 3.9, but project needs 3.12+
 - Multiple Python versions installed, UV uses wrong one
 
 #### ✅ Solution
@@ -479,7 +479,7 @@ python --version  # Should be 3.13+
 
 | Dependency | Min | Max | Notes |
 |------------|-----|-----|-------|
-| Python | 3.11 | 3.14 | 3.13 recommended |
+| Python | 3.12 | 3.14 | 3.13 recommended |
 | spaCy | 3.8.0 | <4.0 | 3.8.12+ for Pydantic v2 |
 | MarkItDown | 0.1.5 | <1.0 | Optional, primary HTML cleaner |
 | BeautifulSoup4 | 4.12.0 | <5.0 | Fallback if MarkItDown unavailable |
@@ -642,7 +642,7 @@ RUN apt-get install -y libxml2-dev libxslt-dev python3-dev
 
 ## Version Upgrade Paths
 
-### Upgrading Python 3.11 → 3.13
+### Upgrading Python 3.12 → 3.13
 ```bash
 uv python pin 3.13
 uv sync  # Will recreate environment
@@ -815,10 +815,10 @@ rm -rf ~/.cache/ms-playwright && uv run playwright install chromium
 
 ### 5. **anthropic SDK & TLS/SSL Compatibility (MINOR ⚠️)**
 
-| Version | Python 3.11 | Python 3.12 | Python 3.13 | TLS Support | Status |
-|---------|------------|------------|------------|-------------|--------|
-| **0.25.0+** | ✅ | ✅ | ✅ | TLS 1.2+ | ✅ Stable |
-| **< 0.25.0** | ✅ | ⚠️ | ❌ | TLS 1.2+ | ⚠️ Legacy |
+| Version | Python 3.12 | Python 3.13 | TLS Support | Status |
+|---------|------------|------------|-------------|--------|
+| **0.25.0+** | ✅ | ✅ | TLS 1.2+ | ✅ Stable |
+| **< 0.25.0** | ⚠️ | ❌ | TLS 1.2+ | ⚠️ Legacy |
 
 **Details**: anthropic SDK v0.25.0+ has improved TLS/SSL handling for Python 3.12+. Older versions may have connectivity issues on systems with outdated TLS libraries.
 
