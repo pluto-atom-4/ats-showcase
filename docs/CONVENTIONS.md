@@ -224,20 +224,19 @@ class TestTokenCounter:
     def test_count_tokens_basic(self):
         counter = TokenCounter()
         text = "Hello world"
-        count = counter.count(text)
+        count = counter.count_tokens(text)
         assert count > 0
         assert isinstance(count, int)
 
     def test_count_tokens_empty(self):
         counter = TokenCounter()
-        count = counter.count("")
+        count = counter.count_tokens("")
         assert count == 0
 
-    @patch("tiktoken.encoding_for_model")
-    def test_uses_correct_model(self, mock_encoding):
-        counter = TokenCounter(model="gpt-4")
-        counter.count("test")
-        mock_encoding.assert_called_with("gpt-4")
+    @patch("tiktoken.get_encoding")
+    def test_loads_cl100k_base_encoding(self, mock_get_encoding):
+        TokenCounter()
+        mock_get_encoding.assert_called_with("cl100k_base")
 ```
 
 ### Integration Testing
