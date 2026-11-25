@@ -13,7 +13,7 @@ Ground truth labeling rules:
 - Skill labels are surface spans exactly as written in the text, including any determiner inside the span (matcher outputs surface form, not lemma). Labels are the full phrase an ideal extractor would take.
 - Technology labels are the terms a perfect extractor should return, including terms outside `TECH_TERMS`.
 
-Run both extractors over the JSON. Both extractors return sorted lists of lowercased strings. The harness is `scripts/eval_poc_accuracy.py`, which runs the same logic as the snippet below.
+Run both extractors over the JSON. Both extractors return sorted lists of lowercased strings. The harness is `src/poc/scripts/eval_poc_accuracy.py`, which runs the same logic as the snippet below.
 
 ```python
 import json
@@ -270,7 +270,7 @@ Pre-#515 benchmark: no before-timing for `136ee36` was run for this update, so t
 - **Date:** 2026-10-13.
 - **Commit context:** current run on HEAD `d0938ae` (main; worktree branch `docs/issue-517-negation-reports`, docs-only change on top of `d0938ae`; no `src/`, `tests/`, or `scripts/` changes). Previous run on `201d156` (2026-10-12, recorded above). Pre-fix run on `2d93802` (#477 re-run, recorded above).
 - **Environment:** `/home/pluto-atom-4/Documents/full-stack/ats-playground/.venv/bin/python` (Python 3.12.12), spaCy 3.8.14, `en_core_web_md` 3.8.0. The worktree's own venv was not used because it lacks the model.
-- **Accuracy command:** `scripts/eval_poc_accuracy.py` from the worktree root, 3 runs. Output identical across runs (same MD5 for all three captured outputs).
+- **Accuracy command:** `src/poc/scripts/eval_poc_accuracy.py` from the worktree root, 3 runs. Output identical across runs (same MD5 for all three captured outputs).
 - **Benchmark command:** `scripts/benchmark_poc_extraction.py --table` (default `--repeats 5`), 3 runs (ranges above).
 - **Baseline comparison:** `136ee36` source extracted with `git archive` to a temporary directory; the 12-snippet tech comparison and the #516 example probes were run against it and against the worktree `src/`. Probe scripts were kept outside the repository and are not committed.
 - **Probes (not in the harness):** POS tags for `Research`, `ship`, `Mentor`, `Design`, and the extractor outputs for the sentences quoted in Remaining gaps, run with the same interpreter. Results are cited inline as [run].
