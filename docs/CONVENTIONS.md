@@ -5,7 +5,6 @@
 - [Testing Strategy](#testing-strategy)
 - [Git & Commit Workflow](#git--commit-workflow)
 - [Documentation Standards](#documentation-standards)
-- [Deployment Checklist](#deployment-checklist)
 - [Troubleshooting & Common Errors](#troubleshooting--common-errors)
 
 ---
@@ -74,6 +73,8 @@ tests/
 ```
 
 ### Naming Conventions
+
+Names in this section are illustrative, not the real API.
 
 **Modules**: `snake_case` (crawler.py, llm_client.py)
 **Classes**: `PascalCase` (Crawler, LLMProvider, JobStore)
@@ -424,7 +425,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```bash
 # Good commits
-git commit -m "feat(cli): add --mock flag to assess command"
+git commit -m "feat(cli): add --mock flag to crawl command"
 git commit -m "fix(llm): handle 429 rate limit with exponential backoff
 
 The assess command would crash on rate limit errors.
@@ -569,71 +570,6 @@ When code changes:
 
 ---
 
-## Deployment Checklist
-
-### Pre-Deployment
-
-- [ ] All tests pass: `pytest tests/ -v --cov=src`
-- [ ] Linting passes: `ruff check src/ tests/`
-- [ ] Type check passes: `mypy src/ tests/`
-- [ ] No secrets in commits: `git log --oneline | grep -i "key\|secret\|password"`
-- [ ] All PRs merged to main
-- [ ] Bump version in `src/__init__.py` (semantic versioning)
-
-### Staging Deployment
-
-```bash
-# Build Docker image
-docker build -t ats-showcase:staging .
-
-# Test in container
-docker run --env-file .env.staging ats-showcase:staging \
-  python -m pytest tests/ -v
-
-# Push to registry
-docker tag aats-showcasestaging myregistry/ats-showcase:staging
-docker push myregistry/ats-showcase:staging
-```
-
-### Production Deployment
-
-```bash
-# Tag release
-git tag v1.2.0
-git push origin v1.2.0
-
-# GitHub Action auto-triggers:
-# 1. Build Docker image
-# 2. Push to registry: myregistry/ats-showcase:v1.2.0
-# 3. Deploy to production (if configured)
-# 4. Run smoke tests
-
-# Monitor
-docker logs -f ats-showcase-prod
-# Check: logs/app.log for errors
-# Check: Database health (query count, response time)
-# Check: Cost tracking (compare actual vs estimate)
-```
-
-### Post-Deployment
-
-- [ ] Verify health check endpoint: `curl http://localhost:8000/health`
-- [ ] Test core workflows: `crawl` → `assess` → `export`
-- [ ] Check logs for errors: `tail -f logs/app.log`
-- [ ] Monitor cost tracking: Compare actual vs estimated cost
-- [ ] Set up alerts for: Rate limit errors, database size, API latency
-
-### Rollback
-
-```bash
-# If deployment fails:
-git revert <commit_hash>
-git push origin main
-# GitHub Action re-deploys previous version
-```
-
----
-
 ## Troubleshooting & Common Errors
 
 ### Playwright Browser Issues
@@ -734,8 +670,4 @@ mypy src/ tests/
 git checkout -b feature/my-feature
 git commit -m "feat(cli): add new command"
 git push origin feature/my-feature
-
-# Docker
-docker build -t ats-showcase .
-docker run -e CLAUDE_API_KEY="sk-..." ats-showcase
 ```
