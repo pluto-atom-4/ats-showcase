@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-# Ensure src module is importable when run as a script (matches scripts/parity_check.py)
+# Script sits 3 levels below the project root; put it on sys.path so `src` imports resolve
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
