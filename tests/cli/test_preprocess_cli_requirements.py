@@ -17,6 +17,8 @@ from typer.testing import CliRunner
 from src.cli import app
 
 runner = CliRunner()
+# Rich wraps help text at COLUMNS; pin wide so phrase assertions do not split across lines.
+HELP_ENV = {"COLUMNS": "200"}
 
 
 def strip_ansi(text: str) -> str:
@@ -170,7 +172,7 @@ class TestPreprocessCLIRequirementExtraction:
 
     def test_preprocess_help_includes_requirement_flags(self):
         """Test that help text includes requirement extraction flags."""
-        result = runner.invoke(app, ["preprocess", "--help"])
+        result = runner.invoke(app, ["preprocess", "--help"], env=HELP_ENV)
 
         assert result.exit_code == 0
         help_output_clean = strip_ansi(result.stdout)
@@ -182,7 +184,7 @@ class TestPreprocessCLIRequirementExtraction:
 
     def test_default_extract_requirements_enabled(self):
         """Test that requirement extraction is enabled by default."""
-        result = runner.invoke(app, ["preprocess", "--help"])
+        result = runner.invoke(app, ["preprocess", "--help"], env=HELP_ENV)
 
         assert result.exit_code == 0
         help_output_clean = strip_ansi(result.stdout)
