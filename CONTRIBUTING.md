@@ -18,7 +18,7 @@ We appreciate your interest in contributing to the ATS Showcase project! This gu
 
 ### Prerequisites
 
-- Python 3.11 or later
+- Python 3.12 or later
 - Git and GitHub CLI (`gh`)
 - `uv` package manager (recommended) or pip/venv
 
@@ -53,7 +53,7 @@ uv run pytest tests/ -v
 
 ```bash
 # Check Python version
-python --version  # Should be 3.11+
+python --version  # Should be 3.12+
 
 # Verify dependencies
 uv pip list
@@ -99,7 +99,7 @@ ATS Showcase provides a GitHub Copilot CLI plugin with 3 reusable skills for aut
 ### Prerequisites
 
 - GitHub Copilot CLI (v1.0.51+) — Download from [GitHub Copilot CLI releases](https://github.com/github/copilot-cli/releases)
-- Python 3.11+ with ATS Showcase installed (see [Getting Started](#setup-development-environment))
+- Python 3.12+ with ATS Showcase installed (see [Getting Started](#setup-development-environment))
 - GitHub authentication: `gh auth status`
 
 ### Install the Plugin
@@ -147,7 +147,7 @@ Configure and validate spaCy models used for preprocessing.
 ```bash
 > /ats-nlp-setup --validate
 ✅ spaCy model 'en_core_web_md' is installed
-  Path: /usr/local/lib/python3.11/site-packages/en_core_web_md
+  Path: /usr/local/lib/python3.12/site-packages/en_core_web_md
   Components: tokenizer, tagger, parser, lemmatizer
 ```
 

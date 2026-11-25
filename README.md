@@ -164,7 +164,6 @@ python -m src.setup.validate_nlp_setup
 **Python Version Strategy**:
 - **Recommended**: Python 3.12.x (production-ready, EOL 2028-10)
 - **Alternative**: Python 3.13+ (security-only, newer features)
-- **Not Recommended**: Python 3.11 (legacy, slower)
 
 **If validation fails**: See [docs/SETUP.md](./docs/SETUP.md) for platform-specific system dependency installation (Ubuntu/Debian, macOS, Windows) and [docs/COMPATIBILITY.md](./docs/COMPATIBILITY.md) for known issues and workarounds.
 
@@ -236,7 +235,7 @@ The preprocessing phase uses consolidated `clean_html()` function with 70+ pre-c
 
 ## 📋 Requirements
 
-- **Python**: 3.11+ (3.13 recommended)
+- **Python**: 3.12+ (3.13 recommended)
 - **Package manager**: `uv` ([install](https://docs.astral.sh/uv/getting-started/installation/))
 - **Browser**: Chromium or Chrome (Playwright handles download)
 - **API key**: Anthropic Claude API key ([get one](https://console.anthropic.com))
