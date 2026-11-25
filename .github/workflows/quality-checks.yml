@@ -89,7 +89,10 @@ jobs:
       - name: Run docs-only pre-commit hooks
         if: needs.changes.outputs.code == 'false'
         # Pinned to the uv.lock pre-commit version so hook behaviour matches the full run.
-        run: uvx pre-commit@4.7.0 run trailing-whitespace end-of-file-fixer detect-secrets --all-files
+        run: |
+          for h in trailing-whitespace end-of-file-fixer detect-secrets; do
+            uvx pre-commit@4.7.0 run "$h" --all-files || exit 1
+          done
 
       - name: Scoped commented-out-code check (ERA001)
         if: github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
