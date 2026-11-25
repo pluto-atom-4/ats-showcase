@@ -7,9 +7,13 @@
       "selectors": {
         "job_container": ".job-posting",
         "title": ".job-title",
-        "description": ".job-description",
+        "description_selector": ".job-description",
         "location": ".job-location",
-        "requirements": ".job-requirements"
+        "requirements_selector": ".job-requirements",
+        "link": "a.job-link"
+      },
+      "crawler": {
+        "fetch_detail": false
       }
     },
     "DataCo": {
@@ -19,9 +23,13 @@
       "selectors": {
         "job_container": "[data-job-id]",
         "title": "h2.title",
-        "description": ".content",
+        "description_selector": ".content",
         "location": ".meta-location",
-        "requirements": ".requirements-list"
+        "requirements_selector": ".requirements-list",
+        "link": "a.job-link"
+      },
+      "crawler": {
+        "fetch_detail": false
       }
     }
   }
