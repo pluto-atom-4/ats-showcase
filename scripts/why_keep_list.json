@@ -240,6 +240,50 @@
     "Negation must fall within 50 chars of the trigger."
   ],
   [
+    "src/poc/scripts/measure_heading_promoter_fp.py",
+    "Ensure src module is importable when run as a script (matches scripts/parity_check.py)"
+  ],
+  [
+    "src/poc/scripts/measure_heading_promoter_fp.py",
+    "Under data/, which .gitignore covers (`data/`), so the generated report is never committed."
+  ],
+  [
+    "src/poc/scripts/measure_heading_promoter_fp.py",
+    "1-based position in the de-duplicated job list"
+  ],
+  [
+    "src/poc/scripts/measure_heading_promoter_fp.py",
+    "section.content[:120]"
+  ],
+  [
+    "src/poc/scripts/measure_heading_promoter_fp.py",
+    "section_type == \"other\" and word_count < MISMATCH_WORD_COUNT_THRESHOLD"
+  ],
+  [
+    "src/poc/scripts/measure_heading_promoter_fp.py",
+    "Explicit entity_ruler registration (required by TechnologyProcessor, D5 decision)"
+  ],
+  [
+    "src/poc/scripts/measure_heading_promoter_fp.py",
+    "Instantiate components once"
+  ],
+  [
+    "src/poc/scripts/measure_heading_promoter_fp.py",
+    "Add pipeline components (all use last=True, D3 decision)"
+  ],
+  [
+    "src/poc/scripts/measure_heading_promoter_fp.py",
+    "(raw, expected normalized value); expected must be one of the 16 phrases"
+  ],
+  [
+    "src/poc/scripts/measure_heading_promoter_fp.py",
+    "Raw strings that must match HeadingPromoter._normalize exactly (not necessarily phrases)"
+  ],
+  [
+    "src/poc/scripts/measure_heading_promoter_fp.py",
+    "Surface the duplicate-drop count from load_and_dedupe_jobs() on stderr"
+  ],
+  [
     "src/poc/skills/extract_skills_a.py",
     "\"Built with Go and gRPC\" names a stack, not a skill phrase: a participle skill verb before \"with\" is dropped."
   ],
