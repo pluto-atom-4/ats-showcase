@@ -259,7 +259,7 @@ class Crawler:
             if req_selector:
                 req_elem = await detail_page.query_selector(req_selector)
                 if req_elem:
-                    # inner_text keeps <li>/<br> line breaks that text_content glues together
+                    # Do not use text_content: it glues <li>/<br> items together, so line splitting fails.
                     req_text = await req_elem.inner_text()
                     lines = [line.strip() for line in req_text.splitlines()]
                     requirements = [line for line in lines if line] or None
