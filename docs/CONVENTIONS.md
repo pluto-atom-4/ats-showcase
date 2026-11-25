@@ -25,50 +25,52 @@
 
 ```
 src/
-├── __init__.py              (empty or version string)
-├── cli.py                   (main entry point, 50-100 lines max)
-├── config.py                (env vars, defaults, validation)
+├── __init__.py        (empty or version string)
+├── cli.py             (main entry point)
+├── assessment/
 ├── browser/
-│   ├── __init__.py
-│   └── crawler.py           (20–30 functions, 300–500 lines)
-├── tokenization/
-│   ├── __init__.py
-│   ├── markitdown.py        (wrapper around MarkItDown)
-│   ├── cleaner.py           (BeautifulSoup post-processing)
-│   ├── nld_processor.py      (spaCy NER entity extraction)
-│   └── counter.py           (tiktoken integration)
-├── verification/
-│   ├── __init__.py
-│   ├── interactive_cli.py    (Typer UI, <200 lines)
-│   └── reviewer.py          (business logic)
+├── config/
+├── formatters/
+├── id_generation/
+├── integrity/
 ├── llm/
-│   ├── __init__.py
-│   ├── claude_client.py      (Anthropic API wrapper)
-│   ├── prompts.py           (templates, no API calls)
-│   └── batch_processor.py    (queueing, cost tracking)
-└── storage/
-    ├── __init__.py
-    ├── db_client.py         (connection pool, transactions)
-    ├── schema.py            (table definitions)
-    ├── queries.py           (common patterns)
-    └── export.py            (markdown + JSON output)
+├── models/
+├── nlp/
+├── parsers/
+├── poc/
+├── preprocessing/
+├── setup/
+├── storage/
+├── tokenization/
+├── tui/
+└── verification/
 
 tests/
 ├── __init__.py
-├── test_browser.py          (mock Playwright, assert selectors)
-├── test_tokenization.py     (mock spaCy, assert token counts)
-├── test_verification.py     (mock CLI input, assert output)
-├── test_llm.py             (mock Claude, assert prompts)
-├── test_storage.py         (in-memory SQLite, assert queries)
-└── conftest.py             (pytest fixtures, mocks)
+├── conftest.py        # Shared fixtures
+├── test_*.py          # Top-level tests
+├── assessment/        # assessment/ module tests
+├── browser/           # browser/ module tests
+├── cli/               # CLI tests
+├── llm/               # llm/ module tests
+├── parsers/           # parsers/ module tests
+├── poc/               # poc/ module tests
+├── preprocessing/     # preprocessing/ module tests
+├── scripts/           # tooling script tests
+├── storage/           # storage/ module tests
+├── tokenization/      # tokenization/ module tests
+└── tui/               # tui/ module tests
 
 .github/
 ├── workflows/
-│   ├── test.yml             (run tests + lint on PR)
-│   ├── deploy.yml           (build Docker on merge to main)
-│   └── codeql.yml           (security scan)
+│   ├── config-validation.yml
+│   ├── context-lint.yml
+│   ├── dependency-review.yml
+│   └── quality-checks.yml
+├── instructions/
+├── ISSUE_TEMPLATE/
 ├── copilot-instructions.md  (quick-start)
-└── PULL_REQUEST_TEMPLATE.md (standard PR format)
+└── dependabot.yml
 ```
 
 ### Naming Conventions
@@ -223,21 +225,7 @@ except asyncio.TimeoutError:
 
 ### Test Structure
 
-```
-tests/
-├── unit/              # No I/O, no external calls
-│   ├── test_tokenizer.py
-│   └── test_db_queries.py
-├── integration/        # Multiple modules, real I/O
-│   ├── test_crawl_and_preprocess.py
-│   └── test_assess_and_store.py
-├── e2e/               # Full workflow, real services
-│   └── test_full_pipeline.py
-└── fixtures/          # Shared mocks and test data
-    ├── raw_jobs.json
-    ├── mock_claude_responses.json
-    └── conftest.py
-```
+Tests live under `tests/`, grouped by area in subdirectories (for example `tests/browser/` and `tests/storage/`), with some top-level `tests/test_*.py` files and shared fixtures in `tests/conftest.py`. See [Project Structure](#project-structure) for the layout.
 
 ### Unit Testing
 
