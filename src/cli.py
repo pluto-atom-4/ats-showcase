@@ -3158,12 +3158,33 @@ def query(
 
 @app.command()
 def stats(
-    show_token_usage: bool = typer.Option(False, help="Show token statistics"),
+    db_path: str = typer.Option("data/ats_playground.db", "--db", help="Path to assessment database"),
+    show_token_usage: bool = typer.Option(False, help="Show token usage and cost breakdown"),
 ) -> None:
-    """Display database and cost statistics."""
-    # TODO(#985): stats not implemented; --show-token-usage is ignored
+    """Display database and cost statistics.
+
+    For v1.0 vs v2.0 preprocessing cost comparisons, use 'cost-analysis' instead.
+    """
     logger.info("Displaying statistics")
+    data = AssessmentStore(db_path).get_stats()
+    total = data.get("total_assessments", 0)
+
     typer.echo("📈 Statistics:")
+    typer.echo(f"   Total assessments: {total}")
+    if total == 0:
+        typer.echo("⚠️  No assessments in database yet. Run 'assess' first.")
+        return
+
+    typer.echo(f"   Average score:     {data['avg_score']:.1f}")
+    typer.echo(f"   Score range:       {data['min_score']:.0f} - {data['max_score']:.0f}")
+
+    if show_token_usage:
+        typer.echo("")
+        typer.echo("💰 Token Usage:")
+        typer.echo(f"   Input tokens:   {data['total_input_tokens']:,}")
+        typer.echo(f"   Output tokens:  {data['total_output_tokens']:,}")
+        typer.echo(f"   Total cost:     ${data['total_cost']:.6f}")
+        typer.echo(f"   Avg cost/job:   ${data['avg_cost']:.6f}")
 
 
 @app.command()
