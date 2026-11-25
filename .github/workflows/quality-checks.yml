@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      core: ${{ steps.diff.outputs.core }}
+      poc: ${{ steps.diff.outputs.poc }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -26,24 +28,46 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          core=true
+          poc=true
           code=true
           if [ "$EVENT_NAME" = "pull_request" ] \
             && [ "$BASE_SHA" != "0000000000000000000000000000000000000000" ] \
-            && changed=$(git diff --name-only "$BASE_SHA..$HEAD_SHA"); then
-            code=false
-            if [ -z "$changed" ]; then
-              code=true
+            && changed=$(git diff --no-renames --name-only "$BASE_SHA..$HEAD_SHA"); then
+            if [ -n "$changed" ]; then
+              core=false
+              poc=false
+              # Case order matters: .github/* must match before *.md, and specific files before tests/* and docs.
+              while IFS= read -r path; do
+                case "$path" in
+                  .github/*|.claude/scripts/*|pyproject.toml|uv.lock|.pre-commit-config.yaml|tests/conftest.py|conftest.py|tests/__init__.py|.python-version|scripts/*)
+                    core=true; poc=true ;;
+                  tests/poc/fixtures/raw_job_description.md)
+                    core=true; poc=true ;;
+                  docs/dev-note/poc/expected_output_schema.json)
+                    poc=true ;;
+                  .claude/hooks/*)
+                    core=true ;;
+                  src/poc/*|src/preprocessing/*|src/id_generation/*|src/parsers/*|src/__init__.py)
+                    core=true; poc=true ;;
+                  tests/poc/*)
+                    poc=true ;;
+                  tests/*)
+                    core=true ;;
+                  *.md|docs/*|LICENSE*|.claude/*) ;;
+                  *)
+                    core=true ;;
+                esac
+              done <<< "$changed"
+              code=false
+              if [ "$core" = true ] || [ "$poc" = true ]; then
+                code=true
+              fi
             fi
-            # .github/* precedes *.md so workflow-adjacent markdown still runs the full pipeline.
-            while IFS= read -r path; do
-              case "$path" in
-                .github/*|.claude/scripts/*) code=true; break ;;
-                *.md|docs/*|LICENSE*|.claude/*) ;;
-                *) code=true; break ;;
-              esac
-            done <<< "$changed"
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "core=$core" >> "$GITHUB_OUTPUT"
+          echo "poc=$poc" >> "$GITHUB_OUTPUT"
 
   quality:
     name: Quality Assurance
