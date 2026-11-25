@@ -868,15 +868,15 @@ Rank │ Company          │ Title                    │ Score │ Tech │ Se
 ### Display Statistics
 
 ```bash
-uv run python -m src.cli stats \
-  --show-token-usage false
+uv run python -m src.cli stats --show-token-usage
 ```
 
 ### Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--show-token-usage` | `false` | Include token usage breakdown |
+| `--db` | `data/ats_playground.db` | Path to assessment database |
+| `--show-token-usage` / `--no-show-token-usage` | `--no-show-token-usage` | Include token usage breakdown |
 
 ---
 
