@@ -230,9 +230,9 @@ class TestIframeHtmlExtraction:
 class TestRequirementsExtraction:
     """Tests for requirements parsing in _fetch_job_detail."""
 
-    async def _fetch_requirements(self, crawler, req_elem):
+    async def _fetch_requirements(self, crawler, req_elems):
         mock_page = AsyncMock()
-        mock_page.query_selector = AsyncMock(return_value=req_elem)
+        mock_page.query_selector_all = AsyncMock(return_value=req_elems)
         mock_page.set_default_timeout = MagicMock()
         crawler.context = MagicMock()
         crawler.context.new_page = AsyncMock(return_value=mock_page)
@@ -252,7 +252,7 @@ class TestRequirementsExtraction:
         """Multi-line inner_text becomes one stripped item per non-blank line."""
         req_elem = self._req_elem("\n  Python 3.11+\n\n  FastAPI\nPostgreSQL\n")
 
-        result = await self._fetch_requirements(crawler, req_elem)
+        result = await self._fetch_requirements(crawler, [req_elem])
 
         assert result == ["Python 3.11+", "FastAPI", "PostgreSQL"]
 
@@ -261,9 +261,40 @@ class TestRequirementsExtraction:
         """A single line stays one item even when it contains commas."""
         req_elem = self._req_elem("5+ years of Python, SQL")
 
-        result = await self._fetch_requirements(crawler, req_elem)
+        result = await self._fetch_requirements(crawler, [req_elem])
 
         assert result == ["5+ years of Python, SQL"]
+
+    @pytest.mark.asyncio
+    async def test_multiple_elements_concatenated_in_page_order(self, crawler):
+        """Lines from every matched element are collected in DOM order."""
+        first = self._req_elem("Python 3.11+\nFastAPI")
+        second = self._req_elem("  PostgreSQL \n\n")
+        third = self._req_elem("Docker")
+
+        result = await self._fetch_requirements(crawler, [first, second, third])
+
+        assert result == ["Python 3.11+", "FastAPI", "PostgreSQL", "Docker"]
+
+    @pytest.mark.asyncio
+    async def test_blank_element_contributes_nothing(self, crawler):
+        """A blank matched element adds no items; the others still count."""
+        blank = self._req_elem("  \n\t\n")
+        filled = self._req_elem("Go\nRust")
+
+        result = await self._fetch_requirements(crawler, [blank, filled])
+
+        assert result == ["Go", "Rust"]
+
+    @pytest.mark.asyncio
+    async def test_commas_within_multiple_elements_not_split(self, crawler):
+        """Commas inside any element never split a line into items."""
+        first = self._req_elem("Python, SQL, Go")
+        second = self._req_elem("Kubernetes, Helm")
+
+        result = await self._fetch_requirements(crawler, [first, second])
+
+        assert result == ["Python, SQL, Go", "Kubernetes, Helm"]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("text", ["", "   \n\t  \n"])
@@ -271,13 +302,20 @@ class TestRequirementsExtraction:
         """Whitespace-only or empty requirements text yields None."""
         req_elem = self._req_elem(text)
 
-        result = await self._fetch_requirements(crawler, req_elem)
+        result = await self._fetch_requirements(crawler, [req_elem])
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_all_blank_elements_return_none(self, crawler):
+        """None only when every matched element is blank."""
+        result = await self._fetch_requirements(crawler, [self._req_elem(""), self._req_elem(" \n ")])
 
         assert result is None
 
     @pytest.mark.asyncio
     async def test_no_matching_element_returns_none(self, crawler):
         """A missing requirements element yields None."""
-        result = await self._fetch_requirements(crawler, None)
+        result = await self._fetch_requirements(crawler, [])
 
         assert result is None
