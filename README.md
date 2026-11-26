@@ -184,7 +184,7 @@ python -m src.setup.validate_nlp_setup
 
 **System design**:
 - [ARCHITECTURE.md](./docs/ARCHITECTURE.md) – System architecture, data flow, modules, scaling
-- [CONVENTIONS.md](./docs/CONVENTIONS.md) – Code style, testing, deployment, best practices
+- [CONVENTIONS.md](./docs/CONVENTIONS.md) – Code style, testing, best practices
 - [COMPATIBILITY.md](./docs/COMPATIBILITY.md) – Troubleshooting, version matrix, setup issues
 
 ## ✨ Features
@@ -443,7 +443,7 @@ Tests cover:
    ```
 7. **Push & open PR**: Include description of changes & testing
 
-See [CONVENTIONS.md](./docs/CONVENTIONS.md) for code style, error handling, and deployment checklist.
+See [CONVENTIONS.md](./docs/CONVENTIONS.md) for code style and error handling.
 
 ## 🐛 Debugging
 

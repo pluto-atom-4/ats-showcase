@@ -38,7 +38,7 @@ STORE / RETRIEVE / EXPORT (SQLite)
 ## Technical References
 
 - **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - System architecture & data flow
-- **[docs/CONVENTIONS.md](./docs/CONVENTIONS.md)** - Code style, testing strategy, deployment
+- **[docs/CONVENTIONS.md](./docs/CONVENTIONS.md)** - Code style, testing strategy
 - **[docs/COMPATIBILITY.md](./docs/COMPATIBILITY.md)** - Python module compatibility, known issues, environment setup
 
 ## Directory Map
@@ -58,7 +58,7 @@ ats-showcase/
 │   ├── VERIFY.md                    (user verification workflow)
 │   ├── ASSESS.md                    (LLM integration & prompts)
 │   ├── STORAGE.md                  (SQLite schema, queries, export)
-│   └── CONVENTIONS.md               (code style, testing, deployment)
+│   └── CONVENTIONS.md               (code style, testing)
 │
 ├── src/                             💻 IMPLEMENTATION
 │   ├── cli.py                       (see: docs/CLI.md)
@@ -105,7 +105,6 @@ ats-showcase/
 ### I'm deploying to production
 - Follow checklist in each phase doc
 - Review `docs/COMPATIBILITY.md` for environment setup (Docker, CI/CD, etc.)
-- Check [docs/CONVENTIONS.md](./docs/CONVENTIONS.md) deployment section
 
 ## Quick Links
 
