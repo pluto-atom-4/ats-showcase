@@ -257,14 +257,7 @@ class Crawler:
 
             req_selector = selectors.get("requirements_selector")
             if req_selector:
-                req_elems = await detail_page.query_selector_all(req_selector)
-                collected: List[str] = []
-                for req_elem in req_elems:
-                    # Do not use text_content: it glues <li>/<br> items together, so line splitting fails.
-                    req_text = await req_elem.inner_text()
-                    lines = [line.strip() for line in (req_text or "").splitlines()]
-                    collected.extend(line for line in lines if line)
-                requirements = collected or None
+                requirements = await self._read_requirements(detail_page, req_selector, job_url)
 
             logger.debug(f"Fetched detail: {len(description)} chars")
             return description, requirements
@@ -278,6 +271,20 @@ class Crawler:
         finally:
             if detail_page:
                 await detail_page.close()
+
+    async def _read_requirements(self, page: Page, req_selector: str, job_url: str) -> Optional[List[str]]:
+        try:
+            req_elems = await page.query_selector_all(req_selector)
+            collected: List[str] = []
+            for req_elem in req_elems:
+                # Do not use text_content: it glues <li>/<br> items together, so line splitting fails.
+                req_text = await req_elem.inner_text()
+                lines = [line.strip() for line in (req_text or "").splitlines()]
+                collected.extend(line for line in lines if line)
+            return collected or None
+        except Exception as e:
+            logger.warning(f"Failed to read requirements for {job_url}: {e}")
+            return None
 
     async def _fetch_iframe_via_frame(self, page: Page, inner_selector: Optional[str] = None) -> str:
         """
