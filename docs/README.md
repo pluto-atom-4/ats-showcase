@@ -104,7 +104,7 @@ ats-showcase/
 
 ### I'm deploying to production
 - Follow checklist in each phase doc
-- Review `docs/COMPATIBILITY.md` for environment setup (Docker, CI/CD, etc.)
+- Review `docs/COMPATIBILITY.md` for environment setup and CI notes
 
 ## Quick Links
 
