@@ -1,4 +1,4 @@
-# CONVENTIONS.md – Code Style, Testing & Deployment
+# CONVENTIONS.md – Code Style & Testing
 
 **Table of Contents**
 - [Code Style Guide](#code-style-guide)
