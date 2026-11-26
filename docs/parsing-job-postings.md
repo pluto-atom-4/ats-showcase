@@ -81,9 +81,18 @@ Selectors come from the `selectors` object of each company entry in `config/comp
 | `link` | No | `.get()` | Job URL from `href`, made absolute with `urljoin` against the company `url`. `url` is `None` if absent. |
 | `description_selector` | No | `.get()`, detail fetch only | Detail-page description. A plain element gives its `inner_html()`. An `<iframe>` goes through the frame path. |
 | `inner_description_selector` | No | `.get()`, detail fetch only | Selector inside the iframe. Used only when `description_selector` matches an iframe. |
-| `requirements_selector` | No | `.get()`, detail fetch only | Detail-page requirements from `text_content()`. See the known issue under Error Handling. |
+| `requirements_selector` | No | `.get()`, detail fetch only | Detail-page requirements. Every match is read; see Requirements below. |
 
 The `description_selector`, `inner_description_selector`, and `requirements_selector` keys are read only when `fetch_detail` is truthy.
+
+### Requirements
+
+`requirements_selector` matches every element on the detail page, not only the first.
+
+- Matched elements are read in DOM order with `inner_text()`. Each text is split on newlines, stripped, and blank lines are dropped.
+- The lines from all elements are flattened into one `List[str]`. Commas are not split.
+- The result is `None` when no line is collected, including when the selector matches nothing or every match is blank.
+- No de-duplication is done. The selector must not match nested elements: a parent and its child would contribute the same lines twice.
 
 ## Cleaning Raw HTML
 
@@ -232,10 +241,6 @@ except Exception as e:
     logger.warning(f"Failed to extract job {i}: {e}")
 ```
 
-### Known Issue: `requirements` Type
-
-When `fetch_detail` is on and `requirements_selector` matches, `_fetch_job_detail` returns a `str`. `JobPosting.requirements` is declared `Optional[List[str]]` (`src/models/job.py`). Pydantic rejects a `str` for that field. The `ValidationError` is caught in `_extract_job_from_container`, which returns `None`, so the job is dropped. This was confirmed offline with pydantic 2 against the same field type. It was not reproduced end-to-end.
-
 ---
 
 ## Performance
@@ -263,7 +268,7 @@ The crawler constructs `JobPosting` (`src/models/job.py`) with these values:
 | `location` | Stripped text of `location` selector, or `"Not specified"` |
 | `url` | Absolute URL from `link`, or `None` |
 | `description` | Detail-page raw HTML (or plain text from the iframe fallback), or `""` when detail fetch is off or fails |
-| `requirements` | Detail-page text, or `None` (see the known issue above) |
+| `requirements` | Flattened detail-page lines from every `requirements_selector` match (see Requirements), or `None` |
 | `salary_min`, `salary_max` | Always `None` |
 | `posted_date` | Always `None` |
 | `status` | `"pending_review"` |
@@ -363,5 +368,4 @@ HTML-to-text conversion is `clean_html()` in `src/parsers/html_to_markdown.py`.
 
 **Known gaps:**
 - Companies are crawled sequentially.
-- `requirements` from the detail page is a `str` but the model expects `List[str]`, so those jobs are dropped.
 - Pagination, salary extraction, and posted-date extraction are not implemented.
