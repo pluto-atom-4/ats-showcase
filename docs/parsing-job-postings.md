@@ -92,6 +92,7 @@ The `description_selector`, `inner_description_selector`, and `requirements_sele
 - Matched elements are read in DOM order with `inner_text()`. Each text is split on newlines, stripped, and blank lines are dropped.
 - The lines from all elements are flattened into one `List[str]`. Commas are not split.
 - The result is `None` when no line is collected, including when the selector matches nothing or every match is blank.
+- If reading any match raises, the result is `None` and a warning is logged. Lines from the other matches are discarded too.
 - No de-duplication is done. The selector must not match nested elements: a parent and its child would contribute the same lines twice.
 
 ## Cleaning Raw HTML
@@ -124,7 +125,7 @@ for each container (stop after max_jobs_debug, if set):
     ├─ no title → return None
     ├─ link = urljoin(url, link) when link is set
     ├─ fetch_detail and link → _fetch_job_detail(link, selectors)
-    │     → (description, requirements); ("", None) on any failure
+    │     → (description, requirements); ("", None) if the page or description read fails; requirements None if the requirements read fails
     ├─ id = generate_job_id(company, title, location or "Not specified", link)
     └─ return JobPosting(status="pending_review", crawled_at=utcnow)
   ↓
@@ -216,7 +217,8 @@ A title count below the container count means some jobs will be dropped, because
 | Zero containers matched | `Found 0 job containers` is logged at info level; the loop does nothing; returns `[]`. |
 | Container has no title | Warning `No title found in container`; the job is dropped. |
 | Any other per-container exception | Warning `Failed to extract job i`; that job is skipped. |
-| Detail fetch fails | `_fetch_job_detail` returns `("", None)`; the job is kept with an empty description. |
+| Detail page fails to load, or the description read raises | `_fetch_job_detail` returns `("", None)`; the job is kept with an empty description and no requirements. |
+| Requirements read raises | `_read_requirements` logs a warning and returns `None`. The description is kept; all requirements are dropped, not a partial list. |
 | Iframe content not found | Returns `""`, so the description is empty. |
 
 The selector wait (`crawler.py:86-91`):
