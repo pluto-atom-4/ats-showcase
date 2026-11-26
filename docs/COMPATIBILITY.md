@@ -619,6 +619,7 @@ The CI setup is defined in [`.github/workflows/quality-checks.yml`](../.github/w
 ## Version Upgrade Paths
 
 ### Upgrading Python 3.12 → 3.13
+3.12 is the pinned version (`.python-version`) and the only version tested in CI. `pyproject.toml` allows 3.13, but CI does not test it, so verify locally after upgrading.
 ```bash
 uv python pin 3.13
 uv sync  # Will recreate environment
