@@ -603,32 +603,8 @@ uv run python -m spacy info
 
 ## Environment-Specific Notes
 
-### Docker / Container
-- Need system deps: `libxml2-dev libxslt-dev python3-dev`
-- Add to Dockerfile:
-```dockerfile
-RUN apt-get install -y libxml2-dev libxslt-dev python3-dev
-```
-
 ### GitHub Actions / CI
-- Use `setup-python@v4` for Python version
-- Cache UV: `actions/setup-python` handles it
-- Example workflow:
-```yaml
-- name: Setup Python
-  uses: actions/setup-python@v4
-  with:
-    python-version: "3.13"
-
-- name: Install UV
-  run: pip install uv
-
-- name: Sync dependencies
-  run: uv sync
-
-- name: Download models
-  run: uv run python -m spacy download en_core_web_md
-```
+The CI setup is defined in [`.github/workflows/quality-checks.yml`](../.github/workflows/quality-checks.yml).
 
 ### macOS (Apple Silicon)
 - Some packages (lxml, tiktoken) may need arm64 builds
@@ -676,24 +652,7 @@ uv sync --upgrade
 
 ## Recommended Configuration for ATS Showcase
 
-```toml
-# pyproject.toml - Optimized for ATS
-[project]
-name = "ats-showcase"
-version = "0.1.0"
-requires-python = "^3.13"
-
-dependencies = [
-    "spacy>=3.8.0,<4.0",            # ✅ Pydantic v2 compatible, 3.13 support
-    "markitdown>=0.1.5,<1.0",        # ✅ Fast HTML→text converter (primary)
-    "beautifulsoup4>=4.12.0,<5.0",   # Fallback HTML parser
-    "lxml>=4.9.0,<5.0",              # BeautifulSoup lxml backend
-    "tiktoken>=0.8.0,<1.0",          # ✅ Token counting
-    "pydantic>=2.5.0,<3.0",          # Data validation
-    "playwright>=1.48.0,<2.0",       # Web crawling
-    "anthropic>=0.25.0,<3.0",        # Claude API
-]
-```
+The Python requirement and dependency ranges are defined in [`pyproject.toml`](../pyproject.toml).
 
 **spaCy Environment Variables** (optional, for advanced use):
 ```bash
