@@ -225,3 +225,59 @@ class TestIframeHtmlExtraction:
 
         mock_frame1.evaluate.assert_called()
         assert substantial_content in result
+
+
+class TestRequirementsExtraction:
+    """Tests for requirements parsing in _fetch_job_detail."""
+
+    async def _fetch_requirements(self, crawler, req_elem):
+        mock_page = AsyncMock()
+        mock_page.query_selector = AsyncMock(return_value=req_elem)
+        mock_page.set_default_timeout = MagicMock()
+        crawler.context = MagicMock()
+        crawler.context.new_page = AsyncMock(return_value=mock_page)
+        selectors = {"requirements_selector": ".requirements"}
+        _, requirements = await crawler._fetch_job_detail("https://example.com/job/1", selectors)
+        return requirements
+
+    @staticmethod
+    def _req_elem(text):
+        req_elem = AsyncMock()
+        req_elem.inner_text = AsyncMock(return_value=text)
+        req_elem.text_content = AsyncMock(return_value=text)
+        return req_elem
+
+    @pytest.mark.asyncio
+    async def test_multiline_inner_text_splits_into_list(self, crawler):
+        """Multi-line inner_text becomes one stripped item per non-blank line."""
+        req_elem = self._req_elem("\n  Python 3.11+\n\n  FastAPI\nPostgreSQL\n")
+
+        result = await self._fetch_requirements(crawler, req_elem)
+
+        assert result == ["Python 3.11+", "FastAPI", "PostgreSQL"]
+
+    @pytest.mark.asyncio
+    async def test_single_line_is_not_comma_split(self, crawler):
+        """A single line stays one item even when it contains commas."""
+        req_elem = self._req_elem("5+ years of Python, SQL")
+
+        result = await self._fetch_requirements(crawler, req_elem)
+
+        assert result == ["5+ years of Python, SQL"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("text", ["", "   \n\t  \n"])
+    async def test_blank_text_returns_none(self, crawler, text):
+        """Whitespace-only or empty requirements text yields None."""
+        req_elem = self._req_elem(text)
+
+        result = await self._fetch_requirements(crawler, req_elem)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_no_matching_element_returns_none(self, crawler):
+        """A missing requirements element yields None."""
+        result = await self._fetch_requirements(crawler, None)
+
+        assert result is None
