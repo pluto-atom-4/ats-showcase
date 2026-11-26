@@ -319,3 +319,24 @@ class TestRequirementsExtraction:
         result = await self._fetch_requirements(crawler, [])
 
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_requirements_error_keeps_description(self, crawler):
+        """A requirements read failure must not discard the already-extracted description."""
+        mock_page = AsyncMock()
+        desc_elem = AsyncMock()
+        desc_elem.evaluate = AsyncMock(return_value="div")
+        desc_elem.inner_html = AsyncMock(return_value="<p>Job description</p>")
+        mock_page.query_selector = AsyncMock(return_value=desc_elem)
+        bad_elem = self._req_elem("ignored")
+        bad_elem.inner_text = AsyncMock(side_effect=RuntimeError("detached element"))
+        mock_page.query_selector_all = AsyncMock(return_value=[bad_elem])
+        mock_page.set_default_timeout = MagicMock()
+        crawler.context = MagicMock()
+        crawler.context.new_page = AsyncMock(return_value=mock_page)
+        selectors = {"description_selector": ".desc", "requirements_selector": ".requirements"}
+
+        description, requirements = await crawler._fetch_job_detail("https://example.com/job/1", selectors)
+
+        assert description == "<p>Job description</p>"
+        assert requirements is None
