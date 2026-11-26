@@ -231,7 +231,7 @@ The preprocessing phase uses consolidated `clean_html()` function with 70+ pre-c
 
 **Deprecation Notice:** `HTMLCleaner` class deprecated (v2.0 removal planned); use `clean_html()` instead.
 
-**See also:** [docs/CLI.md#preprocessing--boilerplate-removal](./docs/CLI.md#preprocessing--boilerplate-removal) for configuration examples.
+**See also:** [docs/CLI.md#preprocessing--boilerplate-removal-issue-230--231](./docs/CLI.md#preprocessing--boilerplate-removal-issue-230--231) for configuration examples.
 
 ## 📋 Requirements
 
