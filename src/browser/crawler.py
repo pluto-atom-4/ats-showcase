@@ -257,12 +257,14 @@ class Crawler:
 
             req_selector = selectors.get("requirements_selector")
             if req_selector:
-                req_elem = await detail_page.query_selector(req_selector)
-                if req_elem:
+                req_elems = await detail_page.query_selector_all(req_selector)
+                collected: List[str] = []
+                for req_elem in req_elems:
                     # Do not use text_content: it glues <li>/<br> items together, so line splitting fails.
                     req_text = await req_elem.inner_text()
-                    lines = [line.strip() for line in req_text.splitlines()]
-                    requirements = [line for line in lines if line] or None
+                    lines = [line.strip() for line in (req_text or "").splitlines()]
+                    collected.extend(line for line in lines if line)
+                requirements = collected or None
 
             logger.debug(f"Fetched detail: {len(description)} chars")
             return description, requirements
