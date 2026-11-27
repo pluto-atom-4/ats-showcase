@@ -69,6 +69,7 @@ from src.poc.tweak.spacy_pipeline import (
     HTMLPreprocessor,
     MarkdownPolisher,
     RequirementProcessor,
+    SectionClassifierComponent,
     SkillProcessor,
     TechnologyProcessor,
 )
@@ -277,6 +278,7 @@ def process_job(
     req_processor: RequirementProcessor,
     skill_processor: SkillProcessor,
     tech_processor: TechnologyProcessor,
+    section_classifier: SectionClassifierComponent,
     description_selector: Optional[str] = None,
     description_match: str = "first",
     heading_promoter: Optional[HeadingPromoter] = None,
@@ -315,6 +317,7 @@ def process_job(
         req_processor: RequirementProcessor instance
         skill_processor: SkillProcessor instance
         tech_processor: TechnologyProcessor instance
+        section_classifier: SectionClassifierComponent instance applied to each job's doc (built once per batch)
         description_selector: Optional CSS selector to scope HTML fragment before processing
         description_match: Strategy for multi-match selection: "first", "all", or "longest"
                           (default "first"). Invalid values treated as "first" with warning.
@@ -545,9 +548,6 @@ def process_job(
         # SectionClassifierComponent reads doc._.sections, so populate it from the ruler output.
         doc._.sections = sections
 
-        from src.poc.tweak.spacy_pipeline import SectionClassifierComponent
-
-        section_classifier = SectionClassifierComponent(nlp, "section_classifier")
         doc = section_classifier(doc)
 
         try:
@@ -590,6 +590,36 @@ def process_job(
         result.requirements, result.skills, result.technologies = pre_fallback_lists
         result.extraction_outcome = pre_fallback_outcome
     return result
+
+
+_BASE_NLP_CACHE: Dict[str, spacy.language.Language] = {}
+
+
+def _get_cached_base_nlp(
+    enable_poc_sentence_splitter: bool, model_name: str = "en_core_web_md"
+) -> spacy.language.Language:
+    nlp = _BASE_NLP_CACHE.get(model_name)
+    if nlp is None:
+        try:
+            nlp = spacy.load(model_name)
+        except OSError as e:
+            raise OSError(
+                f"Failed to load spaCy model '{model_name}': {e}. Run: uv run python -m spacy download {model_name}"
+            ) from e
+        _BASE_NLP_CACHE[model_name] = nlp
+
+    # Shared across calls: drop pipe state from earlier calls so patterns and the splitter do not leak.
+    if "entity_ruler" in nlp.pipe_names:
+        nlp.remove_pipe("entity_ruler")
+    # Explicit entity_ruler registration (required by TechnologyProcessor, D5 decision).
+    nlp.add_pipe("entity_ruler", before="ner")
+
+    if "poc_sentence_splitter" in nlp.pipe_names:
+        nlp.remove_pipe("poc_sentence_splitter")
+    # Sentence splitter (Issue #643); default-on, disable with --no-poc-sentences
+    if enable_poc_sentence_splitter:
+        nlp.add_pipe("poc_sentence_splitter")
+    return nlp
 
 
 def run_batch(
@@ -647,20 +677,7 @@ def run_batch(
     """
     jobs = load_jobs(input_path)
 
-    try:
-        nlp = spacy.load("en_core_web_md")
-    except OSError as e:
-        raise OSError(
-            f"Failed to load spaCy model 'en_core_web_md': {e}. Run: uv run python -m spacy download en_core_web_md"
-        ) from e
-
-    # Explicit entity_ruler registration (required by TechnologyProcessor, D5 decision).
-    if "entity_ruler" not in nlp.pipe_names:
-        nlp.add_pipe("entity_ruler", before="ner")
-
-    # Sentence splitter (Issue #643); default-on, disable with --no-poc-sentences
-    if enable_poc_sentence_splitter and "poc_sentence_splitter" not in nlp.pipe_names:
-        nlp.add_pipe("poc_sentence_splitter")
+    nlp = _get_cached_base_nlp(enable_poc_sentence_splitter)
 
     # Load technology patterns into entity_ruler (Issue #321 fix)
     ruler = nlp.get_pipe("entity_ruler")
@@ -673,6 +690,7 @@ def run_batch(
     heading_promoter = HeadingPromoter() if promote_headings else None
     markdown_ruler = MarkdownSpanRuler(nlp)
     classifier = SectionClassifier()
+    section_classifier = SectionClassifierComponent(nlp, "section_classifier")
 
     req_processor = RequirementProcessor(nlp, "requirement_processor")
     skill_processor = SkillProcessor(nlp, "skill_processor")
@@ -704,6 +722,7 @@ def run_batch(
             req_processor=req_processor,
             skill_processor=skill_processor,
             tech_processor=tech_processor,
+            section_classifier=section_classifier,
             description_selector=job_selector,
             description_match=job_match,
             heading_promoter=heading_promoter,

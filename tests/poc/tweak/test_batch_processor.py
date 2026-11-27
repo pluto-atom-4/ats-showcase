@@ -1605,6 +1605,29 @@ class TestBatchSentences:
         assert all("poc_sentence_splitter" not in names for names in seen_pipes)
         assert all(result.sentences == [] for result in off_results)
 
+    def test_entity_ruler_pattern_count_same_across_consecutive_run_batch_calls(self, monkeypatch):
+        """Shared base nlp: each run_batch() sees the same entity_ruler pattern count, not an accumulated one."""
+        import src.poc.tweak.batch_processor as bp
+
+        pattern_counts: list = []
+        original_process_job = bp.process_job
+
+        def recording_process_job(job, **kwargs):
+            pattern_counts.append(len(kwargs["nlp"].get_pipe("entity_ruler").patterns))
+            return original_process_job(job, **kwargs)
+
+        monkeypatch.setattr(bp, "process_job", recording_process_job)
+
+        run_batch(str(FIXTURE_PATH))
+        first_run = list(pattern_counts)
+        pattern_counts.clear()
+        run_batch(str(FIXTURE_PATH))
+        second_run = list(pattern_counts)
+
+        assert first_run, "process_job was not invoked"
+        assert first_run == second_run
+        assert min(second_run) > 0
+
     def test_cli_no_poc_sentences_leaves_sentences_empty(self, tmp_path):
         """--no-poc-sentences yields empty sentences for every job in the JSON export."""
         out_file = tmp_path / "out_off.json"
@@ -2005,9 +2028,7 @@ class TestExtractionOutcomeWiring:
 
 def _process_job_kwargs() -> dict:
     """Collaborators for process_job, built the same way run_batch builds them (Issue #738, W1)."""
-    import spacy
-
-    from src.poc.tweak.batch_processor import TechnologyProcessor
+    from src.poc.tweak.batch_processor import TechnologyProcessor, _get_cached_base_nlp
     from src.poc.tweak.markdown_section_classifier import SectionClassifier
     from src.poc.tweak.multi_line_paragraph import MarkdownSpanRuler
     from src.poc.tweak.spacy_pipeline import (
@@ -2015,14 +2036,11 @@ def _process_job_kwargs() -> dict:
         HTMLPreprocessor,
         MarkdownPolisher,
         RequirementProcessor,
+        SectionClassifierComponent,
         SkillProcessor,
     )
 
-    nlp = spacy.load("en_core_web_md")
-    if "entity_ruler" not in nlp.pipe_names:
-        nlp.add_pipe("entity_ruler", before="ner")
-    if "poc_sentence_splitter" not in nlp.pipe_names:
-        nlp.add_pipe("poc_sentence_splitter")
+    nlp = _get_cached_base_nlp(enable_poc_sentence_splitter=True)
     nlp.get_pipe("entity_ruler").add_patterns(TechnologyProcessor.generate_tech_patterns())  # type: ignore
 
     return {
@@ -2035,6 +2053,7 @@ def _process_job_kwargs() -> dict:
         "req_processor": RequirementProcessor(nlp, "requirement_processor"),
         "skill_processor": SkillProcessor(nlp, "skill_processor"),
         "tech_processor": TechnologyProcessor(nlp, "technology_processor"),
+        "section_classifier": SectionClassifierComponent(nlp, "section_classifier"),
     }
 
 

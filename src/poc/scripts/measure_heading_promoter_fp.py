@@ -46,6 +46,7 @@ from src.poc.tweak.spacy_pipeline import (  # noqa: E402
     HTMLPreprocessor,
     MarkdownPolisher,
     RequirementProcessor,
+    SectionClassifierComponent,
     SkillProcessor,
     TechnologyProcessor,
 )
@@ -137,7 +138,7 @@ class JobDelta:
 
 def build_components(nlp: Any) -> dict[str, Any]:
     """Build and return the shared preprocessor/converter/polisher/classifier/ruler/
-    req_processor/skill_processor/tech_processor objects exactly as
+    req_processor/skill_processor/tech_processor/section_classifier objects exactly as
     batch_processor.run_batch() does (copy that block). heading_promoter is excluded
     here: it is built separately per before/after call in run_before_after().
 
@@ -167,6 +168,7 @@ def build_components(nlp: Any) -> dict[str, Any]:
     req_processor = RequirementProcessor(nlp, "requirement_processor")
     skill_processor = SkillProcessor(nlp, "skill_processor")
     tech_processor = TechnologyProcessor(nlp, "technology_processor")
+    section_classifier = SectionClassifierComponent(nlp, "section_classifier")
 
     return {
         "preprocessor": preprocessor,
@@ -177,6 +179,7 @@ def build_components(nlp: Any) -> dict[str, Any]:
         "req_processor": req_processor,
         "skill_processor": skill_processor,
         "tech_processor": tech_processor,
+        "section_classifier": section_classifier,
     }
 
 
@@ -200,6 +203,7 @@ def run_before_after(job: dict[str, Any], nlp: Any, components: dict[str, Any]) 
         req_processor=components["req_processor"],
         skill_processor=components["skill_processor"],
         tech_processor=components["tech_processor"],
+        section_classifier=components["section_classifier"],
         heading_promoter=before_promoter,
     )
     result_after = process_job(
@@ -213,6 +217,7 @@ def run_before_after(job: dict[str, Any], nlp: Any, components: dict[str, Any]) 
         req_processor=components["req_processor"],
         skill_processor=components["skill_processor"],
         tech_processor=components["tech_processor"],
+        section_classifier=components["section_classifier"],
         heading_promoter=after_promoter,
     )
     return result_before, result_after
